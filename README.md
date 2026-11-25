@@ -4,9 +4,12 @@
 
 # Mork
 
+[![CI](https://github.com/AndreiIlie/mork/actions/workflows/ci.yml/badge.svg)](https://github.com/AndreiIlie/mork/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 **Local Rust orchestrator for parallel Claude, Codex, and Gemini CLI workflows.**
 
-Website: [https://mork.sh](https://mork.sh)
+Website: [https://mork.sh](https://mork.sh) · [Architecture](ARCHITECTURE.md) · [Security Model](SECURITY.md)
 
 Mork drives the coding CLIs you already pay for (Claude Code, OpenAI Codex, Gemini) through a deterministic Rust state machine (~89k LOC Rust across 8 crates, ~5.5k LOC React/TypeScript). Each work card runs in its own git clone inside a Linux Bubblewrap + Landlock sandbox, gets audited by fresh read-only reviewers from a different model family with zero builder chat history, and lands through a serialized merge queue after checks and tests pass.
 

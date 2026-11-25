@@ -35,6 +35,11 @@ jobs:
       - name: Run workspace checks (fmt, clippy, crate graph, audits)
         run: cargo xtask check
 
+      - name: Configure git identity for tests
+        run: |
+          git config --global user.name "Mork CI"
+          git config --global user.email "ci@mork.sh"
+
       - name: Run workspace test suite
         env:
           FACTORY_UNWALLED: "1"
