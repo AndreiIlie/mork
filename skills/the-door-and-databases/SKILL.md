@@ -42,6 +42,7 @@ JSON
 
    Every target takes any read its login may run, as written, with no table list, except `information_schema` and the `sys` schema: one `SELECT`, `WITH`, `TABLE`, `VALUES`, `SHOW`, `DESCRIBE` or `EXPLAIN`, escaped and multiline strings, optimizer hints and executable comments included.
    A write under `EXPLAIN` stays unmeasured.
+   When a target sets `schema_hint`, `door.help <target>` and any schema refusal show where its schema is documented and what to inspect instead.
    The session is read-only on the server.
    Backslash escapes and multiline literals use a consistent connection mode; hints cannot change that mode or the row cap, or lift the time limit.
    The server ends a read at the target's timeout, and kills it when its call ends early: if your `factory ctl door` is killed (a tool's own timeout) or your turn is cut, its query goes with it, so keep a long read's wait alive (run it in the background).
@@ -60,7 +61,7 @@ JSON
 Keys such as `$where`, `$function` and `$accumulator` inside literal documents and values are data.
 Projection, sort and document/byte/time bounds apply.
 
-`file.get` copies one file under a target's named root, bytes intact, into your seat's `io/` folder (`FACTORY_IO`), up to 20 MB, with `file.cat`'s guards and no ask: `factory ctl door --target production --op file.get --params '{"root": "upload", "path": "ap_<idAssociation>/docs/<n>/bills/<id>.pdf"}'` answers `file`, its path, and `size`.
+`file.get` copies one file under a target's named root, bytes intact, into your seat's `io/` folder (`FACTORY_IO`), up to 20 MB, with `file.cat`'s guards and no ask: `factory ctl door --target production --op file.get --params '{"root": "uploads", "path": "reports/<year>/<id>.pdf"}'` answers `file`, its path, and `size`.
 Read it there with your own tools (`pdftotext`, `unzip`).
 `door.help` lists the file roots; build the path under a root from the database.
 

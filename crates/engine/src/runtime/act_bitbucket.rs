@@ -141,7 +141,7 @@ pub fn run(c: &Call) -> Result<Value, ActionFailure> {
             check(c, body, "the reply on the PR")?;
             calls::reply(&repo(&c.project(&k.project)?)?, *pr, *comment, body)
         }
-        // Nothing of ours is sent: the comment's id alone, its thread resolved as review-bot posted it.
+        // Nothing of ours is sent: the comment's id alone, its thread resolved as the review bot posted it.
         ActionWhat::ResolveComment { pr, comment, .. } => {
             let k = c.card()?;
             calls::resolve(&repo(&c.project(&k.project)?)?, *pr, *comment)

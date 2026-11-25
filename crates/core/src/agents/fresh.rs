@@ -10,12 +10,12 @@ use crate::messages::places::{self, MAIN};
 use crate::post::Poster;
 use crate::state::{Change, State};
 
-/// `fresh <agent>`: a key (`hf-550/foreman`), or a name for main's agent (`echo`), whoever
+/// `fresh <agent>`: a key (`ex-550/foreman`), or a name for main's agent (`echo`), whoever
 /// sends it (3.6.3). A turn running ends in the old session; the next starts the new one.
 pub(super) fn fresh(state: &State, from: &Sender, name: &str, ctx: Ctx<'_>) -> Decision {
     let name = name.trim();
     if name.is_empty() {
-        return Decision::refused("name the agent: `fresh hf-550/foreman`");
+        return Decision::refused("name the agent: `fresh ex-550/foreman`");
     }
     let key = if name.contains('/') { AgentKey::new(name) } else { AgentKey::new(format!("{MAIN}/{name}")) };
     let Some(agent) = state.agents.get(&key) else {

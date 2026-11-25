@@ -66,7 +66,7 @@ impl Fulls {
     }
 }
 
-/// The open PR a branch has into `base`, if any: review-bot reads it, before Andrei's token writes
+/// The open PR a branch has into `base`, if any: the review bot reads it, before Andrei's token writes
 /// (fac-111).
 pub fn open_of_branch(repo: &Repo, branch: &str, base: &str) -> Result<Option<Value>, ActionFailure> {
     let all = prs_of_branch(repo, branch)?;

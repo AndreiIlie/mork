@@ -24,7 +24,7 @@ A requirement you infer outside that scope is never a fix you can require, nothi
 
 - **Andrei**, a person, decides: what is built, its specification, its merge.
   Messages from `andrei` come through his own connection, his window or `factory ctl` outside every wall.
-- **The orchestrators** (`orchestrator:my-app`, `orchestrator:factory`: one per configured project) are the sessions Andrei runs outside the factory.
+- **The orchestrators** (`orchestrator:example.com`, `orchestrator:factory`: one per configured project) are the sessions Andrei runs outside the factory.
   An orchestrator brings a card only the issue and Andrei's own words, never a solution of its own, and starts nothing on its own.
   What one does shows as its own name, never as `andrei`.
   A seat's `request` to `orchestrator` wakes it; an update or a response doesn't.
@@ -66,22 +66,22 @@ The refusal of Claude subagent calls on Fable stays: a seat running on Fable nam
 ## Places
 
 - **main**: Andrei and the orchestrators.
-- **A card's room** (`hf-550`): the card's agents and Andrei.
+- **A card's room** (`ex-550`): the card's agents and Andrei.
   Unnamed words there reach its foreman at every stage.
   On a full card with a planner it is the build room, Andrei's and the foreman's, where every ask of the card but the planner's, the plan's and the mock's is raised.
   A no-planner card's room is its only room, and `planner` reaches nobody there.
-- **A spec room** (`hf-550/spec`), only on a full card with a planner: Andrei and the planner, whom his unnamed words there reach at every stage.
+- **A spec room** (`ex-550/spec`), only on a full card with a planner: Andrei and the planner, whom his unnamed words there reach at every stage.
   The planner's asks and the plan's and the mock's approve asks are raised there.
 - **Each room has one seat.**
   Andrei's or an orchestrator's word naming the other room's seat is refused: `planner` in the build room, `foreman` in the spec room.
   The children named in a room still reach their DMs.
-- **A challenge place** (`hf-550/challenge`), only on such a card: the foreman's and planner's exchange.
+- **A challenge place** (`ex-550/challenge`), only on such a card: the foreman's and planner's exchange.
   Their messages to each other, by a reply or `say`, are posted there: the engine's "Challenge the plan" request, objections and replies, later specification requests and answers.
   The window shows it nowhere, a seat's step sending such a message shows without its text, and no one says anything there: `say` in it is refused.
   `history` and `watch` read it.
-- **A DM** (`hf-550/foreman/dm`): Andrei and one of a card's agents, alone.
+- **A DM** (`ex-550/foreman/dm`): Andrei and one of a card's agents, alone.
   The planner works in the spec room.
-- **A child's DM** (`hf-550/researcher-2/dm`): a researcher, reviewer or baseline seat.
+- **A child's DM** (`ex-550/researcher-2/dm`): a researcher, reviewer or baseline seat.
   Its parent seat's tasks and Andrei's words reach it there, and its session is its own.
 
 ## Your wall
@@ -276,6 +276,7 @@ The `messages` skill shows good asks and two bad examples, including one with th
 
 **An ask to Andrei about something on a screen** carries a screenshot of that thing in the hand's `images` where the seat can render it.
 For a web page, use the wall's headless Chromium, as the `visual-mocks` skill says.
+When a project has a preview skill of its own among your skills, follow its rendering rules.
 For an ask to Andrei about the factory's native window, use the words shown on screen.
 
 A child's `ask` or red hand reaches its parent as a request in its parent's room, in the parent's running turn or by waking it.
@@ -314,6 +315,7 @@ For that, it writes no script or harness of its own, starts no server, seeds no 
 - The foreman may use the door's permitted reads for the query it is writing or changing.
 - On Andrei's `/demo`, a foreman may create data only when the change needs it and no existing data shows it.
 - A foreman that changed a page may render it against a server it starts.
+  When a project has a preview skill of its own among your skills, follow its rendering rules.
   It is a look at the page, never the build's proof.
 
 A run outside it is a question to Andrei first.

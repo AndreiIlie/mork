@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Color } from "./types";
+import type { Color, HandView } from "./types";
 
 // The one place the card carries colour: its header's pill, in the hand's colour.
 const PILL: Record<Color, string> = {
@@ -8,6 +8,11 @@ const PILL: Record<Color, string> = {
   green: "bg-gray-500",
   grey: "bg-gray-500",
 };
+
+/** The colour a hand's label shows: grey once sent to an orchestrator, no longer waiting on Andrei. */
+export function labelColor(hand: HandView): Color {
+  return hand.given ? "grey" : hand.color;
+}
 
 /** One open ask in the Raised Hands dock: a monochrome surface, its colour only in the header's pill. */
 export function HandCard({

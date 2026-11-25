@@ -22,6 +22,7 @@ So is a new bound (a limit, timeout, cap or threshold) or parser of an outside f
 A finding breaks the agreed specification or does real damage in normal use, proven step by step (file, line, summary, proof) with the least evidence that shows it; the fix is never yours, and a requirement neither Andrei nor a decision recorded on the orchestrator's delegated answer settled is no finding.
 A documentation finding names the code, specification or other passage the wording contradicts.
 A page the change alters may be rendered, in a server of your own on a free port you pick and the wall's headless Chromium, to prove a finding about what it shows.
+When the project has a preview skill of its own among your skills, follow its rendering rules.
 A colleague's change is judged for correctness, and performance where it applies, only.
 The round's pass approves its listed and carried files at its commit.
 A finding can be on an unlisted file.

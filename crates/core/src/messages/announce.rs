@@ -254,11 +254,6 @@ pub(crate) fn brief_approved(p: &mut Poster<'_>, card: &CardId, brief: &str) {
     to_card(p, card, &format!("{card}{APPROVED_HEADLINE}"), &text);
 }
 
-/// Whether a message announces this card's approved specification, in any of its places.
-pub(crate) fn is_approval(m: &Message, card: &CardId) -> bool {
-    is(m) && m.headline.strip_suffix(APPROVED_HEADLINE) == Some(card.as_str())
-}
-
 /// The approval sentence from the card's room, where the foreman already holds the plan (fac-622).
 pub(crate) fn approval_lead(m: &Message) -> Option<&str> {
     if !is(m) || m.headline.strip_suffix(APPROVED_HEADLINE) != Some(m.place.as_str()) {

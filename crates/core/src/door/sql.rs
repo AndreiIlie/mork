@@ -8,9 +8,9 @@ use super::lex::{Tok, Token, fragment, tokens};
 // The words a read begins with; a leading `(` is a SELECT's too.
 const LEADS: &[&str] = &["SELECT", "WITH", "TABLE", "VALUES", "SHOW", "DESCRIBE", "DESC", "EXPLAIN"];
 
-/// Why a read of `information_schema` or `sys` is refused (fac-183): the scan opens every
-/// database's tables and can OOM-kill a shared replica.
-pub(super) const SCHEMA_REFUSED: &str = "refused: information_schema and sys scans open every database's tables and can OOM-kill the replica. Read schema files in the repository or inspect one database directly with SHOW TABLES FROM <db> and DESCRIBE <db>.<table>.";
+/// Why a read of `information_schema` or `sys` is refused (fac-183, fac-721): scanning them opens
+/// every database's tables and can overload or crash the server.
+pub(super) const SCHEMA_REFUSED: &str = "refused: reading information_schema or the sys schema is not allowed because it scans metadata across every database on the server.";
 
 // Reserved words can be identifiers after a period or function names before `(`.
 const WRITES: &[&str] = &["INSERT", "UPDATE", "DELETE", "REPLACE"];

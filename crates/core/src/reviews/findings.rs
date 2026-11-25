@@ -149,7 +149,7 @@ pub(super) fn reply_declined(p: &mut Poster<'_>, c: &Card, comment: u64, ctx: Ct
 // It names nobody, as nothing posted on a PR does.
 const DECLINED: &str = "Andrei declined this finding.";
 
-// Its comment's thread resolved on its PR, review-bot's as its comment was.
+// Its comment's thread resolved on its PR, the review bot's as its comment was.
 pub(super) fn thread(p: &mut Poster<'_>, c: &Card, comment: u64, ctx: Ctx<'_>) {
     let Some(pr) = c.pr else { return };
     let repo = crate::queue::pr::repo_of(c, ctx.config);

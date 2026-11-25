@@ -258,7 +258,7 @@ fn write_new(c: &Call, project: &str, file: &str, text: &str) -> Result<Value, A
     Ok(json!({"id": id_of(file), "file": file}))
 }
 
-/// A new card's id, from its file's name (`tasks/HF-12 - Title.md`).
+/// A new card's id, from its file's name (`tasks/EX-12 - Title.md`).
 pub fn id_of(file: &str) -> String {
     file.rsplit('/').next().and_then(|n| n.split(" - ").next()).unwrap_or("").to_owned()
 }

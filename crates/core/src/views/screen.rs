@@ -66,7 +66,7 @@ fn grouped<'a>(state: &'a State, ctx: Ctx<'_>) -> Vec<(Under, &'a Card)> {
         .into_iter()
         .map(|c| {
             let mut u = under(state, c);
-            u.detail = state.cards.get(&u.card).map(|h| detail(state, h)).unwrap_or_default();
+            u.detail = state.cards.get(&u.card).map(|h| detail(state, h, ctx.config)).unwrap_or_default();
             (u, c)
         })
         .collect();
@@ -87,9 +87,12 @@ fn grouped<'a>(state: &'a State, ctx: Ctx<'_>) -> Vec<(Under, &'a Card)> {
     out
 }
 
-// A card's PR and work-item tasks beside its id in the rooms column (fac-362).
-fn detail(state: &State, c: &Card) -> String {
-    let tasks = crate::board::tickets::own(state, c).iter().map(u64::to_string).collect::<Vec<_>>();
+// A ticketed project's card PR and DevOps tasks beside its id in the rooms column (fac-362).
+fn detail(state: &State, c: &Card, config: &factory_types::config::Config) -> String {
+    if !crate::board::tickets::has_tickets(config, &c.project) {
+        return String::new();
+    }
+    let tasks = crate::board::tickets::own(state, c, config).iter().map(u64::to_string).collect::<Vec<_>>();
     let pr = c.pr.map(|n| format!("PR {n}"));
     let devops = (!tasks.is_empty()).then(|| format!("DevOps {}", tasks.join(" ")));
     [pr, devops].into_iter().flatten().collect::<Vec<_>>().join(" ")

@@ -26,21 +26,21 @@ pub fn repo_of(c: &Card, config: &Config) -> String {
 // The most words a PR's title keeps of the card's.
 const TITLE_WORDS: usize = 6;
 
-pub(crate) fn title_words(state: &State, c: &Card) -> String {
+pub(crate) fn title_words(state: &State, c: &Card, config: &Config) -> String {
     let title = state.board.get(&c.id).map_or(c.title.clone(), |b| b.title.clone());
     let lead = title.split(':').next().filter(|l| !l.trim().is_empty()).unwrap_or(&title);
     let is_ticket =
         |w: &&str| w.strip_prefix('#').is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
-    let own = !crate::board::tickets::own(state, c).is_empty();
+    let own = !crate::board::tickets::own(state, c, config).is_empty();
     let words: Vec<&str> = lead.split_whitespace().skip_while(|w| own && is_ticket(w)).take(TITLE_WORDS).collect();
     words.join(" ").trim_end_matches(|ch: char| !ch.is_alphanumeric()).to_owned()
 }
 
-/// A card's PR title: its board title cut at its first colon, a few words, no card id (fac-111); a ticketed card's
+/// A card's PR title: its board title cut at its first colon, a few words, no card id (fac-111); a ticketed project's
 /// starts with its tickets, then its foreman's uncropped `PR wording` summary when it has one (fac-296).
-pub fn pr_title(state: &State, c: &Card) -> String {
-    let words = crate::board::tickets::summary(state, c).unwrap_or_else(|| title_words(state, c));
-    let tickets: Vec<String> = crate::board::tickets::of(state, c).iter().map(|n| format!("#{n}")).collect();
+pub fn pr_title(state: &State, c: &Card, config: &Config) -> String {
+    let words = crate::board::tickets::summary(state, c, config).unwrap_or_else(|| title_words(state, c, config));
+    let tickets: Vec<String> = crate::board::tickets::of(state, c, config).iter().map(|n| format!("#{n}")).collect();
     if tickets.is_empty() { words } else { format!("{} {words}", tickets.join(" ")).trim_end().to_owned() }
 }
 
@@ -52,7 +52,7 @@ pub(super) fn published(c: &Card, commit: &Sha) -> bool {
 }
 
 /// The card's head pushed: its PR opens, or the merge goes on with the PR it has.
-pub fn pushed(p: &mut Poster<'_>, mut c: Card, commit: &Sha) {
+pub fn pushed(p: &mut Poster<'_>, mut c: Card, commit: &Sha, config: &Config) {
     if c.pushed.as_ref().is_some_and(|old| old != commit) {
         c.previous_push = c.pushed.clone();
         c.gates.approved = None;
@@ -67,12 +67,12 @@ pub fn pushed(p: &mut Poster<'_>, mut c: Card, commit: &Sha) {
         return;
     }
     let branch = c.branch.clone().unwrap_or_else(|| id.as_str().to_owned());
-    let (title, description) = (pr_title(p.state, &c), crate::board::tickets::description(p.state, &c));
+    let (title, description) = (pr_title(p.state, &c, config), crate::board::tickets::description(p.state, &c, config));
     let what = ActionWhat::OpenPr { card: id, project: c.project.clone(), branch, title, description, pr: c.pr };
     // Published again: the card's own PR takes the title as it is now, as a new opening naming it,
     // then waits again.
     let opening = p.act_as(what, c.pr.is_some());
-    hold(p, &opening);
+    hold(p, &opening, config);
 }
 
 /// The PR opened, in Andrei's name: it waits for his approval.
@@ -175,24 +175,24 @@ fn calling(p: &Poster<'_>, id: &CardId) -> bool {
 /// Why a PR the leak or internals check refused is held: its title's words.
 pub fn held_words(words: &str) -> String {
     format!(
-        "{words}: for a ticketed card, change the card's `PR wording` note with card.change --note; otherwise change its board title with card.change --title; then /action.retry"
+        "{words}: on a project with tickets configured, change the card's `PR wording` note with card.change --note; otherwise change its board title with card.change --title; then /action.retry"
     )
 }
 
 // Why a PR opening can't go yet: its card's `PR wording` note is missing or incomplete (fac-296).
-fn unworded(state: &State, a: &Action) -> Option<String> {
+fn unworded(state: &State, a: &Action, config: &Config) -> Option<String> {
     let ActionWhat::OpenPr { card, .. } = &a.what else { return None };
-    state.cards.get(card).and_then(|c| crate::board::tickets::unworded(state, c))
+    state.cards.get(card).and_then(|c| crate::board::tickets::unworded(state, c, config))
 }
 
 // A PR opening just made is held when its wording is incomplete, with what to write (fac-296);
 // nothing runs it before.
-fn hold(p: &mut Poster<'_>, id: &factory_types::ActionId) {
+fn hold(p: &mut Poster<'_>, id: &factory_types::ActionId, config: &Config) {
     let a = p
         .all_actions()
         .find(|a| &a.id == id && matches!(a.status, ActionStatus::Pending | ActionStatus::Held))
         .cloned();
-    if let Some((a, why)) = a.and_then(|a| unworded(p.state, &a).map(|why| (a, why))) {
+    if let Some((a, why)) = a.and_then(|a| unworded(p.state, &a, config).map(|why| (a, why))) {
         held(p, a, &why);
     }
 }
@@ -217,14 +217,14 @@ fn held(p: &mut Poster<'_>, mut a: Action, why: &str) {
 
 /// A pending action about to run: a PR opening takes its title and description as they are now
 /// (2.5.7, M3.17; fac-98), held again with what to write when its wording is incomplete (fac-296).
-pub fn run(p: &mut Poster<'_>, mut a: Action) {
+pub fn run(p: &mut Poster<'_>, mut a: Action, config: &Config) {
     if let ActionWhat::OpenPr { card, title, description, .. } = &mut a.what
         && let Some(c) = p.state.cards.get(card)
     {
-        *title = pr_title(p.state, c);
-        *description = crate::board::tickets::description(p.state, c);
+        *title = pr_title(p.state, c, config);
+        *description = crate::board::tickets::description(p.state, c, config);
     }
-    if let Some(why) = unworded(p.state, &a) {
+    if let Some(why) = unworded(p.state, &a, config) {
         return held(p, a, &why);
     }
     a.status = ActionStatus::Pending;

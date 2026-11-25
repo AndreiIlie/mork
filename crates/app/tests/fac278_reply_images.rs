@@ -19,7 +19,7 @@ fn attach(name: &str, setup: Vec<Value>, images: Value) -> Value {
     let mut r = reply("working", "Attached", json!([]));
     r["hand"]["images"] = images;
     steps.push(json!({"do": "codex-reply", "value": r}));
-    json!({"fake": "codex", "agent": "hf-1/foreman", "phrase": format!("Attach {name}"), "steps": steps})
+    json!({"fake": "codex", "agent": "ex-1/foreman", "phrase": format!("Attach {name}"), "steps": steps})
 }
 
 fn file(path: &str, text: &str) -> Value {
@@ -69,12 +69,12 @@ fn scenario(cases: &[Case]) -> Value {
     );
     good["hand"]["images"] = json!(["{io}/shot"]);
     let mut runs = vec![
-        json!({"fake": "codex", "agent": "hf-1/foreman", "phrase": REFUSED, "steps": [{"do": "thread-started"}, sh("cat {io}/two.png > {io}/kept"), {"do": "codex-reply", "value": reply("working", "Fixed", json!([]))}]}),
+        json!({"fake": "codex", "agent": "ex-1/foreman", "phrase": REFUSED, "steps": [{"do": "thread-started"}, sh("cat {io}/two.png > {io}/kept"), {"do": "codex-reply", "value": reply("working", "Fixed", json!([]))}]}),
     ];
-    runs.push(json!({"fake": "codex", "agent": "hf-1/foreman", "phrase": "Attach good", "steps": [
+    runs.push(json!({"fake": "codex", "agent": "ex-1/foreman", "phrase": "Attach good", "steps": [
         {"do": "thread-started"}, file("{io}/shot", "SHOT"), file("{io}/two.png", "TWO"), {"do": "codex-reply", "value": good}]}));
     runs.extend(cases.iter().map(|(name, setup, images, ..)| attach(name, setup.clone(), images.clone())));
-    runs.push(json!({"fake": "codex", "agent": "hf-1/foreman", "steps": [{"do": "thread-started"}, file("{io}/shot", "CHANGED"), {"do": "codex-reply", "value": reply("working", "Seen", json!([]))}]}));
+    runs.push(json!({"fake": "codex", "agent": "ex-1/foreman", "steps": [{"do": "thread-started"}, file("{io}/shot", "CHANGED"), {"do": "codex-reply", "value": reply("working", "Seen", json!([]))}]}));
     Value::Array(runs)
 }
 
@@ -82,7 +82,7 @@ fn scenario(cases: &[Case]) -> Value {
 fn fac278_reply_images_are_published_from_their_seats_io_only() {
     let mut rig = Rig::new();
     rig.write_config(&rig.config(CODEX_FOREMAN));
-    let c = rig.card("hf-1", Mode::Full);
+    let c = rig.card("ex-1", Mode::Full);
     rig.put_cards(vec![c]);
     let (secret, outside) = (rig.t.root.join("secret.png"), rig.t.root.join("outside"));
     std::fs::create_dir_all(&outside).unwrap();
@@ -95,13 +95,13 @@ fn fac278_reply_images_are_published_from_their_seats_io_only() {
     let cases = escapes(&secret, &outside);
     rig.scenario(scenario(&cases));
     rig.start();
-    rig.say("hf-1", "@foreman Attach good");
-    rig.wait_turns("hf-1/foreman", 2);
+    rig.say("ex-1", "@foreman Attach good");
+    rig.wait_turns("ex-1/foreman", 2);
     for (i, (name, ..)) in cases.iter().enumerate() {
-        rig.say("hf-1", &format!("@foreman Attach {name}"));
-        rig.wait_turns("hf-1/foreman", 4 + 2 * i);
+        rig.say("ex-1", &format!("@foreman Attach {name}"));
+        rig.wait_turns("ex-1/foreman", 4 + 2 * i);
     }
-    let jobs = rig.jobs("hf-1/foreman");
+    let jobs = rig.jobs("ex-1/foreman");
     let published: Vec<String> = rig.state().messages.iter().flat_map(|m| m.images.clone()).collect();
     let first = jobs.iter().find(|j| j.stdin.contains("Attach good")).unwrap();
     let published_dir = rig.job_dir(first).join("published");
@@ -150,7 +150,7 @@ fn kept_in_its_seat(rig: &Rig, jobs: &[factory_types::state::Job], two: &Path) {
 // sent; the turn it wakes fails once, overwriting the files it was given, and its retry is given that copy again.
 fn says() -> Value {
     let say = |to: &str, images: &str, text: &str| {
-        let args = ["say", "hf-1", "--to", to, "--kind", "request", "--images", images, text];
+        let args = ["say", "ex-1", "--to", to, "--kind", "request", "--images", images, text];
         json!({"do": "ctl", "args": args})
     };
     let send = json!([{"do": "thread-started"}, file("{io}/a.png", "ORIG"), file("{io}/b.png", "B"),
@@ -162,8 +162,8 @@ fn says() -> Value {
     let done = json!({"do": "codex-reply", "value": reply("working", "Seen", json!([]))});
     let seen = json!([{"do": "thread-started"}, sh(once), done]);
     json!([
-        {"fake": "codex", "agent": "hf-1/foreman", "phrase": "Send it", "steps": send},
-        {"fake": "codex", "agent": "hf-1/foreman", "steps": seen},
+        {"fake": "codex", "agent": "ex-1/foreman", "phrase": "Send it", "steps": send},
+        {"fake": "codex", "agent": "ex-1/foreman", "steps": seen},
     ])
 }
 
@@ -171,15 +171,15 @@ fn says() -> Value {
 fn fac654_a_said_image_is_copied_as_it_is_sent() {
     let mut rig = Rig::new();
     rig.write_config(&rig.config(CODEX_FOREMAN));
-    let c = rig.card("hf-1", Mode::Full);
+    let c = rig.card("ex-1", Mode::Full);
     rig.put_cards(vec![c]);
     rig.scenario(says());
     rig.start();
-    rig.say("hf-1", "@foreman Send it");
-    rig.wait_turns("hf-1/foreman", 2);
-    rig.say("hf-1", "@foreman Go again");
-    rig.wait_turns("hf-1/foreman", 3);
-    let jobs = rig.jobs("hf-1/foreman");
+    rig.say("ex-1", "@foreman Send it");
+    rig.wait_turns("ex-1/foreman", 2);
+    rig.say("ex-1", "@foreman Go again");
+    rig.wait_turns("ex-1/foreman", 3);
+    let jobs = rig.jobs("ex-1/foreman");
     let sent = jobs.iter().find(|j| j.stdin.contains("Send it")).unwrap();
     let published = rig.job_dir(sent).join("published");
     let names: Vec<_> = std::fs::read_dir(&published).unwrap().flatten().map(|e| e.file_name()).collect();

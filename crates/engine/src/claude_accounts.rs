@@ -10,28 +10,27 @@ use serde_json::Value;
 
 use crate::{clock, random};
 
-const SAVED: [(&str, &str); 3] =
-    [("personal-max", "claude max"), ("work-team", "claude team"), ("small-team", "claude team small")];
 const EVERY: Duration = Duration::from_secs(1);
-
-/// The pool header for a known saved account.
-pub(crate) fn header(name: &str) -> Option<&'static str> {
-    SAVED.into_iter().find_map(|(saved, header)| (saved == name).then_some(header))
-}
 
 #[derive(Debug, Default)]
 pub(crate) struct Accounts {
     pub live: Option<Account>,
     pub saved: BTreeMap<String, Account>,
+    configured: BTreeMap<String, String>,
     checked: Option<Instant>,
     stamps: Vec<Option<(u64, i64, i64)>>,
 }
 
 impl Accounts {
-    pub fn read(home: &Path) -> Self {
-        let mut accounts = Self::default();
+    pub fn read(home: &Path, configured: BTreeMap<String, String>) -> Self {
+        let mut accounts = Self { configured, ..Self::default() };
         accounts.reload(home);
         accounts
+    }
+
+    /// The pool header for a configured saved account.
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.configured.get(name).map(String::as_str)
     }
 
     pub fn refresh(&mut self, home: &Path) -> bool {
@@ -39,7 +38,7 @@ impl Accounts {
             return false;
         }
         self.checked = Some(clock::instant());
-        if self.stamps == stamps(home) {
+        if self.stamps == stamps(home, &self.configured) {
             return false;
         }
         let before = (self.live.clone(), self.saved.clone());
@@ -49,21 +48,22 @@ impl Accounts {
 
     pub fn reload(&mut self, home: &Path) {
         self.checked = Some(clock::instant());
-        self.stamps = stamps(home);
-        self.saved = SAVED
-            .into_iter()
-            .filter_map(|(name, _)| {
+        self.stamps = stamps(home, &self.configured);
+        self.saved = self
+            .configured
+            .keys()
+            .filter_map(|name| {
                 let login = Login::read(saved_path(home, name, "claude")).ok()?;
-                Some((name.to_owned(), login.account()?))
+                Some((name.clone(), login.account()?))
             })
             .collect();
         self.live = Login::read(home.join(".claude.json")).ok().and_then(|login| login.account());
     }
 }
 
-fn stamps(home: &Path) -> Vec<Option<(u64, i64, i64)>> {
+fn stamps(home: &Path, configured: &BTreeMap<String, String>) -> Vec<Option<(u64, i64, i64)>> {
     std::iter::once(home.join(".claude.json"))
-        .chain(SAVED.map(|(name, _)| saved_path(home, name, "claude")))
+        .chain(configured.keys().map(|name| saved_path(home, name, "claude")))
         .map(|path| {
             let metadata = fs::metadata(path).ok()?;
             Some((metadata.ino(), metadata.ctime(), metadata.ctime_nsec()))
@@ -82,15 +82,16 @@ pub(crate) struct Switch {
 }
 
 impl Switch {
-    pub fn prepare(home: &Path, name: &str) -> Result<Self, String> {
-        if header(name).is_none() {
+    pub fn prepare(home: &Path, name: &str, configured: &BTreeMap<String, String>) -> Result<Self, String> {
+        if !configured.contains_key(name) {
             return Err(format!("no saved Claude account `{name}`"));
         }
         let home_login = Login::read(home.join(".claude.json"))?;
-        let mut saved: BTreeMap<_, _> = SAVED
-            .into_iter()
-            .filter(|(saved, _)| *saved != name)
-            .filter_map(|(name, _)| Login::read(saved_path(home, name, "claude")).ok().map(|login| (name, login)))
+        let mut saved: BTreeMap<&str, Login> = configured
+            .keys()
+            .map(String::as_str)
+            .filter(|saved| *saved != name)
+            .filter_map(|saved| Login::read(saved_path(home, saved, "claude")).ok().map(|login| (saved, login)))
             .collect();
         saved.insert(name, Login::read(saved_path(home, name, "claude"))?);
         let current = home_login.account().ok_or("the home's Claude login matches no saved account")?;

@@ -75,6 +75,13 @@ fn kinds(t: &Target) -> Vec<String> {
 
 type Step = (Plan, Verdict, u64);
 
+fn schema_refused(hint: Option<&str>) -> String {
+    match hint.map(str::trim).filter(|h| !h.is_empty()) {
+        Some(hint) => format!("{} {hint}", super::sql::SCHEMA_REFUSED),
+        None => super::sql::SCHEMA_REFUSED.to_owned(),
+    }
+}
+
 // Any read, on any table (fac-124): the login's own grants and the read-only session it runs in
 // bound it, the gate only names a write first.
 fn sql(t: &Target, target: &str, p: &SqlSelect, defaults: Limits) -> Result<Step, String> {
@@ -82,9 +89,10 @@ fn sql(t: &Target, target: &str, p: &SqlSelect, defaults: Limits) -> Result<Step
     let (cap, timeout_ms) = super::target::sql_bounds(defaults, t);
     // An unqualified read of a target whose database is one of these reads that schema.
     if ["information_schema", "sys"].iter().any(|d| s.database.eq_ignore_ascii_case(d)) {
-        return Err(super::sql::SCHEMA_REFUSED.into());
+        return Err(schema_refused(s.schema_hint.as_deref()));
     }
-    let read = super::sql::read(&p.query)?;
+    let read = super::sql::read(&p.query)
+        .map_err(|e| if e == super::sql::SCHEMA_REFUSED { schema_refused(s.schema_hint.as_deref()) } else { e })?;
     let plan = Plan::Sql {
         login: s.login.clone(),
         host: s.host.clone(),

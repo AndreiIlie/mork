@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from "react";
-import { HandCard } from "./HandCard";
+import { HandCard, labelColor } from "./HandCard";
 import { Markdown } from "./Markdown";
 import { sendCommand } from "./bridge";
 import { ago, coldMinutes, plural } from "./format";
@@ -146,7 +146,7 @@ export function TriagePanel({
 
   return (
     <HandCard
-      color={hand.color}
+      color={labelColor(hand)}
       head={
         <>
           <span className="text-label-13 text-gray-900">

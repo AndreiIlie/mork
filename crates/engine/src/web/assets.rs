@@ -48,7 +48,7 @@ pub fn open_asset(root: &Path, url_path: &str) -> Option<(File, &'static str)> {
     if let Some(file) = open_regular(root, &rel) {
         return Some((file, content_type(&rel)));
     }
-    // A card id may carry a dot (`hf-583.1`), so every `/cards/<id>` is the app's route.
+    // A card id may carry a dot (`ex-583.1`), so every `/cards/<id>` is the app's route.
     let route = rel.extension().is_none() || rel.parent() == Some(Path::new("cards"));
     if rel != Path::new("index.html") && route {
         let index = Path::new("index.html");
@@ -108,8 +108,8 @@ mod tests {
         assert_eq!(read_body("/"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
         assert_eq!(read_body("/assets/main.js"), Some(("console.log(1)".into(), "text/javascript; charset=utf-8")));
         assert_eq!(read_body("/cards/fac-671"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
-        assert_eq!(read_body("/cards/hf-583.1"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
-        assert_eq!(read_body("/cards/pr-my-app-123"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
+        assert_eq!(read_body("/cards/ex-583.1"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
+        assert_eq!(read_body("/cards/pr-example.com-123"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
         assert_eq!(read_body("/cards/a/b.js"), None);
         assert_eq!(read_body("/assets/missing.js"), None);
         assert_eq!(read_body("/leak.txt"), None);

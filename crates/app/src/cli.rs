@@ -156,9 +156,13 @@ fn app(home: &Home, args: &[String], reloaded: Option<String>) -> i32 {
         return runtime::run(opts);
     }
     // The engine says what is wrong with a bad config.
-    let settings =
-        config::read(&config_path).map_or(factory_ui::app::Settings { editor: String::new(), animations: true }, |c| {
-            factory_ui::app::Settings { editor: c.factory.editor, animations: c.factory.animations }
-        });
+    let settings = config::read(&config_path).map_or(
+        factory_ui::app::Settings { editor: String::new(), animations: true, tunnels: Default::default() },
+        |c| factory_ui::app::Settings {
+            editor: c.factory.editor,
+            animations: c.factory.animations,
+            tunnels: c.tunnels,
+        },
+    );
     crate::window::run(home, settings, move || runtime::run(opts))
 }

@@ -1,6 +1,7 @@
 //! The window's SSH forwards (fac-35) own their connections: no daemon or shared SSH master
 //! may keep a forward alive after its tracker or the app exits.
 
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::fs::FileTypeExt;
@@ -9,7 +10,8 @@ use std::process::{Child, Stdio};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
-use factory_types::web_tunnel::{Environment, Status};
+use factory_types::config::TunnelConfig;
+use factory_types::web_tunnel::Status;
 
 use super::{
     door_ssh::{self, Scratch},
@@ -18,78 +20,101 @@ use super::{
 use crate::{clock, paths::Home};
 
 /// The window's explicit open or close request, never an engine command available to a seat.
-pub type Request = (Environment, bool);
+pub type Request = (String, bool);
 
 /// Starts the tracker off the window thread. Dropping its sender closes its owned forwards;
 /// `changed` returning false closes them too. The process guard also ends them when the app dies.
-pub fn start(home: Home, changed: impl Fn(Environment, Status) -> bool + Send + 'static) -> Sender<Request> {
+pub fn start(
+    home: Home,
+    configured: BTreeMap<String, TunnelConfig>,
+    changed: impl Fn(String, Status) -> bool + Send + 'static,
+) -> Sender<Request> {
     let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || run(&home, rx, changed));
+    std::thread::spawn(move || run(&home, &configured, rx, changed));
     tx
 }
 
-fn run(home: &Home, requests: Receiver<Request>, changed: impl Fn(Environment, Status) -> bool) {
-    let mut tunnels: [Option<Tunnel>; 2] = [None, None];
-    let mut reopen = wanted(home).into_iter();
+fn run(
+    home: &Home,
+    configured: &BTreeMap<String, TunnelConfig>,
+    requests: Receiver<Request>,
+    changed: impl Fn(String, Status) -> bool,
+) {
+    let mut tunnels: BTreeMap<String, Tunnel> = BTreeMap::new();
+    let mut reopen = wanted(home, configured).into_iter();
     loop {
         let request = match reopen.next() {
-            Some(env) => Ok((env, true)),
+            Some(name) => Ok((name, true)),
             None => requests.recv_timeout(Duration::from_millis(100)),
         };
         match request {
-            Ok((env, open)) => {
-                remember(home, env, open);
-                let at = &mut tunnels[env.index()];
-                if !open {
-                    *at = None;
-                    if !changed(env, Status::Closed) {
-                        return;
-                    }
-                } else if at.is_none() {
-                    let status = match Tunnel::open(home, env) {
-                        Ok(t) => {
-                            *at = Some(t);
-                            Status::Opening
-                        }
-                        Err(e) => Status::Failed(e),
-                    };
-                    if !changed(env, status) {
-                        return;
-                    }
+            Ok((name, open)) => {
+                if !handle_request(home, configured, &mut tunnels, name, open, &changed) {
+                    return;
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => return,
             Err(mpsc::RecvTimeoutError::Timeout) => {}
         }
-        for env in Environment::ALL {
-            let at = &mut tunnels[env.index()];
-            if let Some(t) = at
-                && let Some(status) = t.poll()
-            {
-                if status != Status::Open {
-                    *at = None;
-                }
-                if !changed(env, status) {
-                    return;
-                }
-            }
+        if !poll_tunnels(&mut tunnels, &changed) {
+            return;
         }
     }
 }
 
-// The forwards Andrei left open, opened again when the app starts: a restart or a reload ends them.
-fn wanted(home: &Home) -> Vec<Environment> {
-    let text = std::fs::read_to_string(open_list(home)).unwrap_or_default();
-    Environment::ALL.into_iter().filter(|e| text.lines().any(|l| l == e.name())).collect()
+fn handle_request(
+    home: &Home,
+    configured: &BTreeMap<String, TunnelConfig>,
+    tunnels: &mut BTreeMap<String, Tunnel>,
+    name: String,
+    open: bool,
+    changed: &impl Fn(String, Status) -> bool,
+) -> bool {
+    let Some(cfg) = configured.get(&name) else { return true };
+    remember(home, configured, &name, open);
+    if !open {
+        tunnels.remove(&name);
+        return changed(name, Status::Closed);
+    }
+    if tunnels.contains_key(&name) {
+        return true;
+    }
+    let status = match Tunnel::open(home, &name, cfg) {
+        Ok(t) => {
+            tunnels.insert(name.clone(), t);
+            Status::Opening
+        }
+        Err(e) => Status::Failed(e),
+    };
+    changed(name, status)
 }
 
-fn remember(home: &Home, env: Environment, open: bool) {
-    let mut open_ones = wanted(home);
-    open_ones.retain(|e| *e != env);
-    if open {
-        open_ones.push(env);
+fn poll_tunnels(tunnels: &mut BTreeMap<String, Tunnel>, changed: &impl Fn(String, Status) -> bool) -> bool {
+    let updates: Vec<_> = tunnels.iter_mut().filter_map(|(n, t)| t.poll().map(|s| (n.clone(), s))).collect();
+    for (name, status) in updates {
+        if status != Status::Open {
+            tunnels.remove(&name);
+        }
+        if !changed(name, status) {
+            return false;
+        }
     }
-    let text: String = open_ones.iter().map(|e| format!("{}\n", e.name())).collect();
+    true
+}
+
+// The forwards Andrei left open, opened again when the app starts: a restart or a reload ends them.
+fn wanted(home: &Home, configured: &BTreeMap<String, TunnelConfig>) -> Vec<String> {
+    let text = std::fs::read_to_string(open_list(home)).unwrap_or_default();
+    configured.keys().filter(|name| text.lines().any(|l| l == name.as_str())).cloned().collect()
+}
+
+fn remember(home: &Home, configured: &BTreeMap<String, TunnelConfig>, name: &str, open: bool) {
+    let mut open_ones = wanted(home, configured);
+    open_ones.retain(|n| n != name);
+    if open {
+        open_ones.push(name.to_owned());
+    }
+    let text: String = open_ones.iter().map(|n| format!("{n}\n")).collect();
     let _ = std::fs::write(open_list(home), text);
 }
 
@@ -97,7 +122,7 @@ fn open_list(home: &Home) -> PathBuf {
     home.door().join("web-tunnels-open")
 }
 
-fn argv(env: Environment, socket: &Path) -> Vec<String> {
+fn argv(cfg: &TunnelConfig, socket: &Path) -> Vec<String> {
     let mut a = door_ssh::base(&[
         "ExitOnForwardFailure=yes",
         "ControlMaster=yes",
@@ -105,7 +130,12 @@ fn argv(env: Environment, socket: &Path) -> Vec<String> {
         "ForkAfterAuthentication=no",
     ]);
     a.extend(["-N".into(), "-S".into(), socket.display().to_string()]);
-    a.extend(["-L".into(), format!("127.0.0.1:{}:127.0.0.1:9081", env.port()), "--".into(), env.alias().into()]);
+    a.extend([
+        "-L".into(),
+        format!("127.0.0.1:{}:127.0.0.1:{}", cfg.port, cfg.remote_port),
+        "--".into(),
+        cfg.alias.clone(),
+    ]);
     a
 }
 
@@ -118,12 +148,12 @@ struct Tunnel {
 }
 
 impl Tunnel {
-    fn open(home: &Home, env: Environment) -> Result<Self, String> {
-        Self::open_using(home, env, |socket| argv(env, socket))
+    fn open(home: &Home, name: &str, cfg: &TunnelConfig) -> Result<Self, String> {
+        Self::open_using(home, name, |socket| argv(cfg, socket))
     }
 
-    fn open_using(home: &Home, env: Environment, args: impl FnOnce(&Path) -> Vec<String>) -> Result<Self, String> {
-        let scratch = Scratch::make(&home.run_dir().join("web-tunnels"), env.name())?;
+    fn open_using(home: &Home, name: &str, args: impl FnOnce(&Path) -> Vec<String>) -> Result<Self, String> {
+        let scratch = Scratch::make(&home.run_dir().join("web-tunnels"), name)?;
         let errors = scratch.secret("ssh.err", "")?;
         let args = args(&scratch.socket());
         proclog::record(home.root(), "web-tunnel", &args, "", false);

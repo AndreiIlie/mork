@@ -135,7 +135,7 @@ function Thumbnail({ image }: { image: ImageView }) {
   );
 }
 
-export function MessageExtras({ m }: { m: MessageView }) {
+function MessageExtras({ m }: { m: MessageView }) {
   const images = m.images ?? [];
   return (
     <>
@@ -211,18 +211,7 @@ function FoldedRow({
   );
 }
 
-/** One stream message row, optionally tagged with its room for the per-card Overview. */
-export function MessageRow({
-  m,
-  tzOffsetMin,
-  run,
-  room,
-}: {
-  m: MessageView;
-  tzOffsetMin: number;
-  run?: MessageView[];
-  room?: string;
-}) {
+function MessageRow({ m, tzOffsetMin, run }: { m: MessageView; tzOffsetMin: number; run?: MessageView[] }) {
   const times = run?.length ?? 1;
   if (m.kind === "marker") {
     return (
@@ -268,11 +257,8 @@ export function MessageRow({
       <span className={`text-label-13 font-medium ${engine ? "text-gray-900" : "text-gray-1000"}`}>
         {authorName(m.from)}
       </span>
-      {room !== undefined ? (
-        <span className="text-label-12 text-gray-900">{andrei ? `in ${room}` : room}</span>
-      ) : (
-        m.from.is === "agent" &&
-        m.from.label !== m.from.role && <span className="text-label-12 text-gray-900">{m.from.role}</span>
+      {m.from.is === "agent" && m.from.label !== m.from.role && (
+        <span className="text-label-12 text-gray-900">{m.from.role}</span>
       )}
       {m.ask_open && <span className="text-label-12 text-gray-900">asks below</span>}
       <span className="font-mono text-label-12 tabular-nums text-gray-700">{clockTime(m.time_ms, tzOffsetMin)}</span>

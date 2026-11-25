@@ -9,7 +9,7 @@ export interface AlertPermission {
   request: () => void;
 }
 
-const BASE_TITLE = "Factory";
+const BASE_TITLE = "Mork";
 // Matches web/src/index.css tokens: background-100, gray-1000, amber-700, red-700.
 const BG = "hsl(0,0%,4%)";
 const FG = "hsl(0,0%,93%)";
@@ -34,24 +34,23 @@ export function faviconTone(hands: HandView[]): FaviconTone {
   return hands.some((h) => h.color === "red") ? "red" : "amber";
 }
 
-/** Data-URI SVG favicon matching FactoryMark with an optional top-right status dot. */
+/** Data-URI SVG favicon matching MorkMark with an optional top-right status dot. */
 export function faviconHref(tone: FaviconTone): string {
   const dot =
     tone === null
       ? ""
-      : `<circle cx="15.5" cy="4.5" r="4.5" fill="${BG}"/><circle cx="15.5" cy="4.5" r="3.5" fill="${BADGE_COLOR[tone]}"/>`;
+      : `<circle cx="18.6" cy="5.4" r="5.4" fill="${BG}"/><circle cx="18.6" cy="5.4" r="4.2" fill="${BADGE_COLOR[tone]}"/>`;
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">` +
-    `<rect width="20" height="20" fill="${BG}"/>` +
-    `<rect x="2.5" y="2.5" width="15" height="15" fill="none" stroke="${FG}" stroke-width="1"/>` +
-    `<path d="M7 14V6.5H13.5M7 10.2H12" fill="none" stroke="${FG}" stroke-width="1.5"/>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">` +
+    `<rect width="24" height="24" fill="${BG}"/>` +
+    `<path d="M2 20V5L12 12V5L22 12V20H18.5V13.8L12 9.2V16.2L5.5 11.6V20H2Z" fill="${FG}"/>` +
     `${dot}</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-/** Browser notification heading matching the engine's `factory · <place>` label. */
+/** Browser notification heading naming the brand and the hand's place. */
 export function notificationTitle(hand: HandView): string {
-  return `Factory · ${hand.place}`;
+  return `Mork · ${hand.place}`;
 }
 
 function setFavicon(href: string): void {

@@ -30,7 +30,7 @@ pub fn publish(p: &mut Poster<'_>, mut c: Card, k: Candidate, ctx: Ctx<'_>) {
             c.verified_pushes.push(commit.clone());
         }
         if c.pr.is_some() && c.pushed.as_ref() == Some(&commit) {
-            super::pr::pushed(p, c, &commit);
+            super::pr::pushed(p, c, &commit, ctx.config);
             return;
         }
         let branch = c.branch.clone().unwrap_or_else(|| id.as_str().to_owned());

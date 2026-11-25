@@ -39,7 +39,7 @@ pub struct Under {
     pub card: CardId,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub review: bool,
-    /// A heading card's PR and work-item tasks, as `PR 123 DevOps 1234 1235` (fac-362);
+    /// A ticketed project heading card's PR and DevOps tasks, as `PR 123 DevOps 1234 1235` (fac-362);
     /// empty when it has neither, and for any other project.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub detail: String,

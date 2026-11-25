@@ -127,10 +127,11 @@ fn web_url(url: &str) -> bool {
 /// Reports the window's owned forwards over its inbox, without exposing a socket command.
 pub fn tunnels(
     home: Home,
+    configured: std::collections::BTreeMap<String, factory_types::config::TunnelConfig>,
     tx: fmpsc::UnboundedSender<Msg>,
 ) -> mpsc::Sender<factory_engine::jobs::web_tunnels::Request> {
-    factory_engine::jobs::web_tunnels::start(home, move |env, status| {
-        tx.unbounded_send(Msg::Ui(UiMessage::TunnelStatus(env, status))).is_ok()
+    factory_engine::jobs::web_tunnels::start(home, configured, move |name, status| {
+        tx.unbounded_send(Msg::Ui(UiMessage::TunnelStatus(name, status))).is_ok()
     })
 }
 

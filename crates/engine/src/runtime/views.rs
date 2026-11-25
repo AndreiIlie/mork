@@ -108,9 +108,9 @@ fn bounded(mut v: PlaceView) -> PlaceView {
     v.pinned = std::mem::take(&mut v.pinned).into_iter().map(trimmed).collect();
     let left = LINE_BUDGET.saturating_sub(size_of(&v)).saturating_sub(super::chat::BUDGET);
     let (overview, msg_budget) = match overview {
-        Some(o) => {
+        Some(mut o) => {
             // Give overview its own share of the line budget so it never starves the room's messages (fac-684).
-            let o = bounded_overview(o, (VIEW_BUDGET / 2).min(left / 2));
+            bound_round_proofs(&mut o, (VIEW_BUDGET / 2).min(left / 2));
             let rem = left.saturating_sub(size_of(&o));
             (Some(o), rem)
         }
@@ -121,33 +121,6 @@ fn bounded(mut v: PlaceView) -> PlaceView {
     v.messages = kept;
     v.overview = overview;
     v
-}
-
-// Keep the newest overview lines across stages within `budget`, preserving every stage's exact count.
-fn bounded_overview(mut o: factory_types::view::OverviewView, budget: usize) -> factory_types::view::OverviewView {
-    let mut all: Vec<Vec<factory_types::view::OverviewLine>> =
-        o.stages.iter_mut().map(|s| std::mem::take(&mut s.lines)).collect();
-    bound_round_proofs(&mut o, budget);
-    let avail = budget.saturating_sub(size_of(&o));
-    let mut used = 0usize;
-    let mut kept = vec![Vec::new(); all.len()];
-    'outer: for (si, lines) in all.iter_mut().enumerate().rev() {
-        for mut line in lines.drain(..).rev() {
-            line.message = trimmed(line.message);
-            line.answer = line.answer.map(trimmed);
-            let sz = size_of(&line);
-            if used + sz > avail {
-                break 'outer;
-            }
-            used += sz;
-            kept[si].push(line);
-        }
-    }
-    for (stage, mut lines) in o.stages.iter_mut().zip(kept) {
-        lines.reverse();
-        stage.lines = lines;
-    }
-    o
 }
 
 // Cut round proofs to WORDS_MAX and shed oldest rounds' proofs first if the overview still exceeds its budget (fac-698).
@@ -364,10 +337,10 @@ impl Engine {
     pub(super) fn usage(&self) -> Value {
         let now = crate::clock::now_ms();
         let accounts = &self.views_cache.claude_accounts;
-        let (lines, limits) = super::usage::answer(&self.state, now, accounts.live.as_ref(), &accounts.saved);
+        let (lines, limits) = super::usage::answer(&self.state, now, accounts);
         let contexts = self.agent_contexts();
         let at = (now, self.views_cache.tz_offset_min);
-        let recent_burn = super::burn::recent(&self.state, &self.store, at, accounts.live.as_ref(), &accounts.saved);
+        let recent_burn = super::burn::recent(&self.state, &self.store, at, accounts);
         // The answer's keys print sorted: `by_pool` sorts first, so the pace lines come above the full fields.
         json!({"usage": {"by_pool": lines, "limits": limits, "contexts": contexts, "recent_burn": recent_burn}})
     }

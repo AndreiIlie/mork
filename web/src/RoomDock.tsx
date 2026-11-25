@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { HandCard } from "./HandCard";
+import { HandCard, labelColor } from "./HandCard";
 import { Markdown } from "./Markdown";
 import { TriagePanel } from "./Triage";
 import { sendCommand } from "./bridge";
@@ -54,7 +54,7 @@ function AskPanel({
 
   return (
     <HandCard
-      color={hand.color}
+      color={labelColor(hand)}
       head={
         <>
           <span className="text-label-13 text-gray-900">{heading}</span>
@@ -164,7 +164,7 @@ function ApproveBody({ words, brief, decisions }: { words: string; brief?: Brief
 }
 
 // An ask's lines stay apart: a list ends at a plain line, and plain lines break where the seat broke them.
-export function keepLines(text: string): string {
+function keepLines(text: string): string {
   const isItem = (l: string) => /^\s*(\d+\.|[-*])\s+/.test(l);
   const lines = text.split("\n");
   return lines
@@ -199,7 +199,8 @@ function FoldedHand({
     : hand.role !== null
       ? `${hand.role} asks in ${where}`
       : `${hand.kind} in ${where}`;
-  const pill = hand.color === "red" ? "bg-red-700" : hand.color === "yellow" ? "bg-amber-700" : "bg-gray-500";
+  const color = labelColor(hand);
+  const pill = color === "red" ? "bg-red-700" : color === "yellow" ? "bg-amber-700" : "bg-gray-500";
   return (
     <div className="px-gutter pt-3">
       <button
@@ -211,8 +212,9 @@ function FoldedHand({
         <span className={`flex h-5 shrink-0 items-center px-2 text-label-12 font-medium text-background-100 ${pill}`}>
           Raised Hand
         </span>
-        <span className="shrink-0 text-label-13 text-gray-900">{heading}</span>
-        {!isTriage && <span className="min-w-0 truncate text-label-13 text-gray-1000">{hand.words.split("\n", 1)[0]}</span>}
+        <span className={`${isTriage || hand.given ? "min-w-0 truncate" : "shrink-0"} text-label-13 text-gray-900`}>{heading}</span>
+        {hand.given && <span className="shrink-0 text-label-13 text-gray-900">sent to orchestrator</span>}
+        {!isTriage && <span className="min-w-0 flex-1 truncate text-label-13 text-gray-1000">{hand.words.split("\n", 1)[0]}</span>}
         <span className="ml-auto shrink-0 font-mono text-label-12 tabular-nums text-gray-700">
           {ago(nowMs - hand.raised_ms)}
         </span>
@@ -233,13 +235,13 @@ interface HandsProps {
   live: boolean;
 }
 
-/** The card's Raised Hands dock: one hand shown whole, any others folded to one line. */
+/** The card's Raised Hands dock: the hand `openAsk` names shown whole, the others folded to one line. */
 export function RoomHands({ cardId, hands, triage, ownRoom, openAsk, onOpenHand, nowMs, live }: HandsProps) {
   const { pending, refusals, press } = useHandOffers();
   if (hands.length === 0) return null;
 
   const cards = hands.map((hand) => {
-    const folded = openAsk !== undefined && hand.ask !== openAsk;
+    const folded = hand.ask !== openAsk;
     if (hand.kind === "triage" && triage !== undefined && triage.ask === hand.ask) {
       return (
         <Fragment key={hand.ask}>

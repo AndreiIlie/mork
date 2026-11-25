@@ -15,7 +15,7 @@ pub fn rebuilt(p: &Poster<'_>, c: &Card, ctx: Ctx<'_>) -> Option<String> {
     let words = &ctx.config.internals.words;
     let branch = c.branch.as_deref().filter(|_| c.mode == Mode::Full)?;
     crate::board::tickets::refused(words, branch)?;
-    unpublished(p, c, branch).then(|| crate::board::tickets::branch(p.state, c, words)).filter(|b| b != branch)
+    unpublished(p, c, branch).then(|| crate::board::tickets::branch(p.state, c, ctx.config)).filter(|b| b != branch)
 }
 
 /// Whether nothing of the card's work is published, nor on `branch` in any run: no push of it done or of an

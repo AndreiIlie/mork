@@ -160,6 +160,9 @@ pub struct Sql {
     /// A read-only server's SQL timeout, above `[defaults]` if need be: up to an hour.
     #[serde(default)]
     pub timeout_ms: Option<u64>,
+    /// Target-specific schema guidance shown in `door.help` and appended to schema refusals (fac-721).
+    #[serde(default)]
+    pub schema_hint: Option<String>,
 }
 
 /// `[targets.<id>.mongo]`: `find`, by `mongoexport` on this machine. `host` and `port` are the

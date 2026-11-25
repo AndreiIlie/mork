@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use factory_types::Command;
-use factory_types::config::Effort;
+use factory_types::config::{Effort, TunnelConfig};
 use factory_types::view::{AgentRow, ModelChoice, PlaceView, Screen};
 use iced::Element;
 use iced::widget::text_editor;
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::input::draft_content;
 use crate::session::{Tab, UiSession};
-use factory_types::web_tunnel::{Environment, Status as TunnelStatus};
+use factory_types::web_tunnel::Status as TunnelStatus;
 
 /// The window's settings from the config (1.14).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -21,6 +21,9 @@ pub struct Settings {
     pub editor: String,
     /// `[factory] animations`.
     pub animations: bool,
+    /// `[tunnels.<name>]`: window-owned SSH web forwards (fac-721).
+    #[serde(default)]
+    pub tunnels: BTreeMap<String, TunnelConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -40,7 +43,7 @@ pub enum Effect {
     Copy(String),
     /// Open a web page outside the window.
     Link(String),
-    Tunnel(Environment, bool),
+    Tunnel(String, bool),
     /// Opens `name` in job `job`'s `io/` once the app checked it stays there (fac-105); a refusal
     /// comes back as `Message::OutputRefused`.
     Output {
@@ -185,9 +188,9 @@ pub enum Message {
     /// Why the app didn't hand a produced file to the viewer (fac-105).
     OutputRefused(String),
     ShowTunnels,
-    Tunnel(Environment, bool),
-    TunnelStatus(Environment, TunnelStatus),
-    TunnelPage(Environment),
+    Tunnel(String, bool),
+    TunnelStatus(String, TunnelStatus),
+    TunnelPage(String),
     /// An agent's steps clicked: its latest turn opens over the place (fac-96).
     Turn(String),
     /// A step's text or thinking (`turn::key`), or a chat's turn block by its job: fold or unfold it.
@@ -262,7 +265,7 @@ pub struct App {
     pub older: Option<u64>,
     /// By card, the deliverables a click folded or unfolded in its plan: open or not (fac-128).
     pub plan_folds: BTreeMap<String, crate::plan::Folds>,
-    pub tunnels: [TunnelStatus; 2],
+    pub tunnels: BTreeMap<String, TunnelStatus>,
     pub(crate) last_top_press: Option<i64>,
 }
 
@@ -405,8 +408,8 @@ impl App {
             Message::Pick { agent, model, effort } => self.picked(&agent, model, effort),
             Message::Link(url) => self.link(url),
             Message::ChatLink(url) => vec![Effect::Link(url)],
-            Message::Tunnel(env, open) => self.tunnel(env, open),
-            Message::TunnelPage(env) => self.tunnel_page(env),
+            Message::Tunnel(name, open) => self.tunnel(name, open),
+            Message::TunnelPage(name) => self.tunnel_page(&name),
             Message::Copy(seq) => self.copy(seq),
             other => {
                 self.shift(other);
@@ -426,7 +429,9 @@ impl App {
             Message::Unpaste(i) => self.unpaste(i),
             Message::OutputRefused(why) => self.note = Some(format!("✗ {}", crate::text::clean(&why))),
             Message::ShowTunnels => self.overlay = Some(Overlay::Tunnels),
-            Message::TunnelStatus(env, status) => self.tunnels[env.index()] = status,
+            Message::TunnelStatus(name, status) => {
+                self.tunnels.insert(name, status);
+            }
             Message::Tab(tab) => self.session.tab = tab,
             Message::Fold(seq) => self.fold(seq),
             Message::FoldRoom(card) => self.fold_room(&card, !self.session.collapsed.contains(&card)),

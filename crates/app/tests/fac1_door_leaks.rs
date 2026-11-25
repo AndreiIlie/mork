@@ -17,14 +17,14 @@ const AGY_TOKENS: [&str; 2] = ["SENTINEL-agy-access-token-31", "SENTINEL-agy-ref
 // The project's repo lets its fetches pass.
 fn run_calls(rig: &mut Rig, calls: &[Vec<String>]) -> Vec<Value> {
     rig.write_config(&rig.config(CODEX_FOREMAN));
-    let c = rig.card("hf-1", Mode::Full);
+    let c = rig.card("ex-1", Mode::Full);
     rig.put_cards(vec![c]);
     common::builds::factory_repo(rig, 1);
-    rig.scenario(json!([ctl_turn("hf-1/foreman", None, calls, reply("working", "Done", json!([]))),]));
+    rig.scenario(json!([ctl_turn("ex-1/foreman", None, calls, reply("working", "Done", json!([]))),]));
     rig.start();
-    rig.say("hf-1", "@foreman Call the door");
-    rig.wait_turns("hf-1/foreman", 1);
-    answers(rig, &rig.jobs("hf-1/foreman").remove(0))
+    rig.say("ex-1", "@foreman Call the door");
+    rig.wait_turns("ex-1/foreman", 1);
+    answers(rig, &rig.jobs("ex-1/foreman").remove(0))
 }
 
 #[test]

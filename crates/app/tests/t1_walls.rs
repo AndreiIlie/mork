@@ -337,8 +337,8 @@ mod walled {
         let work = listed_folder(&mut rig);
         let f = rig.fhome();
         std::fs::create_dir_all(f.join("clones/other-card")).unwrap();
-        rig.put_cards(vec![rig.card("hf-1", factory_types::card::Mode::Full)]);
-        let clone = f.join("clones/hf-1");
+        rig.put_cards(vec![rig.card("ex-1", factory_types::card::Mode::Full)]);
+        let clone = f.join("clones/ex-1");
         let roots = [work.join("data"), std::path::PathBuf::from("/data")];
         let read: Vec<_> =
             roots.iter().flat_map(|p| HIDDEN_NAMES.iter().chain(PUBLIC_NAMES).map(|n| p.join(n))).collect();
@@ -347,11 +347,11 @@ mod walled {
             "exists": [f.join("clones/other-card"), roots[0].join("ACCESS-private/hidden"), roots[1].join("ACCESS-private/hidden")],
             "writable": [clone.clone(), f.join("agent-home"), f.join("clones/other-card"), roots[1].clone()],
         });
-        rig.scenario(json!([{"agent": "hf-1/foreman", "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]}]));
+        rig.scenario(json!([{"agent": "ex-1/foreman", "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]}]));
         rig.start();
-        rig.say("hf-1", "Go.");
+        rig.say("ex-1", "Go.");
         let line = || {
-            let job = rig.jobs("hf-1/foreman").into_iter().next()?;
+            let job = rig.jobs("ex-1/foreman").into_iter().next()?;
             rig.out_lines(&job).into_iter().find(|v| v["type"] == "probe")
         };
         wait_until("the probe", LONG, || line().is_some());
@@ -363,7 +363,7 @@ mod walled {
         for root in roots {
             assert_listed(&r, &root);
         }
-        rig.send(json!({"stop": {"card": "hf-1"}}));
+        rig.send(json!({"stop": {"card": "ex-1"}}));
         rig.wait_settled(LONG);
     }
 
@@ -373,7 +373,7 @@ mod walled {
         if common::wall_test("T1.33") {
             return;
         }
-        handoff_wall(factory_types::card::Mode::Report, "hf-1/foreman");
+        handoff_wall(factory_types::card::Mode::Report, "ex-1/foreman");
     }
 
     #[test]
@@ -381,15 +381,15 @@ mod walled {
         if common::wall_test("T1.33 planner") {
             return;
         }
-        handoff_wall(factory_types::card::Mode::Full, "hf-1/planner");
+        handoff_wall(factory_types::card::Mode::Full, "ex-1/planner");
     }
 
     fn handoff_wall(mode: factory_types::card::Mode, agent: &str) {
         let mut rig = Rig::new();
-        let clone = rig.fhome().join("clones/hf-1");
+        let clone = rig.fhome().join("clones/ex-1");
         std::fs::create_dir_all(clone.join(".git")).unwrap();
         std::fs::write(clone.join("source"), "the source").unwrap();
-        let mut card = rig.card("hf-1", mode);
+        let mut card = rig.card("ex-1", mode);
         if mode == factory_types::card::Mode::Full {
             card.stage = factory_types::card::Stage::Brief;
             card.approval = None;
@@ -403,7 +403,7 @@ mod walled {
         rig.scenario(json!([{"agent": agent, "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]}]));
         rig.start();
         // A full card's planner hears Andrei in its spec room, a report card's foreman in its room (fac-633).
-        rig.say(if agent.ends_with("/planner") { "hf-1/spec" } else { "hf-1" }, "Go.");
+        rig.say(if agent.ends_with("/planner") { "ex-1/spec" } else { "ex-1" }, "Go.");
         let line = || {
             let job = rig.jobs(agent).into_iter().next()?;
             rig.out_lines(&job).into_iter().find(|v| v["type"] == "probe")
@@ -415,7 +415,7 @@ mod walled {
         for rel in ["", ".git", ".git/factory"] {
             assert_ne!(r["writable"][at(rel)], "WROTE", "{rel:?} is writable: {r}");
         }
-        rig.send(json!({"stop": {"card": "hf-1"}}));
+        rig.send(json!({"stop": {"card": "ex-1"}}));
         rig.wait_settled(LONG);
     }
 
@@ -433,9 +433,9 @@ mod walled {
 
     fn planner_mock_wall(stage: factory_types::card::Stage) {
         let mut rig = Rig::new();
-        let clone = rig.fhome().join("clones/hf-1");
+        let clone = rig.fhome().join("clones/ex-1");
         std::fs::create_dir_all(clone.join(".git/factory-mock-host")).unwrap();
-        let mut card = rig.card("hf-1", factory_types::card::Mode::Full);
+        let mut card = rig.card("ex-1", factory_types::card::Mode::Full);
         card.visual = true;
         if stage == factory_types::card::Stage::Brief {
             card.stage = stage;
@@ -458,12 +458,12 @@ mod walled {
                 at(".git/factory-mock-host"),
             ],
         });
-        rig.scenario(json!([{"agent": "hf-1/planner", "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]}]));
+        rig.scenario(json!([{"agent": "ex-1/planner", "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]}]));
         rig.start();
         // Unnamed words in the spec room reach the planner (fac-633).
-        rig.say("hf-1/spec", "Go.");
+        rig.say("ex-1/spec", "Go.");
         let line = || {
-            let job = rig.jobs("hf-1/planner").into_iter().next()?;
+            let job = rig.jobs("ex-1/planner").into_iter().next()?;
             rig.out_lines(&job).into_iter().find(|v| v["type"] == "probe")
         };
         wait_until("the planner's wall probe", LONG, || line().is_some());
@@ -475,7 +475,7 @@ mod walled {
         for rel in ["", ".git", ".git/factory-mock-host"] {
             assert_eq!(r["writable"][at(rel)], "EROFS", "{stage:?}, {rel:?}: {r}");
         }
-        rig.send(json!({"stop": {"card": "hf-1"}}));
+        rig.send(json!({"stop": {"card": "ex-1"}}));
         rig.wait_settled(LONG);
     }
 
@@ -487,9 +487,9 @@ mod walled {
             return;
         }
         let mut rig = Rig::new();
-        let clone = rig.fhome().join("clones/hf-1");
+        let clone = rig.fhome().join("clones/ex-1");
         std::fs::create_dir_all(clone.join(".git/factory/handoff")).unwrap();
-        let mut card = rig.card("hf-1", factory_types::card::Mode::Full);
+        let mut card = rig.card("ex-1", factory_types::card::Mode::Full);
         card.visual = true;
         card.stage = factory_types::card::Stage::Brief;
         card.approval = None;
@@ -504,15 +504,15 @@ mod walled {
             "read": [at("source")],
             "writable": [at(".git/factory-mock"), at(""), at(".git"), at(".git/factory/handoff")],
         });
-        let spawn = json!({"do": "ctl", "args": ["spawn", "hf-1", "baseline", "Reproduce today's pages."]});
+        let spawn = json!({"do": "ctl", "args": ["spawn", "ex-1", "baseline", "Reproduce today's pages."]});
         rig.scenario(json!([
-            {"agent": "hf-1/foreman", "steps": [spawn, {"do": "hang"}]},
-            {"agent": "hf-1/baseline-1", "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]},
+            {"agent": "ex-1/foreman", "steps": [spawn, {"do": "hang"}]},
+            {"agent": "ex-1/baseline-1", "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]},
         ]));
         rig.start();
-        rig.say("hf-1", "Go.");
+        rig.say("ex-1", "Go.");
         let line = || {
-            let job = rig.jobs("hf-1/baseline-1").into_iter().next()?;
+            let job = rig.jobs("ex-1/baseline-1").into_iter().next()?;
             rig.out_lines(&job).into_iter().find(|v| v["type"] == "probe")
         };
         wait_until("the baseline seat's wall probe", LONG, || line().is_some());
@@ -522,7 +522,7 @@ mod walled {
         for rel in ["", ".git", ".git/factory/handoff"] {
             assert_eq!(r["writable"][at(rel)], "EROFS", "{rel:?}: {r}");
         }
-        rig.send(json!({"stop": {"card": "hf-1"}}));
+        rig.send(json!({"stop": {"card": "ex-1"}}));
         rig.wait_settled(LONG);
     }
 
@@ -533,9 +533,9 @@ mod walled {
         }
         use std::os::unix::fs::PermissionsExt;
         let mut rig = Rig::new();
-        let clone = rig.fhome().join("clones/hf-1");
+        let clone = rig.fhome().join("clones/ex-1");
         std::fs::create_dir_all(clone.join(".git/factory-mock")).unwrap();
-        let mut card = rig.card("hf-1", factory_types::card::Mode::Full);
+        let mut card = rig.card("ex-1", factory_types::card::Mode::Full);
         card.mock = Some(factory_types::card::Mock {
             step: factory_types::card::MockStep::Approved,
             // The fake host probes its wall without binding a port.

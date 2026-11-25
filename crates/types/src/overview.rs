@@ -2,8 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::view::MessageView;
-
 /// Structured kind of an Overview stage row (fac-698).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -25,17 +23,7 @@ pub enum OverviewStageAt {
     Current,
 }
 
-/// One human-facing message in the Overview, tagged with the room it came from (`Spec`, `Build`, `Review`, `Report`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OverviewLine {
-    pub room: String,
-    pub message: MessageView,
-    /// An answered ask's answer (fac-691): Andrei's or the orchestrator's line, folded into its ask.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub answer: Option<MessageView>,
-}
-
-/// One milestone in the card's Overview spine: its kind, state, window, summary, count, lines, and round.
+/// One milestone in the card's Overview spine: its kind, state, window, summary, and round.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OverviewStage {
     pub kind: OverviewStageKind,
@@ -46,9 +34,6 @@ pub struct OverviewStage {
     pub end_ms: Option<i64>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub summary: String,
-    pub count: usize,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub lines: Vec<OverviewLine>,
     /// A round stage's verdict, commit, and named findings with proofs (fac-698).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub round: Option<crate::review::RoundView>,
@@ -58,7 +43,7 @@ pub struct OverviewStage {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OverviewView {
     pub stages: Vec<OverviewStage>,
-    /// The current stage's live rows, after its lines (fac-691).
+    /// The current stage's live rows (fac-691).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub live: Vec<LiveRow>,
 }

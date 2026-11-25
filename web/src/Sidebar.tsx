@@ -1,8 +1,8 @@
 import { useState } from "react";
-import type { AlertPermission } from "./alerts";
+import { type AlertPermission, ownHands } from "./alerts";
 import type { Link } from "./bridge";
 import { cardTarget, coldMinutes, dollars, workingSeats } from "./format";
-import { BoardIcon, ChevronIcon, Cold, FactoryMark, HandIcon } from "./icons";
+import { BoardIcon, ChevronIcon, Cold, HandIcon, MorkMark } from "./icons";
 import { RefusalLine, useHandOffers } from "./offers";
 import { quotaReading } from "./quota";
 import { PageLink, cardPath } from "./route";
@@ -40,7 +40,6 @@ function HandItem({ hand, activeCard, nowMs }: { hand: HandView; activeCard: str
         </span>
         {hand.role !== null && <span className="min-w-0 shrink-[4] truncate text-label-12 text-gray-900">{hand.role}</span>}
         <span className="ml-auto flex shrink-0 items-center gap-2">
-          {hand.given && <span className="text-label-12 text-gray-700">delegated</span>}
           {cold !== null && <Cold minutes={cold} />}
         </span>
       </div>
@@ -74,7 +73,7 @@ function ProjectTree({
   open: boolean;
   onToggle: () => void;
 }) {
-
+  const waiting = ownHands(screen.hands);
   return (
     <div className="border-b border-gray-400">
       <button
@@ -91,7 +90,7 @@ function ProjectTree({
         <ul>
           {board.live.cards.map((r) => {
             const target = cardTarget(r);
-            const raised = screen.hands.some((h) => h.card === r.id);
+            const raised = waiting.some((h) => h.card === r.id);
             const working = workingSeats(r, screen.rooms).length > 0;
             return (
               <li key={r.id}>
@@ -253,15 +252,15 @@ export function Sidebar({
   const rendered = new Set(
     screen?.boards.filter((b) => isOpen(b.project)).flatMap((b) => b.live.cards.map((r) => r.id)) ?? [],
   );
-  const alerts = screen?.hands.filter((h) => h.card === null || !rendered.has(h.card)) ?? [];
+  const alerts = ownHands(screen?.hands ?? []).filter((h) => h.card === null || !rendered.has(h.card));
   const title = build === null ? LINK_WORDS[link] : `${LINK_WORDS[link]} · build ${build}`;
   const updateReady = screen?.top.pin?.ready === true;
   const reloading = screen?.top.phase.is === "reloading";
   return (
     <aside className="flex w-[260px] shrink-0 flex-col border-r border-gray-400 bg-background-100">
       <div className="flex h-12 shrink-0 items-center gap-[10px] border-b border-gray-400 px-edge">
-        <FactoryMark />
-        <span className="text-heading-14 text-gray-1000">Factory</span>
+        <MorkMark />
+        <span className="text-heading-14 text-gray-1000">Mork</span>
         <span title={title} className="ml-auto font-mono text-label-12 text-gray-700">
           {build === null ? "offline" : build.slice(0, 8)}
         </span>

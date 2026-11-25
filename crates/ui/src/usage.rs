@@ -8,8 +8,9 @@ use crate::widgets;
 
 /// The usage pools and their window rows, aligned across the section.
 pub(crate) fn body(app: &App) -> Element<'_, Message> {
-    // The engine's order holds: the live Claude account before the signed-out one.
-    let mut pools: Vec<(&str, Vec<_>)> = Vec::new();
+    // The engine's order holds: the live Claude account before the signed-out ones, keyed so shared headers stay distinct.
+    type PoolKey<'a> = (&'a str, bool, Option<&'a str>);
+    let mut pools: Vec<(PoolKey<'_>, Vec<_>)> = Vec::new();
     let mut widths = [0usize; 3];
     for s in &app.screen.top.usage {
         let cells = spans::usage_cells(s, app.now_ms);
@@ -17,22 +18,20 @@ pub(crate) fn body(app: &App) -> Element<'_, Message> {
         for (width, cell) in widths[1..].iter_mut().zip(&cells) {
             *width = (*width).max(cell.text.chars().count());
         }
+        let key = (s.cli.as_str(), s.signed_out, s.switch_account.as_deref());
         match pools.last_mut() {
-            Some((name, rows)) if *name == s.cli => rows.push((s, cells)),
-            _ => pools.push((s.cli.as_str(), vec![(s, cells)])),
+            Some((last, rows)) if *last == key => rows.push((s, cells)),
+            _ => pools.push((key, vec![(s, cells)])),
         }
     }
     let mut col = Column::new();
-    for (name, rows) in pools {
+    for ((name, _, _), rows) in pools {
         let age = rows.iter().find_map(|(s, _)| s.read_ago.as_ref());
         let label = age.map_or_else(|| name.to_owned(), |age| format!("{name} · read {age} ago"));
         let tone = if rows.iter().all(|(s, _)| s.signed_out) { Tone::Dim } else { Tone::Text };
         let account = rows.iter().find_map(|(s, _)| s.switch_account.clone());
-        col = col.push(widgets::clickable(
-            format!("usage:{name}"),
-            widgets::txt(label, tone),
-            account.map(Message::ClaudeAccount),
-        ));
+        let id = account.as_deref().map_or_else(|| format!("usage:{name}"), |a| format!("usage:{name}:{a}"));
+        col = col.push(widgets::clickable(id, widgets::txt(label, tone), account.map(Message::ClaudeAccount)));
         for (s, cells) in rows {
             col = col.push(window(s, cells, widths));
         }

@@ -1,7 +1,11 @@
 # Copy to ~/.config/factory/factory.toml and adjust paths for your machine.
 
 [factory]
-project = "my-app"
+# Identifies Mork's own repo for self-rebuilds (and unwalled self-tests).
+# Keep this distinct from your application's [projects.<name>] entry below
+# unless you are developing Mork itself.
+project = "mork"
+
 # Bound read-only into every sandbox wall; each `bin` joins PATH in order.
 toolchains = [
   { path = "/usr/local", bin = "bin" },

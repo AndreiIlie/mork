@@ -64,7 +64,7 @@ pub fn place(state: &State, place: &str, tail: Option<u64>, outside: &Outside, c
             .then(|| card.and_then(|c| super::findings::triage_for_card(state, c)))
             .flatten(),
         overview: matches!(kind, PlaceKind::Card { .. })
-            .then(|| card.map(|c| super::overview::overview(state, c, tail, outside)))
+            .then(|| card.map(|c| super::overview::overview(state, c, outside)))
             .flatten(),
         kind,
     }

@@ -465,7 +465,7 @@ pub(super) fn pick(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) ->
     let Command::Pick { agent: name, model, effort, cli } = cmd else { return Decision::default() };
     let name = name.trim();
     if name.is_empty() || (model.is_none() && effort.is_none()) {
-        return Decision::refused("name the agent and a model, an effort or both: `pick hf-550/foreman --effort high`");
+        return Decision::refused("name the agent and a model, an effort or both: `pick ex-550/foreman --effort high`");
     }
     let key = if name.contains('/') { AgentKey::new(name) } else { AgentKey::new(format!("{MAIN}/{name}")) };
     let Some(agent) = state.agents.get(&key) else { return Decision::refused(format!("no agent `{key}`")) };

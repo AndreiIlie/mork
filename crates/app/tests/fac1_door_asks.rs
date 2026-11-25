@@ -28,7 +28,7 @@ fn ask_of(rig: &Rig, text: &str) -> String {
 // one, so its fetches pass.
 fn card(rig: &Rig) {
     rig.write_config(&rig.config(CODEX_FOREMAN));
-    let c = rig.card("hf-1", Mode::Full);
+    let c = rig.card("ex-1", Mode::Full);
     rig.put_cards(vec![c]);
     common::builds::factory_repo(rig, 1);
 }
@@ -42,7 +42,7 @@ fn news(rig: &Rig, place: &str, to: &str) -> Vec<factory_types::state::Message> 
 
 // Later turns consume the replies to the door calls.
 fn later() -> Value {
-    json!({"fake": "codex", "agent": "hf-1/foreman", "steps": [{"do": "thread-started"}, {"do": "codex-reply", "value": reply("working", "Seen", json!([]))}]})
+    json!({"fake": "codex", "agent": "ex-1/foreman", "steps": [{"do": "thread-started"}, {"do": "codex-reply", "value": reply("working", "Seen", json!([]))}]})
 }
 
 // Mixing reads and asks catches accidental approval prompts on the allowed read path.
@@ -60,16 +60,16 @@ fn probed() -> (Rig, Vec<Value>) {
         door_args("staging", "file.cat", json!({"root": "app", "path": "../../etc/passwd"})),
         door_args("staging", "file.cat", json!({"root": "app", "path": "passwd"})),
         door_args("nowhere", "sql.select", json!({"query": "SELECT 1"})),
-        vec!["door.once".into(), "hf-1/door/1".into()],
+        vec!["door.once".into(), "ex-1/door/1".into()],
     ];
     rig.scenario(json!([
-        ctl_turn("hf-1/foreman", Some("Probe the door"), &calls, reply("working", "Probed", json!([]))),
+        ctl_turn("ex-1/foreman", Some("Probe the door"), &calls, reply("working", "Probed", json!([]))),
         later(),
     ]));
     rig.start();
-    rig.say("hf-1", "@foreman Probe the door");
-    rig.wait_turns("hf-1/foreman", 1);
-    let a = answers(&rig, &rig.jobs("hf-1/foreman").remove(0));
+    rig.say("ex-1", "@foreman Probe the door");
+    rig.wait_turns("ex-1/foreman", 1);
+    let a = answers(&rig, &rig.jobs("ex-1/foreman").remove(0));
     (rig, a)
 }
 
@@ -89,11 +89,11 @@ fn fac1_refusals_and_misc_are_andreis_asks() {
     let asks = door_asks(&rig);
     assert_eq!(asks.len(), 3, "{asks:#?}");
     for x in &asks {
-        assert!(x.open && x.place == "hf-1", "{x:?}");
-        assert!(x.text.starts_with("hf-1/foreman wants "), "{}", x.text);
+        assert!(x.open && x.place == "ex-1", "{x:?}");
+        assert!(x.text.starts_with("ex-1/foreman wants "), "{}", x.text);
         assert!(x.detail.contains("allowlist: ") && !x.detail.contains("model check: "), "{}", x.detail);
     }
-    assert!(ask_of(&rig, "misc.run").starts_with("hf-1/door/"));
+    assert!(ask_of(&rig, "misc.run").starts_with("ex-1/door/"));
     assert_eq!(rig.door_runs("mysql").len(), 1, "the allowed read ran");
     assert_eq!(remote_commands(&rig, "misc ran"), 0);
 }
@@ -104,17 +104,17 @@ fn fac1_once_runs_once_and_no_refuses() {
     let (rig, _) = probed();
     let misc = ask_of(&rig, "misc ran");
     assert!(rig.send(json!({"door.once": {"ask": misc}})).get("ok").is_some());
-    wait_until("the misc call's news", LONG, || !news(&rig, "hf-1", "foreman").is_empty());
-    let n = news(&rig, "hf-1", "foreman").remove(0);
+    wait_until("the misc call's news", LONG, || !news(&rig, "ex-1", "foreman").is_empty());
+    let n = news(&rig, "ex-1", "foreman").remove(0);
     assert!(n.text.contains("\"misc ran\"") && n.text.contains("\"done\""), "{}", n.text);
-    rig.wait_turns("hf-1/foreman", 2);
-    assert!(rig.prompts("hf-1/foreman")[1].contains("misc ran"), "the news is in its next turn");
+    rig.wait_turns("ex-1/foreman", 2);
+    assert!(rig.prompts("ex-1/foreman")[1].contains("misc ran"), "the news is in its next turn");
     assert_eq!(remote_commands(&rig, "misc ran"), 1);
     let again = rig.send(json!({"door.once": {"ask": misc}}));
     assert_eq!(again["err"]["code"], "refused", "{again}");
     let outside = ask_of(&rig, "refuse ran");
     assert!(rig.send(json!({"door.no": {"ask": outside}})).get("ok").is_some());
-    let told_no = || news(&rig, "hf-1", "foreman").iter().any(|m| m.text.contains("Andrei said no"));
+    let told_no = || news(&rig, "ex-1", "foreman").iter().any(|m| m.text.contains("Andrei said no"));
     wait_until("the no's news", LONG, told_no);
     let parallel = ask_of(&rig, "parallel ran");
     let mut c1 = Client::connect(&rig.fhome().join("factory.sock"));
@@ -138,21 +138,21 @@ fn fac1_a_changed_configuration_voids_an_approval() {
     card(&rig);
     let call = door_args("staging", "misc.run", json!({"argv": ["printf", "%s", "x"]}));
     rig.scenario(json!([
-        ctl_turn("hf-1/foreman", Some("Run misc"), &[call], reply("working", "Asked", json!([]))),
+        ctl_turn("ex-1/foreman", Some("Run misc"), &[call], reply("working", "Asked", json!([]))),
         later(),
     ]));
     rig.start();
-    rig.say("hf-1", "@foreman Run misc");
-    rig.wait_turns("hf-1/foreman", 1);
+    rig.say("ex-1", "@foreman Run misc");
+    rig.wait_turns("ex-1/foreman", 1);
     let ask = ask_of(&rig, "misc.run");
     let targets = rig.fhome().join("targets.toml");
     // The alias the call would run over is part of its plan: change it, and the plan it was
     // approved on is no longer the one the file gives.
-    let text = std::fs::read_to_string(&targets).unwrap().replace(STAGING_ALIAS, "hf-other-box");
+    let text = std::fs::read_to_string(&targets).unwrap().replace(STAGING_ALIAS, "ex-other-box");
     std::fs::write(&targets, text).unwrap();
     assert!(rig.send(json!({"door.once": {"ask": ask}})).get("ok").is_some());
-    wait_until("the news", LONG, || !news(&rig, "hf-1", "foreman").is_empty());
-    let n = news(&rig, "hf-1", "foreman").remove(0);
+    wait_until("the news", LONG, || !news(&rig, "ex-1", "foreman").is_empty());
+    let n = news(&rig, "ex-1", "foreman").remove(0);
     assert!(n.text.contains("not allowed") && n.text.contains("configuration changed"), "{}", n.text);
     assert_eq!(remote_commands(&rig, "x"), 0, "nothing ran");
 }
@@ -165,19 +165,19 @@ fn fac124_a_revoked_misc_door_voids_an_approval() {
     card(&rig);
     let call = door_args("staging", "misc.run", json!({"argv": ["printf", "%s", "revoke-probe"]}));
     rig.scenario(json!([
-        ctl_turn("hf-1/foreman", Some("Run misc"), &[call], reply("working", "Asked", json!([]))),
+        ctl_turn("ex-1/foreman", Some("Run misc"), &[call], reply("working", "Asked", json!([]))),
         later(),
     ]));
     rig.start();
-    rig.say("hf-1", "@foreman Run misc");
-    rig.wait_turns("hf-1/foreman", 1);
+    rig.say("ex-1", "@foreman Run misc");
+    rig.wait_turns("ex-1/foreman", 1);
     let ask = ask_of(&rig, "revoke-probe");
     let targets = rig.fhome().join("targets.toml");
     let text = std::fs::read_to_string(&targets).unwrap().replace("misc = true", "misc = false");
     std::fs::write(&targets, text).unwrap();
     assert!(rig.send(json!({"door.once": {"ask": ask}})).get("ok").is_some());
-    wait_until("the news", LONG, || !news(&rig, "hf-1", "foreman").is_empty());
-    let n = news(&rig, "hf-1", "foreman").remove(0);
+    wait_until("the news", LONG, || !news(&rig, "ex-1", "foreman").is_empty());
+    let n = news(&rig, "ex-1", "foreman").remove(0);
     assert!(n.text.contains("not allowed") && n.text.contains("no misc door"), "{}", n.text);
     assert_eq!(remote_commands(&rig, "revoke-probe"), 0, "nothing ran");
 }
@@ -193,15 +193,15 @@ fn fac1_generic_commands_never_bypass_the_door() {
     let act = |cmd: &str| vec![cmd.to_owned(), "act-2".to_owned(), "--note".to_owned(), "seen".to_owned()];
     let drop = vec!["action.drop".to_owned(), "act-2".to_owned()];
     rig.scenario(json!([ctl_turn(
-        "hf-1/foreman",
+        "ex-1/foreman",
         Some("Run misc"),
         &[call, drop, act("action.done")],
         reply("working", "Asked", json!([]))
     ),]));
     rig.start();
-    rig.say("hf-1", "@foreman Run misc");
-    rig.wait_turns("hf-1/foreman", 1);
-    let a = answers(&rig, &rig.jobs("hf-1/foreman").remove(0));
+    rig.say("ex-1", "@foreman Run misc");
+    rig.wait_turns("ex-1/foreman", 1);
+    let a = answers(&rig, &rig.jobs("ex-1/foreman").remove(0));
     assert_eq!(a[0]["door"]["status"], "ask raised");
     assert_eq!(a[1]["err"]["code"], "buzz", "{}", a[1]);
     assert_eq!(a[2]["err"]["code"], "buzz", "{}", a[2]);

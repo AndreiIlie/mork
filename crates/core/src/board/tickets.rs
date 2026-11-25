@@ -1,12 +1,16 @@
-//! A ticketed card's work items (fac-290): read from its notes, they name its PR, its branch and
+//! A ticketed project's card tickets (fac-290): read from its notes, they name its PR, its branch and
 //! its description.
 
-use factory_types::CardId;
 use factory_types::card::Card;
+use factory_types::config::Config;
+use factory_types::{CardId, ProjectId};
 
 use crate::state::State;
 
-const TICKET_URL: &str = "https://dev.azure.com/example-org/example-project/_workitems/edit/";
+/// Whether a project has `[projects.<name>.tickets]` configured (fac-721).
+pub fn has_tickets(config: &Config, project: &ProjectId) -> bool {
+    config.projects.get(project).is_some_and(|p| p.tickets.is_some())
+}
 
 // The numbers a note lists after `Azure DevOps` (`4123, 4124`, or `User Story 4650 under epic 4607`:
 // the epic is no ticket of the card).
@@ -37,17 +41,20 @@ fn ticket_note(n: &str) -> Vec<u64> {
 }
 
 /// A card's ticket numbers (fac-351): those of its newest ticket note, in its order, then each carried
-/// card's (fac-563), then those its newest `PR wording` note adds, in its order.
-pub fn of(state: &State, c: &Card) -> Vec<u64> {
-    listed_of(state, c, true)
+/// card's (fac-563), then those its newest `PR wording` note adds, in its order; none when the project has no `tickets` table.
+pub fn of(state: &State, c: &Card, config: &Config) -> Vec<u64> {
+    listed_of(state, c, config, true)
 }
 
 /// As [`of`], leaving out the cards the run carries: its branch is named from its own card alone.
-pub fn own(state: &State, c: &Card) -> Vec<u64> {
-    listed_of(state, c, false)
+pub fn own(state: &State, c: &Card, config: &Config) -> Vec<u64> {
+    listed_of(state, c, config, false)
 }
 
-fn listed_of(state: &State, c: &Card, carried: bool) -> Vec<u64> {
+fn listed_of(state: &State, c: &Card, config: &Config, carried: bool) -> Vec<u64> {
+    if !has_tickets(config, &c.project) {
+        return Vec::new();
+    }
     let mut out = noted(state, &c.id, &c.description);
     let carried = c.carries.iter().filter(|_| carried).flat_map(|k| noted(state, &k.id, &k.description));
     let added = wording(state, c).map(|w| w.1).unwrap_or_default().into_iter().map(|(n, _)| n);
@@ -85,17 +92,17 @@ fn wording(state: &State, c: &Card) -> Option<(String, Vec<(u64, String)>)> {
 
 /// A card's PR title's wording: the foreman's summary from its `PR wording` note, whole; none when
 /// it has no ticket or no such note.
-pub fn summary(state: &State, c: &Card) -> Option<String> {
-    wording(state, c).map(|w| w.0).filter(|t| !t.is_empty() && !of(state, c).is_empty())
+pub fn summary(state: &State, c: &Card, config: &Config) -> Option<String> {
+    wording(state, c).map(|w| w.0).filter(|t| !t.is_empty() && !of(state, c, config).is_empty())
 }
 
 /// The request to add a card's PR wording before publication.
 pub(crate) const WORDING_REQUEST: &str = "Its PR opens from the card's `PR wording` note: add it now with `card.change --note`, its first line `PR wording`, then `Title: <a summary of under 10 words>` and one `<ticket number>: <a note of about 15 words>` line for every ticket (the bitbucket skill).";
 
-/// Why a card's PR can't be published yet: a card with tickets needs a `PR wording`
+/// Why a card's PR can't be published yet: a ticketed project's card with tickets needs a `PR wording`
 /// note with a summary and a note for every ticket (fac-296); none when it is complete or no ticket's.
-pub fn unworded(state: &State, c: &Card) -> Option<String> {
-    let tickets = of(state, c);
+pub fn unworded(state: &State, c: &Card, config: &Config) -> Option<String> {
+    let tickets = of(state, c, config);
     if tickets.is_empty() {
         return None;
     }
@@ -113,24 +120,27 @@ pub fn unworded(state: &State, c: &Card) -> Option<String> {
 
 /// A card's PR description: one line a ticket, its page and the foreman's note of it when its
 /// `PR wording` note has one; none for a card with no ticket.
-pub fn description(state: &State, c: &Card) -> String {
+pub fn description(state: &State, c: &Card, config: &Config) -> String {
+    let Some(page) = config.projects.get(&c.project).and_then(|p| p.tickets.as_ref()).map(|t| t.page.as_str()) else {
+        return String::new();
+    };
     let notes = wording(state, c).map(|w| w.1).unwrap_or_default();
     let line = |n: &u64| match notes.iter().find(|(m, _)| m == n) {
-        Some((_, note)) => format!("[{n}]({TICKET_URL}{n}): {note}"),
-        None => format!("{TICKET_URL}{n}"),
+        Some((_, note)) => format!("[{n}]({page}{n}): {note}"),
+        None => format!("{page}{n}"),
     };
-    of(state, c).iter().map(line).collect::<Vec<_>>().join("\n")
+    of(state, c, config).iter().map(line).collect::<Vec<_>>().join("\n")
 }
 
-/// The branch a card starts on (fac-111): its id, or when carrying tickets starting with
+/// The branch a card starts on (fac-111): its id, a ticketed project's card with a ticket starting with
 /// the first one's number and its title's words, each the push's internals check would refuse left out (fac-394).
-pub fn branch(state: &State, c: &Card, words: &[String]) -> String {
-    let Some(first) = own(state, c).first().copied() else { return c.id.as_str().to_lowercase() };
-    let title = crate::queue::pr::title_words(state, c).to_lowercase();
+pub fn branch(state: &State, c: &Card, config: &Config) -> String {
+    let Some(first) = own(state, c, config).first().copied() else { return c.id.as_str().to_lowercase() };
+    let title = crate::queue::pr::title_words(state, c, config).to_lowercase();
     let mut name = first.to_string();
     for w in title.split(|ch: char| !ch.is_ascii_alphanumeric()).filter(|w| !w.is_empty()) {
         let longer = format!("{name}-{w}");
-        if refused(words, &longer).is_none() {
+        if refused(&config.internals.words, &longer).is_none() {
             name = longer;
         }
     }

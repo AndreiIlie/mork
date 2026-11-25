@@ -56,7 +56,7 @@ xtask: the production-only tests: 1 test binaries, 2 at a time
 #[test]
 fn jest_counts_test_files_once_and_gives_no_total() {
     let output = "\
-> my-app@1.0.0 test:unit
+> example@1.0.0 test:unit
 PASS server/features/bills/bills-rules.test.js (5.2 s)
 FAIL server/features/payees/payees-service.test.js
   ● payees › refuses a blank IBAN

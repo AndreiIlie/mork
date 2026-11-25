@@ -1,6 +1,7 @@
 //! The window owns these controls (fac-35), so opening a forward never sends an agent command.
 
-use factory_types::web_tunnel::{Environment, Status};
+use factory_types::config::TunnelConfig;
+use factory_types::web_tunnel::Status;
 use iced::widget::{Column, column, row};
 use iced::{Element, Length};
 
@@ -9,8 +10,11 @@ use crate::spans::Tone;
 use crate::widgets::{self, bold, txt, words_button};
 
 impl App {
-    pub(crate) fn tunnel(&mut self, env: Environment, open: bool) -> Vec<Effect> {
-        let status = &mut self.tunnels[env.index()];
+    pub(crate) fn tunnel(&mut self, name: String, open: bool) -> Vec<Effect> {
+        if !self.settings.tunnels.contains_key(&name) {
+            return Vec::new();
+        }
+        let status = self.tunnels.entry(name.clone()).or_default();
         let permitted = match status {
             Status::Closed | Status::Failed(_) | Status::Dropped(_) => open,
             Status::Opening | Status::Open => !open,
@@ -20,16 +24,24 @@ impl App {
             return Vec::new();
         }
         *status = if open { Status::Opening } else { Status::Closing };
-        vec![Effect::Tunnel(env, open)]
+        vec![Effect::Tunnel(name, open)]
     }
 
-    pub(crate) fn tunnel_page(&self, env: Environment) -> Vec<Effect> {
-        if self.tunnels[env.index()] == Status::Open { vec![Effect::Link(env.url().into())] } else { Vec::new() }
+    pub(crate) fn tunnel_page(&self, name: &str) -> Vec<Effect> {
+        if self.tunnels.get(name) == Some(&Status::Open)
+            && let Some(cfg) = self.settings.tunnels.get(name)
+        {
+            vec![Effect::Link(cfg.url.clone())]
+        } else {
+            Vec::new()
+        }
     }
 }
 
 pub fn view(app: &App) -> Element<'_, Message> {
-    let rows = Environment::ALL.into_iter().map(|env| environment(env, &app.tunnels[env.index()]));
+    static CLOSED: Status = Status::Closed;
+    let rows =
+        app.settings.tunnels.iter().map(|(name, cfg)| tunnel_row(name, cfg, app.tunnels.get(name).unwrap_or(&CLOSED)));
     column![
         Column::with_children(rows).spacing(16),
         txt("Tunnels close when Factory exits and open again when it starts.", Tone::Dim),
@@ -38,7 +50,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
     .into()
 }
 
-fn environment(env: Environment, status: &Status) -> Element<'_, Message> {
+fn tunnel_row<'a>(name: &'a str, cfg: &'a TunnelConfig, status: &'a Status) -> Element<'a, Message> {
     let (label, tone) = match status {
         Status::Closed => ("closed", Tone::Dim),
         Status::Opening => ("opening…", Tone::Orange),
@@ -47,7 +59,6 @@ fn environment(env: Environment, status: &Status) -> Element<'_, Message> {
         Status::Failed(_) => ("failed", Tone::Orange),
         Status::Dropped(_) => ("dropped", Tone::Orange),
     };
-    let name = env.name();
     let mut line = row![bold(name, Tone::Bright), txt(label, tone)].spacing(12);
     let action = match status {
         Status::Closed | Status::Failed(_) | Status::Dropped(_) => Some(("open", true)),
@@ -59,14 +70,13 @@ fn environment(env: Environment, status: &Status) -> Element<'_, Message> {
             format!("tunnel:{name}:{label}"),
             label.into(),
             Tone::Green,
-            Message::Tunnel(env, open),
+            Message::Tunnel(name.to_owned(), open),
         ));
     }
-    let address = format!("localhost:{}/root", env.port());
     let link = widgets::clickable(
         format!("tunnel:{name}:link"),
-        txt(address, if *status == Status::Open { Tone::Green } else { Tone::Dim }),
-        (*status == Status::Open).then_some(Message::TunnelPage(env)),
+        txt(cfg.url.clone(), if *status == Status::Open { Tone::Green } else { Tone::Dim }),
+        (*status == Status::Open).then_some(Message::TunnelPage(name.to_owned())),
     );
     let mut col = column![line, link].spacing(4);
     if let Status::Failed(why) | Status::Dropped(why) = status {

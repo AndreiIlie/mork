@@ -77,11 +77,11 @@ newtype!(
     JobId
 );
 newtype!(
-    /// A card's id, as its board names it in lowercase (`hf-550`).
+    /// A card's id, as its board names it in lowercase (`ex-550`).
     CardId
 );
 newtype!(
-    /// An agent: a seat in a role at a place (`hf-550/foreman`, `main/echo`).
+    /// An agent: a seat in a role at a place (`ex-550/foreman`, `main/echo`).
     AgentKey
 );
 newtype!(
@@ -89,7 +89,7 @@ newtype!(
     Sha
 );
 newtype!(
-    /// A place: `main`, a card's room (`hf-550`), a DM (`hf-550/foreman/dm`), a test place.
+    /// A place: `main`, a card's room (`ex-550`), a DM (`ex-550/foreman/dm`), a test place.
     PlaceId
 );
 newtype!(
@@ -102,11 +102,11 @@ newtype!(
 );
 
 newtype!(
-    /// An ask: `<place>/<kind>/<n>` (`hf-550/approve-brief/1`).
+    /// An ask: `<place>/<kind>/<n>` (`ex-550/approve-brief/1`).
     AskId
 );
 newtype!(
-    /// A project of the config (`hf`).
+    /// A project of the config (`example`).
     ProjectId
 );
 newtype!(

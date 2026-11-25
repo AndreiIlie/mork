@@ -5,13 +5,12 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use factory_types::config::ProjectConfig;
 use factory_types::work::{OpenPr, Ticket};
 use serde_json::Value;
 
-const API: &str = "https://dev.azure.com/example-org/example-project/_apis/wit/workitems";
-
-fn api() -> String {
-    crate::faults::test_env("FACTORY_TEST_AZURE").unwrap_or_else(|| API.into())
+fn api(configured: &str) -> String {
+    crate::faults::test_env("FACTORY_TEST_AZURE").unwrap_or_else(|| configured.to_owned())
 }
 
 /// The token, as the file holds it.
@@ -43,8 +42,8 @@ fn agent() -> ureq::Agent {
         .into()
 }
 
-fn read(agent: &ureq::Agent, header: &str, id: u64) -> Read {
-    let url = format!("{}/{id}?api-version=7.1", api());
+fn read(agent: &ureq::Agent, base: &str, header: &str, id: u64) -> Read {
+    let url = format!("{base}/{id}?api-version=7.1");
     let Ok(mut resp) = agent.get(&url).header("Authorization", header).call() else { return Read::Unavailable };
     match resp.status().as_u16() {
         400 | 403 | 404 | 410 => return Read::Missing,
@@ -104,9 +103,11 @@ pub struct Cache(Arc<Mutex<BTreeMap<(String, u64), Tickets>>>);
 
 impl Cache {
     /// The PRs with the tickets they refer to, read again for a new head or new numbers; a PR whose
-    /// tickets couldn't be read has none until a later poll reads them.
-    pub fn attach(&self, project: &str, mut prs: Vec<OpenPr>) -> Vec<OpenPr> {
+    /// tickets couldn't be read has none until a later poll reads them. Read only for projects with `tickets`.
+    pub fn attach(&self, project: &str, config: &ProjectConfig, mut prs: Vec<OpenPr>) -> Vec<OpenPr> {
+        let Some(tickets_cfg) = &config.tickets else { return prs };
         let Some(pat) = pat() else { return prs };
+        let base = api(&tickets_cfg.api);
         let (agent, header) = (agent(), header(&pat));
         let Ok(mut seen) = self.0.lock() else { return prs };
         seen.retain(|(p, n), _| p != project || prs.iter().any(|x| x.pr == *n));
@@ -127,7 +128,7 @@ impl Cache {
                     read_all = false;
                     break;
                 }
-                match read(&agent, &header, n) {
+                match read(&agent, &base, &header, n) {
                     Read::Ticket(t) => tickets.push(t),
                     Read::Missing => {}
                     Read::Unavailable => {

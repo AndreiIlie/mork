@@ -10,8 +10,8 @@ description: "Use before sending a factory ctl command: how fields are filled, t
 - **Sending one.**
   `factory ctl <command> <fields>` sends one command to the running factory and prints its answer.
   Plain words fill the required fields in order.
-  When the last required field is free text (`text`, `why`, `note`, `question`, `title`, `description`, `task`, `words`) or a list, it takes all the remaining words; otherwise the words past the required ones fill the optional fields not yet given: when the only one is free text, it takes them all, else they fill them in the catalog's order, one word each (`start hf-550 report` sets `mode`), and the last required field takes what is left.
-  `start`'s words after its card are the cards its run carries (`start hf-550 hf-551 hf-552`), one card each and never split at commas, unless the first of them is a mode word: then mode, model and effort as before; with carried cards, name those three with their flags.
+  When the last required field is free text (`text`, `why`, `note`, `question`, `title`, `description`, `task`, `words`) or a list, it takes all the remaining words; otherwise the words past the required ones fill the optional fields not yet given: when the only one is free text, it takes them all, else they fill them in the catalog's order, one word each (`start ex-550 report` sets `mode`), and the last required field takes what is left.
+  `start`'s words after its card are the cards its run carries (`start ex-550 ex-551 ex-552`), one card each and never split at commas, unless the first of them is a mode word: then mode, model and effort as before; with carried cards, name those three with their flags.
   `--<field> <value>` fills any field, anywhere, with the one word after it (quote a value with spaces); boolean flags (`--delegated`, `--no-planner`) take no word after them.
   `spawn`'s `--task-file <path>` option, `-` for stdin, reads its task from a file and sends the text as written, for a task with quotes or parentheses.
   Give optional fields that way to be sure.
@@ -24,7 +24,7 @@ description: "Use before sending a factory ctl command: how fields are filled, t
 - **Who sends it.**
   Inside a wall, `factory ctl` reaches the engine through your job's socket, and the command is yours: the engine knows which agent's job it came from.
   Outside every wall, on `factory.sock`, it is Andrei's, unless an unwalled seat's job sends it, which is that seat's.
-  `factory ctl --as orchestrator:<project> <command>` on `factory.sock` (`orchestrator:my-app`, `orchestrator:factory`) sends it as that project's orchestrator: a declaration, not a lock, refused from any job's socket and for a project not configured.
+  `factory ctl --as orchestrator:<project> <command>` on `factory.sock` (`orchestrator:example.com`, `orchestrator:factory`) sends it as that project's orchestrator: a declaration, not a lock, refused from any job's socket and for a project not configured.
   A connection that belongs to no running job is refused.
 - **Answers.**
   An accepted command prints its `ok` answer as one JSON object on stdout and exits 0.

@@ -141,7 +141,8 @@ impl Engine {
     fn claude_account(&mut self, name: &str) -> Result<Value, ErrorBody> {
         let refused = |message| ErrorBody::new(ErrorCode::Refused, message);
         let home = self.opts.home.agent_home();
-        let switch = crate::claude_accounts::Switch::prepare(&home, name).map_err(refused)?;
+        let switch =
+            crate::claude_accounts::Switch::prepare(&home, name, &self.ctx.config.claude_accounts).map_err(refused)?;
         self.forget_claude_readings().map_err(refused)?;
         let result = switch.apply();
         self.views_cache.claude_accounts.reload(&home);

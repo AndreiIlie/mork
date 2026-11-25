@@ -11,6 +11,7 @@ pub mod cli;
 pub mod clipboard;
 pub mod clock;
 pub mod config;
+mod config_checks;
 pub mod doctor;
 pub mod door;
 pub mod faults;

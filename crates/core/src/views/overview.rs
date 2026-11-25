@@ -1,14 +1,12 @@
-// Per-card Overview stage spine and human-facing lines built in `core` for the web Card Room (fac-684).
+// Per-card Overview stage spine built in `core` for the web Card Room (fac-684); it carries no messages (fac-719).
 
 use factory_types::card::{Card, Mode, Stage};
 use factory_types::decisions;
 use factory_types::review::{FindingState, Review, Round, RoundView, Verdict};
-use factory_types::view::{OverviewLine, OverviewStage, OverviewStageAt, OverviewStageKind, OverviewView};
+use factory_types::view::{OverviewStage, OverviewStageAt, OverviewStageKind, OverviewView};
 
-use super::conversation::MESSAGES_MAX;
 use super::findings::{review_card, round_findings, round_view, state_of};
 use super::outside::Outside;
-use super::overview_lines::collect_lines;
 use super::pipeline::{land_sub, plan_progress, review_sub, verify_sub};
 use super::timeline::{Mark, Point};
 use crate::state::State;
@@ -35,34 +33,19 @@ struct RoundSlot {
     start_ms: Option<i64>,
 }
 
-pub(super) fn overview(state: &State, card: &Card, tail: Option<u64>, outside: &Outside) -> OverviewView {
+pub(super) fn overview(state: &State, card: &Card, outside: &Outside) -> OverviewView {
     // Ignore a finished review card left over from an earlier run of a restarted parent card.
     let review = review_card(state, card)
         .filter(|(rc, _)| card.mode == Mode::Review || rc.stage.is_live() || rc.first_seq >= card.first_seq);
     let points = outside.timelines.get(&card.id).map(Vec::as_slice).unwrap_or_default();
     let raw = build_stages(state, card, review, points);
-    let build_ms = raw.iter().find(|s| s.kind == RawKind::Build).map(|s| s.start_ms);
-    let all = collect_lines(state, card, review, build_ms);
-    let limit = tail.map_or(MESSAGES_MAX, |t| usize::try_from(t).unwrap_or(usize::MAX).min(MESSAGES_MAX));
-    let keep_from = all.len().saturating_sub(limit);
-    let mut counts = vec![0usize; raw.len()];
-    let mut buckets: Vec<Vec<OverviewLine>> = vec![Vec::new(); raw.len()];
-    for (idx, (time_ms, _, line)) in all.into_iter().enumerate() {
-        let si = stage_for(&raw, time_ms);
-        counts[si] += 1;
-        if idx >= keep_from {
-            buckets[si].push(line);
-        }
-    }
     let last_spec = raw.iter().rposition(|s| s.kind == RawKind::Spec);
     let last_build = raw.iter().rposition(|s| s.kind == RawKind::Build);
     let review_ref = review.map(|(_, r)| r);
     let stages = raw
         .iter()
         .enumerate()
-        .zip(counts)
-        .zip(buckets)
-        .map(|(((i, st), count), lines)| {
+        .map(|(i, st)| {
             let is_last = i + 1 == raw.len();
             let current = card.stage.is_live() && is_last;
             let flags = (current, is_last, Some(i) == last_spec, Some(i) == last_build);
@@ -73,8 +56,6 @@ pub(super) fn overview(state: &State, card: &Card, tail: Option<u64>, outside: &
                 start_ms: st.start_ms,
                 end_ms: st.end_ms,
                 summary: stage_summary(state, card, review_ref, outside, st.kind, flags),
-                count,
-                lines,
                 round: stage_round(st.kind, review_ref),
             }
         })
@@ -291,7 +272,7 @@ fn splice_rounds(state: &State, card: &Card, phases: Vec<RawStage>, review: Opti
     out
 }
 
-// A later round whose request is not yet sent starts at its verification re-entry, keeping earlier round lines intact.
+// A later round whose request is not yet sent starts at its verification re-entry, where the round before it ends.
 fn slots_to_stages(
     slots: &[RoundSlot],
     entries: &[i64],
@@ -314,10 +295,6 @@ fn slots_to_stages(
         out[i].end_ms = out.get(i + 1).map(|next| next.start_ms).or(last_end);
     }
     out
-}
-
-fn stage_for(stages: &[RawStage], time_ms: i64) -> usize {
-    stages.iter().rposition(|s| s.start_ms <= time_ms).unwrap_or(0)
 }
 
 fn stage_kind(kind: RawKind) -> OverviewStageKind {

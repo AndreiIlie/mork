@@ -13,7 +13,7 @@ fn names(files: &[factory_types::note::HandoffFile]) -> Vec<&str> {
 #[test]
 fn fac287_a_handoff_is_copied_through_no_link() {
     let root = std::env::temp_dir().join(format!("factory-test-handoff-{}", std::process::id()));
-    let (clone, to, secret) = (root.join("clone"), root.join("records/handoffs/hf-1-1"), root.join("secret"));
+    let (clone, to, secret) = (root.join("clone"), root.join("records/handoffs/ex-1-1"), root.join("secret"));
     let handoff = clone.join(".git/factory/handoff");
     std::fs::create_dir_all(handoff.join("notes")).unwrap();
     std::fs::create_dir_all(secret.join("deep")).unwrap();

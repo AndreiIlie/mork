@@ -29,7 +29,7 @@ pub fn sha(name: &str) -> Sha {
     Sha::new(format!("{hex:0<40}"))
 }
 
-/// The test config: a local project `web` and a Bitbucket project `hf`, with checks and a test command, neither the
+/// The test config: a local project `web` and a Bitbucket project `ex`, with checks and a test command, neither the
 /// factory's own project, whose suite would owe its wall tests a second run.
 pub fn config() -> Config {
     let c = json!({
@@ -38,9 +38,9 @@ pub fn config() -> Config {
         "projects": {
             "web": {"repo": "/r/web", "board": "/b/web", "test": "npm test",
                     "checks": {"command": "checks", "folder": "/c/web"}},
-            "hf": {"repo": "/r/hf", "board": "/b/hf", "test": "npm test",
-                   "bitbucket": {"workspace": "ws", "slug": "hf"},
-                   "checks": {"command": "checks", "folder": "/c/hf"}}
+            "ex": {"repo": "/r/ex", "board": "/b/ex", "test": "npm test",
+                   "bitbucket": {"workspace": "ws", "slug": "ex"},
+                   "checks": {"command": "checks", "folder": "/c/ex"}}
         }
     });
     serde_json::from_value(c).unwrap()

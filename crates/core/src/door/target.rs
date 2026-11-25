@@ -170,7 +170,7 @@ const READS: &[&str] = &[
 // A read-only server's bounds are its SQL's own: `max_rows` null caps no rows.
 fn sql(f: &TargetsFile, t: &Target, s: &Sql) -> Value {
     let (max_rows, timeout_ms) = sql_bounds(f.defaults, t);
-    json!({
+    let mut v = json!({
         "database": s.database,
         "tables": "every table its login may read, except information_schema and the sys schema",
         "read_only": true,
@@ -178,7 +178,11 @@ fn sql(f: &TargetsFile, t: &Target, s: &Sql) -> Value {
         "reads": READS,
         "max_rows": max_rows,
         "timeout_ms": timeout_ms,
-    })
+    });
+    if let Some(hint) = s.schema_hint.as_deref().map(str::trim).filter(|h| !h.is_empty()) {
+        v["schema_hint"] = json!(hint);
+    }
+    v
 }
 
 /// A target's SQL row cap (none: the query's own LIMIT alone) and timeout. A read-only server

@@ -10,7 +10,7 @@ import { SectionHead } from "./ui/Section";
 
 const ID = "min-w-[76px] max-w-[220px] shrink-0 truncate font-mono text-label-13 font-medium text-gray-1000";
 
-/** The Board's attention list: every open hand, in the engine's order, with its offers. */
+/** The Board's attention list: the open hands waiting on Andrei, in the engine's order, with their offers. */
 export function RaisedHands({ hands, nowMs, live }: { hands: HandView[]; nowMs: number; live: boolean }) {
   const { pending, refusals, press } = useHandOffers();
   const expiring = hands.filter((h) => coldMinutes(h.cold_at_ms, nowMs) !== null).length;
@@ -25,9 +25,7 @@ export function RaisedHands({ hands, nowMs, live }: { hands: HandView[]; nowMs: 
       <List>
         {hands.map((h) => {
           const cold = coldMinutes(h.cold_at_ms, nowMs);
-          const meta = [wherePlace(h), h.role, h.design ? "design" : null, h.given ? "sent to orchestrator" : null]
-            .filter(Boolean)
-            .join(" · ");
+          const meta = [wherePlace(h), h.role, h.design ? "design" : null].filter(Boolean).join(" · ");
           const card = h.card;
           const actions = (
             <div className="flex shrink-0 items-center gap-2">

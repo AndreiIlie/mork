@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ownHands } from "./alerts";
 import { RaisedHands } from "./Hands";
 import { cardTarget, coldMinutes, dollars, duration, plural, shortAge, workingSeats } from "./format";
 import { ChevronIcon, GitMergeIcon } from "./icons";
@@ -290,7 +291,8 @@ export function Board({ screen, burn, nowMs, live }: { screen: Screen; burn: Rec
   const filter = screen.boards.some((b) => b.project === chosen) ? chosen : ALL;
   const boards = filter === ALL ? screen.boards : screen.boards.filter((b) => b.project === filter);
   const ids = cardIds(boards);
-  const hands = filter === ALL ? screen.hands : screen.hands.filter((h) => h.card === null || ids.has(h.card));
+  const waiting = ownHands(screen.hands);
+  const hands = filter === ALL ? waiting : waiting.filter((h) => h.card === null || ids.has(h.card));
   const queues = boards.filter((b) => b.merge.slot !== null || b.merge.in_line > 0);
 
   return (

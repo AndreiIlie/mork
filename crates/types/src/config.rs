@@ -29,6 +29,12 @@ pub struct Config {
     pub picks: Option<Picks>,
     #[serde(default)]
     pub projects: BTreeMap<crate::ProjectId, ProjectConfig>,
+    /// Saved Claude accounts: `<name> = "<pool header>"` (fac-721).
+    #[serde(default)]
+    pub claude_accounts: BTreeMap<String, String>,
+    /// Window-owned SSH web forwards, keyed by name (fac-721).
+    #[serde(default)]
+    pub tunnels: BTreeMap<String, TunnelConfig>,
     /// The projects in the file's order, for every project list; empty, their names' order.
     #[serde(skip)]
     pub project_order: Vec<crate::ProjectId>,
@@ -79,6 +85,9 @@ pub struct FactoryConfig {
     /// Shared auto-compaction context cap in tokens for Claude and agy seats (fac-681); 0 disables the cap.
     #[serde(default = "d_context_cap")]
     pub context_cap: u64,
+    /// Extra skills folder merged with the built-in skills at start (fac-721).
+    #[serde(default)]
+    pub skills: Option<String>,
 }
 
 /// Default, minimum, and maximum non-zero `[factory] context_cap` values in tokens (fac-681).
@@ -161,6 +170,24 @@ pub struct Checks {
     pub folder: String,
 }
 
+/// `[tunnels.<name>]`: a window-owned SSH web forward (fac-721).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TunnelConfig {
+    pub alias: String,
+    pub port: u16,
+    pub remote_port: u16,
+    pub url: String,
+}
+
+/// `[projects.<name>.tickets]`: a project's issue-tracker API and ticket page URL prefix (fac-721).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TicketsConfig {
+    pub api: String,
+    pub page: String,
+}
+
 /// `[projects.<name>]` (4.1).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -210,6 +237,12 @@ pub struct ProjectConfig {
     /// Whether this project's orchestrator reads queued wakes with `factory ctl wakes` (fac-663).
     #[serde(default)]
     pub orchestrator_waits: bool,
+    /// Issue-tracker URLs for a project whose cards and PRs track external tickets (fac-721).
+    #[serde(default)]
+    pub tickets: Option<TicketsConfig>,
+    /// Pull request title tag that triggers automatic review into any destination branch (fac-721).
+    #[serde(default)]
+    pub review_tag: Option<String>,
 }
 
 impl ProjectConfig {
@@ -217,16 +250,7 @@ impl ProjectConfig {
     pub fn port_list(&self) -> Vec<u16> {
         self.ports.iter().flat_map(|p| p.from..=p.to).collect()
     }
-
-    /// Whether it is a company repository on the configured Bitbucket workspace (fac-98): its PRs are
-    /// described. Every Bitbucket project's PRs open in Andrei's name and land on his approval (fac-111).
-    pub fn company(&self) -> bool {
-        self.bitbucket.as_ref().is_some_and(|b| b.workspace == COMPANY_WORKSPACE)
-    }
 }
-
-/// The Bitbucket workspace of the company's repositories (fac-98).
-pub const COMPANY_WORKSPACE: &str = "example-workspace";
 
 /// The keys each table must have (1.14, 4.1): the table, then its keys.
 pub const REQUIRED: &[(&str, &[&str])] = &[("factory", &["project"]), ("git", &["author"])];

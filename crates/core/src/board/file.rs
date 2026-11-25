@@ -138,7 +138,7 @@ pub fn config(text: &str) -> Result<(String, String), BoardError> {
     Ok((prefix, done))
 }
 
-/// The number of an id (`HF-583.1` → 583), when it is on the prefix.
+/// The number of an id (`EX-583.1` → 583), when it is on the prefix.
 pub fn number(prefix: &str, id: &str) -> Option<u64> {
     let lower = id.to_lowercase();
     let rest = lower.strip_prefix(&format!("{}-", prefix.to_lowercase()))?;
@@ -151,7 +151,7 @@ pub fn next_id(prefix: &str, ids: &[String]) -> String {
     format!("{}-{}", prefix.to_lowercase(), top + 1)
 }
 
-/// A card's id: letters, a dash, a number, and sub-numbers (`HF-583.1`). It names the card's
+/// A card's id: letters, a dash, a number, and sub-numbers (`EX-583.1`). It names the card's
 /// clone, room and record, so nothing else is taken (R14).
 pub fn valid_id(id: &str) -> bool {
     let Some((prefix, rest)) = id.split_once('-') else { return false };

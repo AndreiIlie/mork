@@ -6,7 +6,7 @@ description: "Use when you are a review card's foreman: a round of our card's br
 # Review cards
 
 A review card is its foreman's to review: our card's branch (`branch-<project>-<branch>`), a pull request (`pr-<project>-<n>`, every one into a repository's base by itself, ours only at a head no verification passed) or a colleague's branch (`branch-<project>-<branch>`).
-A Bitbucket project also reviews any PR whose title contains `@review-bot`, into any destination.
+A project with `review_tag` configured also reviews any PR whose title contains that tag, into any destination.
 The engine makes our card's branch card with its first round at the implementing card's delegation level and ends it when the card lands or closes, on a repository with PRs too, before its PR is published.
 Every review runs in its candidate's verification: its destination (a branch's base) merged in, the checks, then your round and the whole suite side by side, the results returned once both ended.
 Nothing reviews a review card in turn.

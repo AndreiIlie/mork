@@ -24,7 +24,7 @@ pub enum Sender {
     Pa,
 }
 
-/// The prefix of an orchestrator's identity, before its project: `orchestrator:my-app` (fac-244).
+/// The prefix of an orchestrator's identity, before its project: `orchestrator:example.com` (fac-244).
 pub const ORCHESTRATOR: &str = "orchestrator:";
 
 impl Sender {

@@ -101,7 +101,7 @@ fn slash(rest: &str, ctx: &Context) -> Parsed {
         "open" => {
             return match args {
                 [card] => Parsed::Open(card.clone()),
-                _ => Parsed::Note("✗ /open takes one card: /open hf-550".into()),
+                _ => Parsed::Note("✗ /open takes one card: /open ex-550".into()),
             };
         }
         _ => {}
@@ -226,8 +226,8 @@ pub fn shown_nowhere(place: &str) -> bool {
     place.split_once('/').is_some_and(|(card, rest)| rest == "challenge" && card != "main" && names_a_place(card))
 }
 
-/// Whether a word names a place: `main`, a card's id (`hf-550`, `hf-12.1`, `pr-hf-12`), or a DM
-/// (`hf-550/foreman/dm`).
+/// Whether a word names a place: `main`, a card's id (`ex-550`, `ex-12.1`, `pr-ex-12`), or a DM
+/// (`ex-550/foreman/dm`).
 pub fn names_a_place(word: &str) -> bool {
     if word == "main" {
         return true;

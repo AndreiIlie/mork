@@ -134,7 +134,7 @@ fn own_project_orchestrator_words_withdraw_a_given_plan_and_leave_ungiven_waitin
     offer_plan(&mut s, CARD);
     let ask_id = open_ask(&s, AskKind::ApproveBrief).id.clone();
 
-    let other = Sender::Orchestrator("hf".into());
+    let other = Sender::Orchestrator("ex".into());
     s.cmd(other, json!({"say": {"place": format!("{CARD}/spec"), "text": "Other project note"}})).unwrap();
     assert!(s.card(CARD).recap, "another project's orchestrator leaves a waiting plan waiting");
     assert!(s.state.asks[&ask_id].open);

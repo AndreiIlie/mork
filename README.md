@@ -4,51 +4,62 @@
 
 # Mork
 
-**Outgrow the single-agent terminal. Turn your Claude, Codex, and Gemini subscriptions into a parallel, sandboxed software factory.**
+**Local Rust orchestrator for parallel Claude, Codex, and Gemini CLI workflows.**
 
 Website: [https://mork.sh](https://mork.sh)
 
-Mork drives the coding CLIs you already pay for (Claude Code, OpenAI Codex, Gemini) through a deterministic Rust state machine. Every task runs in its own isolated git clone inside a Linux Bubblewrap + Landlock sandbox, gets audited by fresh read-only reviewers from a different model family with zero builder chat history, and lands through a serialized merge queue after full checks and tests pass.
+Mork drives the coding CLIs you already pay for (Claude Code, OpenAI Codex, Gemini) through a deterministic Rust state machine (~89k LOC Rust across 8 crates, ~5.5k LOC React/TypeScript). Each work card runs in its own git clone inside a Linux Bubblewrap + Landlock sandbox, gets audited by fresh read-only reviewers from a different model family with zero builder chat history, and lands through a serialized merge queue after checks and tests pass.
 
 ![Mork Board](docs/screenshots/board.png)
 
-## Why Mork exists
+## What the engine enforces
 
-Over 39 days of daily use (1,049 shipped work cards across 4 production and personal repositories), **45.8% of AI-written branches failed independent review after local tests were 100% green**, averaging 3.24 findings per failed branch (98.7% verified fixed before merge).
+Over 39 days of daily use (1,049 shipped work cards across four repositories: Mork itself, a large legacy Node/Angular production web app, a Rust game rewrite, and a web service), **45.8% of AI-written branches (330 of 720) failed independent review after local tests were green**, averaging 3.24 findings per failed branch (98.7% verified fixed before merge).
 
-A single agent reviewing its own diff stays anchored on why its implementation is "right." Mork separates those roles structurally in code, not politely in a prompt:
+A single CLI session reviewing its own diff stays anchored on its own assumptions. Mork enforces the boundaries in code:
 
-- **Isolated sandboxes ("walls"):** Each card runs in its own git clone inside Linux Bubblewrap + Landlock (`crates/engine/src/wall/`). Reviewers inspect a clean read-only clone with no builder history.
+- **Sandboxed clones ("walls"):** Each card runs in its own git clone inside Linux Bubblewrap + Landlock (`crates/engine/src/jobs/wall.rs`, `wall_exec.rs`, `crates/sys/src/landlock.rs`). Reviewers inspect a clean read-only clone with no builder history.
 - **Cross-family pairing:** Different model families plan, build, challenge plans, and review code, configured in `factory.toml`.
-- **Proof-required findings:** Reviewers cannot wave at hypothetical bugs. Every finding carries an exact `file:line`, failure path, and proof; failed rounds route to structured triage (`Fix`, `Decline`, `Foreman decides`).
-- **Raised Hands:** Agents only interrupt you when a real product decision, visual mock approval, plan approval, or failed-round triage is needed.
-- **Serialized merge train:** Approved branches verify checks, review rounds, and full test suites side by side, then land serially onto base so parallel cards never trample each other.
-- **Live web UI:** Local React + TypeScript dashboard served over a keyed localhost bridge (`web/`), featuring a full-width Board, 50/50 Card Room with auto-opened Seat Chat, live test-suite progress, and Usage / Quota pace tracking.
+- **Proof-required findings:** Every review finding carries a `file:line`, failure path, and proof. Failed rounds route to structured triage (`Fix`, `Decline`, `Foreman decides`).
+- **Raised Hands:** Seats stay quiet while working and interrupt you only when a product decision, visual mock approval, plan approval, or failed-round triage is needed.
+- **Serialized merge queue:** Approved branches run checks, review rounds, and full test suites side by side, then land serially onto base so parallel cards do not trample each other.
+- **Local web dashboard:** React + TypeScript UI served over a keyed localhost bridge (`crates/engine/src/web/`, `web/`), with a full-width Board, 50/50 Card Room, live test-suite progress, and Usage / Quota pace tracking.
 
 ![Mork Card Room](docs/screenshots/card-room.png)
 ![Mork Usage and Quotas](docs/screenshots/usage.png)
 
 ## Architecture
 
-Mork is a pure-Rust workspace with a strict dependency graph audited by `cargo xtask checks` (`crates/xtask/src/graph.rs`):
+Mork is an 8-crate Rust workspace with a dependency graph and boundary rules enforced by `cargo xtask check` (`crates/xtask/src/graph.rs`):
 
 | Path | Role |
 | --- | --- |
 | `crates/types/` | Wire protocol, view models, config schema, and domain identifiers (`CardId`, `AskId`, `JobId`). |
-| `crates/core/` | Pure deterministic state machine: lifecycle, review rounds, triage, merge queue, door SQL/file gates, and view builders (zero I/O). |
-| `crates/engine/` | Runtime loop, SQLite event journal (`store/`), Bubblewrap + Landlock sandboxing (`wall/`), CLI drivers (`cli/`), live test-suite watcher, Vite visual mock host, and web bridge (`web/`). |
-| `crates/app/` | Main `factory` binary, CLI control client (`factory ctl`), and embedded roles/manuals/skills. |
-| `crates/xtask/` | Workspace verification: rustfmt, clippy, crate-graph checks, file/function size caps, web Tailwind/TS audits, and parallel test runner. |
+| `crates/core/` | Pure deterministic state machine: card lifecycle, review rounds, triage, merge queue, SQL/file door rules, and view builders (zero I/O). |
+| `crates/engine/` | Runtime loop, SQLite event journal (`store/`), Bubblewrap + Landlock sandboxing (`jobs/wall.rs`, `jobs/wall_exec.rs`), CLI drivers (`cli/`), live test-suite watcher, Vite visual mock host, and keyed localhost web bridge (`web/`). |
+| `crates/sys/` | Isolated OS primitives (Landlock syscall bindings and process/sandbox helpers; the only crate permitted to use `unsafe`). |
+| `crates/ui/` | Native Linux desktop window crate. |
+| `crates/app/` | Main binary (`factory`), CLI control client (`factory ctl`), and embedded roles/manuals/skills. |
+| `crates/fakes/` | Fake CLI/Bitbucket harnesses used by integration tests. |
+| `crates/xtask/` | Workspace verification: rustfmt, comments, clippy, crate-graph and capability audits, file/function size caps, web Tailwind/TS checks, and parallel test runner. |
 | `web/` | Local web UI (React 19, TypeScript, Tailwind CSS v4, Vite). |
 | `manuals/`, `roles/`, `skills/` | Operating manuals and on-demand skills loaded into agent seats. |
 
-> **Naming note:** Mork started as an internal personal tool codenamed `factory`. Crate names, the binary (`factory`), and `~/.config/factory/factory.toml` still use that name while the project transitions publicly to Mork.
+> **Transition note:** Mork started as a personal tool named `factory`. Crate names, the binary (`factory`), `~/.config/factory/factory.toml`, and some operator strings still carry that history while the full `factory` -> `mork` rename is underway.
+
+## Security Model and Current Limitations
+
+- **Filesystem vs. network isolation:** File isolation is enforced by Bubblewrap mounts (`--ro-bind / /`, tmpfs over host home directories, read-write only inside the card's clone and scratch paths) with `--unshare-user/pid/ipc` and `--cap-drop ALL`. The network namespace is not unshared because CLIs need HTTPS access to model APIs; Landlock restricts outbound TCP connect ports (default `443`, `80`, `53` in `crates/types/src/config.rs`) and does not add Landlock filesystem rules.
+- **Shared agent home:** Seats share one `~/.local/share/factory/agent-home` directory for CLI credentials and session state. Per-seat home isolation is not yet implemented.
+- **Autonomous CLI execution:** Inside the sandbox, seats run with CLI permission prompts disabled so work does not stall waiting on interactive shell prompts. The sandbox wall and door allowlists are the enforcement boundary.
+- **PR automation:** Local git merge-queue landings work with any git repository. Hosted pull-request review/merge automation currently targets Bitbucket only (GitHub PR automation is not implemented yet).
+- **Self-build project setting:** `[factory] project` in `factory.toml` identifies Mork's own repository for self-rebuilds and an extra unwalled verification run on Mork's own test suite. Leave it set to `"mork"` (not your app's `[projects.<name>]`) unless you are developing Mork itself; making this field optional is planned alongside the `mork` rename.
 
 ## Quick Start (Linux)
 
 ### Prerequisites
 
-- **Linux** with user namespaces enabled and `bwrap` (Bubblewrap) installed
+- **Linux** with user namespaces enabled, `bwrap` (Bubblewrap), and Landlock ABI 6+
 - **Rust** toolchain (`cargo`, `rustc`)
 - **Node.js 22+** (for building `web/`)
 - One or more supported agent CLIs installed and signed in (`claude`, `codex`, etc.)
@@ -86,7 +97,7 @@ factory status
 ```bash
 cargo xtask web        # Tailwind class audit, TypeScript typecheck, and Vite production build
 cargo xtask check      # rustfmt, comments, clippy, crate graph, size caps, and web checks
-cargo xtask test       # Parallel workspace test runner
+cargo xtask test       # Parallel workspace test runner (set FACTORY_UNWALLED=1 inside containers without bwrap)
 ```
 
 ## License

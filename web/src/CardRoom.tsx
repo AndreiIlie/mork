@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ownHands } from "./alerts";
 import { Overview } from "./Overview";
 import { Pipeline } from "./Pipeline";
 import { RoomHands } from "./RoomDock";
@@ -12,8 +13,9 @@ import { PageHeader } from "./ui/Page";
 import { SplitPane } from "./ui/SplitPane";
 import { TextLink } from "./ui/TextLink";
 
-function pickHand(hands: HandView[], picked: string | null): HandView | undefined {
-  return hands.find((h) => h.ask === picked) ?? [...hands].sort((a, b) => a.raised_ms - b.raised_ms)[0];
+// A hand sent to an orchestrator opens whole only when picked; by default the oldest hand waiting on Andrei does.
+function pickHand(hands: HandView[], own: HandView[], picked: string | null): HandView | undefined {
+  return hands.find((h) => h.ask === picked) ?? [...own].sort((a, b) => a.raised_ms - b.raised_ms)[0];
 }
 
 function overviewStatus(hands: HandView[], seats: AgentRow[]): Color {
@@ -93,6 +95,8 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
     card.mode === "review" ? `${card.id}/foreman` : review !== undefined ? `${review.card}/foreman` : null;
   const seatName = (agent: string) => (agent === reviewForeman ? "review foreman" : agentSeatName(agent));
   const cardHands = screen.hands.filter((h) => h.card === card.id);
+  const own = ownHands(cardHands);
+  const docked = [...own, ...cardHands.filter((h) => h.given)];
 
   const [pickedSeat, setPickedSeat] = useState<string | null>(null);
   const [pickedHand, setPickedHand] = useState<string | null>(handAsk);
@@ -120,7 +124,7 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
     clearHandParam();
   };
 
-  const whole = pickHand(cardHands, pickedHand);
+  const whole = pickHand(cardHands, own, pickedHand);
   // Chat follows the hand shown whole when a seat raised it, else the current pipeline step's seat, until picked.
   const handSeat =
     whole !== undefined && whole.role !== null ? seats.find((s) => placeOf(s.agent) === whole.place)?.agent : undefined;
@@ -175,14 +179,14 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
               plan={buildView.plan}
               triageRound={buildView.triage?.round}
               tzOffsetMin={screen.tz_offset_min}
-              status={overviewStatus(cardHands, seats)}
+              status={overviewStatus(own, seats)}
               nowMs={nowMs}
             />
-            {cardHands.length > 0 && (
+            {docked.length > 0 && (
               <div className="max-h-[60%] shrink-0 overflow-y-auto border-t border-gray-400 pb-3">
                 <RoomHands
                   cardId={card.id}
-                  hands={cardHands}
+                  hands={docked}
                   triage={buildView.triage}
                   ownRoom={ownRoom}
                   openAsk={whole?.ask}

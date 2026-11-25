@@ -160,7 +160,7 @@ fn follows(p: &mut Poster<'_>, id: &ActionId, what: &ActionWhat, v: &Value, ctx:
         }
         ActionWhat::Push { card: c, commit, .. } => {
             if let Some(cd) = card(p, c) {
-                crate::queue::pr::pushed(p, cd, commit);
+                crate::queue::pr::pushed(p, cd, commit, ctx.config);
             }
         }
         ActionWhat::OpenPr { card: c, .. } => {
@@ -396,7 +396,7 @@ pub fn settle_held(state: &State, id: &str, how: &str, note: Option<&str>, ctx: 
     match how {
         "retry" => {
             crate::board::retry::refresh(&p, &mut a);
-            crate::queue::pr::run(&mut p, a);
+            crate::queue::pr::run(&mut p, a, ctx.config);
         }
         "drop" if matches!(a.what, ActionWhat::Door(_)) => crate::door::approval::refuse(&mut p, a, DROPPED_BY_ANDREI),
         "drop" => {

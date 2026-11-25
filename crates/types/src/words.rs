@@ -1,4 +1,4 @@
-//! A command typed as words (`start hf-550 report`): `factory ctl`'s subcommands and the window's
+//! A command typed as words (`start ex-550 report`): `factory ctl`'s subcommands and the window's
 //! `/` lines read them here, one parser for both (1.7, 5.10.2, 1.12.6).
 
 use serde_json::{Map, Value, json};
@@ -39,7 +39,7 @@ fn list(raw: &[String], name: &str) -> Result<Value, String> {
             .map(|items| json!(items))
             .map_err(|e| format!("`{name}` takes a JSON array of strings: {e}"));
     }
-    // `carries` keeps a blank field so `start` refuses `hf-551,` as the reference says (fac-606).
+    // `carries` keeps a blank field so `start` refuses `ex-551,` as the reference says (fac-606).
     let keep_blank = name == "carries";
     Ok(json!(raw.iter().flat_map(|r| r.split(',')).filter(|s| keep_blank || !s.is_empty()).collect::<Vec<_>>()))
 }

@@ -32,7 +32,7 @@ pub fn run(home: &Home, settings: Settings, engine: impl FnOnce() -> i32 + Send 
     let place = session.place.clone();
     let window = factory_ui::window::settings_at(session.position);
     wiring::link(home.clone(), tx.clone(), outs, place);
-    let tunnels = wiring::tunnels(home.clone(), tx.clone());
+    let tunnels = wiring::tunnels(home.clone(), settings.tunnels.clone(), tx.clone());
     clock(tx);
     let home = home.clone();
     let boot = move || {
@@ -127,10 +127,10 @@ fn effect(s: &Shell, e: Effect) -> Task<Msg> {
             wiring::page(&s.home, &url);
             Task::none()
         }
-        Effect::Tunnel(env, open) => {
-            if s.tunnels.send((env, open)).is_err() {
+        Effect::Tunnel(name, open) => {
+            if s.tunnels.send((name.clone(), open)).is_err() {
                 return Task::done(Msg::Ui(Message::TunnelStatus(
-                    env,
+                    name,
                     factory_types::web_tunnel::Status::Failed("The tunnel tracker stopped".into()),
                 )));
             }

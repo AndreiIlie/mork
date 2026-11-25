@@ -38,6 +38,7 @@ Before approval that foreman writes, edits and commits nothing, except `.git/fac
    Then whole-approach changes (a different mechanism, a simpler design, a reason not to build it), details after: an early detail settled is wasted if the approach under it changes.
    **Open the card once, with where it lands.**
    One line names it.
+   When the project has a preview skill of its own among your skills, follow it for the page's address and screenshot, saved in your seat's `io/` (`FACTORY_IO`).
    A card with no page a seat can render (the factory's native window, back-end work) names the screen and the words shown on it, or the area for back-end work, with no picture; a Factory web page is rendered like any page.
    When an ask opens the conversation, that first ask carries it: the line is the first of what he must know, and counts as a line of the ask, the address itself aside from its 15 words.
    With delegation off and nothing to ask, the recap opens the card instead (step 5).

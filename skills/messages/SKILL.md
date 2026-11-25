@@ -20,11 +20,12 @@ Questions nest:
 
 An ask to Andrei about something on a screen carries a screenshot of it where you can render it.
 For a web page, use the wall's headless Chromium, as the `visual-mocks` skill says.
+When the project has a preview skill of its own among your skills, follow its rendering rules.
 For an ask to Andrei about the factory's native window, use the words shown on screen.
 To show Andrei a layout or a mechanism, or to hand an agent a picture, put a screenshot or a diagram in your seat's `io/` (`FACTORY_IO`) and list its full path in the `images` of your hand (shown beside your message and ask) or of a message (carried into its recipient's turn).
 The engine copies each file, so later edits don't change it.
 `factory ctl say <place> --kind <kind> <text>` gives it too.
-The news says each message with its kind's verb: `hf-550/foreman asks researcher-1: …`, `hf-550/researcher-1 answers foreman: …`, `hf-550/researcher-1 notes to foreman: …`.
+The news says each message with its kind's verb: `ex-550/foreman asks researcher-1: …`, `ex-550/researcher-1 answers foreman: …`, `ex-550/researcher-1 notes to foreman: …`.
 
 A parent seat's message to its child lands in the child's DM.
 A child's message to its parent lands in its parent's room.

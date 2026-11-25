@@ -324,12 +324,8 @@ fn overview_labels(o: &factory_types::view::OverviewView) -> Vec<&str> {
     o.stages.iter().map(|st| st.label.as_str()).collect()
 }
 
-fn overview_lines(o: &factory_types::view::OverviewView) -> Vec<&factory_types::view::OverviewLine> {
-    o.stages.iter().flat_map(|st| st.lines.iter()).collect()
-}
-
 #[test]
-fn overview_stages_echoes_failed_round_window_and_tail_counts() {
+fn overview_stages_carry_a_failed_round_and_its_successor() {
     use factory_types::view::OverviewStageAt;
 
     let mut s = Sim::new();
@@ -340,13 +336,10 @@ fn overview_stages_echoes_failed_round_window_and_tail_counts() {
     assert_eq!(overview_labels(ov), vec!["Spec", "Build", "Verify · Round 1"]);
     assert_eq!(ov.stages[2].at, OverviewStageAt::Current);
     assert_eq!(ov.stages[2].summary, "2 to triage");
-    assert!(!overview_lines(ov).iter().any(|l| l.room == "Review" && l.message.hand.is_some()));
-    assert!(!overview_lines(ov).iter().any(|l| l.message.headline == "findings wait for triage"));
     assert!(place(&s.state, &format!("{CARD}/spec"), Some(100), &timeline_outside(&s), s.ctx()).overview.is_none());
 
     s.andrei(json!({"triage": {"card": CARD, "fix": ["1"], "decline": ["2"]}})).unwrap();
     s.imported(CARD);
-    s.andrei(json!({"say": {"place": CARD, "text": "between rounds note"}})).unwrap();
     s.built(CARD, "h2", "base1");
     s.checks(CARD, 0, &[]);
     s.candidate(CARD);
@@ -357,17 +350,6 @@ fn overview_stages_echoes_failed_round_window_and_tail_counts() {
     assert_eq!(overview_labels(ov2), vec!["Spec", "Build", "Verify · Round 1", "Verify · Round 2"]);
     assert_eq!(ov2.stages[2].at, OverviewStageAt::Failed);
     assert_eq!(ov2.stages[2].summary, "1 declined, 1 open");
-    assert!(ov2.stages[2].lines.iter().any(|l| l.message.headline == "findings wait for triage"));
-    assert!(ov2.stages[2].lines.iter().any(|l| l.message.text == "between rounds note"));
-
-    let total_exact: usize = ov2.stages.iter().map(|st| st.count).sum();
-    assert!(total_exact > 2);
-    let pv_cut = place(&s.state, CARD, Some(2), &timeline_outside(&s), s.ctx());
-    let ov_cut = pv_cut.overview.as_ref().unwrap();
-    assert_eq!(ov_cut.stages.iter().map(|st| st.lines.len()).sum::<usize>(), 2);
-    let cut_counts: Vec<usize> = ov_cut.stages.iter().map(|st| st.count).collect();
-    let full_counts: Vec<usize> = ov2.stages.iter().map(|st| st.count).collect();
-    assert_eq!(cut_counts, full_counts);
 }
 
 #[test]
@@ -391,21 +373,18 @@ fn overview_checks_failure_unasked_round_and_restarted_review_run() {
     s.suite(CARD, 0);
     s.andrei(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
     s.imported(CARD);
-    s.andrei(json!({"say": {"place": CARD, "text": "between rounds note"}})).unwrap();
     s.built(CARD, "h3", "base1");
     s.checks(CARD, 0, &[]);
     s.candidate(CARD);
 
     let ov_unasked = place(&s.state, CARD, Some(100), &timeline_outside(&s), s.ctx()).overview.unwrap();
     assert_eq!(overview_labels(&ov_unasked), vec!["Spec", "Build", "Verify · Round 1", "Verify · Round 2"]);
-    assert!(ov_unasked.stages[2].lines.iter().any(|l| l.message.text == "between rounds note"));
 
-    // Stopping and resuming while R2 is unasked must not shift R2's start past lines already in R2.
-    s.andrei(json!({"say": {"place": CARD, "text": "in r2 before stop"}})).unwrap();
+    // Stopping and resuming while R2 is unasked must not shift R2's start.
     s.andrei(json!({"stop": {"card": CARD}})).unwrap();
     s.andrei(json!({"resume": {"card": CARD}})).unwrap();
     let ov_paused = place(&s.state, CARD, Some(100), &timeline_outside(&s), s.ctx()).overview.unwrap();
-    assert!(ov_paused.stages[3].lines.iter().any(|l| l.message.text == "in r2 before stop"));
+    assert_eq!(ov_paused.stages[3].start_ms, ov_unasked.stages[3].start_ms);
 
     s.andrei(json!({"close": {"card": CARD, "why": "redo"}})).unwrap();
     for id in s.open_jobs(|p| matches!(p, Purpose::Bundle { .. })) {
@@ -416,7 +395,6 @@ fn overview_checks_failure_unasked_round_and_restarted_review_run() {
     s.settle_actions();
     let ov_restart = place(&s.state, CARD, Some(100), &timeline_outside(&s), s.ctx()).overview.unwrap();
     assert_eq!(overview_labels(&ov_restart), vec!["Spec"]);
-    assert!(!overview_lines(&ov_restart).iter().any(|l| l.room == "Review"));
 }
 
 #[test]
@@ -463,59 +441,6 @@ fn overview_pause_in_land_and_reopened_standalone_review_drop_prior_rounds() {
     s.state.cards.insert(rc_id.clone(), rc);
     let ov_pr = place(&s.state, rc_id.as_str(), Some(100), &Outside::default(), s.ctx()).overview.unwrap();
     assert_eq!(overview_labels(&ov_pr), vec!["Review"]);
-}
-
-#[test]
-fn overview_folds_answered_asks_with_andreis_and_orchestrators_answers() {
-    let mut s = Sim::new();
-    s.board(CARD, "web");
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
-    s.settle_actions();
-    let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
-    s.end_job(&clone, json!({}));
-    s.settle_actions();
-    let (spec, planner) = (format!("{CARD}/spec"), format!("{CARD}/planner"));
-    let mut r = reply("working", "Route");
-    r["hand"]["ask"] = json!("Keep the route?\n1. Yes\n2. No");
-    s.turn(&planner, r);
-    s.andrei(json!({"say": {"place": spec, "text": "1"}})).unwrap();
-    let mut r = reply("working", "Name");
-    r["hand"]["ask"] = json!("Rename it?\n1. Yes\n2. No");
-    s.turn(&planner, r);
-    let ask = s.state.asks.values().find(|a| a.open && a.kind == AskKind::Answer).unwrap().id.clone();
-    s.andrei(json!({"give": {"ask": ask}})).unwrap();
-    s.cmd(Sender::Orchestrator("web".into()), json!({"say": {"place": spec, "text": "2"}})).unwrap();
-
-    let pv = place(&s.state, CARD, None, &Outside::default(), s.ctx());
-    let lines = overview_lines(pv.overview.as_ref().unwrap());
-    let answered: Vec<(&str, &str)> = lines
-        .iter()
-        .filter_map(|l| Some((l.message.hand.as_ref()?.headline.as_str(), l.answer.as_ref()?.text.as_str())))
-        .collect();
-    assert_eq!(answered, vec![("Route", "1"), ("Name", "2")]);
-    assert!(lines.iter().all(|l| l.message.text != "1" && l.message.text != "2"), "answers' own lines stay folded");
-}
-
-#[test]
-fn overview_drops_verification_and_deliverables_lines_and_shortens_the_approval() {
-    let mut s = Sim::new();
-    s.through_brief(CARD, "web");
-    let deliverables = json!({"deliverables": {"card": CARD, "names": "engine"}});
-    s.turn_sending(&format!("{CARD}/foreman"), &[deliverables], reply("built", "Built"));
-    s.take(CARD, "h1", "base1", &["src/a.rs"]);
-    s.checks(CARD, 0, &[]);
-    s.candidate(CARD);
-    assert!(s.messages(CARD).iter().any(|m| m.headline == "verification started"));
-    assert!(s.messages(CARD).iter().any(|m| m.text.starts_with("deliverables: ")));
-
-    let pv = place(&s.state, CARD, None, &timeline_outside(&s), s.ctx());
-    let lines = overview_lines(pv.overview.as_ref().unwrap());
-    assert!(!lines.iter().any(|l| l.message.headline == "verification started"));
-    assert!(!lines.iter().any(|l| l.message.text.starts_with("deliverables: ")));
-    let approvals: Vec<_> = lines.iter().filter(|l| l.message.headline.contains("approved")).collect();
-    assert_eq!(approvals.len(), 1, "one approval line");
-    assert_eq!(approvals[0].message.headline, format!("Andrei approved {CARD}'s specification."));
-    assert!(approvals[0].message.text.is_empty(), "the specification isn't posted again");
 }
 
 #[test]

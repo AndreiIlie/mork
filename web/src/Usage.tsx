@@ -98,6 +98,7 @@ function SpendChart({ days, tzOffsetMin }: { days: DayBurn[]; tzOffsetMin: numbe
 }
 
 interface PoolGroup {
+  key: string;
   name: string;
   readAgo: string | null;
   switchAccount: string | null;
@@ -108,11 +109,12 @@ interface PoolGroup {
 function groupPools(shares: Share[]): PoolGroup[] {
   const groups: PoolGroup[] = [];
   for (const share of shares) {
+    const key = `${share.cli}\0${share.signed_out === true ? "1" : "0"}\0${share.switch_account ?? ""}`;
     const last = groups[groups.length - 1];
-    if (last !== undefined && last.name === share.cli) {
+    if (last !== undefined && last.key === key) {
       last.windows.push(share);
     } else {
-      groups.push({ name: share.cli, readAgo: null, switchAccount: null, signedOut: true, windows: [share] });
+      groups.push({ key, name: share.cli, readAgo: null, switchAccount: null, signedOut: true, windows: [share] });
     }
   }
   for (const g of groups) {
@@ -159,7 +161,7 @@ function AccountQuotas({ shares, nowMs, live }: { shares: Share[]; nowMs: number
           {pools.map((p) => {
             const account = p.switchAccount;
             return (
-              <div key={p.name} className="divide-y divide-gray-400">
+              <div key={p.key} className="divide-y divide-gray-400">
                 <Row
                   actions={
                     account !== null ? (
@@ -167,9 +169,9 @@ function AccountQuotas({ shares, nowMs, live }: { shares: Share[]; nowMs: number
                         tier="secondary"
                         size="sm"
                         disabled={!live || busy}
-                        onClick={() => press(p.name, { label: "Switch", command: { "claude.account": { name: account } } })}
+                        onClick={() => press(p.key, { label: "Switch", command: { "claude.account": { name: account } } })}
                       >
-                        {pending[p.name] !== undefined ? "Switching…" : "Switch"}
+                        {pending[p.key] !== undefined ? "Switching…" : "Switch"}
                       </Button>
                     ) : undefined
                   }
@@ -180,7 +182,7 @@ function AccountQuotas({ shares, nowMs, live }: { shares: Share[]; nowMs: number
                       {p.signedOut && <span className="text-label-12 text-gray-700">signed out</span>}
                       {p.readAgo !== null && <span className="text-label-12 text-gray-700">read {p.readAgo} ago</span>}
                     </div>
-                    <RefusalLine refusal={refusals[p.name] ?? null} className="mt-1" />
+                    <RefusalLine refusal={refusals[p.key] ?? null} className="mt-1" />
                   </div>
                 </Row>
                 {p.windows.map((w) => (

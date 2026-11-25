@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build and audit web UI
+        run: cargo xtask web
+
+      - name: Run workspace checks (fmt, clippy, crate graph, audits)
+        run: cargo xtask check
+
+      - name: Run workspace test suite
+        env:
+          FACTORY_UNWALLED: "1"
+          FACTORY_TEST_PORTS: "42000-42099"
+        run: cargo xtask test

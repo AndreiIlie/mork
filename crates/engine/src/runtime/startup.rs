@@ -144,18 +144,27 @@ fn telemetry() -> std::collections::BTreeMap<String, String> {
     std::env::var_os("HOME").map(|h| settings::read_telemetry(std::path::Path::new(&h))).unwrap_or_default()
 }
 
+fn materialize_skills(
+    home: &Home,
+    config: &factory_types::config::Config,
+) -> Result<Option<std::path::PathBuf>, String> {
+    let extra = config.factory.skills.as_deref().map(std::path::Path::new);
+    crate::builds::skills::materialize(home, extra).map_err(|e| format!("skills: {e}"))
+}
+
 // The jobs' launch is chosen before any job is written, recovery's included (fac-143); with
 // why it is the fallback, if it is.
 fn context(
     opts: &Options,
     config: factory_types::config::Config,
     choosing: jobs::slice::Choosing,
-) -> Result<(Context, Option<String>), String> {
+    skills: Option<std::path::PathBuf>,
+) -> (Context, Option<String>) {
     let mut ctx = Context::new(opts.home.clone(), config, opts.bin.clone(), telemetry());
-    ctx.skills = crate::builds::skills::materialize(&opts.home).map_err(|e| format!("skills: {e}"))?;
+    ctx.skills = skills;
     let (launch, fallback) = choosing.chosen();
     ctx.launch = launch;
-    Ok((ctx, fallback))
+    (ctx, fallback)
 }
 
 // The start's timing: a line in `logs/app.log` for each step, with its duration, so a slow start
@@ -219,6 +228,8 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
     let sampled = tx.clone();
     std::thread::spawn(move || crate::resources::watch(|r| sampled.send(Input::Resources(r)).is_ok()));
     builds::check_reload_target(&opts)?;
+    // Materialize configured skills before open_state migrates the DB or finish_reload moves the pin (fac-721).
+    let skills = materialize_skills(&opts.home, &config)?;
     t.step("sockets");
     // Its probe runs while the state opens and loads (fac-336), its lock held.
     let choosing = jobs::slice::choosing(opts.home.root(), &config.slice);
@@ -231,7 +242,7 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
     t.step("finish_reload");
     let state = store.load().map_err(|e| e.to_string())?;
     t.step("store.load");
-    let (ctx, fallback) = context(&opts, config, choosing)?;
+    let (ctx, fallback) = context(&opts, config, choosing, skills);
     let wakes = super::wakes::Wakes::open(&opts.home);
     let engine = Engine {
         opts,
@@ -266,7 +277,10 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
 pub fn start(opts: Options) -> Result<(Engine, Receiver<Input>), String> {
     let mut t = Timer::new(&opts);
     let (mut engine, rx, reload_note, fallback) = open(opts, &mut t)?;
-    engine.views_cache.claude_accounts = crate::claude_accounts::Accounts::read(&engine.opts.home.agent_home());
+    engine.views_cache.claude_accounts = crate::claude_accounts::Accounts::read(
+        &engine.opts.home.agent_home(),
+        engine.ctx.config.claude_accounts.clone(),
+    );
     let shared = Arc::clone(&engine.shared);
     let from = reload_note.as_ref().and_then(|n| n.builds.as_ref()).map(|(from, _)| from.clone());
     // The boards first: they are never stored, and a job's end applied in recovery decides on

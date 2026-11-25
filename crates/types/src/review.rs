@@ -20,7 +20,7 @@ pub struct Review {
     /// Opened by `review.merge`: approval merging remains enabled into the PR's destination.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub merge: bool,
-    /// Started automatically: base PRs, or PRs titled with @review-bot (fac-269).
+    /// Started automatically: base PRs, or PRs titled with a project's configured `review_tag` (fac-269, fac-721).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub auto: bool,
     /// A PR's destination branch as the poller read it: its diff's base, and what it merges into.

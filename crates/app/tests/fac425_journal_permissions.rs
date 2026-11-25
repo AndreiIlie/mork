@@ -20,9 +20,9 @@ fn journal_read_holds_the_seats_project_limit() {
     );
     rig.write_config(&rig.config(&extra));
     common::builds::factory_repo(&rig, 1);
-    let mut limited = rig.card("hf-1", Mode::Full);
+    let mut limited = rig.card("ex-1", Mode::Full);
     limited.project = "first".into();
-    let mut target = rig.card("hf-2", Mode::Full);
+    let mut target = rig.card("ex-2", Mode::Full);
     target.project = "second".into();
     target.stage = Stage::Done;
     let broad = rig.card("fac-1", Mode::Full);
@@ -30,18 +30,18 @@ fn journal_read_holds_the_seats_project_limit() {
     let data = json!({"stage": "done", "paused": false});
     rig.put_journaled(
         vec![],
-        &[Journal { card: Some("hf-2".into()), kind: "card.stage".into(), data: data.clone() }],
+        &[Journal { card: Some("ex-2".into()), kind: "card.stage".into(), data: data.clone() }],
         42,
     );
-    let calls = [["history.journal", "hf-2", "1", "--at", "42", "--kinds", "card.stage"].map(str::to_owned).to_vec()];
+    let calls = [["history.journal", "ex-2", "1", "--at", "42", "--kinds", "card.stage"].map(str::to_owned).to_vec()];
     rig.scenario(json!([
-        ctl_turn("hf-1/foreman", Some("Read the journal"), &calls, reply("working", "Checked", json!([]))),
+        ctl_turn("ex-1/foreman", Some("Read the journal"), &calls, reply("working", "Checked", json!([]))),
         ctl_turn("fac-1/foreman", Some("Read the journal"), &calls, reply("working", "Read", json!([]))),
     ]));
     rig.start();
-    rig.say("hf-1", "@foreman Read the journal");
-    rig.wait_turns("hf-1/foreman", 1);
-    let refused = answers(&rig, &rig.jobs("hf-1/foreman").remove(0));
+    rig.say("ex-1", "@foreman Read the journal");
+    rig.wait_turns("ex-1/foreman", 1);
+    let refused = answers(&rig, &rig.jobs("ex-1/foreman").remove(0));
     assert_eq!(refused.len(), 1, "{refused:#?}");
     assert_eq!(refused[0]["err"]["code"], "refused", "{refused:#?}");
     rig.say("fac-1", "@foreman Read the journal");

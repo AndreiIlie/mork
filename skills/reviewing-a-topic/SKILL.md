@@ -76,6 +76,7 @@ JSON
    Build a Rust proof through its crate (never `include!` of single files with stubs), checking its Cargo.toml's path dependencies and giving it a target folder under the clone.
    A JavaScript proof resolves sibling fixtures from `__dirname`, project code from `process.cwd()` and scratch from `os.tmpdir()`, since the fixer runs its copy in `.git/factory/review-proofs/round-<n>/` from the clone's root.
    A proof that needs a browser launches Chromium from `$PLAYWRIGHT_BROWSERS_PATH`, never from a path under `$HOME`.
+   When the project has a preview skill of its own among your skills, follow its rendering rules when proving what a page shows.
    A fake module starts from the real one's exports and overrides only what the finding needs, so the fixed code's new calls still resolve.
    The fix is the foreman's, never part of a finding.
    If a requirement is unsettled, say it in your hand.

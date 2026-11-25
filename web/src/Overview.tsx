@@ -1,20 +1,15 @@
 import { type ReactNode, useState } from "react";
 import { Markdown } from "./Markdown";
-import { keepLines } from "./RoomDock";
-import { MessageExtras, MessageRow } from "./RoomStream";
-import { authorName, clockTime, plural, took } from "./format";
+import { clockTime, plural, took } from "./format";
 import { ChevronIcon } from "./icons";
 import type {
   Color,
   FindingView,
   LiveRow,
-  MessageView,
-  OverviewLine,
   OverviewStage,
   OverviewStageAt,
   OverviewView,
   Plan,
-  RoundView,
   SuiteProgress,
 } from "./types";
 import { Dot } from "./ui/Dot";
@@ -23,7 +18,6 @@ import { PinnedScroll } from "./ui/PinnedScroll";
 import { ProgressBar } from "./ui/ProgressBar";
 
 const MARK: Record<Exclude<OverviewStageAt, "current">, string> = { passed: "✓", failed: "✕" };
-const BODY = "pl-[calc(var(--spacing-gutter)+24px)] pr-gutter";
 const DEEP = "pl-[calc(var(--spacing-gutter)+48px)] pr-gutter";
 
 function minutes(ms: number): string {
@@ -149,101 +143,6 @@ function FindingRows({ findings }: { findings: FindingView[] }) {
   );
 }
 
-function answerer(m: MessageView): string {
-  return m.from.is === "orchestrator" ? `${authorName(m.from)}, on Andrei's delegation,` : authorName(m.from);
-}
-
-/** An answered ask folded to its headline and who answered it with which option; its headline unfolds the whole ask. */
-function AnsweredAsk({ line, tzOffsetMin }: { line: OverviewLine & { answer: MessageView }; tzOffsetMin: number }) {
-  const [open, setOpen] = useState(false);
-  const { message: m, answer } = line;
-  const options = (m.hand?.options ?? []).map((text, i) => ({ n: i + 1, text }));
-  const n = answer.choice;
-  const chosen = options.find((o) => o.n === n);
-  const said = chosen === undefined ? answer.text.trim() : null;
-  const more = chosen !== undefined && answer.text.trim() !== String(n) ? answer.text.trim() : "";
-  const pick = m.hand?.pick;
-  const why = m.hand?.reason ?? "";
-  return (
-    <div className="max-w-[74ch] py-2">
-      <div className="flex items-baseline gap-2 text-label-13">
-        <span className="font-medium text-gray-1000">{authorName(m.from)}</span>
-        <span className="text-label-12 text-gray-900">{line.room}</span>
-        <span className="font-mono text-label-12 tabular-nums text-gray-700">{clockTime(m.time_ms, tzOffsetMin)}</span>
-      </div>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="mt-1 flex w-full cursor-pointer items-baseline gap-2 text-left text-copy-14 font-medium text-gray-1000 hover:underline"
-      >
-        <ChevronIcon open={open} className="translate-y-[2px] text-gray-700" />
-        <span>{m.hand !== null && m.hand.headline !== "" ? m.hand.headline : m.headline}</span>
-      </button>
-      <p className="mt-1 pl-[22px] text-copy-14 text-gray-900">
-        <span className="text-gray-1000">{answerer(answer)}</span> answered{" "}
-        {said === null ? (
-          <>
-            <span className="font-mono text-gray-1000">{n}</span>: {chosen?.text}
-          </>
-        ) : (
-          said
-        )}
-      </p>
-      <div className="pl-[22px]">
-        {more !== "" && <Markdown text={more} className="mt-1 text-gray-1000" />}
-        <MessageExtras m={answer} />
-        <MessageExtras m={m} />
-      </div>
-      {open && (
-        <div className="ml-[22px] mt-2 border-l border-gray-400 pl-3 text-copy-14 text-gray-900">
-          {m.hand !== null && m.hand.ask !== "" && <Markdown text={keepLines(m.hand.ask)} className="text-gray-900" />}
-          {options.length > 0 && (
-            <div className="my-2 flex flex-col gap-1">
-              {options.map((o) => (
-                <div key={o.n} className={`flex items-baseline gap-3 ${o.n === n ? "text-gray-1000" : ""}`}>
-                  <span className="w-3 shrink-0 font-mono text-label-13 tabular-nums">{o.n}</span>
-                  <span className="min-w-0 flex-1">{o.text}</span>
-                  {o.n === n && <span className="shrink-0 text-label-12 text-gray-900">chosen</span>}
-                </div>
-              ))}
-            </div>
-          )}
-          {pick !== undefined && options.some((o) => o.n === pick) && (
-            <p className="text-gray-900">
-              {authorName(m.from)}&apos;s pick: {pick}
-              {why !== "" ? `, ${why}` : ""}
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Updates({ stage, tzOffsetMin }: { stage: OverviewStage; tzOffsetMin: number }) {
-  const lines = stage.lines ?? [];
-  const earlier = Math.max(0, stage.count - lines.length);
-  if (lines.length === 0 && earlier === 0) return null;
-  return (
-    <div className={`${BODY} py-1`}>
-      {earlier > 0 && (
-        <p className="py-2 text-label-12 text-gray-700">
-          {earlier} earlier {plural(earlier, "update", "updates")}
-        </p>
-      )}
-      {lines.map((line) => {
-        const { answer } = line;
-        return answer !== undefined ? (
-          <AnsweredAsk key={`${line.room}:${line.message.seq}`} line={{ ...line, answer }} tzOffsetMin={tzOffsetMin} />
-        ) : (
-          <MessageRow key={`${line.room}:${line.message.seq}`} m={line.message} room={line.room} tzOffsetMin={tzOffsetMin} />
-        );
-      })}
-    </div>
-  );
-}
-
 /** A running suite's counts: passed of its total when known, else what passed, tests or Jest's files. */
 function suiteCounts(p: SuiteProgress): string {
   const passed =
@@ -293,41 +192,37 @@ function LiveRows({ rows, nowMs }: { rows: LiveRow[]; nowMs: number }) {
   );
 }
 
-function StageBody({
-  stage,
-  current,
-  lastBuild,
-  plan,
-  round,
-  hideFindings,
-  live,
-  tzOffsetMin,
-  nowMs,
-}: {
-  stage: OverviewStage;
-  current: boolean;
-  lastBuild: boolean;
-  plan: Plan | undefined;
-  round: RoundView | undefined;
-  hideFindings: boolean;
-  live: LiveRow[];
-  tzOffsetMin: number;
-  nowMs: number;
-}) {
-  const lines = stage.lines ?? [];
-  const hasUpdates = lines.length > 0 || stage.count > lines.length;
+// What an unfolded stage shows: its live rows, its plan, its round's findings; Spec, and a stage with none, never fold.
+function stageParts(
+  stage: OverviewStage,
+  {
+    current,
+    lastBuild,
+    plan,
+    hideFindings,
+    live,
+    nowMs,
+  }: {
+    current: boolean;
+    lastBuild: boolean;
+    plan: Plan | undefined;
+    hideFindings: boolean;
+    live: LiveRow[];
+    nowMs: number;
+  },
+): ReactNode[] {
   const parts: ReactNode[] = [];
+  if (stage.kind === "spec") return parts;
   if (current && live.length > 0) parts.push(<LiveRows key="live" rows={live} nowMs={nowMs} />);
   if (lastBuild && plan !== undefined && plan.deliverables.length > 0) parts.push(<PlanRows key="plan" plan={plan} />);
+  const round = stage.round;
   if (!hideFindings && round !== undefined && round.findings.length > 0) {
     parts.push(<FindingRows key="findings" findings={round.findings} />);
   }
-  if (hasUpdates) parts.push(<Updates key="updates" stage={stage} tzOffsetMin={tzOffsetMin} />);
-  if (parts.length === 0) return null;
-  return <div className="divide-y divide-gray-400 border-t border-gray-400 bg-background-100">{parts}</div>;
+  return parts;
 }
 
-/** Per-card Overview pane: full-bleed stage rows with inline live status, plan, findings/proofs, and updates. */
+/** Per-card Overview pane: full-bleed stage rows with inline live status, plan, and findings with their proofs. */
 export function Overview({
   overview,
   plan,
@@ -355,21 +250,30 @@ export function Overview({
   return (
     <PinnedScroll>
       {stages.length === 0 ? (
-        <p className="px-gutter py-4 text-label-13 text-gray-700">No updates yet.</p>
+        <p className="px-gutter py-4 text-label-13 text-gray-700">No stages yet.</p>
       ) : (
         <PaneList>
           {stages.map((st, i) => {
             const current = st.at === "current";
             const key = stageKey(st, i);
-            const open = folds[key] ?? current;
             const round = st.round;
+            const parts = stageParts(st, {
+              current,
+              lastBuild: i === lastBuild,
+              plan,
+              hideFindings: round !== undefined && round.n === triageRound,
+              live,
+              nowMs,
+            });
+            const foldable = parts.length > 0;
+            const open = foldable && (folds[key] ?? current);
             return (
               <div key={key}>
                 <Row
                   pane
-                  expanded={open}
+                  expanded={foldable ? open : undefined}
                   active={current && !open}
-                  onClick={() => setFolds((prev) => ({ ...prev, [key]: !open }))}
+                  onClick={foldable ? () => setFolds((prev) => ({ ...prev, [key]: !open })) : undefined}
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="flex w-3 shrink-0 items-center justify-center font-mono text-label-12 text-gray-1000">
@@ -387,30 +291,17 @@ export function Overview({
                     {round !== undefined && (
                       <span className="shrink-0 font-mono text-label-12 text-gray-700">{round.commit}</span>
                     )}
-                    <span className="ml-auto flex shrink-0 items-center gap-3">
-                      <span className="text-label-12 text-gray-700">
-                        {st.count} {plural(st.count, "update", "updates")}
-                      </span>
-                      <span className="font-mono text-label-12 tabular-nums text-gray-700">
-                        {clockTime(st.start_ms, tzOffsetMin)} · {minutes((st.end_ms ?? nowMs) - st.start_ms)}
-                      </span>
+                    <span className="ml-auto shrink-0 font-mono text-label-12 tabular-nums text-gray-700">
+                      {clockTime(st.start_ms, tzOffsetMin)} · {minutes((st.end_ms ?? nowMs) - st.start_ms)}
                     </span>
                   </div>
-                  <ChevronIcon open={open} className="shrink-0 text-gray-700" />
+                  {foldable ? (
+                    <ChevronIcon open={open} className="shrink-0 text-gray-700" />
+                  ) : (
+                    <span className="w-3.5 shrink-0" aria-hidden="true" />
+                  )}
                 </Row>
-                {open && (
-                  <StageBody
-                    stage={st}
-                    current={current}
-                    lastBuild={i === lastBuild}
-                    plan={plan}
-                    round={round}
-                    hideFindings={round !== undefined && round.n === triageRound}
-                    live={live}
-                    tzOffsetMin={tzOffsetMin}
-                    nowMs={nowMs}
-                  />
-                )}
+                {open && <div className="divide-y divide-gray-400 border-t border-gray-400 bg-background-100">{parts}</div>}
               </div>
             );
           })}

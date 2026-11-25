@@ -1,11 +1,10 @@
-use std::collections::BTreeMap;
-
 use factory_core::state::State;
 use factory_types::config::Cli;
-use factory_types::usage::{Account, Limit};
+use factory_types::usage::Limit;
 use factory_types::view::Share;
 use serde_json::{Value, json};
 
+use crate::claude_accounts::Accounts;
 use crate::cli::limits::{ACCOUNT, length_ms, short_name};
 
 struct Reading<'a> {
@@ -18,12 +17,9 @@ struct Reading<'a> {
     pace: Option<(u32, u64)>,
 }
 
-fn readings<'a>(
-    state: &'a State,
-    now: i64,
-    active: Option<&Account>,
-    saved: &BTreeMap<String, Account>,
-) -> Vec<Reading<'a>> {
+fn readings<'a>(state: &'a State, now: i64, accounts: &Accounts) -> Vec<Reading<'a>> {
+    let active = accounts.live.as_ref();
+    let saved = &accounts.saved;
     let mut out: Vec<_> = state
         .limits
         .values()
@@ -41,7 +37,7 @@ fn readings<'a>(
                     saved
                         .iter()
                         .find(|(_, saved)| saved.id == a.id)
-                        .and_then(|(name, _)| crate::claude_accounts::header(name))
+                        .and_then(|(name, _)| accounts.header(name))
                         .map_or_else(|| format!("claude {}", a.plan), str::to_owned)
                 },
             );
@@ -68,6 +64,7 @@ fn readings<'a>(
             r.limit.cli.as_str(),
             agy_3p,
             r.name.clone(),
+            r.limit.account.as_ref().map(|a| a.id.clone()),
             r.limit.bucket != ACCOUNT,
             window,
         )
@@ -95,13 +92,8 @@ fn age(ms: i64) -> String {
     }
 }
 
-pub(super) fn shares(
-    state: &State,
-    now: i64,
-    active: Option<&Account>,
-    saved: &BTreeMap<String, Account>,
-) -> Vec<Share> {
-    readings(state, now, active, saved)
+pub(super) fn shares(state: &State, now: i64, accounts: &Accounts) -> Vec<Share> {
+    readings(state, now, accounts)
         .into_iter()
         .filter(|r| pool(r) && (r.limit.percent.is_some() || r.limit.reached))
         .map(|r| {
@@ -116,7 +108,7 @@ pub(super) fn shares(
                 ends_percent: r.pace.map(|(_, end)| end),
                 signed_out: r.signed_out,
                 switch_account: r.limit.account.as_ref().filter(|_| r.signed_out).and_then(|account| {
-                    saved.iter().find(|(_, saved)| saved.id == account.id).map(|(name, _)| name.clone())
+                    accounts.saved.iter().find(|(_, saved)| saved.id == account.id).map(|(name, _)| name.clone())
                 }),
                 read_ago: r.signed_out.then(|| age(now.saturating_sub(seen.unwrap_or(r.limit.seen_ms)))),
             }
@@ -124,13 +116,8 @@ pub(super) fn shares(
         .collect()
 }
 
-pub(super) fn week_pools(
-    state: &State,
-    now: i64,
-    active: Option<&Account>,
-    saved: &BTreeMap<String, Account>,
-) -> Vec<factory_core::views::burn::WeekPool> {
-    readings(state, now, active, saved)
+pub(super) fn week_pools(state: &State, now: i64, accounts: &Accounts) -> Vec<factory_core::views::burn::WeekPool> {
+    readings(state, now, accounts)
         .into_iter()
         .filter(|r| pool(r) && r.window == "week")
         .map(|r| factory_core::views::burn::WeekPool {
@@ -147,13 +134,8 @@ pub(super) fn week_pools(
         .collect()
 }
 
-pub(super) fn answer(
-    state: &State,
-    now: i64,
-    active: Option<&Account>,
-    saved: &BTreeMap<String, Account>,
-) -> (Vec<String>, Vec<Value>) {
-    let readings = readings(state, now, active, saved);
+pub(super) fn answer(state: &State, now: i64, accounts: &Accounts) -> (Vec<String>, Vec<Value>) {
+    let readings = readings(state, now, accounts);
     let lines = readings.iter().filter(|r| pool(r)).map(|r| line(r, now)).collect();
     let limits = readings
         .iter()

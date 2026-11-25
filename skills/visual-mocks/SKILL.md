@@ -14,6 +14,7 @@ A screenshot meant for your reply goes in your seat's `io/` folder (`FACTORY_IO`
 If you can render the page an ask to Andrei is about, render it and attach the screenshot.
 Render a mock before each recap or offer of it when the request gives a link, and during review when the round requests it.
 Otherwise, render when seeing the page settles something reading its code leaves open.
+A project may say more on what a render loads in a preview skill of its own among your skills.
 
 ## Visual mode
 
@@ -50,6 +51,7 @@ On a card with a planner, no new turn of the foreman starts until the new approv
 Before a card's clone is removed, its mock is kept in the factory's home.
 The card's next run gets it back in its new clone, for its baseline seat to keep and its specification holder to carry on from at brief; its link may change.
 
+A project may add its own mock rules in a preview skill of its own among your skills.
 
 ## Factory web pages
 

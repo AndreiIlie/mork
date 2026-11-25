@@ -31,8 +31,8 @@ pub const SENTINELS: [&str; 9] =
     [HOST_PW, MONGO_PW, REMOTE_PW, REMOTE_MONGO_PW, LIBRA_KEY, LIBRA_SECRET, LIBRA_TOKEN, LIBRA_REFRESH, SUDO_PW];
 
 /// Andrei's own ssh aliases, each its box's host, login and keys; distinct from the target id.
-pub const STAGING_ALIAS: &str = "hf-staging-box";
-pub const PRODUCTION_ALIAS: &str = "hf-prod-box";
+pub const STAGING_ALIAS: &str = "ex-staging-box";
+pub const PRODUCTION_ALIAS: &str = "ex-prod-box";
 
 impl Rig {
     /// The targets' own files: `remote/` holds what lives on the remote targets.
@@ -131,7 +131,7 @@ fn ssh_target(id: &str, alias: &str, r: &std::path::Display) -> String {
          ssh = {{ alias = \"{alias}\" }}\nmisc = true\n\
          [targets.{id}.sql]\ndatabase = \"app\"\nlogin = {{ section = \"app-db\" }}\n\
          [targets.{id}.mongo]\ndatabase = \"logs\"\nlogin = {{ section = \"app-mongo\" }}\n\
-         [targets.{id}.libra]\norigin = \"https://libra.hf.invalid:8243\"\n\
+         [targets.{id}.libra]\norigin = \"https://libra.ex.invalid:8243\"\n\
          client = {{ section = \"libra-api\", key = \"consumer_key\", secret = \"consumer_secret\" }}\n\
          [targets.{id}.libra.endpoints.invoices]\nabout = \"invoices by date\"\npath = \"/v1/invoices\"\n\
          [targets.{id}.file]\nroots = {{ app = \"{r}/srv/app\" }}\nlogs = {{ app = \"{r}/app.log\" }}\n\

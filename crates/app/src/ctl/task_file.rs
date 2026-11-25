@@ -127,16 +127,16 @@ mod tests {
         assert!(pending("fac-1 researcher --task look --task-file -").is_err_and(|e| e.starts_with(BOTH)));
         assert!(pending("fac-1 researcher --task-file").is_err());
         assert!(pending("fac-1 researcher look here").unwrap().is_none());
-        assert!(pending("pr-hf-12 reviewer --topic correctness --task review").unwrap().is_none());
+        assert!(pending("pr-ex-12 reviewer --topic correctness --task review").unwrap().is_none());
         assert!(pending("fac-1 researcher --task-file - --task look").is_err_and(|e| e.starts_with(BOTH)));
         assert!(
-            pending("pr-hf-12 reviewer --task-file - --topic").is_err_and(|e| e.starts_with("--topic needs a value"))
+            pending("pr-ex-12 reviewer --task-file - --topic").is_err_and(|e| e.starts_with("--topic needs a value"))
         );
     }
 
     #[test]
     fn an_option_value_that_looks_like_an_option_is_kept() {
-        let p = pending("pr-hf-12 reviewer --topic --task-file --task-file -").unwrap().unwrap();
+        let p = pending("pr-ex-12 reviewer --topic --task-file --task-file -").unwrap().unwrap();
         let line: Value = serde_json::from_str(&p.line("review it", None).unwrap()).unwrap();
         assert_eq!(line["cmd"]["spawn"]["topic"], json!("--task-file"));
         assert_eq!(line["cmd"]["spawn"]["task"], json!("review it"));

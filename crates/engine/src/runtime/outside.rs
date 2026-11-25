@@ -128,7 +128,7 @@ impl Engine {
                 Phase::Ready => ViewPhase::Ready,
                 Phase::Reloading { target, .. } => ViewPhase::Reloading { short: target.chars().take(7).collect() },
             },
-            usage: super::usage::shares(&self.state, now, c.claude_accounts.live.as_ref(), &c.claude_accounts.saved),
+            usage: super::usage::shares(&self.state, now, &c.claude_accounts),
             base_ahead: c.base_ahead.clone(),
             lookback_counts: c.lookback_counts.clone(),
             resources: c.resources.clone(),

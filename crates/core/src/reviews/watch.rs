@@ -25,10 +25,11 @@ pub fn watched(p: &ProjectConfig, dest: &str) -> bool {
     p.bitbucket.is_some() && dest == p.base
 }
 
-// Whether a PR is reviewed automatically: base PRs, and explicitly tagged review requests.
+// Whether a PR is reviewed automatically: base PRs, and tagged requests into any branch when configured.
 fn reviews_itself(project: &str, pr: &OpenPr, ctx: Ctx<'_>) -> bool {
     ctx.config.projects.get(project).is_some_and(|p| {
-        watched(p, &pr.dest) || (p.bitbucket.is_some() && pr.title.contains("@review-bot"))
+        watched(p, &pr.dest)
+            || (p.bitbucket.is_some() && p.review_tag.as_deref().is_some_and(|tag| pr.title.contains(tag)))
     })
 }
 
@@ -73,6 +74,7 @@ fn left(p: &mut Poster<'_>, project: &str, prs: &[OpenPr]) {
 // Enters detected PRs into the train on first sight or head movement, reusing their review cards.
 // Persisted card heads prevent duplicate runs after restart (fac-98, fac-111).
 fn review_open(p: &mut Poster<'_>, project: &str, prs: &[OpenPr], ctx: Ctx<'_>) {
+    let tagged_project = ctx.config.projects.get(project).is_some_and(|c| c.review_tag.is_some());
     let mut fetch = false;
     for pr in prs {
         crate::queue::approval::close_stale(p, project, pr);
@@ -83,10 +85,12 @@ fn review_open(p: &mut Poster<'_>, project: &str, prs: &[OpenPr], ctx: Ctx<'_>) 
         let auto = reviews_itself(project, pr, ctx) || published(p, project, pr);
         match card {
             Some(mut c) if c.stage.is_live() => {
-                let follows = auto || c.review.as_ref().is_some_and(|r| !r.auto);
+                let follows = !tagged_project || auto || c.review.as_ref().is_some_and(|r| !r.auto);
                 if follows && crate::queue::entries::moves(&c, &pr.head) {
                     if let Some(r) = c.review.as_deref_mut() {
-                        r.dest = Some(pr.dest.clone()).filter(|d| !d.is_empty());
+                        if tagged_project {
+                            r.dest = Some(pr.dest.clone()).filter(|d| !d.is_empty());
+                        }
                         super::cards::copy_context(r, pr);
                     }
                     crate::queue::entries::moved(p, c, &pr.head);

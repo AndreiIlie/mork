@@ -11,7 +11,7 @@ pub(super) fn live_cards(state: &State) -> Vec<&Card> {
     cards
 }
 
-/// Ids compared as numbers (`hf-12` before `hf-12.1` before `hf-100`): runs of digits by
+/// Ids compared as numbers (`ex-12` before `ex-12.1` before `ex-100`): runs of digits by
 /// value, the rest as text.
 pub fn by_number(a: &str, b: &str) -> Ordering {
     let parts = |s: &str| {

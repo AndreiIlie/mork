@@ -450,13 +450,6 @@ export type OverviewStageKind = "spec" | "build" | "verify" | "land" | "report" 
 
 export type OverviewStageAt = "passed" | "failed" | "current";
 
-export interface OverviewLine {
-  room: string;
-  message: MessageView;
-  /** An answered ask's answer, folded into it. */
-  answer?: MessageView;
-}
-
 export interface OverviewStage {
   kind: OverviewStageKind;
   label: string;
@@ -464,8 +457,6 @@ export interface OverviewStage {
   start_ms: number;
   end_ms?: number;
   summary?: string;
-  count: number;
-  lines?: OverviewLine[];
   round?: RoundView;
 }
 

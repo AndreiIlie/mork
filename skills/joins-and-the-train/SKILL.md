@@ -6,7 +6,7 @@ description: "Use when the base moved under a card (a join), or when a candidate
 # Joins, verification and the merge queue
 
 **Its entries.**
-Our card's branch, once its head's checks pass or when none are configured; every pull request into a repository's base the poller reads, a colleague's, or ours at a head no verification passed; my-app's pull requests whose titles contain `@review-bot`, into any destination; a pull request or branch Andrei asked to review (`review`, `review.merge`, `review.branch`).
+Our card's branch, once its head's checks pass or when none are configured; every pull request into a repository's base the poller reads, a colleague's, or ours at a head no verification passed; any pull request into any destination whose title contains its project's configured `review_tag`; a pull request or branch Andrei asked to review (`review`, `review.merge`, `review.branch`).
 No `/merge` is waited for.
 Each is verified on a candidate of its own as it comes, `merging` while it runs, none waiting for another: only its suite waits for a test slot.
 A new head the poller reads on a pull request or a branch under review takes it through the steps again, on the same card; our card's new head takes it out, and passing its checks puts it back.

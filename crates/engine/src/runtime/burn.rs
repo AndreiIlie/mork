@@ -5,8 +5,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use factory_core::state::State;
 use factory_core::views::burn::{self, Row, WEEK_MS};
 use factory_types::CardId;
-use factory_types::usage::{Account, RecentBurn};
+use factory_types::usage::RecentBurn;
 
+use crate::claude_accounts::Accounts;
 use crate::store::{JournalRow, Store};
 
 fn as_rows(rows: &[JournalRow]) -> Vec<Row<'_>> {
@@ -17,8 +18,7 @@ pub(super) fn recent(
     state: &State,
     store: &Store,
     (now, tz_offset_min): (i64, i32),
-    active: Option<&Account>,
-    saved: &BTreeMap<String, Account>,
+    accounts: &Accounts,
 ) -> RecentBurn {
     let since = now.saturating_sub(WEEK_MS);
     // The daily series reaches back further than the week: the week's figures read their part of its rows (fac-696).
@@ -46,7 +46,7 @@ pub(super) fn recent(
         .collect();
     let card_rows: BTreeMap<String, Vec<Row<'_>>> =
         owned_rows.iter().map(|(card, rows)| (card.clone(), as_rows(rows))).collect();
-    let pools = super::usage::week_pools(state, now, active, saved);
+    let pools = super::usage::week_pools(state, now, accounts);
     RecentBurn { daily, ..burn::recent(since, &cost_refs, &stage_refs, &card_rows, &parents, &pools) }
 }
 

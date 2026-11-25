@@ -64,6 +64,29 @@ In `factory.toml`, `[factory] context_cap` sets the shared auto-compaction conte
 Valid values are `0` (disables the cap, omitting `--autocompact` on Claude and `AGY_CLI_AUTO_COMPACT_OVERRIDE` on agy) or `100000` through `1000000` inclusive.
 When active, the cap is passed to Claude via `--autocompact` and to agy via `AGY_CLI_AUTO_COMPACT_OVERRIDE`, and is used as the effective context window denominator (`min(model_window, context_cap)` on Claude, `context_cap` on agy) in seat indicators, `/usage` contexts and prompt `Context size` lines.
 
+### skills
+
+In `factory.toml`, `[factory] skills` names an optional absolute folder path (with no `.` or `..` component) whose regular files are merged with the built-in skills at startup into the same content-named folder mounted in every wall.
+Symlinks and non-regular files inside it are skipped, and a missing folder uses the built-in skills alone.
+Any other error opening the folder, a path under `.claude-plugin`, or a path colliding with a built-in skill fails startup.
+
+### tickets and review_tag
+
+In `factory.toml`, `[projects.<name>.tickets]` enables issue-tracker behaviour for that project, with `api` (an `https://` work-items API URL without a trailing `/`, sent the token from `~/.config/azure-devops/pat`) and `page` (an `http://` or `https://` ticket page URL prefix).
+Projects with `tickets` parse ticket numbers from card notes and PRs, format PR titles, branches, descriptions and room details from them, and require a `PR wording` note before publishing a PR with tickets.
+`[projects.<name>] review_tag` names a non-empty title substring that triggers automatic PR review into any destination branch on a Bitbucket project, rather than only its base branch.
+
+### claude_accounts
+
+In `factory.toml`, `[claude_accounts]` maps each saved account's name (`[A-Za-z0-9._-]`, not `.` or `..`, matching `<name>.claude.json` and `<name>.credentials.json` under `.claude/accounts/`) to its non-empty usage pool header.
+Without `[claude_accounts]`, no saved accounts are read and `claude.account` refuses every name as unknown.
+
+### tunnels
+
+In `factory.toml`, each `[tunnels.<name>]` entry configures a window-owned SSH web forward shown in the window's `web tunnels` overlay in name order.
+Each entry requires `alias` (an SSH alias, non-empty, not starting with `-`, with no whitespace), `port` (non-zero unique local port), `remote_port` (non-zero remote port) and `url` (`http://` or `https://` browser address).
+With no `[tunnels.*]` configured, the overlay lists no rows.
+
 ## Commands
 
 ### watch
@@ -71,7 +94,7 @@ When active, the cap is passed to Claude via `--autocompact` and to agy via `AGY
 The views of places, as they change: a live stream, not a one-off read.
 
 Answers `{"watch": {"places": [...]}}`, then one line per place, `{"event": {"view": <view>}}` (`{"event": {"screen": ...}}` for `screen`), sent again when what it says changed: a state change that leaves a place's view as it was, its `revision` apart, sends nothing.
-A place is `main`, a card's room (`hf-550`), a full card's spec room (`hf-550/spec`) or challenge place (`hf-550/challenge`), which the window shows nowhere, a DM (`hf-550/foreman/dm`) or `screen`; names aren't checked.
+A place is `main`, a card's room (`ex-550`), a full card's spec room (`ex-550/spec`) or challenge place (`ex-550/challenge`), which the window shows nowhere, a DM (`ex-550/foreman/dm`) or `screen`; names aren't checked.
 Without `tail`, a view carries the place's whole conversation, within its line; with it, only its latest `tail` messages, and the earlier ones whose ask is still open (`pinned`).
 By default a view is the conversation alone: `{"place", "revision", "messages", "earlier", "pinned"}`, with no header, agents, offers, plan, notes, sessions, outputs, `turns` or `lists`.
 With `--full` (JSON: `"full": true`) it is the whole view, described below, which can be large.
@@ -85,12 +108,12 @@ The card header's `about.seat_costs` gives each seat's current-run `agent`, `cos
 Each agent row also carries an optional `cache` (`running`, or `idle` with `cold_at_ms`), and a card's room view carries `summaries` (its card's and each carried card's) and `findings` (its review card's raised findings with their states, without proofs).
 A `screen` event's `hands` carry `cold_at_ms` while their waiting seat's prompt cache is idle, `projects` carries each project's look-back state, and `top.resources` carries the machine's sampled CPU and RAM.
 
-Example: `factory ctl watch main hf-550`, `factory ctl watch main --tail 50`; with turn traces, `factory ctl watch hf-550 --full`
+Example: `factory ctl watch main ex-550`, `factory ctl watch main --tail 50`; with turn traces, `factory ctl watch ex-550 --full`
 
 ### hook
 
 A project's orchestrator's stream: what reaches Andrei or `orchestrator` about that project's cards, as it happens.
-Each configured project has its own orchestrator, `orchestrator:<project>` (`orchestrator:my-app`), and only it sends its project's hook, with `factory ctl --as orchestrator:<project> hook`, on `factory.sock`: the hook's project is the sender's.
+Each configured project has its own orchestrator, `orchestrator:<project>` (`orchestrator:example.com`), and only it sends its project's hook, with `factory ctl --as orchestrator:<project> hook`, on `factory.sock`: the hook's project is the sender's.
 `--as orchestrator:<project>` makes any command count as that orchestrator's, never as Andrei's; it is refused on an agent's socket and for a project not configured.
 An orchestrator may send what Andrei may, on any project's cards, except what a command's own reference keeps for him alone.
 What it does shows as `orchestrator:<project>`; its messages answer only asks given to it (`give`, or asks given automatically on a delegated or self-sustained card).
@@ -107,7 +130,7 @@ The command line prints every line, reconnects when the factory restarts, and st
 
 **Waking**
 
-A project with waking enabled has a line the factory writes for each ask given to the orchestrators (`ask given to you: hf-550/answer/2` when delegation is off, `ask given to you (delegated): hf-550/answer/2` at the first level, or `ask given to you (self-sustained): hf-550/answer/2` at the second), each `opinion` (its whole text, ending `Ask in <place>.`), each `review` of its stream, a section Andrei sent to review (its whole text), each request a seat or the engine sends `orchestrator` (`request from hf-550/foreman in hf-550`: who and where, never its text; an update or a response wakes nobody), and each of its cards whose run ends (`hf-550 is done`, `hf-550 is closed`), a review card's excepted, whose end wakes nobody, held until the card settles: its seats' closing turns ended and its clone removed, its handoff copied first, a removal held on a failed copy keeping it waiting until it is retried and done, dropped or done by hand; the line then names the notes of the card still listed under the card's project, as `notes` lists them, by kind and count (`hf-550 is done, left a feedback and a handoff`, `hf-550 is closed, left 2 code smells`, lessons and proposals counted too), and is the plain line when there are none: the factory's notes a seat of another project's card filed are the factory's orchestrator's to find with `notes`, and wake no line; a card live again before it settles is not said to have ended.
+A project with waking enabled has a line the factory writes for each ask given to the orchestrators (`ask given to you: ex-550/answer/2` when delegation is off, `ask given to you (delegated): ex-550/answer/2` at the first level, or `ask given to you (self-sustained): ex-550/answer/2` at the second), each `opinion` (its whole text, ending `Ask in <place>.`), each `review` of its stream, a section Andrei sent to review (its whole text), each request a seat or the engine sends `orchestrator` (`request from ex-550/foreman in ex-550`: who and where, never its text; an update or a response wakes nobody), and each of its cards whose run ends (`ex-550 is done`, `ex-550 is closed`), a review card's excepted, whose end wakes nobody, held until the card settles: its seats' closing turns ended and its clone removed, its handoff copied first, a removal held on a failed copy keeping it waiting until it is retried and done, dropped or done by hand; the line then names the notes of the card still listed under the card's project, as `notes` lists them, by kind and count (`ex-550 is done, left a feedback and a handoff`, `ex-550 is closed, left 2 code smells`, lessons and proposals counted too), and is the plain line when there are none: the factory's notes a seat of another project's card filed are the factory's orchestrator's to find with `notes`, and wake no line; a card live again before it settles is not said to have ended.
 The orchestrator of the factory's own project (`[factory] project`) alone is also woken by each finished reload, with the whole announcement the new build says in main once it is said there (`Reloaded to a09d55a (from 5bbc110). It brought:` and its list); a failed reload wakes nobody.
 What was asked or said is read on the stream or with `history`.
 Each entry is queued as its event is recorded or as its card settles.
@@ -129,7 +152,7 @@ With no such login (`waker-home/.claude/.credentials.json`) no run starts, the e
 With `orchestrator_waits = true`, an Antigravity Desktop orchestrator runs `wakes` as its daemon command to wait for the next batch.
 This uses the command's connection alone, without a haiku run or a `waker-home` login.
 
-Example: `factory ctl --as orchestrator:my-app hook`
+Example: `factory ctl --as orchestrator:example.com hook`
 
 ### wakes
 
@@ -164,7 +187,7 @@ A page past its line keeps the messages nearest `before` (`earlier` counts the r
 A read: allowed during a reload.
 Changes nothing.
 
-Example: `factory ctl history main 4120 50`; with the turns, `factory ctl history hf-550 4120 50 --turns`
+Example: `factory ctl history main 4120 50`; with the turns, `factory ctl history ex-550 4120 50 --turns`
 
 ### history.search
 
@@ -232,20 +255,20 @@ The read runs on its own read-only connection and one transaction, ended cards i
 Allowed during a reload.
 Changes nothing.
 
-Example: the newest rows, `factory ctl history.journal hf-550 40`; around an event, `factory ctl history.journal hf-550 40 --seq 12000`; by a message's `time_ms`: `factory ctl history.journal hf-550 40 --at 1794351522350 --kinds message,reply,ask,job.settled`; an older page: `factory ctl history.journal hf-550 40 --before 11980`
+Example: the newest rows, `factory ctl history.journal ex-550 40`; around an event, `factory ctl history.journal ex-550 40 --seq 12000`; by a message's `time_ms`: `factory ctl history.journal ex-550 40 --at 1794351522350 --kinds message,reply,ask,job.settled`; an older page: `factory ctl history.journal ex-550 40 --before 11980`
 
 ### status
 
 The live cards, one line each; job records only when requested, the live ones by default.
 
-Answers `{"status": {"lines": ["hf-550  brief  yellow  asks 1  Its title"], "revision": n}}`; a run that carries cards names them at its line's end (`  carries hf-551 hf-552`).
+Answers `{"status": {"lines": ["ex-550  brief  yellow  asks 1  Its title"], "revision": n}}`; a run that carries cards names them at its line's end (`  carries ex-551 ex-552`).
 With `--jobs` (JSON: `{"status":{"jobs":true}}`), also includes `jobs`: a list of `{"id", "kind", "settled", "settled_ms"}` records for the jobs not yet settled.
 `--all` adds the settled jobs whose folders are still kept, which build wait and `doctor` read.
 `--card <card>` keeps the jobs of that card alone: a turn of its agents, or a work job (clone, install, bundle, check, candidate, train, suite) made for it; other cards' and the factory's own builds are left out.
 Both need `--jobs`.
 A read: allowed during a reload.
 
-Example: `factory ctl status`; with job records, `factory ctl status --jobs`; one card's, `factory ctl status --jobs --card hf-550`
+Example: `factory ctl status`; with job records, `factory ctl status --jobs`; one card's, `factory ctl status --jobs --card ex-550`
 
 ### usage
 
@@ -264,7 +287,7 @@ Readings for other Claude accounts stay stored and show again if the account bec
 `by_pool` gives each pool's pace, one line each, above the full fields in `/usage` and first in the answer (its keys print sorted): Claude's week, Fable and any 5-hour pool for each account, Codex's week, and agy's five-hour and weekly `agy gemini` (Gemini Models) and `agy 3p` (Claude and GPT models) pools.
 While agy's token file exists, the engine reads both groups every 60 seconds with `agy --output-format json -p="/usage"` in a wall.
 The read starts no conversation and spends no quota.
-Each saved account's pool shows under its own header: `claude max` for `personal-max`, `claude team` for `work-team` and `claude team small` for `small-team`.
+Each saved account's pool shows under the header configured for it in `[claude_accounts]` (for example, `claude max` for `account-max`).
 Pace uses the reading's time: used share divided by the share of its window then gone, rounded to whole percentages.
 Missing shares or reset times, or passed resets, have no pace.
 A passed reset shows as `stale`.
@@ -279,7 +302,7 @@ Example: `factory ctl usage`
 
 ### claude.account
 
-Switches the Claude seats' shared home to the saved account `name`: `personal-max`, `work-team` or `small-team`.
+Switches the Claude seats' shared home to the saved account `name` configured in `[claude_accounts]`.
 Andrei and the orchestrators may send it; every seat is refused.
 The orchestrators' and the waker's own logins are untouched.
 
@@ -294,7 +317,7 @@ Refused with nothing written when the name is not a saved account, its files can
 Turns started after the switch use the new account.
 A turn already running may move to it; from a switch on, the engine ignores usage readings from turns that started before it, including after a switch back.
 
-Example: `factory ctl claude.account work-team`
+Example: `factory ctl claude.account account-team`
 
 ### projects
 
@@ -410,7 +433,7 @@ Andrei may approve either; the card's project's orchestrator may approve only a 
 It is kept with the message, whose news line says its verb.
 `delivery` `now` (the window's Send now) cuts the agent's running turn: what it ran and edited stands, its reply is dropped, and once that turn has settled its session continues with the message, the prompt first saying the turn was interrupted and to check what already happened; the card and its other agents run on.
 An agent with no turn running, or paused, has it as an ordinary message.
-`choice`, Andrei's or an orchestrator's alone, names by its number the option of the addressed agent's open `answer` ask that the message chooses (the window's option buttons send it): it is kept with the message, the Overview shows the option it chose, and a number that ask doesn't offer, a `say` with none open, or an orchestrator's on an ask not given to it, is refused.
+`choice`, Andrei's or an orchestrator's alone, names by its number the option of the addressed agent's open `answer` ask that the message chooses (the window's option buttons send it): it is kept with the message, and a number that ask doesn't offer, a `say` with none open, or an orchestrator's on an ask not given to it, is refused.
 Without `delivery`, a message from Andrei, an orchestrator, or the agent's parent seat, as a parent's reply to its child, reaches the agent's running turn between its tool calls and wakes no turn of its own: a Claude turn has it staged for its next model call, a walled Codex turn steered with it.
 The engine's report of a child's ended turn (finished its task, passed or failed its topic, blocked, asking or a red hand) likewise reaches that child's parent's running turn, whatever it says.
 Messages a child writes to its parent in a reply or with `say` stay queued for the parent's next turn.
@@ -430,7 +453,7 @@ Answers `{"say": {"seq", "to"}}`, `to` the agent's key.
 In a card's room, a `to` (or leading `@name`) naming one of the card's children (`researcher-1`, `reviewer-1`) posts in that child's DM, `<card>/<name>/dm`, and wakes it; a planner's researcher is named from the spec room.
 Refused when its `text` is empty or only whitespace and it carries no image, or when no such agent is in the place.
 
-Example: `factory ctl say hf-550/researcher-1/dm --kind request Where is the empty cart tested?`
+Example: `factory ctl say ex-550/researcher-1/dm --kind request Where is the empty cart tested?`
 
 ### dm
 
@@ -442,7 +465,7 @@ The foreman's DM agent names `planner` to reach it in the challenge place.
 Answers `{"dm": {"place"}}`, the same for a DM already open.
 Refused for other roles (a foreman's children have theirs from `spawn`), an unknown card, or a role the card has no agent in.
 
-Example: `factory ctl dm hf-550 foreman`
+Example: `factory ctl dm ex-550 foreman`
 
 ### spawn
 
@@ -500,7 +523,7 @@ Each additional model has its own entry.
 A plain `[[picks.reviewer]]` is rejected as a config error naming its line, with no compatibility reading.
 Configure every role and review kind the foreman needs to select explicitly; an omitted or empty list grants no choices.
 
-The child is `<card>/<role>-<n>` (`hf-550/researcher-2`), numbered after the last of its role, its parent the seat that spawned it.
+The child is `<card>/<role>-<n>` (`ex-550/researcher-2`), numbered after the last of its role, its parent the seat that spawned it.
 Its place is its DM, `<card>/<role>-<n>/dm`, nested under its card's row in the window, which folds it, where `task` is posted from its parent as a request that wakes it.
 It has a session of its own, which its later tasks resume: the foreman's message to it by name (`researcher-1`), or Andrei's in its DM.
 The engine reports its `built`, `reported` or `blocked` to its parent in its parent's room (the spec room for a planner's researcher), reaching its running turn between tool calls or waking it for its next turn: it submits nothing, the foreman alone submits the card with its own `built`, after merging `origin/<base>` in that turn.
@@ -511,8 +534,8 @@ Resuming the foreman restores a wake that a stop or second cut dropped, after th
 A planner's researchers wake it per report.
 A submitted head lacking the newest base tip the engine has seen gets a join request, the tip imported first, before the checks run in its clone.
 A researcher works in a folder of its own, the clone read-only at `$FACTORY_CLONE`.
-A visual card's baseline seat (`hf-550/baseline-1`) is its foreman's at the card's baseline step alone, one at a time: it works in the clone, reading it and writing only its `.git/factory-mock/`, and its `built` or `blocked` reports to the foreman, whose `built` ends the step and releases it.
-A review card's reviewer (`pr-hf-12/reviewer-1`) is one of its blind reviewers, one per topic, with its topic in the first task in its DM.
+A visual card's baseline seat (`ex-550/baseline-1`) is its foreman's at the card's baseline step alone, one at a time: it works in the clone, reading it and writing only its `.git/factory-mock/`, and its `built` or `blocked` reports to the foreman, whose `built` ends the step and releases it.
+A review card's reviewer (`pr-ex-12/reviewer-1`) is one of its blind reviewers, one per topic, with its topic in the first task in its DM.
 Its `review-pass`, `review-fail` or `blocked` reports to the foreman with its findings and decides nothing.
 A verdict the foreman gives for its round drops a wake caused only by queued reports, which stay in the room's history.
 A report delivered into the foreman's running turn still wakes it if left unread.
@@ -524,13 +547,13 @@ The card's foreman may spawn children.
 Its planner may spawn researchers.
 Refused for a card that isn't live, a role other than `researcher`, `reviewer` or `baseline`, a baseline seat outside its visual card's baseline step, while the card has one that isn't retiring, or naming `model`, `effort` or `cli`, a reviewer on a card that isn't a review card, an empty task, a reviewer without a topic, or a researcher with one.
 
-For example, `factory ctl spawn hf-550 researcher "Find where the cart's totals are computed" --model gpt-6.2-sol --effort xhigh`, or `factory ctl spawn pr-hf-12 reviewer 'Correctness: ...' --topic correctness`.
+For example, `factory ctl spawn ex-550 researcher "Find where the cart's totals are computed" --model gpt-6.2-sol --effort xhigh`, or `factory ctl spawn pr-ex-12 reviewer 'Correctness: ...' --topic correctness`.
 
 `--task-file <path>`, in `factory ctl`'s words alone, reads the task from that file, or from stdin for `-`, so no shell quoting touches it: its text goes as `task` verbatim, its trailing newlines trimmed.
 The build the factory runs reads it once, after any handover to that build.
 Refused with exit 2 and a usage line, sending nothing: a task in words or `--task` beside it, no path, an unreadable file, an empty text, or a request over the factory's 1 MiB line.
 
-Example: `factory ctl spawn hf-550 researcher --task-file .git/task.md --model sol --effort xhigh`, or from stdin: `factory ctl spawn pr-hf-12 reviewer --task-file - --topic correctness < task.md`
+Example: `factory ctl spawn ex-550 researcher --task-file .git/task.md --model sol --effort xhigh`, or from stdin: `factory ctl spawn pr-ex-12 reviewer --task-file - --topic correctness < task.md`
 
 ### ack
 
@@ -540,7 +563,7 @@ An agent's `ack` of an alarm is buzzed: only Andrei or an orchestrator closes on
 Answers `{"ack": {"ask"}}`.
 Refused for another kind of ask, an alarm holding an action, or one not open.
 
-Example: `factory ctl ack hf-550/answer/1`
+Example: `factory ctl ack ex-550/answer/1`
 
 ### start
 
@@ -586,16 +609,16 @@ Refused with `--mode report`.
 Andrei's or an orchestrator's alone: any other seat's start naming it is buzzed.
 The window has no control for it.
 
-Cards named after the first are carried by its run (JSON `carries`): `start hf-550 hf-551 hf-552` runs all three in hf-550's one plan, room, clone, branch, review and merge, and decisions stay on hf-550.
-When the word after the card is a mode word, the words fill mode, model and effort in order as before (`start hf-550 report opus high`); otherwise each word after the card is one carried card as typed, never split at commas nor read as a JSON list, and mode, model and effort take their flags.
-`--carries` takes a list (`hf-551,hf-552`, or a JSON array); an empty word, or a `--carries` naming no card or a blank one, is refused.
+Cards named after the first are carried by its run (JSON `carries`): `start ex-550 ex-551 ex-552` runs all three in ex-550's one plan, room, clone, branch, review and merge, and decisions stay on ex-550.
+When the word after the card is a mode word, the words fill mode, model and effort in order as before (`start ex-550 report opus high`); otherwise each word after the card is one carried card as typed, never split at commas nor read as a JSON list, and mode, model and effort take their flags.
+`--carries` takes a list (`ex-551,ex-552`, or a JSON array); an empty word, or a `--carries` naming no card or a blank one, is refused.
 Only a full run carries.
 Each carried card's board status is set to started with the run's own, the first turn waiting for every one of those writes, after a restart too, and to merged when the run lands, a merged PR included; those writes are held, retried and asked about in the run's room.
 A carried card is its run's, so it can't start alone or be carried by another run: while the run is live; while it is closed with a head or publication that hasn't landed (its last bundle still saving included), until a read of the boards finds the run's card closed on its board, a release that a later read missing its file, or a restart, keeps; and while its merged write from the run's landing is still to be done.
 A later run going on with work that hasn't landed must name the same carried cards; the room's start button sends them.
 Refused, with nothing made, when a carried card is on no configured board or another project, is done or merged on its board, is live, is named twice, is held by another run, or its own earlier run left work that hasn't landed; when a report start names one; when a later run names another set than its unlanded work carried; while the take keeping that closed run's last head is held, which `action.retry` resumes, the run going on from that head once it is kept; and, for the run's own card, while another run holds it.
 
-Example: `factory ctl start hf-550 --mode full --delegated`, or `factory ctl start hf-550 hf-551 --model opus`
+Example: `factory ctl start ex-550 --mode full --delegated`, or `factory ctl start ex-550 ex-551 --model opus`
 
 ### approve
 
@@ -618,7 +641,7 @@ Approval of a plan agreed after `brief` asks the foreman to continue the build f
 A mock's ask is never given to an orchestrator.
 Refused to a sender outside these rules (buzz), when no plan is offered for approval at brief, or on an open mock at build while its offer is down.
 
-Example: `factory ctl approve hf-120`
+Example: `factory ctl approve ex-120`
 
 ### mock
 
@@ -641,7 +664,7 @@ Refused for a card not in the state, not full or not visual, ended, whose mock i
 A local base move still waiting for the card's running turns to end hasn't started: the reopen drops it.
 Andrei's alone (buzz).
 
-Example: `factory ctl mock hf-120`
+Example: `factory ctl mock ex-120`
 
 ### brief
 
@@ -666,7 +689,7 @@ Answers `{"brief": {"card"}}`.
 Refused for a card not in the state, not full, ended, without an approved plan or already back at brief, with its mock open, and once its final landing has started, as for `mock`.
 Andrei's or the card's own foreman's (buzz).
 
-Example: `factory ctl brief hf-120 'The fix belongs in the parser, not the view.'`, or unquoted: every word after the card is the words.
+Example: `factory ctl brief ex-120 'The fix belongs in the parser, not the view.'`, or unquoted: every word after the card is the words.
 
 ### merge
 
@@ -683,21 +706,21 @@ On a repository with PRs only his approval on Bitbucket merges it, as the `bitbu
 Answers `{"merge": {"card", "landing", "ahead"}}`: its step (`none`; `queued`, `fetch`, `prepare` and `test` while it is being verified, `review` while its suite ended and its round runs; `passed`, verified and in the queue; `merge` landing; `published`, `approval` and `hand-merged` for its PR) and the cards of the merge queue before it, all of them while it is still being verified.
 Refused when it has no head that passed its checks, isn't ready, or (buzz) from anyone but Andrei.
 
-Example: `factory ctl merge hf-120`
+Example: `factory ctl merge ex-120`
 
 ### stop
 
 Stops a card, or one agent: exactly one of `card` and `agent`.
 
 A card: it and its agents pause, every job of it is stopped, its pending actions are cancelled.
-An agent (its key: `hf-120/foreman`, `hf-120/foreman/dm`; a foreman's child is `hf-120/researcher-2`, its place `hf-120/researcher-2/dm` not its key): its running turn is stopped and it pauses.
+An agent (its key: `ex-120/foreman`, `ex-120/foreman/dm`; a foreman's child is `ex-120/researcher-2`, its place `ex-120/researcher-2/dm` not its key): its running turn is stopped and it pauses.
 A card is stopped only by Andrei or an orchestrator, any orchestrator on any card; an agent only by Andrei or the seat that spawned it (a full card's foreman may also stop or interrupt its planner).
 Every other sender is buzzed: no seat stops a card, its own included, and an orchestrator never stops one agent.
 Answers `{"stop": {"card"}}` or `{"stop": {"agent"}}`.
 Refused when neither or both are given, for an unknown card or one that isn't live, or for an unknown agent.
 A card is named with `--card`, an agent with `--agent` and its full key: a bare word fills the card, and a bare `researcher-2` is no agent.
 
-Example: `factory ctl stop --card hf-120`; a foreman stops its child with `factory ctl stop --agent hf-120/researcher-2`
+Example: `factory ctl stop --card ex-120`; a foreman stops its child with `factory ctl stop --agent ex-120/researcher-2`
 
 ### resume
 
@@ -710,13 +733,13 @@ Every other sender is buzzed: no seat resumes a card, its own included, and an o
 Answers `{"resume": {"card"}}` or `{"resume": {"agent"}}`.
 Refused when neither or both are given, for an unknown card or one that isn't live, or for an unknown agent.
 
-Example: `factory ctl resume --card hf-120`
+Example: `factory ctl resume --card ex-120`
 
 ### fresh
 
 Replaces an agent's session with a new one: its next turn starts afresh.
 
-`agent` is a key (`hf-120/foreman`, `hf-120/foreman/dm`; a foreman's child is `hf-120/researcher-2`, its place `hf-120/researcher-2/dm` not its key), whoever sends it.
+`agent` is a key (`ex-120/foreman`, `ex-120/foreman/dm`; a foreman's child is `ex-120/researcher-2`, its place `ex-120/researcher-2/dm` not its key), whoever sends it.
 In the window, `/fresh foreman` in a room names its card's foreman.
 The session ends: nothing resumes it again.
 The agent's next turn starts a new session with the start's whole material, the news since its last turn, and one line naming the session it replaces and where its turns are (its place's conversation).
@@ -729,7 +752,7 @@ A turn whose CLI can't find its session raises an error ask saying so, offering 
 Answers `{"fresh": {"agent", "replaces", "pending"}}`, `pending` true while the old session's turn runs.
 Refused for an unknown agent, or one with no session yet.
 
-Example: `factory ctl fresh hf-120/foreman`
+Example: `factory ctl fresh ex-120/foreman`
 
 ### pick
 
@@ -826,7 +849,7 @@ It sends `cli` with every model pick, and the row shows a pending pick as `→ <
 Answers `{"pick": {"agent", "cli", "model", "effort", "pending", "fresh"}}`, `fresh` is true for a change of CLI from the one the session runs next: its last turn's.
 Refused for an unknown agent, a model not offered, an ambiguous model without `cli`, an effort outside the selected model's permissions, an unknown CLI, or neither model nor effort named.
 
-Example: `factory ctl pick hf-120/foreman --model claude-opus-5-5 --effort high`
+Example: `factory ctl pick ex-120/foreman --model claude-opus-5-5 --effort high`
 
 ### close
 
@@ -837,7 +860,7 @@ Its board isn't changed: `card.close` does that.
 Answers `{"close": {"card"}}`.
 Refused when the card isn't live.
 
-Example: `factory ctl close hf-120 superseded by hf-131`
+Example: `factory ctl close ex-120 superseded by ex-131`
 
 ### done
 
@@ -866,18 +889,19 @@ Answers `{"preview": {"card", "on", "running", "url", "log"}}`, `url` being `htt
 Refused for a card whose project names no `preview`, one that isn't live, isn't full or is still starting, an action that isn't one of the three, or a worker that couldn't start, with why.
 Andrei's, but for the card's own foreman's restart (no `action`, or `restart`) while its preview is on, refused while it is off; `start` and `stop` are buzzed to the foreman, and every call to anyone else.
 
-Example: `factory ctl preview hf-550`, `factory ctl preview hf-550 stop`
+Example: `factory ctl preview ex-550`, `factory ctl preview ex-550 stop`
 
 ### demo
 
 Andrei's `/demo` in the card's room turns a full card's preview on and asks its foreman for the changed page's direct link and a brief reminder of the change.
 
 It does what `preview` with no action does, then wakes the foreman to raise its hand with the link and reminder.
+The foreman creates data only when the change needs it and no existing data shows it, following the project's preview skill when one is among its skills.
 Answers `{"demo": {"card", "on", "running", "url", "log"}}`.
 Refused as `preview` is, and for a card at brief, with nothing built yet.
 Andrei's alone (buzz).
 
-Example: `factory ctl demo hf-550`
+Example: `factory ctl demo ex-550`
 
 ### prs
 
@@ -980,7 +1004,7 @@ Marks finding `n` of a review card verified fixed, or with `--declined` ruled ou
 The reviewer that raised a finding verifies its fix and resolves it; the review card's foreman resolves its own alone; Andrei or an orchestrator may resolve any, at any time; the foreman of the card a linked review card reviews may resolve any of its findings with `--declined` only, at any time, when the finding reached it marked Foreman decides (from triage or directly on a delegated card) or on Andrei's word or the project's orchestrator's delegated answer.
 Anyone else is buzzed.
 An agent's resolve counts in a turn of the round under way, one begun after the round was asked, on its commit: between rounds, or from a turn begun before the round was asked, it is refused, and the finding stays open; Andrei's, an orchestrator's, and the reviewed card's foreman's `--declined` on a linked review card count at any time.
-A finding posted on its PR has its comment's thread resolved by review-bot, at once or as soon as its comment is posted; a finding resolved `--declined` first gets review-bot's reply "Andrei declined this finding.", and `--dropped` posts its reviewer’s own words before resolving the thread if needed.
+A finding posted on its PR has its comment's thread resolved by the review bot, at once or as soon as its comment is posted; a finding resolved `--declined` first gets the review bot's reply "Andrei declined this finding.", and `--dropped` posts its reviewer’s own words before resolving the thread if needed.
 Once a round passed, the card's reviewers with no finding left to verify are released; one with a finding open stays for it.
 Answers `{"resolve": {"card", "n", "comment"}}`, `comment` whether a thread is resolved now; one already resolved answers `already`.
 A finding raised again once resolved is a finding of its own, under a new number, its comment and thread new.
@@ -1032,13 +1056,13 @@ Answers `{"rereview": {"card", "review"}}`, `review` the PR's review card.
 Refused for a card not in the state, a review card, a card with no PR or no review card of it, a review card stopped, one whose round or run is under way, one whose last round and last run didn't fail, and an ended one whose PR isn't open as the poller last read it.
 The card's own foreman's on its own judgement, Andrei's or an orchestrator's (buzz): anyone else's is buzzed.
 
-Example: `factory ctl rereview hfe-260`
+Example: `factory ctl rereview ex-260`
 
 ### deliverables
 
 Cuts a card into its deliverables: named parts of its work in order, each with a task list of its own, posted in its room.
 
-`names` takes a string with one deliverable's name per line, in order, or a JSON array of strings (directly through `--json`, or encoded in a string); on the command line each further argument is a name of its own (`deliverables hf-550 'The invoice form' 'The totals modal'`), as if joined by newlines; a leading list marker (`-`, `*`, `1.`) is dropped and a blank line or empty array item skipped.
+`names` takes a string with one deliverable's name per line, in order, or a JSON array of strings (directly through `--json`, or encoded in a string); on the command line each further argument is a name of its own (`deliverables ex-550 'The invoice form' 'The totals modal'`), as if joined by newlines; a leading list marker (`-`, `*`, `1.`) is dropped and a blank line or empty array item skipped.
 A name is its deliverable's only label, never a number.
 Sent again, it re-cuts the card, with no approval: a deliverable whose name is in the new list keeps its tasks and its current task, and the current deliverable stays current while its name survives, else the first is; a deliverable left out is dropped with its tasks.
 A new one has no tasks until `plan` gives it some.
@@ -1047,7 +1071,7 @@ At build the foreman cuts deliverables before publishing their tasks.
 Answers `{"deliverables": {"card", "deliverables", "seq"}}`, `deliverables` counted, `seq` the message's.
 Refused for a card that isn't live, one with no foreman, or a list with no name, two of one name, more than 30 names, or a name over 200 characters.
 
-Example: `factory ctl deliverables hf-550 $'The invoice form\nThe section header\nThe totals modal'`
+Example: `factory ctl deliverables ex-550 $'The invoice form\nThe section header\nThe totals modal'`
 
 ### plan
 
@@ -1066,7 +1090,7 @@ Earlier task lists stay in the conversation.
 Answers `{"plan": {"card", "deliverable", "tasks", "seq"}}`, `tasks` counted, `seq` the message's.
 Refused for a card that isn't live, a deliverable it doesn't have by that name or number, or a plan with no task, more than 100 tasks, or a task over 400 characters.
 
-Example: `factory ctl plan hf-550 2 $'Read the reader\nWrite the failing test\nSkip the repeated header'`
+Example: `factory ctl plan ex-550 2 $'Read the reader\nWrite the failing test\nSkip the repeated header'`
 
 ### plan.task
 
@@ -1077,7 +1101,7 @@ It posts nothing and wakes nobody.
 Answers `{"plan.task": {"card", "deliverable", "task", "of"}}`.
 Refused for a card that isn't live, one with no plan, a deliverable it doesn't have or with no tasks, or a number outside its tasks, or a text it has none or several of.
 
-Example: `factory ctl plan.task hf-550 2 3`
+Example: `factory ctl plan.task ex-550 2 3`
 
 ### card.show
 
@@ -1087,7 +1111,7 @@ Its notes are told apart by the factory's recorded writes to its file in whichev
 Answers `{"card.show": {"card", "project", "title", "status", "description", "notes": [{"number", "text"}], "acceptance": [{"text", "done"}], "run", "carries": [{"card", "title"}], "asks", "brief", "deliverables": [{"n", "name", "tasks", "task", "current"}], "seats": [{"name", "role", "place"}], "delegated", "self_sustained", "visual"}}`; `carries` lists the cards its run carries, titled as their boards hold them, empty when it carries none; `brief` says whether its draft waits for its foreman's challenge until it is offered, then for approval, or is approved, or an older build started it with nothing to clarify; `deliverables` are its run's in order, each with `n`, the number `plan` and `plan.task` take it by, its `tasks`, `task` the current one's number (`null` while it has none), `current` true for the one worked on now; none before any plan; `seats` lists the card's recorded agents in the window's session order: its spec room's, its build room's, its DMs', then its children, each with its full agent `name`, `role` and message `place`, leaving out seats in their closing turn, an empty list when none are live; `delegated` and `self_sustained` its delegation level as `delegate` describes, and `visual` its visual switch.
 A read.
 
-Example: `factory ctl card.show hf-120`
+Example: `factory ctl card.show ex-120`
 
 ### card.create
 
@@ -1123,7 +1147,7 @@ Give each field with `--<field>`: extra plain words fill the optional text field
 Answers `{"card.change": {"card", "action"}}`, with the write's `file`, `before` and `after` (the file's hashes) once written; a write the board refuses is refused with its words.
 Refused when no board holds the card, nothing is given, a value is malformed, the description can't be replaced safely (a note may sit in what it would replace: add a `--note` or `--decision` instead), or (`leak`) a secret would be published.
 
-Example: `factory ctl card.change hf-120 --note "waiting on the payments API"`
+Example: `factory ctl card.change ex-120 --note "waiting on the payments API"`
 
 ### card.close
 
@@ -1134,7 +1158,7 @@ The factory's run of the card isn't touched: `close` or `done` does that.
 Answers `{"card.close": {"card", "action"}}`, with the write's `file`, `before` and `after` (the file's hashes) once written; a write the board refuses is refused with its words.
 Refused for another word than done or dropped, or a card on no board.
 
-Example: `factory ctl card.close hf-120 done shipped in 2.3`
+Example: `factory ctl card.close ex-120 done shipped in 2.3`
 
 ### actions
 
@@ -1154,8 +1178,8 @@ For a backup push, each attempt sends the current local base tip, including comm
 Its asks close and it is pending again.
 A door call is never run again (its requester asks again).
 A merge's retry is a merge, and needs Andrei's consent; a PR's checks again that his approval stands on its head.
-A held PR opening takes its wording as it is now, checked again: on my-app, from the card's newest `PR wording` note (first line `PR wording`, then `Title: <summary>`, then `<ticket number>: <note>` lines; see the bitbucket skill).
-A my-app card with tickets whose note lacks a summary or a ticket's note stays held, with what to write; no fallback is published.
+A held PR opening takes its wording as it is now, checked again: on a project with `tickets` configured, from the card's newest `PR wording` note (first line `PR wording`, then `Title: <summary>`, then `<ticket number>: <note>` lines; see the bitbucket skill).
+A card with tickets on such a project whose note lacks a summary or a ticket's note stays held, with what to write; no fallback is published.
 Any other card's title is the board title in a few words.
 A board note held with every attempt refused by its content check before anything was replaced is made again from the card's file as it is now, and written only over that content; any other board write keeps the content it was made from, and refuses again if the file changed, as does a note one of whose attempts may have written.
 Answers `{"action.retry": {"action"}}`.
@@ -1248,7 +1272,7 @@ A started call keeps running, except `sql.select`, which stops when its last cal
 A call dropped as busy or because its caller went answers no later request: asking again, in the same turn too, makes a new call.
 A queued non-read call nobody waits on, including an approved `misc.run` or a `sh.run` pending across a restart, has no queue time limit and runs when its target is free.
 
-Each operation keeps to its bounds: `sql.select` runs one read-only statement on any table Andrei's login on the target may read, `information_schema` and the `sys` schema refused, a replica (`read_only = true` in its `[sql]`) with its own row cap and timeout; `mongo.find` only finds, its code-executing operators refused; `libra.get` runs any GET path at the configured API origin; `file.get` copies one regular file under a named root into the asking seat's `io/` folder (`FACTORY_IO`), at most 20 MB.
+Each operation keeps to its bounds: `sql.select` runs one read-only statement on any table Andrei's login on the target may read, `information_schema` and the `sys` schema refused (appending `[targets.<id>.sql] schema_hint` when configured), a replica (`read_only = true` in its `[sql]`) with its own row cap and timeout; `mongo.find` only finds, its code-executing operators refused; `libra.get` runs any GET path at the configured API origin; `file.get` copies one regular file under a named root into the asking seat's `io/` folder (`FACTORY_IO`), at most 20 MB.
 An orchestrator's `file.get` outside a turn copies to `<factory home>/door/files/<call id>-<file name>` (`<call id>` is the action id), private to Andrei's user and outside every wall.
 It is kept 14 days; the daily prune removes older copies.
 The answer's `file` gives the full path; the caller never chooses a destination.
@@ -1286,7 +1310,7 @@ Example: `factory ctl door.no web-1/door/1`
 
 ### door.help
 
-The door's targets, as the engine describes them: their services, tables, logs and limits, never an alias, host, login or credential.
+The door's targets, as the engine describes them: their services, tables, logs, optional `schema_hint` and limits, never an alias, host, login or credential.
 
 Answers `{"door.help": <target>}`, or every target.
 Refused when `targets.toml` can't be read, or the target is unknown.
@@ -1305,7 +1329,7 @@ Answers `{"give": {"ask"}}`.
 Refused for an ask that isn't open, already given, a visual card's plan ask, or a mock step's, which wait for Andrei's own `approve`.
 Andrei's alone (buzz).
 
-Example: `factory ctl give hf-550/answer/1`
+Example: `factory ctl give ex-550/answer/1`
 
 ### opinion
 
@@ -1319,7 +1343,7 @@ Answers `{"opinion": {"ask"}}`, journals `opinion`.
 Refused for an ask that isn't open or is already given.
 Andrei's alone (buzz): the orchestrators and every agent are refused.
 
-Example: `factory ctl opinion hf-550/answer/1`
+Example: `factory ctl opinion ex-550/answer/1`
 
 ### delegate
 
@@ -1355,7 +1379,7 @@ Answers `{"delegate": {"card", "delegated", "self_sustained"}}` and journals `de
 Refused for a card not in the state, turning on a card that has ended, or both `--off` and `--self-sustained`.
 Andrei's alone (buzz).
 
-Example: `factory ctl delegate hf-550`, `factory ctl delegate hf-550 --self-sustained`, `factory ctl delegate hf-550 --off`
+Example: `factory ctl delegate ex-550`, `factory ctl delegate ex-550 --self-sustained`, `factory ctl delegate ex-550 --off`
 
 ### visual
 
@@ -1415,7 +1439,7 @@ Answers `{"visual": {"card", "visual"}}`.
 Refused for a card not in the state, a card that is not full, and a card that has ended.
 Andrei's alone (buzz): an orchestrator sets it only as it starts a card, with `start --visual`.
 
-Example: `factory ctl visual hf-550`, `factory ctl visual hf-550 --off`
+Example: `factory ctl visual ex-550`, `factory ctl visual ex-550 --off`
 
 ### auto
 
@@ -1432,7 +1456,7 @@ Answers `{"auto": {"project", "on"}}`.
 Refused for a project not configured.
 Andrei's alone (buzz).
 
-Example: `factory ctl auto my-app`, `factory ctl auto my-app --off`
+Example: `factory ctl auto example.com`, `factory ctl auto example.com --off`
 
 ### memory.read
 
@@ -1526,7 +1550,7 @@ A note whose project nothing accounted for is the factory project's.
 An unknown project is refused.
 The window shows every project's in main's Notes tab.
 
-Example: `factory ctl --as orchestrator:my-app notes my-app`
+Example: `factory ctl --as orchestrator:example.com notes example.com`
 
 ### notes.delete
 
@@ -1541,7 +1565,7 @@ Once no live card cites it, a handoff's note takes its copied files with it.
 Answers `{"notes.delete": {"project", "deleted"}}`, counting distinct ids deleted.
 Journaled as `notes.deleted` with who sent it.
 
-Example: `factory ctl --as orchestrator:my-app notes.delete my-app 12 15`
+Example: `factory ctl --as orchestrator:example.com notes.delete example.com 12 15`
 
 ### orchestrator.review
 
@@ -1557,7 +1581,7 @@ Answers `{"orchestrator.review": {"section", "target"}}`, journals `orchestrator
 Refused for any other section.
 Andrei's alone (buzz): the orchestrators and every agent are refused.
 
-Example: `factory ctl orchestrator.review notes my-app`
+Example: `factory ctl orchestrator.review notes example.com`
 
 ## Helpers
 

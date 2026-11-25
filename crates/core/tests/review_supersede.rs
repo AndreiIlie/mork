@@ -105,8 +105,8 @@ fn drive_entry_to_round(sim: &mut Sim, rc: &str, commit: &Sha, files: &[&str]) {
 }
 
 fn fail_entry_round_one(sim: &mut Sim, rc: &str, h1: &Sha, c1: &Sha) {
-    sim.apply(Event::OpenPrsRead { project: "hf".into(), prs: vec![open_pr(5603, h1)] });
-    settle_fetch(sim, "hf", "feat-5603", h1, "base1");
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, h1)] });
+    settle_fetch(sim, "ex", "feat-5603", h1, "base1");
     drive_entry_to_round(sim, rc, c1, &["src/a.rs"]);
     sim.turn_sending(
         &format!("{rc}/foreman"),
@@ -129,11 +129,11 @@ fn fail_entry_round_one(sim: &mut Sim, rc: &str, h1: &Sha, c1: &Sha) {
 fn pr_entry_round_not_superseded_by_own_commit_and_resolve_succeeds() {
     let mut sim = Sim::new();
     let (h1, c1, h2, c2, h3) = (sha("h1"), sha("c1"), sha("h2"), sha("c2"), sha("h3"));
-    let rc = "pr-hf-5603";
+    let rc = "pr-ex-5603";
     fail_entry_round_one(&mut sim, rc, &h1, &c1);
 
-    sim.apply(Event::OpenPrsRead { project: "hf".into(), prs: vec![open_pr(5603, &h2)] });
-    settle_fetch(&mut sim, "hf", "feat-5603", &h2, "base1");
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, &h2)] });
+    settle_fetch(&mut sim, "ex", "feat-5603", &h2, "base1");
     drive_entry_to_round(&mut sim, rc, &c2, &["src/a.rs"]);
     sim.turn_sending(
         &format!("{rc}/foreman"),
@@ -145,7 +145,7 @@ fn pr_entry_round_not_superseded_by_own_commit_and_resolve_succeeds() {
     // Poller reports c2 (round 2's own commit, while card.head is h2): keeps round 2 and syncs head to c2.
     let superseded_before = sim.journal.iter().filter(|(_, k, _, _)| k == "review.superseded").count();
     let moved_before = sim.journal.iter().filter(|(_, k, _, _)| k == "entry.moved").count();
-    sim.apply(Event::OpenPrsRead { project: "hf".into(), prs: vec![open_pr(5603, &c2)] });
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, &c2)] });
     assert_eq!(sim.journal.iter().filter(|(_, k, _, _)| k == "review.superseded").count(), superseded_before);
     assert_eq!(sim.journal.iter().filter(|(_, k, _, _)| k == "entry.moved").count(), moved_before);
     let card = sim.card(rc);
@@ -164,9 +164,9 @@ fn pr_entry_round_not_superseded_by_own_commit_and_resolve_succeeds() {
     assert_eq!(sim.card(rc).review.unwrap().finished.unwrap().head, c2);
 
     // Subsequent poll of c2 does not restart the entry, whereas a genuinely new head h3 does.
-    sim.apply(Event::OpenPrsRead { project: "hf".into(), prs: vec![open_pr(5603, &c2)] });
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, &c2)] });
     assert_eq!(sim.journal.iter().filter(|(_, k, _, _)| k == "entry.moved").count(), moved_before);
-    sim.apply(Event::OpenPrsRead { project: "hf".into(), prs: vec![open_pr(5603, &h3)] });
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, &h3)] });
     assert_eq!(sim.journal.iter().filter(|(_, k, _, _)| k == "entry.moved").count(), moved_before + 1);
 }
 
@@ -257,27 +257,27 @@ fn linked_branch_round_not_superseded_by_own_commit_and_resolve_succeeds() {
 fn adopt_and_branch_repeat_still_supersede() {
     let mut sim = Sim::new();
     let head = sha("h1");
-    let rc = "pr-hf-7";
+    let rc = "pr-ex-7";
 
     // Start a live PR entry reviewing head h1 (candidate commit also h1).
-    sim.apply(Event::OpenPrsRead { project: "hf".into(), prs: vec![open_pr(7, &head)] });
-    settle_fetch(&mut sim, "hf", "feat-7", &head, "base1");
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(7, &head)] });
+    settle_fetch(&mut sim, "ex", "feat-7", &head, "base1");
     drive_entry_to_round(&mut sim, rc, &head, &["src/a.rs"]);
 
-    // Our full card hf-1 owns PR 7 and enters verification on the same head h1: adoption must supersede round 1.
-    sim.through_brief("hf-1", "hf");
-    let mut ours = sim.card("hf-1");
+    // Our full card ex-1 owns PR 7 and enters verification on the same head h1: adoption must supersede round 1.
+    sim.through_brief("ex-1", "ex");
+    let mut ours = sim.card("ex-1");
     ours.pr = Some(7);
-    sim.state.cards.insert(CardId::new("hf-1"), ours);
-    sim.built("hf-1", "h1", "base1");
-    sim.checks("hf-1", 0, &[]);
-    sim.candidate("hf-1");
+    sim.state.cards.insert(CardId::new("ex-1"), ours);
+    sim.built("ex-1", "h1", "base1");
+    sim.checks("ex-1", 0, &[]);
+    sim.candidate("ex-1");
 
     let adopted = sim.card(rc);
     assert_eq!(adopted.stage, Stage::Review);
     assert!(adopted.landing.is_none());
     let review = adopted.review.unwrap();
-    assert_eq!(review.of, Some(CardId::new("hf-1")));
+    assert_eq!(review.of, Some(CardId::new("ex-1")));
     assert_eq!(review.rounds[0].verdict, Some(Verdict::Superseded));
     assert!(review.open().is_some_and(|o| o.n == 2));
 
@@ -294,22 +294,22 @@ fn adopt_and_branch_repeat_still_supersede() {
 fn sync_open_head_skips_while_prepare_runs() {
     let mut sim = Sim::new();
     let (h1, c1, h2, c2) = (sha("h1"), sha("c1"), sha("h2"), sha("c2"));
-    let rc = "pr-hf-5603";
+    let rc = "pr-ex-5603";
     fail_entry_round_one(&mut sim, rc, &h1, &c1);
 
-    sim.apply(Event::OpenPrsRead { project: "hf".into(), prs: vec![open_pr(5603, &h2)] });
-    settle_fetch(&mut sim, "hf", "feat-5603", &h2, "base1");
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, &h2)] });
+    settle_fetch(&mut sim, "ex", "feat-5603", &h2, "base1");
     drive_entry_to_round(&mut sim, rc, &c2, &["src/a.rs"]);
 
     // Stop and resume so a new Candidate job for h2 is running in Landing::Prepare while round 2 stays open on c2.
     sim.suite(rc, 0);
     sim.andrei(json!({"stop": {"card": rc}})).unwrap();
     sim.andrei(json!({"resume": {"card": rc}})).unwrap();
-    settle_fetch(&mut sim, "hf", "feat-5603", &h2, "base1");
+    settle_fetch(&mut sim, "ex", "feat-5603", &h2, "base1");
     assert!(matches!(sim.card(rc).landing, Some(Landing::Prepare(_))));
 
     // Polling c2 while Prepare runs must not rewrite Card.head and stale the in-flight Candidate job.
-    sim.apply(Event::OpenPrsRead { project: "hf".into(), prs: vec![open_pr(5603, &c2)] });
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, &c2)] });
     assert_eq!(sim.card(rc).head.as_ref(), Some(&h2));
 
     let cand_id = sim.open_jobs(|p| matches!(p, Purpose::Candidate { card, .. } if card.as_str() == rc))[0].clone();
@@ -325,7 +325,7 @@ fn sync_open_head_skips_while_prepare_runs() {
     assert!(matches!(sim.card(rc).landing, Some(Landing::Test(_))), "Prepare job must advance to Test");
 
     // Once past Prepare, polling c2 syncs Card.head and the open round's source head to c2.
-    sim.apply(Event::OpenPrsRead { project: "hf".into(), prs: vec![open_pr(5603, &c2)] });
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, &c2)] });
     assert_eq!(sim.card(rc).head.as_ref(), Some(&c2));
     assert!(sim.card(rc).review.as_deref().and_then(Review::open).is_some_and(|o| o.head.as_ref() == Some(&c2)));
 }

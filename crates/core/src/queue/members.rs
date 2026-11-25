@@ -84,7 +84,7 @@ pub fn enter(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
     );
     say(p, &id, VERIFICATION_STARTED, &text);
     // Asked now, the wording is there before the PR opens, so the opening isn't held (fac-296).
-    if p.card(&id).is_some_and(|c| crate::board::tickets::unworded(p.state, &c).is_some()) {
+    if p.card(&id).is_some_and(|c| crate::board::tickets::unworded(p.state, &c, ctx.config).is_some()) {
         crate::messages::requests::ask_agent(
             p,
             &id,

@@ -151,7 +151,7 @@ fn start_seats(p: &mut Poster<'_>, c: &Card, agent: Option<Agent>) {
 // The live review of the branch a full card would take, which its gate never replaces.
 fn reviewed(p: &Poster<'_>, id: &CardId, prior: Option<&Card>, mode: Mode, c: &Card, ctx: Ctx<'_>) -> Option<CardId> {
     let branch = prior.filter(|x| x.mode != Mode::Review).and_then(|x| x.branch.clone());
-    let branch = branch.unwrap_or_else(|| crate::board::tickets::branch(p.state, c, &ctx.config.internals.words));
+    let branch = branch.unwrap_or_else(|| crate::board::tickets::branch(p.state, c, ctx.config));
     let rid = crate::reviews::cards::branch_id(c.project.as_str(), &branch);
     (mode == Mode::Full).then(|| crate::reviews::gate::taken(p, &rid, id)).flatten()
 }
@@ -263,8 +263,7 @@ pub fn fetched(p: &mut Poster<'_>, project: &str, result: &Value, ctx: Ctx<'_>) 
             continue;
         }
         // One branch per card, whatever its run: a later run goes on with it (fac-111).
-        let branch =
-            c.branch.clone().unwrap_or_else(|| crate::board::tickets::branch(p.state, &c, &ctx.config.internals.words));
+        let branch = c.branch.clone().unwrap_or_else(|| crate::board::tickets::branch(p.state, &c, ctx.config));
         let at = continued_at(&c, &branch, result).unwrap_or_else(|| tip.clone());
         c.base_tip = Some(tip.clone());
         c.branch = Some(branch.clone());

@@ -60,6 +60,7 @@ Follow the editing limits in Delegating.
   Change any module the agreed behaviour needs and flag additions outside the approved specification before doing the work that depends on them.
 - **Andrei's `/demo`** sends "Prepare a demo".
   Raise your hand with the changed page's link and a brief reminder of the change.
+  When the project has a preview skill of its own among your skills, follow it.
 - **Your children's reports:** after sending a child on, end `working` when your independent work is done and its report is still outstanding.
   Never wait for a child in your turn or follow its progress by rereading the clone's git state, the card or job status.
   The engine's report of a child's finished, blocked, asking or red reply, in your room, reaches your running turn between tool calls or wakes you for your next turn.
@@ -117,6 +118,7 @@ On a review card it names `picks.reviewer.inside` or `picks.reviewer.outside`, s
 
 A card's preview runs only on Andrei's call: you neither start one nor show him work he didn't ask for.
 While it is on, you may restart it (`factory ctl preview <card> restart`) so it serves the clone's current code.
+On `/demo`, load the project's preview skill if one is among your skills.
 
 ## Submitting the build
 

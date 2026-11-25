@@ -142,6 +142,7 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
         });
     }
     slice(text, &config.slice)?;
+    crate::config_checks::check(text, &config)?;
     Ok(config)
 }
 
@@ -212,17 +213,24 @@ fn check_projects(text: &str) -> Result<Vec<factory_types::ProjectId>, ConfigErr
     Ok(found.into_iter().map(|(_, n)| n).collect())
 }
 
-// The top-level tables, and each project, must be tables: a scalar there is a wrong type,
-// named with its line, not a missing key (M1.27).
+// The top-level tables, and each project, seat, tunnel and tickets entry, must be tables: a scalar there
+// is a wrong type, named with its line, not a missing key (M1.27).
 fn tables_are_tables(text: &str, table: &toml::Table) -> Result<(), ConfigError> {
-    for name in REQUIRED.iter().map(|r| r.0).chain(["internals", "projects", "seats", "picks", "slice"]) {
+    for name in REQUIRED.iter().map(|r| r.0).chain([
+        "internals",
+        "projects",
+        "seats",
+        "picks",
+        "slice",
+        "claude_accounts",
+        "tunnels",
+    ]) {
         if let Some(v) = table.get(name).filter(|v| !v.is_table()) {
             let line = key_line(text, None, name);
             return Err(ConfigError::NotATable { line, name: name.to_owned(), found: v.type_str() });
         }
     }
-    let nested = ["projects", "seats"];
-    for outer in nested {
+    for outer in ["projects", "seats", "tunnels"] {
         for (name, v) in table.get(outer).and_then(|v| v.as_table()).into_iter().flatten() {
             if !v.is_table() {
                 let line = key_line(text, Some(outer), name);
@@ -230,19 +238,41 @@ fn tables_are_tables(text: &str, table: &toml::Table) -> Result<(), ConfigError>
             }
         }
     }
+    for (name, p) in table.get("projects").and_then(|v| v.as_table()).into_iter().flatten() {
+        if let Some(v) = p.as_table().and_then(|t| t.get("tickets")).filter(|v| !v.is_table()) {
+            let line = key_line(text, Some(&format!("projects.{name}")), "tickets");
+            return Err(ConfigError::NotATable { line, name: format!("projects.{name}.tickets"), found: v.type_str() });
+        }
+    }
     Ok(())
 }
 
-fn key_line(text: &str, table: Option<&str>, key: &str) -> usize {
+fn clean_header(header: &str) -> String {
+    header.split('.').map(|s| s.trim().trim_matches(['"', '\''])).collect::<Vec<_>>().join(".")
+}
+
+pub(crate) fn table_line(text: &str, table: &str) -> usize {
+    for (i, l) in text.lines().enumerate() {
+        let t = l.trim();
+        if let Some(h) = t.strip_prefix('[').and_then(|h| h.strip_suffix(']'))
+            && clean_header(h.trim_matches(['[', ']']).trim()) == table
+        {
+            return i + 1;
+        }
+    }
+    1
+}
+
+pub(crate) fn key_line(text: &str, table: Option<&str>, key: &str) -> usize {
     let mut current: Option<String> = None;
     for (i, l) in text.lines().enumerate() {
         let t = l.trim();
         if let Some(h) = t.strip_prefix('[').and_then(|h| h.strip_suffix(']')) {
-            current = Some(h.trim_matches(['[', ']']).trim().to_owned());
+            current = Some(clean_header(h.trim_matches(['[', ']']).trim()));
             continue;
         }
         let Some((k, _)) = t.split_once('=') else { continue };
-        let k = k.trim();
+        let k = clean_header(k.trim());
         let here = current.as_deref() == table && k == key;
         let dotted = current.is_none() && table.is_some_and(|tb| k == format!("{tb}.{key}"));
         if here || dotted {
@@ -264,8 +294,8 @@ fn located(text: &str, e: &toml::de::Error) -> ConfigError {
 mod tests {
     use super::{ConfigError, parse};
 
-    const WAKE_PROJECT: &str = "[factory]\nproject = \"my-app\"\n[git]\nauthor = \"A <a@b>\"\n\
-                               [projects.\"my-app\"]\nrepo = \"/repo\"\nboard = \"/board\"\ntest = \"true\"\n";
+    const WAKE_PROJECT: &str = "[factory]\nproject = \"example.com\"\n[git]\nauthor = \"A <a@b>\"\n\
+                               [projects.\"example.com\"]\nrepo = \"/repo\"\nboard = \"/board\"\ntest = \"true\"\n";
 
     #[test]
     fn wake_keys_are_mutually_exclusive() {
@@ -275,7 +305,7 @@ mod tests {
                 panic!("expected the wake keys to conflict");
             };
             assert_eq!(line, 9);
-            assert!(message.contains("my-app"));
+            assert!(message.contains("example.com"));
             assert!(message.contains("orchestrator_waits"));
             assert!(message.contains("orchestrator_session"));
         }
@@ -284,7 +314,7 @@ mod tests {
     #[test]
     fn a_project_can_enable_waiting_wakes() -> Result<(), ConfigError> {
         let config = parse(&format!("{WAKE_PROJECT}orchestrator_waits = true\n"))?;
-        assert!(config.projects.get("my-app").is_some_and(|p| p.orchestrator_waits));
+        assert!(config.projects.get("example.com").is_some_and(|p| p.orchestrator_waits));
         Ok(())
     }
 

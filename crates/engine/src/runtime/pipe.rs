@@ -333,7 +333,7 @@ fn poll_projects(
         }
         let me = token.as_ref().ok().and_then(|t| t.user.clone());
         if let Ok(prs) = calls::open_prs(&repo, me.as_deref(), fulls) {
-            let prs = tickets.attach(name, prs);
+            let prs = tickets.attach(name, p, prs);
             open_read((locks, fulls), home, (name, p), prs, owned, &send);
         }
         for (card, _, pr) in reads.iter().filter(|(_, proj, _)| proj == name) {

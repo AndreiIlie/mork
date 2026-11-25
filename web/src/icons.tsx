@@ -1,14 +1,7 @@
-export function FactoryMark() {
+export function MorkMark() {
   return (
-    <svg
-      viewBox="0 0 20 20"
-      className="h-[18px] w-[18px] shrink-0 text-gray-1000"
-      fill="none"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <rect x="2.5" y="2.5" width="15" height="15" strokeWidth="1" />
-      <path d="M7 14V6.5H13.5M7 10.2H12" strokeWidth="1.5" />
+    <svg viewBox="2 5 20 15" className="h-[15px] w-5 shrink-0 text-gray-1000" fill="currentColor" aria-hidden="true">
+      <path d="M2 20V5L12 12V5L22 12V20H18.5V13.8L12 9.2V16.2L5.5 11.6V20H2Z" />
     </svg>
   );
 }

@@ -17,7 +17,7 @@ use factory_types::{AgentKey, Command, catalog, words};
 use serde_json::{Value, json};
 
 const LOCAL: &str = "web-1";
-const PR: &str = "hf-1";
+const PR: &str = "ex-1";
 
 #[test]
 fn only_an_orchestrator_can_wait_for_wakes() {
@@ -108,7 +108,7 @@ fn a_local_card_lands_through_the_merge_queue() {
 #[test]
 fn a_published_pr_merges_on_its_approval() {
     let mut s = Sim::new();
-    s.through_brief(PR, "hf");
+    s.through_brief(PR, "ex");
     s.built(PR, "h1", "base1");
     verifying(&mut s, PR);
     s.round_asked(PR);
@@ -353,7 +353,7 @@ fn lookback_done_before_report_ready_leaves_the_cursor_unchanged() {
 #[test]
 fn lookback_fetches_a_bitbucket_project_with_a_cursor_while_idle() {
     let mut s = Sim::new();
-    for project in ["web", "hf"] {
+    for project in ["web", "ex"] {
         let card = begin_lookback(&mut s, project, Some("deep-sweep"));
         clone_lookback(&mut s, &card);
         s.turn(&format!("{card}/foreman"), reply("report-ready", "Ready"));
@@ -370,7 +370,7 @@ fn lookback_fetches_a_bitbucket_project_with_a_cursor_while_idle() {
             _ => None,
         })
         .collect();
-    assert_eq!(projects, ["hf"]);
+    assert_eq!(projects, ["ex"]);
 }
 
 #[test]
@@ -391,9 +391,9 @@ fn proposal_notes_keep_ordered_literal_paths_under_the_seats_project() {
     assert_eq!(note["notes.add"]["title"], "Use one parser");
     assert_eq!(note["notes.add"]["text"], "Share the parser.");
     assert_eq!(note["notes.add"]["files"], json!(["src/a,b.rs", "[src]"]));
-    s.config.factory.project = "hf".into();
+    s.config.factory.project = "ex".into();
     let mut wrong_project = cmd;
-    wrong_project["notes.add"]["project"] = json!("hf");
+    wrong_project["notes.add"]["project"] = json!("ex");
     let refusal = s.cmd(sender, wrong_project).unwrap_err();
     assert!(refusal.message.contains("this seat files notes under its own project"));
     let without_files = s

@@ -12,7 +12,6 @@ pub mod offers;
 mod order;
 pub mod outside;
 mod overview;
-mod overview_lines;
 mod pipeline;
 pub mod place;
 mod projects;
