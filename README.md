@@ -1,6 +1,10 @@
+<p align="left">
+  <img src="docs/logo.svg" alt="Mork logo" width="44" height="44" />
+</p>
+
 # Mork
 
-**Local-first Rust orchestrator for cross-model coding agents, blind code review, and serialized merge trains.**
+**Outgrow the single-agent terminal. Turn your Claude, Codex, and Gemini subscriptions into a parallel, sandboxed software factory.**
 
 Website: [https://mork.sh](https://mork.sh)
 
