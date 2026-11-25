@@ -1,0 +1,107 @@
+export function FactoryMark() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className="h-[18px] w-[18px] shrink-0 text-gray-1000"
+      fill="none"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <rect x="2.5" y="2.5" width="15" height="15" strokeWidth="1" />
+      <path d="M7 14V6.5H13.5M7 10.2H12" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+export function HandIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`h-3.5 w-3.5 shrink-0 ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2" />
+      <path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2" />
+      <path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8" />
+      <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+    </svg>
+  );
+}
+
+export function BoardIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className={`h-4 w-4 shrink-0 ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <rect x="2.75" y="3.25" width="5.5" height="13.5" />
+      <rect x="11.75" y="3.25" width="5.5" height="8.5" />
+    </svg>
+  );
+}
+
+export function GitMergeIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`h-3.5 w-3.5 shrink-0 ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <circle cx="4.5" cy="3.5" r="1.75" />
+      <circle cx="4.5" cy="12.5" r="1.75" />
+      <circle cx="11.5" cy="6.5" r="1.75" />
+      <path d="M4.5 5.25v5.5M4.5 5.25c0 2.5 2 3.5 5.25 1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ChevronIcon({ open, className = "" }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`h-3.5 w-3.5 shrink-0 transition-transform duration-150 ${open ? "rotate-90" : ""} ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 4l4 4-4 4" />
+    </svg>
+  );
+}
+
+export function ArrowDownIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 3v10M3.5 8.5L8 13l4.5-4.5" />
+    </svg>
+  );
+}
+
+/** The one coloured text beside an error: a prompt cache's last ten minutes. */
+export function Cold({ minutes }: { minutes: number }) {
+  return <span className="shrink-0 font-mono text-label-12 tabular-nums text-amber-900">cold in {minutes}m</span>;
+}

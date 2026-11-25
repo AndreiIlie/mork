@@ -1,0 +1,32 @@
+[package]
+name = "factory-engine"
+description = "The shell around core: store, jobs and walls, git, Bitbucket, boards, sockets."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+faults = []
+
+[dependencies]
+arboard.workspace = true
+factory-types.workspace = true
+factory-core.workspace = true
+factory-sys.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+png.workspace = true
+image.workspace = true
+rusqlite.workspace = true
+sha2.workspace = true
+ureq.workspace = true
+pulldown-cmark.workspace = true
+percent-encoding.workspace = true
+httparse.workspace = true
+
+[dev-dependencies]
+factory-fakes.workspace = true
+
+[lints]
+workspace = true

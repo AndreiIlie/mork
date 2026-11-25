@@ -1,0 +1,52 @@
+# Copy to ~/.config/factory/factory.toml and adjust paths for your machine.
+
+[factory]
+project = "my-app"
+# Bound read-only into every sandbox wall; each `bin` joins PATH in order.
+toolchains = [
+  { path = "/usr/local", bin = "bin" },
+  { path = "/home/you/.rustup" },
+  { path = "/home/you/.cargo/bin", bin = "." },
+]
+env = { RUSTUP_HOME = "/home/you/.rustup" }
+context_cap = 400000
+max_test_runs = 4
+web_port = 41900
+web_assets = "/path/to/mork/web/dist"
+
+[git]
+author = "Your Name <you@example.com>"
+
+# Cross-family seat roster: different model families plan, build, and review.
+[seats.planner]
+cli = "claude"
+model = "claude-opus-4-5"
+effort = "high"
+
+[seats.foreman]
+report = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
+work = { cli = "claude", model = "claude-sonnet-4-5", effort = "high" }
+
+[seats.researcher]
+work = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
+
+[seats.review-foreman]
+work = { cli = "claude", model = "claude-opus-4-5", effort = "high" }
+inside = { cli = "claude", model = "claude-opus-4-5", effort = "high" }
+outside = { cli = "claude", model = "claude-opus-4-5", effort = "high" }
+
+[seats.reviewer]
+work = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
+inside = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
+outside = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
+
+[projects.my-app]
+repo = "/path/to/my-app"
+base = "main"
+board = "/path/to/my-app-board"
+slots = 3
+test = "cargo test"
+# Optional:
+# checks = { command = "cargo clippy -- -D warnings", folder = "/path/to/my-app" }
+# install = "npm ci"
+# preview = "PORT=$FACTORY_PORT npm run dev"

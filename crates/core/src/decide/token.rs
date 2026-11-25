@@ -1,0 +1,78 @@
+//! The Bitbucket token's identity (3.7.2): a refusal holds every Bitbucket action, and its recovery runs again only
+//! what it held.
+
+use factory_types::action::{Action, ActionStatus, ActionWhat};
+use factory_types::ask::{AskKind, Color};
+use serde_json::json;
+
+use super::actions::{close_asks, hold};
+use super::{Ctx, Decision, Intent};
+use crate::messages::asks::{self, Raise};
+use crate::messages::places::MAIN;
+use crate::post::Poster;
+use crate::state::{Change, State};
+
+pub(super) fn token_failure(p: &mut Poster<'_>, a: Action, words: &str) {
+    p.other.push(Change::SetTokenRefused(Some(words.to_owned())));
+    p.journal("token", None, json!({"refused": words}));
+    raise_token(p, words);
+    hold(p, a, &format!("{TOKEN_HOLD}{words}"));
+}
+
+fn raise_token(p: &mut Poster<'_>, why: &str) {
+    let text = format!("the Bitbucket token can't act: {why}. Fix the token file; the engine reads it again.");
+    asks::raise(p, Raise::new(MAIN, AskKind::Token, Color::Red, text));
+}
+
+/// The token's identity, read (3.7.2): Andrei's own, or refused, holds every Bitbucket action.
+/// The verdict is stored, and changes only when a read differs from it.
+pub fn token(state: &State, refused: Option<&str>, ctx: Ctx<'_>) -> Decision {
+    if state.world.token_refused.as_deref() == refused {
+        return Decision::default();
+    }
+    let mut p = Poster::for_ctx(state, ctx);
+    p.other.push(Change::SetTokenRefused(refused.map(str::to_owned)));
+    p.journal("token", None, json!({"refused": refused}));
+    match refused {
+        Some(why) => raise_token(&mut p, why),
+        None => {
+            asks::close(&mut p, MAIN, &[AskKind::Token]);
+            // Only what the token held runs again: an action held for another reason (a
+            // merge Bitbucket refused, a PR declined) waits for its own answer (R1).
+            let held: Vec<Action> = state
+                .actions
+                .values()
+                .filter(|a| a.status == ActionStatus::Held && is_bitbucket(&a.what))
+                .filter(|a| a.words.as_deref().is_some_and(|w| w.starts_with(TOKEN_HOLD)))
+                .cloned()
+                .collect();
+            for mut a in held {
+                a.status = ActionStatus::Pending;
+                a.words = None;
+                let id = a.id.clone();
+                close_asks(&mut p, &id);
+                p.put_action(a);
+                p.intent(Intent::RunAction { id });
+            }
+        }
+    }
+    let mut d = Decision::default();
+    p.finish(&mut d);
+    d
+}
+
+/// How the words of an action the token held begin: what the token's recovery runs again.
+pub const TOKEN_HOLD: &str = "the Bitbucket token can't act: ";
+
+fn is_bitbucket(w: &ActionWhat) -> bool {
+    matches!(
+        w,
+        ActionWhat::Fetch { .. }
+            | ActionWhat::Push { .. }
+            | ActionWhat::OpenPr { .. }
+            | ActionWhat::Comment { .. }
+            | ActionWhat::ReplyComment { .. }
+            | ActionWhat::ResolveComment { .. }
+            | ActionWhat::Merge { .. }
+    )
+}

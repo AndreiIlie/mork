@@ -1,0 +1,58 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/types",
+    "crates/core",
+    "crates/engine",
+    "crates/ui",
+    "crates/sys",
+    "crates/app",
+    "crates/fakes",
+    "crates/xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+factory-types = { path = "crates/types" }
+factory-core = { path = "crates/core" }
+factory-engine = { path = "crates/engine" }
+factory-ui = { path = "crates/ui" }
+factory-sys = { path = "crates/sys" }
+factory-fakes = { path = "crates/fakes" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+libc = "0.2"
+rusqlite = { version = "0.40", features = ["bundled"] }
+sha2 = "0.10"
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+iced = { version = "0.14", default-features = false, features = ["wgpu", "tiny-skia", "crisp", "thread-pool", "x11", "wayland", "advanced", "canvas", "image-without-codecs"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+arboard = { version = "3", default-features = false, features = ["image-data"] }
+png = "0.18"
+pulldown-cmark = { version = "0.13", default-features = false }
+percent-encoding = "2"
+httparse = "1"
+
+[workspace.lints.rust]
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+too_many_lines = "deny"
+cognitive_complexity = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+undocumented_unsafe_blocks = "deny"
+
+[profile.release]
+debug = false

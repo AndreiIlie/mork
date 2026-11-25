@@ -1,0 +1,12 @@
+[package]
+name = "factory-sys"
+description = "The few system calls that need unsafe."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+libc.workspace = true
+
+[lints]
+workspace = true

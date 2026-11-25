@@ -1,0 +1,112 @@
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "tailwindcss";
+
+/* The whole palette, radius and type scale: Tailwind's defaults are removed, so nothing outside web/DESIGN.md exists. */
+@theme {
+  --color-*: initial;
+  --radius-*: initial;
+  --text-*: initial;
+
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+
+  --color-background-100: hsl(0 0% 4%);
+  --color-background-200: hsl(0 0% 6%);
+  --color-gray-100: hsl(0 0% 9%);
+  --color-gray-200: hsl(0 0% 12%);
+  --color-gray-300: hsl(0 0% 16%);
+  --color-gray-400: hsl(0 0% 18%);
+  --color-gray-500: hsl(0 0% 27%);
+  --color-gray-600: hsl(0 0% 53%);
+  --color-gray-700: hsl(0 0% 56%);
+  --color-gray-900: hsl(0 0% 63%);
+  --color-gray-950: hsl(0 0% 78%);
+  --color-gray-1000: hsl(0 0% 93%);
+  --color-gray-alpha-400: #ffffff24;
+
+  --spacing-gutter: 24px;
+  --spacing-edge: 16px;
+
+  --color-red-700: hsl(358 75% 59%);
+  --color-red-900: hsl(358 100% 69%);
+  --color-amber-700: hsl(39 100% 57%);
+  --color-amber-900: hsl(39 90% 50%);
+  --color-green-700: hsl(131 41% 46%);
+
+  --text-heading-24: 24px;
+  --text-heading-24--line-height: 32px;
+  --text-heading-24--letter-spacing: -0.96px;
+  --text-heading-24--font-weight: 600;
+  --text-heading-16: 16px;
+  --text-heading-16--line-height: 24px;
+  --text-heading-16--letter-spacing: -0.32px;
+  --text-heading-16--font-weight: 600;
+  --text-heading-14: 14px;
+  --text-heading-14--line-height: 20px;
+  --text-heading-14--letter-spacing: -0.28px;
+  --text-heading-14--font-weight: 600;
+  --text-label-14: 14px;
+  --text-label-14--line-height: 20px;
+  --text-label-13: 13px;
+  --text-label-13--line-height: 16px;
+  --text-label-12: 12px;
+  --text-label-12--line-height: 16px;
+  --text-copy-14: 14px;
+  --text-copy-14--line-height: 20px;
+  --text-copy-13: 13px;
+  --text-copy-13--line-height: 18px;
+}
+
+@layer base {
+  html,
+  body {
+    background-color: var(--color-background-100);
+    color: var(--color-gray-1000);
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gray-1000);
+    outline-offset: 2px;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gray-400);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-500);
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-soft {
+    animation: none;
+  }
+}
