@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
-use factory_core::views::journal::{self, Anchor, Page, Read, Row};
-use factory_types::ProjectId;
+use mork_core::views::journal::{self, Anchor, Page, Read, Row};
+use mork_types::ProjectId;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::Value;
 

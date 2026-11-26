@@ -1,10 +1,10 @@
 //! Main's Notes tab (fac-287): each project's notes to its orchestrator, newest first, each under
 //! its kind, seat and card, one send-to-orchestrator button per project. Drawn from the screen alone.
 
-use factory_types::note::{Note, NoteWhat, ProjectNotes};
-use factory_types::orchestrator::ReviewSection;
 use iced::widget::{Column, column, container, responsive};
 use iced::{Element, Length};
+use mork_types::note::{Note, NoteWhat, ProjectNotes};
+use mork_types::orchestrator::ReviewSection;
 
 use crate::app::{App, Message, ScrollOp};
 use crate::board::GAP;

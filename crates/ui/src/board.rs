@@ -3,10 +3,10 @@
 
 use std::collections::BTreeSet;
 
-use factory_types::CardId;
-use factory_types::view::{BoardRow, BoardView, HandView, PlaceKind, Screen};
 use iced::widget::{Column, column, container, responsive, row, tooltip};
 use iced::{Element, Length};
+use mork_types::CardId;
+use mork_types::view::{BoardRow, BoardView, HandView, PlaceKind, Screen};
 
 use crate::app::{App, Message};
 use crate::icons::{self, Icon};
@@ -57,7 +57,7 @@ pub fn room_of(screen: &Screen, card: &str) -> String {
     }
 }
 
-/// Whether the factory ran a card the Board shows: a click on its row opens its room.
+/// Whether Mork ran a card the Board shows: a click on its row opens its room.
 pub fn ran(screen: &Screen, id: &str) -> bool {
     screen.boards.iter().flat_map(every_row).any(|r| r.id == id && r.ran)
 }
@@ -150,7 +150,7 @@ fn live_tile<'a>(r: &'a BoardRow, chars: usize, picked: Option<&str>) -> Element
     tile(id, lines, tone, press(r))
 }
 
-// An ask waiting on Andrei, as its hand says it, its colour on the hand by its head, as the
+// An ask waiting on the operator, as its hand says it, its colour on the hand by its head, as the
 // tile's edge is every card's (fac-103): a click opens its place.
 fn wait_tile(h: &HandView, chars: usize) -> Element<'_, Message> {
     let who = h.card.as_ref().map_or_else(|| h.place.to_string(), ToString::to_string);
@@ -202,7 +202,7 @@ pub fn title(r: &BoardRow, chars: usize) -> Element<'_, Message> {
     tooltip(shown, tip, tooltip::Position::Bottom).gap(2.0).padding(TILE_Y).style(theme::tooltip).into()
 }
 
-/// What a click on a card's row does: a card the factory ran opens its room; any other, nothing.
+/// What a click on a card's row does: a card Mork ran opens its room; any other, nothing.
 pub fn press(r: &BoardRow) -> Option<Message> {
     r.ran.then(|| Message::BoardRow(opens(r).to_string()))
 }

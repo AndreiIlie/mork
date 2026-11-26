@@ -3,9 +3,9 @@
 
 use std::collections::BTreeSet;
 
-use factory_core::decide::Event;
-use factory_core::state::unloaded::{Wanted, companions, wanted};
-use factory_types::CardId;
+use mork_core::decide::Event;
+use mork_core::state::unloaded::{Wanted, companions, wanted};
+use mork_types::CardId;
 
 use super::Engine;
 

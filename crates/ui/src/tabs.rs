@@ -1,10 +1,10 @@
 //! A card's tabs (fac-96, fac-633): its spec and build rooms, then its DMs, which have no row and are reached from
 //! here. A foreman with no DM yet has a tab that opens one, as `/dm` does.
 
-use factory_types::reply::Role;
-use factory_types::view::{HandView, PlaceKind, PlaceView};
 use iced::Element;
 use iced::widget::row;
+use mork_types::reply::Role;
+use mork_types::view::{HandView, PlaceKind, PlaceView};
 
 use crate::app::{App, Message};
 use crate::icons::{self, Icon};

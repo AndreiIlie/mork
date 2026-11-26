@@ -8,13 +8,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use factory_core::decide::Event;
-use factory_types::action::ActionStatus;
-use factory_types::door::{Op, OpError, canonical, is_read, status};
-use factory_types::door_call::{DoorCall, Verdict};
-use factory_types::protocol::{ErrorBody, ErrorCode};
-use factory_types::state::Sender;
-use factory_types::{ActionId, JobId};
+use mork_core::decide::Event;
+use mork_types::action::ActionStatus;
+use mork_types::door::{Op, OpError, canonical, is_read, status};
+use mork_types::door_call::{DoorCall, Verdict};
+use mork_types::protocol::{ErrorBody, ErrorCode};
+use mork_types::state::Sender;
+use mork_types::{ActionId, JobId};
 use serde_json::{Value, json};
 
 use super::{Engine, Input};
@@ -87,14 +87,14 @@ impl Engine {
             plan: res.plan,
             nonce: random::uuid(),
         };
-        let stored = factory_core::state::unloaded::alike_stored(
+        let stored = mork_core::state::unloaded::alike_stored(
             &self.state,
-            &factory_types::action::ActionWhat::Door(Box::new(call.clone())),
+            &mork_types::action::ActionWhat::Door(Box::new(call.clone())),
         );
-        self.load(&factory_core::state::unloaded::Wanted { actions: stored, ..Default::default() });
+        self.load(&mork_core::state::unloaded::Wanted { actions: stored, ..Default::default() });
         // The same query, its read before maybe still running on its server: its kill is tried
         // again on a thread of its own (it reaches the server), and core decides after (fac-184).
-        if let Some((id, _)) = factory_core::door::reads::running(&self.state, &call, clock::now_ms())
+        if let Some((id, _)) = mork_core::door::reads::running(&self.state, &call, clock::now_ms())
             && let Some(action) = self.state.actions.get(&id).cloned()
         {
             let (tx, home, bin) = (self.tx.clone(), self.opts.home.clone(), self.opts.bin.clone());
@@ -164,12 +164,12 @@ impl Engine {
         self.apply(&e).answer.unwrap_or_else(|| Ok(json!({"door": {"status": word, "why": why}})))
     }
 
-    fn door_place(&self, from: &Sender) -> (factory_types::PlaceId, Option<factory_types::CardId>) {
+    fn door_place(&self, from: &Sender) -> (mork_types::PlaceId, Option<mork_types::CardId>) {
         let place = match from {
             Sender::Agent(k) => self.state.agents.get(k).map_or_else(|| "main".into(), |a| a.place.clone()),
-            Sender::Andrei | Sender::Engine | Sender::Orchestrator(_) | Sender::Pa => "main".into(),
+            Sender::Operator | Sender::Engine | Sender::Orchestrator(_) | Sender::Pa => "main".into(),
         };
-        let card = factory_core::messages::places::card_of(&self.state, &place);
+        let card = mork_core::messages::places::card_of(&self.state, &place);
         (place, card)
     }
 
@@ -196,9 +196,9 @@ impl Engine {
             Some(id) => {
                 let t =
                     f.targets.get(id).ok_or_else(|| ErrorBody::new(ErrorCode::Refused, format!("no target `{id}`")))?;
-                factory_core::door::target::describe(&f, id, t)
+                mork_core::door::target::describe(&f, id, t)
             }
-            None => factory_core::door::target::describe_all(&f),
+            None => mork_core::door::target::describe_all(&f),
         };
         Ok(json!({"door.help": v}))
     }
@@ -214,8 +214,8 @@ impl Engine {
     // Waiting requests are answered once it isn't under way; asked and held calls owe news with none.
     pub(super) fn door_settle(&mut self, id: &ActionId) {
         let Some(a) = self.state.actions.get(id).cloned() else { return };
-        let Some((call, _)) = factory_core::door::parts(&a).map(|(c, d)| (c.clone(), d.clone())) else { return };
-        let word = factory_core::door::status_of(&a);
+        let Some((call, _)) = mork_core::door::parts(&a).map(|(c, d)| (c.clone(), d.clone())) else { return };
+        let word = mork_core::door::status_of(&a);
         if word == status::UNDER_WAY {
             return;
         }
@@ -223,7 +223,7 @@ impl Engine {
         self.door.stops.remove(id);
         let waiting: Vec<Waiter> =
             self.door.waiters.remove(id).unwrap_or_default().into_iter().filter(|w| w.conn.is_open()).collect();
-        let answer = factory_core::door::answer(&a);
+        let answer = mork_core::door::answer(&a);
         for w in &waiting {
             w.conn.answer(w.req, Ok(answer.clone()));
         }
@@ -232,7 +232,7 @@ impl Engine {
         if !waiting.is_empty() && told.as_deref() != Some(word.as_str()) {
             self.door_step(&call.from, step);
             self.apply(&Event::DoorDelivered { id: id.clone(), answered: true });
-        } else if factory_core::door::owed_news(&a) {
+        } else if mork_core::door::owed_news(&a) {
             self.door_step(&call.from, step);
             self.apply(&Event::DoorDelivered { id: id.clone(), answered: false });
         }
@@ -254,7 +254,7 @@ impl Engine {
 
     fn door_caller_gone(&mut self, id: &ActionId) {
         let Some(a) = self.state.actions.get(id) else { return };
-        let Some((c, _)) = factory_core::door::parts(a) else { return };
+        let Some((c, _)) = mork_core::door::parts(a) else { return };
         if a.status == ActionStatus::Pending && is_read(&c.op) {
             self.apply(&Event::DoorUnstarted { id: id.clone(), busy: None });
         } else if a.status == ActionStatus::Started && c.op == "sql.select" {
@@ -264,7 +264,7 @@ impl Engine {
 
     fn door_expire(&mut self, id: &ActionId) {
         let Some(a) = self.state.actions.get(id).filter(|a| a.status == ActionStatus::Pending) else { return };
-        let Some((call, _)) = factory_core::door::parts(a) else { return };
+        let Some((call, _)) = mork_core::door::parts(a) else { return };
         let from = call.from.clone();
         let Some(waiting) = self.door.waiters.remove(id) else { return };
         let (due, live): (Vec<_>, Vec<_>) = waiting
@@ -281,7 +281,7 @@ impl Engine {
         }
         let behind = self.door_behind(id).or_else(|| due.first().and_then(|w| w.behind.clone()));
         let facts = behind.map(|(r, _)| r.facts(self.door_ahead(id).unwrap_or(0)));
-        let answer = factory_core::door::queue::busy(id, facts.as_ref());
+        let answer = mork_core::door::queue::busy(id, facts.as_ref());
         let why = answer.pointer("/door/why").and_then(Value::as_str).unwrap_or_default().to_owned();
         if live.is_empty() {
             self.door.waiters.insert(id.clone(), due);
@@ -302,7 +302,7 @@ impl Engine {
             .actions
             .values()
             .filter(|a| {
-                a.status == ActionStatus::Pending && factory_core::door::parts(a).is_some_and(|(c, _)| is_read(&c.op))
+                a.status == ActionStatus::Pending && mork_core::door::parts(a).is_some_and(|(c, _)| is_read(&c.op))
             })
             .map(|a| a.id.clone())
             .collect();
@@ -310,7 +310,7 @@ impl Engine {
             self.apply(&Event::DoorUnstarted { id, busy: None });
         }
         let owed: Vec<ActionId> =
-            self.state.actions.values().filter(|a| factory_core::door::owed_news(a)).map(|a| a.id.clone()).collect();
+            self.state.actions.values().filter(|a| mork_core::door::owed_news(a)).map(|a| a.id.clone()).collect();
         for id in owed {
             self.apply(&Event::DoorDelivered { id, answered: false });
         }

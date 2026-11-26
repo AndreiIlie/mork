@@ -20,7 +20,7 @@ pub fn image_rel(url_path: &str) -> Option<PathBuf> {
 
 /// Opens the image the path names, following no link, in `jobs`' own path too, and never leaving it, with its type.
 pub fn open_image(jobs: &Path, url_path: &str) -> Option<(File, &'static str)> {
-    let file = factory_sys::open_beneath_no_symlinks(jobs, &image_rel(url_path)?).ok()?;
+    let file = mork_sys::open_beneath_no_symlinks(jobs, &image_rel(url_path)?).ok()?;
     if !file.metadata().ok()?.is_file() {
         return None;
     }

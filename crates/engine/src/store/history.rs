@@ -3,10 +3,10 @@
 
 use std::collections::BTreeSet;
 
-use factory_core::views::search::Found;
-use factory_types::ProjectId;
-use factory_types::action::{Action, ActionWhat};
-use factory_types::card::Card;
+use mork_core::views::search::Found;
+use mork_types::ProjectId;
+use mork_types::action::{Action, ActionWhat};
+use mork_types::card::Card;
 
 use super::{Result, Store};
 

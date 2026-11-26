@@ -58,7 +58,7 @@ pub fn open_asset(root: &Path, url_path: &str) -> Option<(File, &'static str)> {
 }
 
 fn open_regular(root: &Path, rel: &Path) -> Option<File> {
-    let file = factory_sys::open_beneath_no_symlinks(root, rel).ok()?;
+    let file = mork_sys::open_beneath_no_symlinks(root, rel).ok()?;
     file.metadata().ok()?.is_file().then_some(file)
 }
 
@@ -70,7 +70,7 @@ mod tests {
     use super::*;
 
     fn scratch(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("factory-web-assets-{tag}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("mork-web-assets-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::canonicalize(&dir).unwrap()

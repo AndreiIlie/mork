@@ -1,10 +1,10 @@
 //! Main's Memory tab (fac-159): each memory's counts, then its files, as `memory.stats` has them.
 //! Drawn from the screen alone: seeing a file here reads nothing.
 
-use factory_types::memory::{FileRow, MemoryView};
-use factory_types::orchestrator::ReviewSection;
 use iced::widget::{Column, column, container, responsive};
 use iced::{Element, Length};
+use mork_types::memory::{FileRow, MemoryView};
+use mork_types::orchestrator::ReviewSection;
 
 use crate::app::{App, Message, ScrollOp};
 use crate::board::GAP;

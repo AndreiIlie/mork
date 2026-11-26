@@ -1,19 +1,19 @@
-//! Factory announcements (fac-14): the engine's lines to everyone in a place, or a role manual's change to that role's
+//! Mork announcements (fac-14): the engine's lines to everyone in a place, or a role manual's change to that role's
 //! seats alone (fac-621); they wake nobody and reach each agent addressed with its next turn's news.
 
 use std::collections::BTreeMap;
 
-use factory_types::CardId;
-use factory_types::card::{BoardCard, Card};
-use factory_types::reply::Role;
-use factory_types::state::{Message, MessageKind, Sender};
+use mork_types::CardId;
+use mork_types::card::{BoardCard, Card};
+use mork_types::reply::Role;
+use mork_types::state::{Message, MessageKind, Sender};
 use serde_json::json;
 
 use super::places;
 use crate::board::notes::apart;
 use crate::post::Poster;
 
-/// Whether a message is a Factory announcement: the engine's, to no one in particular or to one role's seats.
+/// Whether a message is a Mork announcement: the engine's, to no one in particular or to one role's seats.
 pub(crate) fn is(m: &Message) -> bool {
     m.from == Sender::Engine && m.kind == MessageKind::Engine && m.to.as_deref().is_none_or(|t| role_of(t).is_some())
 }
@@ -41,7 +41,7 @@ fn card_places(p: &Poster<'_>, card: &CardId) -> Vec<String> {
     }
     for r in places::CARD_ROLES {
         let dm = format!("{card}/{}/dm", r.as_str());
-        if p.agent(&factory_types::AgentKey::new(dm.clone())).is_some() {
+        if p.agent(&mork_types::AgentKey::new(dm.clone())).is_some() {
             out.push(dm);
         }
     }
@@ -180,7 +180,7 @@ pub(crate) fn heard_by(m: &Message, me: &str) -> Heard {
 // What reaches the run's review card: the new decisions on one of its cards that still stand, and the words of those
 // withdrawn.
 fn decisions(p: &mut Poster<'_>, card: &Card, about: &CardId, all: &[String], added: &[String]) {
-    use factory_types::decisions::{is_withdrawal, standing};
+    use mork_types::decisions::{is_withdrawal, standing};
     let standing = standing(all);
     let new: Vec<_> = added.iter().filter(|n| standing.contains(n)).cloned().collect();
     let gone: Vec<_> = added.iter().filter(|n| is_withdrawal(n)).cloned().collect();
@@ -196,7 +196,7 @@ fn decisions(p: &mut Poster<'_>, card: &Card, about: &CardId, all: &[String], ad
     let mut parts = Vec::new();
     if !new.is_empty() {
         parts.push(format!(
-            "Andrei's later decisions on {about}, part of its specification, newest first:\n\n{}",
+            "The operator's later decisions on {about}, part of its specification, newest first:\n\n{}",
             new.join("\n\n")
         ));
     }
@@ -219,7 +219,7 @@ fn decisions(p: &mut Poster<'_>, card: &Card, about: &CardId, all: &[String], ad
             Sender::Engine,
             Some("room"),
             MessageKind::Update,
-            &format!("Andrei's later decisions on {about}"),
+            &format!("The operator's later decisions on {about}"),
             &text,
         );
     }

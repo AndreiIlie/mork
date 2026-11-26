@@ -5,9 +5,9 @@ description: "Use for Pulse and Deep Sweep, the project look-back reads that lea
 
 # Looking back
 
-Read `factory ctl card.show <card>` for the read, fixed commit and input file.
+Read `mork ctl card.show <card>` for the read, fixed commit and input file.
 Keep using that commit if `origin/<base>` moves.
-The file is under `.git/factory/`, read-only in the report wall.
+The file is under `.git/mork/`, read-only in the report wall.
 Change no code and write no card.
 
 ## Method
@@ -19,7 +19,7 @@ Change no code and write no card.
   Require the whole of every assigned file or hunk, including tests and deleted code, and a list of anything left unread.
   Send unread parts back before reporting.
   Check every candidate at the fixed commit and at its cited source when that source is outside the tree.
-- Keep files needed next turn in `.git/factory/handoff/`, the writable folder in the report wall.
+- Keep files needed next turn in `.git/mork/handoff/`, the writable folder in the report wall.
   Remove scratch files before the final report.
   Files left there become a handoff note.
 
@@ -58,13 +58,13 @@ Split the whole code among researchers by module and cover four passes at the fi
   For a secret, give its kind and location and keep its value out of notes and replies.
 - Check **wording** users see in the product and its messages.
   Find different names for the same thing, mixed languages in one flow, placeholders, leftovers and text that no longer matches behaviour.
-  Name the affected places and leave the wording decision to Andrei.
+  Name the affected places and leave the wording decision to the operator.
 
 ## Proposals and report
 
 Group finds by the one change that would fix them.
-Deduplicate against each other, the input file's `open_cards`, and the existing proposals and feedback from `factory ctl notes <project>`.
-File at most seven proposals per run, strongest first, with `factory ctl notes.add proposal '<text>' --title '<title>' --file <path>`.
+Deduplicate against each other, the input file's `open_cards`, and the existing proposals and feedback from `mork ctl notes <project>`.
+File at most seven proposals per run, strongest first, with `mork ctl notes.add proposal '<text>' --title '<title>' --file <path>`.
 Add one `--file` per affected path.
 Use a card-ready title and say what to change, why it matters and which finds it covers.
 Cite each file-based find as `file:line` at the fixed commit, or `<commit>:<path>:<line>` for historical evidence.
@@ -74,4 +74,4 @@ Do not file smell or feedback notes during a look-back.
 Give a short report listing the proposal titles and any gaps, or say that the read found nothing.
 Mention weaker finds beyond the seven in one line of the report.
 End with `report-ready`.
-Andrei's `done` then records the run.
+The operator's `done` then records the run.

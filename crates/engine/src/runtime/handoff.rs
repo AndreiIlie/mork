@@ -6,9 +6,9 @@ use std::io::{self, ErrorKind};
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 
-use factory_core::memory::HANDOFF;
-use factory_types::note::HandoffFile;
-use factory_types::{CardId, ProjectId};
+use mork_core::memory::HANDOFF;
+use mork_types::note::HandoffFile;
+use mork_types::{CardId, ProjectId};
 use serde::{Deserialize, Serialize};
 
 use super::Engine;
@@ -23,7 +23,7 @@ impl Engine {
 }
 
 /// A review clone's handoff set aside before its clone is made again. A copy already aside is whole and
-/// stays until its clone has its `.git/factory/` back or it is filed: only a file the clone has that it hasn't is added.
+/// stays until its clone has its `.git/mork/` back or it is filed: only a file the clone has that it hasn't is added.
 pub(super) fn set_aside_handoff(home: &crate::paths::Home, card: &CardId, clone: &Path) -> Result<(), String> {
     let aside = home.handoffs().join(card.as_str());
     set_aside(&aside, clone).map(|_| ()).map_err(|e| format!("{card}'s handoff wasn't set aside: {e}"))
@@ -94,18 +94,18 @@ fn add_to(aside: &Path, more: &Path, seen: Copied) -> io::Result<()> {
 /// Each file of `kept` written beneath the clone's `folder` (one in `.git`) through no link, with the permission
 /// bits it was kept with.
 pub(super) fn put_back(clone: &Path, folder: &str, aside: &Path, kept: &Copied) -> io::Result<()> {
-    factory_sys::mkdir_beneath(clone, Path::new(".git"))?;
+    mork_sys::mkdir_beneath(clone, Path::new(".git"))?;
     for f in &kept.files {
         let file = Path::new(folder).join(&f.path);
         let mut folders: Vec<&Path> = file.ancestors().skip(1).filter(|a| a.components().count() > 1).collect();
         folders.reverse();
         for folder in folders {
-            factory_sys::mkdir_beneath(clone, folder)?;
+            mork_sys::mkdir_beneath(clone, folder)?;
         }
         let from = aside.join(&f.path);
-        factory_sys::write_beneath(clone, &file, &std::fs::read(&from)?)?;
+        mork_sys::write_beneath(clone, &file, &std::fs::read(&from)?)?;
         let mode = std::fs::metadata(&from)?.permissions().mode() & 0o777;
-        factory_sys::open_beneath(clone, &file)?.set_permissions(Permissions::from_mode(mode))?;
+        mork_sys::open_beneath(clone, &file)?.set_permissions(Permissions::from_mode(mode))?;
     }
     Ok(())
 }
@@ -154,7 +154,7 @@ pub fn recorded(to: &Path) -> io::Result<Option<Copied>> {
 // What a seat made that is no folder or file of its handoff: gone, a link, or a file in a folder's
 // place. Any other failure to read it fails the copy, and the clone stays.
 fn not_there(e: &io::Error) -> bool {
-    e.kind() == ErrorKind::NotFound || factory_sys::not_followed(e)
+    e.kind() == ErrorKind::NotFound || mork_sys::not_followed(e)
 }
 
 /// Copies the clone's handoff into `to`, made fresh, and records it whole; a handoff with no
@@ -165,7 +165,7 @@ pub fn preserve(clone: &Path, to: &Path) -> io::Result<Option<Copied>> {
 
 /// `preserve` of the clone's `folder`: none there keeps an older copy in `to`, an empty one drops it.
 pub fn preserve_folder(clone: &Path, folder: &str, to: &Path) -> io::Result<Option<Copied>> {
-    let root = match factory_sys::open_beneath(clone, Path::new(folder)) {
+    let root = match mork_sys::open_beneath(clone, Path::new(folder)) {
         Ok(root) => root,
         Err(e) if not_there(&e) => return Ok(None),
         Err(e) => return Err(e),
@@ -178,13 +178,13 @@ pub fn preserve_folder(clone: &Path, folder: &str, to: &Path) -> io::Result<Opti
     // Folders as a list, not by recursion: no handoff's depth reaches the engine's stack.
     let mut folders = vec![(root, PathBuf::new())];
     while let Some((dir, rel)) = folders.pop() {
-        for e in factory_sys::read_dir_of(&dir)? {
+        for e in mork_sys::read_dir_of(&dir)? {
             let e = e?;
             let rel = rel.join(e.file_name());
             let kind = e.file_type()?;
             let kept = if kind.is_dir() {
                 // A folder swapped for a link since it was listed opens no more, and is left as one.
-                match factory_sys::open_dir_beneath(&dir, Path::new(&e.file_name())) {
+                match mork_sys::open_dir_beneath(&dir, Path::new(&e.file_name())) {
                     Ok(sub) => {
                         folders.push((sub, rel.clone()));
                         true
@@ -211,7 +211,7 @@ pub fn preserve_folder(clone: &Path, folder: &str, to: &Path) -> io::Result<Opti
 
 // The file as it is when opened, if still a regular one, streamed into the records.
 fn copy(clone: &Path, at: &Path, rel: &Path, to: &Path, copied: &mut Copied) -> io::Result<bool> {
-    let mut from = match factory_sys::open_beneath(clone, at) {
+    let mut from = match mork_sys::open_beneath(clone, at) {
         Ok(f) => f,
         Err(e) if not_there(&e) => return Ok(false),
         Err(e) => return Err(e),

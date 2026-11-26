@@ -62,6 +62,15 @@ pub struct RoleBurn {
     pub unknown: bool,
 }
 
+/// Prompt cache use for a CLI and launch model observed during the burn period.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelCache {
+    pub cli: String,
+    pub model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_hit_percent: Option<u32>,
+}
+
 /// Tightest weekly pool's estimated cards remaining.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CardsLeft {
@@ -79,8 +88,7 @@ pub struct RecentBurn {
     pub ended_cards: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub average_cents: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cache_hit_percent: Option<u32>,
+    pub cache_by_model: Vec<ModelCache>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cards_left: Option<CardsLeft>,
     /// The last 14 local days, oldest first, for the Usage charts (fac-696).

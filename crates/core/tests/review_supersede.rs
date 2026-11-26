@@ -6,17 +6,18 @@
 mod common;
 
 use common::{Sim, contents, reply, sha};
-use factory_core::decide::{Event, JobEnd, SessionSeen};
-use factory_types::action::ActionWhat;
-use factory_types::card::{Landing, Stage};
-use factory_types::review::{Review, Verdict};
-use factory_types::state::Sender;
-use factory_types::work::{CheckRun, Checkout, FinalRun, Made, OpenPr, Purpose};
-use factory_types::{AgentKey, CardId, JobId, Sha};
+use mork_core::decide::{Event, JobEnd, SessionSeen};
+use mork_types::action::ActionWhat;
+use mork_types::card::{Landing, Stage};
+use mork_types::review::{Review, Verdict};
+use mork_types::state::Sender;
+use mork_types::work::{CheckRun, Checkout, FinalRun, Made, OpenPr, Purpose};
+use mork_types::{AgentKey, CardId, JobId, Sha};
 use serde_json::{Value, json};
 
 fn open_pr(pr: u64, head: &Sha) -> OpenPr {
     OpenPr {
+        review_requested: false,
         pr,
         author: "colleague".into(),
         title: format!("PR {pr}"),
@@ -189,7 +190,7 @@ fn setup_linked_round_two(sim: &mut Sim, card: &str, c2: &Sha) -> (String, JobId
     sim.round_ends(card, &[], &[finding("src/a.rs", 10, "[reviewer-1] bug in a")]);
     sim.proofs_copied();
     sim.suite(card, 0);
-    sim.andrei(json!({"triage": {"card": card, "fix": ["1"], "decline": [], "foreman": []}})).unwrap();
+    sim.operator(json!({"triage": {"card": card, "fix": ["1"], "decline": [], "foreman": []}})).unwrap();
     sim.settle_actions();
     sim.imported(card);
 
@@ -226,7 +227,7 @@ fn linked_branch_round_not_superseded_by_own_commit_and_resolve_succeeds() {
 
     // Taking round 2's own candidate commit c2 as head keeps verification and round 2 intact without replacement checks.
     let superseded_before = sim.journal.iter().filter(|(_, k, _, _)| k == "review.superseded").count();
-    sim.andrei(json!({"say": {"place": card, "to": "foreman", "text": "ping", "kind": "request"}})).unwrap();
+    sim.operator(json!({"say": {"place": card, "to": "foreman", "text": "ping", "kind": "request"}})).unwrap();
     sim.built(card, "c2", "base1");
     assert_eq!(sim.journal.iter().filter(|(_, k, _, _)| k == "review.superseded").count(), superseded_before);
     assert_eq!(sim.card(card).stage, Stage::Merging);
@@ -247,7 +248,7 @@ fn linked_branch_round_not_superseded_by_own_commit_and_resolve_succeeds() {
     finish_turn(&mut sim, r2_job, reply("review-pass", "Fixed"));
 
     // A genuinely different head h3 still supersedes round 2.
-    sim.andrei(json!({"say": {"place": card, "to": "foreman", "text": "fix", "kind": "request"}})).unwrap();
+    sim.operator(json!({"say": {"place": card, "to": "foreman", "text": "fix", "kind": "request"}})).unwrap();
     sim.built(card, "h3", "base1");
     assert_eq!(sim.journal.iter().filter(|(_, k, _, _)| k == "review.superseded").count(), superseded_before + 1);
     assert_eq!(sim.card(&rc).review.unwrap().rounds[1].verdict, Some(Verdict::Superseded));
@@ -281,12 +282,12 @@ fn adopt_and_branch_repeat_still_supersede() {
     assert_eq!(review.rounds[0].verdict, Some(Verdict::Superseded));
     assert!(review.open().is_some_and(|o| o.n == 2));
 
-    // Andrei's `review.branch` repeat (head = None) still supersedes an open round.
-    sim.andrei(json!({"review.branch": {"project": "web", "branch": "colleague-br"}})).unwrap();
+    // The operator's `review.branch` repeat (head = None) still supersedes an open round.
+    sim.operator(json!({"review.branch": {"project": "web", "branch": "colleague-br"}})).unwrap();
     settle_fetch(&mut sim, "web", "colleague-br", &head, "base1");
     let brc = "branch-web-colleague-br";
     drive_entry_to_round(&mut sim, brc, &head, &["src/a.rs"]);
-    sim.andrei(json!({"review.branch": {"project": "web", "branch": "colleague-br"}})).unwrap();
+    sim.operator(json!({"review.branch": {"project": "web", "branch": "colleague-br"}})).unwrap();
     assert_eq!(sim.card(brc).review.unwrap().rounds[0].verdict, Some(Verdict::Superseded));
 }
 
@@ -303,8 +304,8 @@ fn sync_open_head_skips_while_prepare_runs() {
 
     // Stop and resume so a new Candidate job for h2 is running in Landing::Prepare while round 2 stays open on c2.
     sim.suite(rc, 0);
-    sim.andrei(json!({"stop": {"card": rc}})).unwrap();
-    sim.andrei(json!({"resume": {"card": rc}})).unwrap();
+    sim.operator(json!({"stop": {"card": rc}})).unwrap();
+    sim.operator(json!({"resume": {"card": rc}})).unwrap();
     settle_fetch(&mut sim, "ex", "feat-5603", &h2, "base1");
     assert!(matches!(sim.card(rc).landing, Some(Landing::Prepare(_))));
 
@@ -328,4 +329,32 @@ fn sync_open_head_skips_while_prepare_runs() {
     sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, &c2)] });
     assert_eq!(sim.card(rc).head.as_ref(), Some(&c2));
     assert!(sim.card(rc).review.as_deref().and_then(Review::open).is_some_and(|o| o.head.as_ref() == Some(&c2)));
+}
+
+#[test]
+fn a_secret_stops_a_pr_entry_before_its_round() {
+    let mut sim = Sim::new();
+    let head = sha("h1");
+    let rc = "pr-ex-5603";
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(5603, &head)] });
+    settle_fetch(&mut sim, "ex", "feat-5603", &head, "base1");
+    sim.candidate(rc);
+    let checks = |p: &Purpose| matches!(p, Purpose::TrainRun { card, checks: true, .. } if card.as_str() == rc);
+    let jobs = sim.open_jobs(checks);
+    let purpose = sim.purpose(&jobs[0]);
+    let hit = "a credential, in fixture:2 (commit h1)";
+    sim.answer_job("candidate checks", checks, json!({"secret_hit": hit}));
+    assert!(
+        sim.state.asks.values().any(|a| {
+            a.open
+                && a.card.as_deref() == Some(rc)
+                && a.kind == mork_types::ask::AskKind::Checks
+                && a.text.contains(hit)
+        }),
+        "the PR's checks notice must identify the detected credential and its location"
+    );
+    let card = sim.card(rc);
+    assert_eq!(card.failed_job.as_ref(), Some(&purpose));
+    assert!(card.review.as_ref().unwrap().rounds.is_empty());
+    assert!(sim.open_jobs(|p| matches!(p, Purpose::TrainRun { checks: false, .. })).is_empty());
 }

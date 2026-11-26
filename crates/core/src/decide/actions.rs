@@ -1,11 +1,11 @@
 //! Outward actions: returns, crash recovery, failures and held-action settlement (2.5, 2.5.7); the token's identity is
 //! `token`'s.
 
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::ask::{AskKind, Color};
-use factory_types::reply::Role;
-use factory_types::work::{ActionFailure, Found, Taken};
-use factory_types::{ActionId, CardId};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::ask::{AskKind, Color};
+use mork_types::reply::Role;
+use mork_types::work::{ActionFailure, Found, Taken};
+use mork_types::{ActionId, CardId};
 use serde_json::{Value, json};
 
 use super::token::token_failure;
@@ -71,7 +71,7 @@ pub fn started(state: &State, id: &str, prepared: Option<&Value>, now: i64) -> D
         return Decision::default();
     }
     let mut d = Decision::default();
-    // A door call's guard runs here, so Andrei's once is taken with the start, or not at all.
+    // A door call's guard runs here, so the operator's once is taken with the start, or not at all.
     if let Err(why) = crate::door::approval::start_guard(&mut a, prepared, now) {
         a.status = ActionStatus::Dropped;
         a.words = Some(why.clone());
@@ -149,7 +149,7 @@ fn follows(p: &mut Poster<'_>, id: &ActionId, what: &ActionWhat, v: &Value, ctx:
             crate::lifecycle::start::fetched(p, project, &v, ctx);
             crate::queue::train::fetched(p, project, &v, ctx);
             if let Some(tip) = v.get("base_tip").and_then(Value::as_str) {
-                crate::queue::refresh::seen(p, project.as_str(), &factory_types::Sha::new(tip));
+                crate::queue::refresh::seen(p, project.as_str(), &mork_types::Sha::new(tip));
             }
         }
         ActionWhat::BackupPush { project, .. } => backed_up(p, project),
@@ -248,11 +248,11 @@ fn failure(p: &mut Poster<'_>, mut a: Action, f: &ActionFailure, ctx: Ctx<'_>) {
                 Some(cd) if cd.pushed.as_ref() != at.as_ref() => {
                     a.status = ActionStatus::Dropped;
                     p.put_action(a);
-                    crate::queue::landing::alarm(p, cd, "its branch on origin was moved from outside the factory");
+                    crate::queue::landing::alarm(p, cd, "its branch on origin was moved from outside Mork");
                 }
-                // Refused with origin where the factory left it: nothing explains it, so it is
+                // Refused with origin where Mork left it: nothing explains it, so it is
                 // held for a look, never dropped silently (R4).
-                _ => hold(p, a, "refused as not a fast-forward, with origin's branch where the factory left it"),
+                _ => hold(p, a, "refused as not a fast-forward, with origin's branch where Mork left it"),
             }
         }
         (ActionFailure::Token { words }, _) => token_failure(p, a, words),
@@ -263,7 +263,7 @@ fn failure(p: &mut Poster<'_>, mut a: Action, f: &ActionFailure, ctx: Ctx<'_>) {
         }
         (ActionFailure::Conflict { .. }, ActionWhat::Merge { .. }) => crate::queue::approval::conflicted(p, a, f, ctx),
         (ActionFailure::Moved { words, tip }, _) => crate::queue::approval::moved(p, a, words, tip, ctx),
-        // Held for Andrei, never retried: a colleague's merge Bitbucket or its guard refused too (fac-95).
+        // Held for the operator, never retried: a colleague's merge Bitbucket or its guard refused too (fac-95).
         (
             ActionFailure::Failed { words }
             | ActionFailure::BoardUnwritten { words }
@@ -289,13 +289,7 @@ fn retry_fetch(p: &mut Poster<'_>, mut a: Action, words: &str) {
 }
 
 // A guard no longer held right before the call drops the action, with why: no call is made (2.5.8).
-fn guard_dropped(
-    p: &mut Poster<'_>,
-    mut a: Action,
-    words: &str,
-    pr: Option<&factory_types::work::PrSeen>,
-    ctx: Ctx<'_>,
-) {
+fn guard_dropped(p: &mut Poster<'_>, mut a: Action, words: &str, pr: Option<&mork_types::work::PrSeen>, ctx: Ctx<'_>) {
     a.status = ActionStatus::Dropped;
     a.words = Some(words.to_owned());
     a.done_ms = Some(p.now);
@@ -367,11 +361,11 @@ pub fn found(state: &State, id: &str, found: &Found, ctx: Ctx<'_>) -> Decision {
     d
 }
 
-/// The words of an action Andrei dropped: an approved merge he dropped stands across polls (fac-98).
-pub const DROPPED_BY_ANDREI: &str = "dropped by Andrei";
+/// The words of an action the operator dropped: an approved merge he dropped stands across polls (fac-98).
+pub const DROPPED_BY_OPERATOR: &str = "dropped by the operator";
 
 pub(super) fn close_asks(p: &mut Poster<'_>, id: &str) {
-    let open: Vec<factory_types::AskId> =
+    let open: Vec<mork_types::AskId> =
         p.all_asks().filter(|x| x.open && x.action.as_deref() == Some(id)).map(|x| x.id.clone()).collect();
     for x in open {
         asks::close_one(p, &x);
@@ -398,10 +392,12 @@ pub fn settle_held(state: &State, id: &str, how: &str, note: Option<&str>, ctx: 
             crate::board::retry::refresh(&p, &mut a);
             crate::queue::pr::run(&mut p, a, ctx.config);
         }
-        "drop" if matches!(a.what, ActionWhat::Door(_)) => crate::door::approval::refuse(&mut p, a, DROPPED_BY_ANDREI),
+        "drop" if matches!(a.what, ActionWhat::Door(_)) => {
+            crate::door::approval::refuse(&mut p, a, DROPPED_BY_OPERATOR)
+        }
         "drop" => {
             a.status = ActionStatus::Dropped;
-            a.words = Some(DROPPED_BY_ANDREI.to_owned());
+            a.words = Some(DROPPED_BY_OPERATOR.to_owned());
             p.put_action(a);
         }
         _ => done(&mut p, a, json!({"by_hand": note.unwrap_or("")}), ctx),

@@ -1,5 +1,5 @@
-use factory_core::state::{Change, State};
-use factory_types::memory::{MemoryFile, Tally};
+use mork_core::state::{Change, State};
+use mork_types::memory::{MemoryFile, Tally};
 use rusqlite::params;
 
 use super::{Result, put_entity};

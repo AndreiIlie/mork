@@ -1,8 +1,8 @@
 //! The engine's life: start up (2.7), take commands, launch and watch jobs, keep up, and
 //! shut down cleanly. It runs on threads of its own; the window never waits on it (1.1.3).
 
-mod act_bitbucket;
 mod act_board;
+mod act_forge;
 mod act_found;
 mod act_run;
 mod actions;
@@ -61,12 +61,13 @@ use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Instant;
 
-use factory_core::decide::{Ctx, Decision, Event, Intent};
-use factory_core::state::State;
-use factory_types::JobId;
+use mork_core::decide::{Ctx, Decision, Event, Intent};
+use mork_core::state::State;
+use mork_types::JobId;
 
 use crate::cli::StreamState;
 use crate::jobs::context::Context;
+use crate::lock::Lock;
 use crate::paths::Home;
 use crate::sockets::{Conn, Incoming, Shared};
 use crate::store::Store;
@@ -108,7 +109,7 @@ pub struct Live {
     pub offset: u64,
     pub stream: StreamState,
     pub spawned: Instant,
-    pub cli: Option<factory_types::config::Cli>,
+    pub cli: Option<mork_types::config::Cli>,
     /// The limits last passed on, so a stream read again passes nothing new.
     pub reported: Vec<crate::cli::limits::Window>,
     /// Reattached after a restart: what the stream held up to here was passed on before it, and
@@ -127,21 +128,21 @@ pub struct AgentSeen {
     pub doing: Option<String>,
     pub context: Option<crate::cli::ContextReport>,
     /// Its steps with their text and thinking, of the job that read them (fac-96).
-    pub turn: Option<Arc<factory_types::seen::TurnView>>,
+    pub turn: Option<Arc<mork_types::seen::TurnView>>,
     /// Its own step list, of the job that read it (fac-128).
-    pub list: Option<factory_types::seen::StepList>,
+    pub list: Option<mork_types::seen::StepList>,
 }
 
 /// A CLI's windows as the state's limits.
 pub fn limits_of(
-    cli: factory_types::config::Cli,
+    cli: mork_types::config::Cli,
     windows: &[crate::cli::limits::Window],
     now: i64,
-) -> Vec<factory_types::usage::Limit> {
+) -> Vec<mork_types::usage::Limit> {
     windows
         .iter()
-        .filter(|w| cli != factory_types::config::Cli::Claude || w.account.is_some())
-        .map(|w| factory_types::usage::Limit {
+        .filter(|w| cli != mork_types::config::Cli::Claude || w.account.is_some())
+        .map(|w| mork_types::usage::Limit {
             cli,
             account: w.account.clone(),
             bucket: w.bucket.clone(),
@@ -161,9 +162,8 @@ pub struct Watched {
     pub places: Vec<String>,
     pub tail: Option<u64>,
     pub full: bool,
-    /// What each place's last view sent said, its `revision` left out: an unrelated change of the
-    /// state sends nothing (fac-321).
-    pub sent: Arc<std::sync::Mutex<BTreeMap<String, u64>>>,
+    // The hash excludes the revision so unrelated state changes send nothing (fac-321).
+    sent: Arc<Lock<BTreeMap<String, u64>>>,
 }
 
 impl Watched {
@@ -181,8 +181,7 @@ impl Watched {
         if let (Some(r), Some(o)) = (revision, view.as_object_mut()) {
             o.insert("revision".into(), r);
         }
-        let Ok(mut sent) = self.sent.lock() else { return false };
-        sent.insert(place.to_owned(), hash) == Some(hash)
+        self.sent.lock().insert(place.to_owned(), hash) == Some(hash)
     }
 }
 
@@ -196,13 +195,11 @@ pub struct Engine {
     pub live: BTreeMap<JobId, Live>,
     pub watchers: Vec<(Arc<Conn>, Watched)>,
     pub tx: Sender<Input>,
-    /// Supervisors started by this process: only the first gets a `sup.*` fault (1.10.5).
-    pub supervisors: u32,
     pub last_upkeep: Option<Instant>,
     /// Kept open for a reload's exec: the lock and the two listeners' descriptors.
     pub keep: startup::Kept,
     /// Each agent's latest turn, as its stream showed it.
-    pub seen: BTreeMap<factory_types::AgentKey, AgentSeen>,
+    pub seen: BTreeMap<mork_types::AgentKey, AgentSeen>,
     /// Codex's limits reader (1.4.8, Codex 7).
     pub limits_read: limits_read::Reader,
     /// The pipeline's intents, slots and poller (section 4).
@@ -239,19 +236,19 @@ pub enum Input {
     /// A clone's completed thread read, kept off the engine's loop (fac-448).
     ReviewThreads {
         job: JobId,
-        end: Box<factory_core::decide::JobEnd>,
+        end: Box<mork_core::decide::JobEnd>,
     },
     WorkPrepared(Box<work_threads::Prepared>),
     CandidateRead {
         job: JobId,
-        end: Box<factory_core::decide::JobEnd>,
+        end: Box<mork_core::decide::JobEnd>,
     },
     /// The poller asked Bitbucket who the token is, whatever it answered (3.7.2).
     TokenAsked,
     /// The views' reads of the world, made on their thread.
     Outside(Box<outside::Reads>),
     /// The machine's load, sampled on its own thread.
-    Resources(factory_types::view::Resources),
+    Resources(mork_types::view::Resources),
     /// The kill of a read's query tried again, as the same query was asked again (fac-184).
     DoorKilled(Box<door::Killed>),
 }
@@ -265,7 +262,7 @@ pub fn run(opts: Options) -> i32 {
             code
         }
         Err(e) => {
-            eprintln!("factory: {e}");
+            eprintln!("mork: {e}");
             1
         }
     }
@@ -278,26 +275,21 @@ impl Engine {
 
     /// Decides and commits one event; carries out its intents after the commit.
     pub fn apply(&mut self, event: &Event) -> Decision {
-        self.apply_with(event, None)
-    }
-
-    /// As [`Engine::apply`], with a fault point inside the transaction (`job.mid-apply`).
-    pub fn apply_with(&mut self, event: &Event, mid_fault: Option<&str>) -> Decision {
         self.load_wanted(event);
         let now = clock::now_ms();
         let d = self.decide(event, now);
-        self.commit_decided(d, now, mid_fault)
+        self.commit_decided(d, now)
     }
 
     /// Decides one event on the state as it stands, committing nothing.
     pub(super) fn decide(&self, event: &Event, now: i64) -> Decision {
         let ctx = Ctx { now, config: &self.ctx.config, faults: self.faults() };
-        factory_core::decide::decide(&self.state, event, ctx)
+        mork_core::decide::decide(&self.state, event, ctx)
     }
 
     /// Commits what [`Engine::decide`] decided, nothing committed since; carries out its intents after.
-    pub(super) fn commit_decided(&mut self, d: Decision, now: i64, mid_fault: Option<&str>) -> Decision {
-        if let Err(e) = self.store.commit(&d.changes, &d.journal, now, mid_fault) {
+    pub(super) fn commit_decided(&mut self, d: Decision, now: i64) -> Decision {
+        if let Err(e) = self.store.commit(&d.changes, &d.journal, now) {
             self.log(&format!("commit failed: {e}"));
             return Decision::refused(format!("the state couldn't be written: {e}"));
         }
@@ -307,7 +299,7 @@ impl Engine {
         self.state.commit(&d.changes);
         self.drop_bundles(&used);
         self.wakes_note(&d.changes, &ended);
-        if d.changes.iter().any(|c| matches!(c, factory_core::state::Change::AddOrchestratorEvent(_))) {
+        if d.changes.iter().any(|c| matches!(c, mork_core::state::Change::AddOrchestratorEvent(_))) {
             self.hooks_send();
         }
         self.pipe.verdict.follow(self.state.world.token_refused.as_ref());
@@ -315,7 +307,7 @@ impl Engine {
             self.carry_out(intent);
         }
         // A door call that moved: its waiting requests answered, or its requester told (fac-1).
-        for id in factory_core::door::touched(&d.changes) {
+        for id in mork_core::door::touched(&d.changes) {
             self.door_settle(&id);
         }
         if !d.changes.is_empty() {
@@ -344,9 +336,7 @@ impl Engine {
     /// Appends to `logs/app.log`.
     /// A line in the app's log, its secrets masked (3.8.3, R15).
     pub fn log(&self, line: &str) {
-        let Ok(mut cache) = self.pipe.masks.lock() else {
-            return upkeep::log(&self.opts.home, "‹a line not masked›");
-        };
+        let mut cache = self.pipe.masks.lock();
         if cache.as_ref().is_none_or(|(at, _)| crate::clock::elapsed(*at) > std::time::Duration::from_secs(60)) {
             let s = crate::secrets::Secrets::gather(&self.opts.home, &self.ctx.config, &self.ctx.telemetry);
             *cache = Some((crate::clock::instant(), s));
@@ -357,7 +347,7 @@ impl Engine {
 
     fn serve(&mut self, rx: &Receiver<Input>) -> i32 {
         loop {
-            if factory_sys::term_requested() {
+            if mork_sys::term_requested() {
                 return 0;
             }
             match rx.recv_timeout(std::time::Duration::from_millis(50)) {

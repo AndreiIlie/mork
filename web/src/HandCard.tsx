@@ -9,7 +9,7 @@ const PILL: Record<Color, string> = {
   grey: "bg-gray-500",
 };
 
-/** The colour a hand's label shows: grey once sent to an orchestrator, no longer waiting on Andrei. */
+/** The colour a hand's label shows: grey once sent to an orchestrator, no longer waiting on the operator. */
 export function labelColor(hand: HandView): Color {
   return hand.given ? "grey" : hand.color;
 }

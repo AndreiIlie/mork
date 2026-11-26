@@ -1,7 +1,7 @@
 //! A conversation message's words as its `copy` puts them on the clipboard (fac-33): as written,
 //! what `more …` folds included, card ids bare.
 
-use factory_types::view::MessageView;
+use mork_types::view::MessageView;
 
 use crate::app::{App, Effect};
 use crate::shape::{self, Shape};

@@ -1,11 +1,11 @@
 //! Each recap is challenged by the card's foreman before it is offered; its approve starts the build, and ends a
 //! visual card's mock with it (fac-420, fac-558, fac-636).
 
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Approval, ApprovedVia, Card, MockStep, Mode, Stage};
-use factory_types::reply::{Intent as MessageIntent, Outcome, Reply, Role};
-use factory_types::state::{Agent, AgentStatus, Job, Message, Sender};
-use factory_types::{AgentKey, CardId};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Approval, ApprovedVia, Card, MockStep, Mode, Stage};
+use mork_types::reply::{Intent as MessageIntent, Outcome, Reply, Role};
+use mork_types::state::{Agent, AgentStatus, Job, Message, Sender};
+use mork_types::{AgentKey, CardId};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision, Intent};
@@ -78,7 +78,7 @@ fn end_mock(c: &mut Card) -> bool {
 
 // The foreman seated at start, which challenged or, with no planner, made the plan, keeps its session and owed work
 // (fac-633). Only a planner's brief turns stop, and a warm planner takes its closing turn now (fac-670).
-fn hand_over(p: &mut Poster<'_>, c: &Card, config: &factory_types::config::Config) {
+fn hand_over(p: &mut Poster<'_>, c: &Card, config: &mork_types::config::Config) {
     if c.mode != Mode::Full {
         return;
     }
@@ -129,7 +129,7 @@ fn build(p: &mut Poster<'_>, c: Card) {
     crate::messages::requests::ask_build(p, &cid, &text);
 }
 
-/// Whether a reply asks nothing of Andrei.
+/// Whether a reply asks nothing of the operator.
 pub(super) fn clear(ask: &str) -> bool {
     ask.trim().is_empty()
 }
@@ -137,8 +137,8 @@ pub(super) fn clear(ask: &str) -> bool {
 /// The approver's name and any delegation.
 pub(crate) fn approval_label(by: &Sender) -> String {
     match by {
-        Sender::Andrei => "Andrei".to_owned(),
-        Sender::Orchestrator(project) => format!("orchestrator:{project}, on Andrei's delegation,"),
+        Sender::Operator => "the operator".to_owned(),
+        Sender::Orchestrator(project) => format!("orchestrator:{project}, on the operator's delegation,"),
         by @ (Sender::Agent(_) | Sender::Engine | Sender::Pa) => by.label(),
     }
 }
@@ -178,8 +178,8 @@ pub(super) fn recapped(p: &mut Poster<'_>, mut card: Card, (who, job): (&Who, &J
         if redraft(p, &mut card) {
             p.put_card(card);
         }
-        let text = "Andrei wrote to you while this recap was being made, so it isn't offered for approval. Answer him, then recap again.";
-        crate::messages::requests::tell_agent(p, &id, who.role, "recap not offered: answer Andrei first", text);
+        let text = "The operator wrote to you while this recap was being made, so it isn't offered for approval. Answer him, then recap again.";
+        crate::messages::requests::tell_agent(p, &id, who.role, "recap not offered: answer the operator first", text);
         return;
     }
     // Its typed sketch heads the plan every reader of words gets (fac-696).
@@ -207,7 +207,7 @@ pub(super) fn recapped(p: &mut Poster<'_>, mut card: Card, (who, job): (&Who, &J
 
 /// Offers the standing plan once no challenge of it waits; mutates `c` in place for its caller to stage.
 pub(crate) fn offer(p: &mut Poster<'_>, c: &mut Card, ctx: Ctx<'_>) {
-    // A visual card's plan, its mock included, is Andrei's alone to approve: an offered one stays as it is (fac-636).
+    // A visual card's plan, its mock included, is the operator's alone to approve: an offered one stays as it is (fac-636).
     if c.stage != Stage::Brief || c.draft.is_none() || c.challenge.is_some() || (c.visual && c.recap) {
         return;
     }
@@ -223,8 +223,8 @@ pub(crate) fn offer(p: &mut Poster<'_>, c: &mut Card, ctx: Ctx<'_>) {
 
 // The approve ask's words: the recap's typed sketch (fac-696), then a visual card's mock link, which the approve
 // approves with it (fac-636).
-fn approve_words(c: &Card, config: &factory_types::config::Config) -> String {
-    let sketch = c.sketch.as_ref().map(factory_types::card::Sketch::words).unwrap_or_default();
+fn approve_words(c: &Card, config: &mork_types::config::Config) -> String {
+    let sketch = c.sketch.as_ref().map(mork_types::card::Sketch::words).unwrap_or_default();
     let link = super::mock::link(c, config).filter(|_| super::mock::briefing(c));
     let mock = link.map(|l| format!("\n\nmock: {l}")).unwrap_or_default();
     match sketch.trim() {
@@ -246,15 +246,15 @@ fn answering_request(state: &State, card: &Card, who: &Who, from: &Sender, inten
         && crate::agents::stalled::unanswered_orchestrator_request(state, card, &who.key, who.place.as_str()).is_some()
 }
 
-/// Whether words to the card's specification holder withdraw its standing recap: Andrei's always; the card's
+/// Whether words to the card's specification holder withdraw its standing recap: the operator's always; the card's
 /// project's orchestrator's only while its plan ask is given and not answering a mechanical request (fac-391, fac-649).
 pub fn withdraws(state: &State, card: &Card, who: &Who, from: &Sender, intent: Option<MessageIntent>) -> bool {
-    *from == Sender::Andrei
+    *from == Sender::Operator
         || (given_plan_holder(state, from, card) && !answering_request(state, card, who, from, intent))
 }
 
 /// Whether `a` is an open `approve-brief` ask of `card` currently given to an orchestrator.
-pub(crate) fn is_given_plan(a: &factory_types::ask::Ask, card: &CardId) -> bool {
+pub(crate) fn is_given_plan(a: &mork_types::ask::Ask, card: &CardId) -> bool {
     a.open && a.given && a.kind == AskKind::ApproveBrief && a.card.as_ref() == Some(card)
 }
 
@@ -272,7 +272,7 @@ pub(crate) fn close_given_plan(
     who: &Who,
     from: &Sender,
     intent: Option<MessageIntent>,
-) -> Vec<factory_types::AskId> {
+) -> Vec<mork_types::AskId> {
     let Some(id) = places::card_of(p.state, &who.place) else { return Vec::new() };
     let Some(c) = p.card(&id) else { return Vec::new() };
     if who.role != super::facts::holder(&c)
@@ -294,13 +294,13 @@ pub(crate) fn close_given_plan(
     ids
 }
 
-// Whether a recap was made without Andrei's or a delegated answer's latest word to its agent (fac-16, fac-649):
+// Whether a recap was made without the operator's or a delegated answer's latest word to its agent (fac-16, fac-649):
 // authoritative words reached it, in its own room or its DM, after its turn's news was read, and weren't taken.
 fn outdated(p: &Poster<'_>, who: &Who, card: &Card) -> bool {
     let Some(a) = p.agent(&who.key) else { return false };
     let (room, dm) = (places::room_of(&card.id, who.role), format!("{}/{}/dm", card.id, who.role.as_str()));
     let unread = |m: &Message| m.seq >= a.seen && !a.taken.contains(&m.seq);
-    let authoritative = |m: &Message| m.from == Sender::Andrei || (m.from.is_orchestrator() && m.delegated.is_some());
+    let authoritative = |m: &Message| m.from == Sender::Operator || (m.from.is_orchestrator() && m.delegated.is_some());
     [room.as_str(), dm.as_str()]
         .iter()
         .any(|place| p.state.messages_in(place).any(|m| unread(m) && authoritative(m) && to_it(who, card, m)))
@@ -343,7 +343,7 @@ pub(crate) fn stop_brief_turns(p: &mut Poster<'_>, key: &AgentKey) -> bool {
 }
 
 /// Recovers a missing foreman's challenge of an unoffered plan.
-pub fn recover_flow(p: &mut Poster<'_>, config: &factory_types::config::Config) {
+pub fn recover_flow(p: &mut Poster<'_>, config: &mork_types::config::Config) {
     let ids: Vec<CardId> = p.state.cards.keys().cloned().collect();
     for id in ids {
         let Some(mut c) = p.card(&id).filter(|c| c.mode == Mode::Full) else { continue };

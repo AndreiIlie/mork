@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Note {
     pub id: u64,
-    /// None: nothing accounts for it, so it is the factory's project's.
+    /// None: nothing accounts for it, so it is Mork's project's.
     pub project: Option<crate::ProjectId>,
     pub card: Option<crate::CardId>,
     pub seat: Option<crate::AgentKey>,
@@ -31,7 +31,7 @@ pub enum NoteWhat {
     Lesson { text: String },
     /// A grouped cleanup ready to become a card.
     Proposal { title: String, text: String, files: Vec<String> },
-    /// The files a card left under `.git/factory/handoff/`, preserved in `dir`.
+    /// The files a card left under `.git/mork/handoff/`, preserved in `dir`.
     Handoff { run: u32, dir: String, files: Vec<HandoffFile>, skipped: Vec<String> },
 }
 

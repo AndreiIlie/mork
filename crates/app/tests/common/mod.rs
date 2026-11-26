@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use factory_fakes::TestHome;
+use mork_fakes::TestHome;
 
 pub mod builds;
 pub mod door;
@@ -15,7 +15,7 @@ pub mod waits;
 use serde_json::{Value, json};
 
 pub fn exe() -> PathBuf {
-    PathBuf::from(env!("CARGO_BIN_EXE_factory"))
+    PathBuf::from(env!("CARGO_BIN_EXE_mork"))
 }
 
 /// Waits until `f` holds, or fails the test naming `what`.
@@ -30,7 +30,7 @@ pub fn wait_until(what: &str, limit: Duration, mut f: impl FnMut() -> bool) {
     panic!("timed out after {limit:?} waiting for {what}");
 }
 
-/// A test's factory.
+/// A test's mork.
 pub struct Rig {
     pub t: TestHome,
     pub env: Vec<(String, String)>,
@@ -41,8 +41,9 @@ impl Rig {
     pub fn new() -> Self {
         let t = TestHome::new();
         t.link_fakes(&exe());
-        std::fs::create_dir_all(t.factory_home().join("agent-home")).unwrap();
-        std::fs::create_dir_all(t.root.join("factory-repo")).unwrap();
+        std::fs::create_dir_all(t.mork_home().join("agent-home")).unwrap();
+        std::fs::create_dir_all(t.root.join("mork-repo")).unwrap();
+        std::fs::create_dir_all(t.mork_home().join("fixtures")).unwrap();
         let mut rig = Self { t, env: Vec::new(), app: None };
         rig.write_config(&rig.config(""));
         // The app's own commands (`notify-send`) find the fakes, and log where the walls' do.
@@ -54,16 +55,19 @@ impl Rig {
     }
 
     pub fn fhome(&self) -> PathBuf {
-        self.t.factory_home()
+        self.t.mork_home()
     }
     pub fn agent_home(&self) -> PathBuf {
         self.fhome().join("agent-home")
     }
+    fn fixture_folder(&self) -> PathBuf {
+        if cfg!(feature = "faults") { self.fhome().join("fixtures") } else { self.agent_home() }
+    }
     pub fn scenario_path(&self) -> PathBuf {
-        self.agent_home().join("scenario.json")
+        self.fixture_folder().join("scenario.json")
     }
     pub fn log_path(&self) -> PathBuf {
-        self.agent_home().join("fake.log")
+        self.fixture_folder().join("fake.log")
     }
 
     /// The test config, with `extra` appended. The foreman is pinned to Codex, which the scenarios script,
@@ -76,19 +80,19 @@ impl Rig {
     /// The test config with the default seats, `extra` appended.
     pub fn config_with(&self, extra: &str) -> String {
         format!(
-            "[factory]\nproject = \"factory\"\ntoolchains = [{{ path = \"{bin}\", bin = \".\" }}]\n\
+            "[mork]\nproject = \"mork\"\ntoolchains = [{{ path = \"{bin}\", bin = \".\" }}]\n\
              env = {{ FAKE_SCENARIO = \"{sc}\", FAKE_LOG = \"{log}\" }}\n\
-             [git]\nauthor = \"Factory Test <test@example.invalid>\"\n\
-             [projects.factory]\nrepo = \"{repo}\"\nboard = \"{repo}\"\ntest = \"true\"\n{extra}",
+             [git]\nauthor = \"Mork Test <test@example.invalid>\"\n\
+             [projects.mork]\nrepo = \"{repo}\"\nboard = {{ kind = \"markdown\", path = \"{repo}\" }}\ntest = \"true\"\n{extra}",
             bin = self.t.bin().display(),
             sc = self.scenario_path().display(),
             log = self.log_path().display(),
-            repo = self.t.root.join("factory-repo").display(),
+            repo = self.t.root.join("mork-repo").display(),
         )
     }
 
     pub fn write_config(&self, text: &str) {
-        std::fs::write(self.t.config_dir().join("factory.toml"), text).unwrap();
+        std::fs::write(self.t.config_dir().join("mork.toml"), text).unwrap();
     }
 
     /// Writes the fakes' scenario (1.10.2). Its last run passes each review round a gated card's
@@ -102,7 +106,7 @@ impl Rig {
 
     /// The fakes' run log, filtered to a fake's name.
     pub fn runs(&self, name: &str) -> Vec<Value> {
-        factory_fakes::runlog::read(&self.log_path()).into_iter().filter(|l| l["name"] == name).collect()
+        mork_fakes::runlog::read(&self.log_path()).into_iter().filter(|l| l["name"] == name).collect()
     }
 
     pub fn set_env(&mut self, k: &str, v: &str) {
@@ -110,7 +114,7 @@ impl Rig {
         self.env.push((k.into(), v.into()));
     }
 
-    /// A command of the factory binary with the test's environment.
+    /// A command of Mork binary with the test's environment.
     pub fn command(&self, args: &[&str]) -> Command {
         self.command_at(exe(), args)
     }
@@ -119,11 +123,11 @@ impl Rig {
     pub fn command_at(&self, bin: impl AsRef<std::ffi::OsStr>, args: &[&str]) -> Command {
         let mut c = Command::new(bin);
         c.args(args).envs(self.t.env()).envs(self.env.iter().map(|(a, b)| (a, b)));
-        c.env_remove("FACTORY_AGENT_SOCK");
+        c.env_remove("MORK_AGENT_SOCK");
         c
     }
 
-    /// Starts `factory --no-window`, and waits until it takes commands.
+    /// Starts `mork --no-window`, and waits until it takes commands.
     pub fn start(&mut self) {
         self.spawn();
         self.wait_ready();
@@ -161,17 +165,17 @@ impl Rig {
     /// Waits until a `status` is answered with anything but `recovering`.
     pub fn wait_ready(&self) {
         wait_until("the app to take commands", Duration::from_secs(30), || {
-            let Ok(mut c) = Client::try_connect(&self.fhome().join("factory.sock")) else { return false };
+            let Ok(mut c) = Client::try_connect(&self.fhome().join("mork.sock")) else { return false };
             let a = c.send(json!({"status": {}}));
             a.get("ok").is_some()
         });
     }
 
     pub fn client(&self) -> Client {
-        Client::connect(&self.fhome().join("factory.sock"))
+        Client::connect(&self.fhome().join("mork.sock"))
     }
 
-    /// One command over `factory.sock`; the answer.
+    /// One command over `mork.sock`; the answer.
     pub fn send(&self, cmd: Value) -> Value {
         self.client().send(cmd)
     }
@@ -211,23 +215,23 @@ impl Rig {
     }
 
     /// The state, when it can be read now (a run killed mid-write, or not yet made).
-    pub fn try_state(&self) -> Option<factory_core::state::State> {
+    pub fn try_state(&self) -> Option<mork_core::state::State> {
         let path = self.fhome().join("state.db");
-        let store = factory_engine::store::Store::open_read_only(&path).ok()?;
+        let store = mork_engine::store::Store::open_read_only(&path).ok()?;
         store.load().ok()
     }
 
     /// The state, opened read-only.
-    pub fn store(&self) -> factory_engine::store::Store {
-        factory_engine::store::Store::open_read_only(&self.fhome().join("state.db")).unwrap()
+    pub fn store(&self) -> mork_engine::store::Store {
+        mork_engine::store::Store::open_read_only(&self.fhome().join("state.db")).unwrap()
     }
 
-    pub fn messages(&self, place: &str) -> Vec<factory_types::state::Message> {
+    pub fn messages(&self, place: &str) -> Vec<mork_types::state::Message> {
         self.store().load().unwrap().messages.into_iter().filter(|m| m.place == place).collect()
     }
 
     /// The jobs of an agent, from the state, oldest first.
-    pub fn jobs(&self, agent: &str) -> Vec<factory_types::state::Job> {
+    pub fn jobs(&self, agent: &str) -> Vec<mork_types::state::Job> {
         let mut j: Vec<_> =
             self.store().load().unwrap().jobs.into_values().filter(|j| j.owner.as_str() == agent).collect();
         j.sort_by_key(|j| j.spec.created_ms);
@@ -327,61 +331,55 @@ impl Client {
 // Straight into the state, past the engine (1.10.4).
 impl Rig {
     /// Commits `changes` to the state, opening it as the app would. The app must be stopped.
-    pub fn put(&self, changes: Vec<factory_core::state::Change>) {
+    pub fn put(&self, changes: Vec<mork_core::state::Change>) {
         self.put_journaled(changes, &[], 0);
     }
 
     /// As [`Rig::put`], with `journal`'s rows at `now`.
     pub fn put_journaled(
         &self,
-        changes: Vec<factory_core::state::Change>,
-        journal: &[factory_core::decide::Journal],
+        changes: Vec<mork_core::state::Change>,
+        journal: &[mork_core::decide::Journal],
         now: i64,
     ) {
         assert!(self.app.is_none(), "put needs the app stopped");
         let f = self.fhome();
-        let mut s = factory_engine::store::Store::open(&f.join("state.db"), &"0".repeat(40)).unwrap();
-        s.commit(&changes, journal, now, None).unwrap();
+        let mut s = mork_engine::store::Store::open(&f.join("state.db"), &"0".repeat(40)).unwrap();
+        s.commit(&changes, journal, now).unwrap();
     }
 
-    /// A card of the test project, `stage` build, its specification approved by Andrei (fac-16),
+    /// A card of the test project, `stage` build, its specification approved by the operator (fac-16),
     /// with its clone folder made.
-    pub fn card(&self, id: &str, mode: factory_types::card::Mode) -> factory_types::card::Card {
+    pub fn card(&self, id: &str, mode: mork_types::card::Mode) -> mork_types::card::Card {
         std::fs::create_dir_all(self.fhome().join("clones").join(id)).unwrap();
-        let mut c = factory_types::card::Card::new(
-            factory_types::CardId::new(id),
-            "factory",
-            &format!("The title of {id}"),
-            mode,
-            1,
-            0,
-        );
+        let mut c =
+            mork_types::card::Card::new(mork_types::CardId::new(id), "mork", &format!("The title of {id}"), mode, 1, 0);
         c.description = format!("The description of {id}.");
         c.acceptance = vec![format!("{id} is accepted")];
-        c.stage = factory_types::card::Stage::Build;
-        c.approval = Some(factory_types::card::Approval {
-            by: factory_types::state::Sender::Andrei,
-            via: factory_types::card::ApprovedVia::Approve,
+        c.stage = mork_types::card::Stage::Build;
+        c.approval = Some(mork_types::card::Approval {
+            by: mork_types::state::Sender::Operator,
+            via: mork_types::card::ApprovedVia::Approve,
             at_ms: 0,
         });
         c
     }
 
     /// Puts cards, and their rooms, in the state.
-    pub fn put_cards(&self, cards: Vec<factory_types::card::Card>) {
+    pub fn put_cards(&self, cards: Vec<mork_types::card::Card>) {
         let mut changes = Vec::new();
         for c in cards {
-            changes.push(factory_core::state::Change::PutPlace(factory_types::state::Place {
+            changes.push(mork_core::state::Change::PutPlace(mork_types::state::Place {
                 id: c.id.as_str().into(),
                 next_number: 1,
             }));
-            changes.push(factory_core::state::Change::PutCard(Box::new(c)));
+            changes.push(mork_core::state::Change::PutCard(Box::new(c)));
         }
         self.put(changes);
     }
 
     /// The whole state, read-only.
-    pub fn state(&self) -> factory_core::state::State {
+    pub fn state(&self) -> mork_core::state::State {
         self.store().load().unwrap()
     }
 
@@ -400,16 +398,16 @@ impl Rig {
         });
     }
 
-    /// Says something in a place, over `factory.sock`, as Andrei.
+    /// Says something in a place, over `mork.sock`, as the operator.
     pub fn say(&self, place: &str, text: &str) -> Value {
         self.send(json!({"say": {"place": place, "text": text}}))
     }
 
-    pub fn job_dir(&self, job: &factory_types::state::Job) -> PathBuf {
+    pub fn job_dir(&self, job: &mork_types::state::Job) -> PathBuf {
         self.fhome().join("jobs").join(job.id.as_str())
     }
 
-    pub fn out_lines(&self, job: &factory_types::state::Job) -> Vec<Value> {
+    pub fn out_lines(&self, job: &mork_types::state::Job) -> Vec<Value> {
         std::fs::read_to_string(self.job_dir(job).join("out.jsonl"))
             .unwrap_or_default()
             .lines()
@@ -430,27 +428,27 @@ pub fn reply(outcome: &str, headline: &str, messages: Value) -> Value {
 /// The foreman seat on Codex, as the scenarios run it (the default is Claude).
 pub const CODEX_FOREMAN: &str = "[seats.foreman]\ncli = \"codex\"\nmodel = \"gpt-6.2-sol\"\neffort = \"high\"\n";
 
-/// Whether this run has no walls: `FACTORY_UNWALLED=1` (1.10.9, 1.10.10).
+/// Whether this run has no walls: `MORK_UNWALLED=1` (1.10.9, 1.10.10).
 pub fn unwalled() -> bool {
-    std::env::var("FACTORY_UNWALLED").as_deref() == Ok("1")
+    std::env::var_os("MORK_UNWALLED").is_some_and(|v| v == "1")
 }
 
-/// Marks assertions that need a real wall; `FACTORY_UNWALLED=1` means they cannot run.
+/// Marks assertions that need a real wall; `MORK_UNWALLED=1` means they cannot run.
 /// With walls enabled, a wall that cannot start must fail the assertion (1.10.9, fac-65).
 pub fn wall_test(what: &str) -> bool {
     let skip = unwalled();
     if skip {
         say_skipped(&format!(
-            "{what}: its assertion is about the wall, and FACTORY_UNWALLED=1 runs no wall (1.10.9, 1.10.10)"
+            "{what}: its assertion is about the wall, and MORK_UNWALLED=1 runs no wall (1.10.9, 1.10.10)"
         ));
     }
     skip
 }
 
 /// The train's phase of the suite, which `cargo xtask test` is told (fac-65).
-pub const TRAIN_PHASE: &str = "FACTORY_TRAIN_PHASE";
+pub const TRAIN_PHASE: &str = "MORK_TRAIN_PHASE";
 /// The file a binary of the train's walled phase records its skipped wall tests in (fac-65).
-pub const WALL_TESTS: &str = "FACTORY_WALL_TESTS";
+pub const WALL_TESTS: &str = "MORK_WALL_TESTS";
 
 /// Walled skips need a record so the unwalled phase can prove their assertions (fac-65).
 /// Skips stay non-fatal until fac-123 so the older engine can land this support.

@@ -1,12 +1,12 @@
-// These work whether or not a factory is running.
+// These work whether or not Mork is running.
 
 use std::time::Duration;
 
-use factory_engine::jobs::context::Context;
-use factory_engine::jobs::{folder, launch};
-use factory_engine::paths::Home;
-use factory_engine::store::{self, Store};
-use factory_engine::{builds, clock, config, doctor, settings};
+use mork_engine::jobs::context::Context;
+use mork_engine::jobs::{folder, launch};
+use mork_engine::paths::Home;
+use mork_engine::store::{self, Store};
+use mork_engine::{builds, clock, config, doctor, settings};
 use serde_json::{Value, json};
 
 use crate::cli::{bin, commit, dirty};
@@ -17,23 +17,23 @@ fn fail(e: &(impl std::fmt::Display + ?Sized)) -> i32 {
     1
 }
 
-/// `factory version [--json]`: its commit, and its manifest (1.8.2).
+/// `mork version [--json]`: its commit, and its manifest (1.8.2).
 pub fn version(rest: &[String]) -> i32 {
     let v = json!({
         "commit": commit(),
         "dirty": dirty(),
         "state_oldest": store::schema::OLDEST,
         "state_newest": store::schema::NEWEST,
-        "protocol": factory_types::protocol::PROTOCOL,
-        "job_formats": factory_types::job::JOB_FORMATS,
-        "reply_schemas": [factory_types::reply::SCHEMA_VERSION],
+        "protocol": mork_types::protocol::PROTOCOL,
+        "job_formats": mork_types::job::JOB_FORMATS,
+        "reply_schemas": [mork_types::reply::SCHEMA_VERSION],
         "home": Home::from_env().map(|h| h.root().display().to_string()),
         "config": config::path().map(|p| p.display().to_string()),
     });
     if rest.iter().any(|a| a == "--json") {
         println!("{v}");
     } else {
-        println!("factory {}{}", commit(), if dirty() { " (dirty)" } else { "" });
+        println!("mork {}{}", commit(), if dirty() { " (dirty)" } else { "" });
     }
     0
 }
@@ -46,10 +46,10 @@ fn context(home: &Home) -> Result<Context, String> {
     Ok(Context::new(home.clone(), config, bin(), telemetry))
 }
 
-/// `factory build <commit>` (1.8.3): through the engine when one runs, else here, recording
+/// `mork build <commit>` (1.8.3): through the engine when one runs, else here, recording
 /// nothing in the state.
 pub fn build(home: &Home, rest: &[String]) -> i32 {
-    let Some(commit) = rest.first() else { return fail("factory build <commit>") };
+    let Some(commit) = rest.first() else { return fail("mork build <commit>") };
     match ctl::request(home, &json!({"build": {"commit": commit}})) {
         Ok(Some(ok)) => return wait_for_build(home, &ok),
         Err(e) => return fail(&e),
@@ -70,7 +70,7 @@ pub fn build(home: &Home, rest: &[String]) -> i32 {
         Ok(d) => d,
         Err(e) => return fail(&e.to_string()),
     };
-    if let Err(e) = launch::start_supervisor(&bin(), &dir.dir, home.root(), true) {
+    if let Err(e) = launch::start_supervisor(&bin(), &dir.dir, home.root()) {
         return fail(&e.to_string());
     }
     while !dir.exit_path().exists() || dir.lock_held() {
@@ -91,7 +91,7 @@ fn wait_for_build(home: &Home, ok: &Value) -> i32 {
     let job = ok["build"]["job"].as_str().unwrap_or_default().to_owned();
     loop {
         let Ok(Some(st)) = ctl::request(home, &json!({"status": {"jobs": true, "all": true}})) else {
-            return fail("the factory went away");
+            return fail("Mork went away");
         };
         let settled = st["status"]["jobs"]
             .as_array()
@@ -105,10 +105,10 @@ fn wait_for_build(home: &Home, ok: &Value) -> i32 {
     }
 }
 
-/// `factory pin <commit>`: through the engine, or, with none running, after the checks a
+/// `mork pin <commit>`: through the engine, or, with none running, after the checks a
 /// reload makes, written here.
 pub fn pin(home: &Home, rest: &[String]) -> i32 {
-    let Some(commit) = rest.first() else { return fail("factory pin <commit>") };
+    let Some(commit) = rest.first() else { return fail("mork pin <commit>") };
     match ctl::request(home, &json!({"pin": {"commit": commit}})) {
         Ok(Some(ok)) => {
             println!("{ok}");
@@ -127,7 +127,7 @@ pub fn pin(home: &Home, rest: &[String]) -> i32 {
     };
     let checked = builds::check_target(home, &ctx.config, commit, version, &unsettled, false);
     match checked.and_then(|full| {
-        builds::write_pin(home, &full, "andrei")
+        builds::write_pin(home, &full, "operator")
             .map(|()| full)
             .map_err(|source| builds::BuildError::Io { what: "the pin".into(), source })
     }) {
@@ -140,16 +140,16 @@ pub fn pin(home: &Home, rest: &[String]) -> i32 {
 }
 
 // Read-only; a home with no state yet is an empty one at the oldest version (M1 self-review, 2).
-fn state_for_checks(home: &Home) -> Result<(u32, factory_core::maintenance::reload::Unsettled), String> {
+fn state_for_checks(home: &Home) -> Result<(u32, mork_core::maintenance::reload::Unsettled), String> {
     if !home.state_db().exists() {
-        return Ok((store::schema::OLDEST, factory_core::maintenance::reload::Unsettled::default()));
+        return Ok((store::schema::OLDEST, mork_core::maintenance::reload::Unsettled::default()));
     }
     let store = Store::open_read_only(&home.state_db()).map_err(|e| e.to_string())?;
     let state = store.load().map_err(|e| e.to_string())?;
     Ok((store.version, builds::unsettled(&state)))
 }
 
-/// `factory status`: one line per live card; through the socket when an app runs, else from
+/// `mork status`: one line per live card; through the socket when an app runs, else from
 /// the state opened read-only.
 pub fn status(home: &Home) -> i32 {
     match ctl::request(home, &json!({"status": {}})) {
@@ -163,7 +163,7 @@ pub fn status(home: &Home) -> i32 {
         Ok(None) if !home.state_db().exists() => 0,
         Ok(None) => match Store::open_read_only(&home.state_db()).and_then(|s| s.load()) {
             Ok(state) => {
-                for l in factory_core::views::status::status_lines(&state) {
+                for l in mork_core::views::status::status_lines(&state) {
                     println!("{l}");
                 }
                 0
@@ -173,7 +173,7 @@ pub fn status(home: &Home) -> i32 {
     }
 }
 
-/// `factory doctor` (1.9): one line per finding; exit 1 with findings.
+/// `mork doctor` (1.9): one line per finding; exit 1 with findings.
 pub fn doctor(home: &Home) -> i32 {
     let mut found = Vec::new();
     let (jobs, state) = match ctl::request(home, &json!({"status": {"jobs": true, "all": true}})) {
@@ -206,51 +206,65 @@ pub fn doctor(home: &Home) -> i32 {
     i32::from(!found.is_empty())
 }
 
-/// `factory login claude|codex|agy` (1.7.2): an interactive wall on the agent home.
+/// `mork login claude|codex|agy` (1.7.2): an interactive wall in the login home.
 pub fn login(home: &Home, rest: &[String]) -> i32 {
-    let argv: Vec<String> = match rest.first().map(String::as_str) {
-        Some("claude") => vec!["claude".into()],
-        Some("codex") => vec!["codex".into(), "login".into()],
-        // It prints a link and takes the pasted code: no callback port, no session bus (fac-657).
-        Some("agy") => vec!["agy".into(), "acp".into(), "--login".into()],
-        _ => return fail("factory login claude|codex|agy"),
+    use mork_types::config::Cli;
+    let Some(cli) = rest.first().and_then(|name| Cli::parse(name)) else {
+        return fail("mork login claude|codex|agy");
+    };
+    let argv = match cli {
+        Cli::Claude => vec!["claude".into()],
+        Cli::Codex => vec!["codex".into(), "login".into()],
+        // agy's pasted code needs neither a callback port nor a session bus.
+        Cli::Agy => vec!["agy".into(), "acp".into(), "--login".into()],
     };
     let ctx = match context(home) {
         Ok(c) => c,
         Err(e) => return fail(&e),
     };
-    for d in [home.agent_home(), home.run_dir(), home.builds()] {
+    for d in [home.login_home(), home.run_dir(), home.builds()] {
         let _ = std::fs::create_dir_all(d);
     }
-    let owner = factory_types::AgentKey::new("login");
-    let id = factory_types::JobId::new("login");
-    let ah = home.agent_home();
-    let places = match ctx.places(&ah, Vec::new(), Vec::new(), None, &[]) {
+    let owner = mork_types::AgentKey::new("login");
+    let id = mork_types::JobId::new("login");
+    let ah = home.login_home();
+    let mut places = match ctx.places(&ah, Vec::new(), Vec::new(), None, &[]) {
         Ok(places) => places,
         Err(e) => return fail(&e),
     };
     let mut env = ctx.env(&id, &owner, None, &[], &home.job(id.as_str()).join("io"));
+    mork_engine::seat_homes::env(home, &ah, &mut env);
+    if let Err(e) = mork_engine::seat_homes::login_places(home, &ah, cli, &mut places) {
+        return fail(&e.to_string());
+    }
     env.insert("TERM".into(), std::env::var("TERM").unwrap_or_else(|_| "xterm-256color".into()));
     // Its binary is read-only in the wall, as at a turn.
-    if argv[0] == "agy" {
+    if cli == Cli::Agy {
         env.insert("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "true".into());
     }
     let spec = ctx.spec(
         &id,
-        factory_types::job::JobKind::Turn,
+        mork_types::job::JobKind::Turn,
         &owner,
         argv,
         &ah.display().to_string(),
         &places,
         env,
-        Some(ctx.config.factory.ports.clone()),
+        Some(ctx.config.mork.ports.clone()),
         clock::now_ms(),
     );
-    launch::interactive_wall(&spec, home.root()).unwrap_or_else(|e| fail(&e.to_string()))
+    let code = launch::interactive_wall(&spec, home.root()).unwrap_or_else(|e| fail(&e.to_string()));
+    if code == 0
+        && cli == Cli::Codex
+        && let Err(e) = mork_engine::login_files::publish_codex(home)
+    {
+        return fail(&e.to_string());
+    }
+    code
 }
 
-/// `factory install [--path]`: the desktop entry; with `--path`, `~/.local/bin/factory` linked to
-/// this binary, Andrei's switch from v1 (1.7.3, 6.5.3; M5.13).
+/// `mork install [--path]`: the desktop entry; with `--path`, `~/.local/bin/mork` linked to
+/// this binary, the operator's switch from v1 (1.7.3, 6.5.3; M5.13).
 pub fn install(rest: &[String]) -> i32 {
     let Some(home) = std::env::var_os("HOME") else { return fail("no HOME") };
     if rest.iter().any(|a| a == "--path") {
@@ -264,43 +278,42 @@ pub fn install(rest: &[String]) -> i32 {
     }
     let dir = std::path::Path::new(&home).join(".local/share/applications");
     let entry = format!(
-        "[Desktop Entry]\nType=Application\nName=Factory\nExec={}\nTerminal=false\nCategories=Development;\n",
+        "[Desktop Entry]\nType=Application\nName=Mork\nExec={}\nTerminal=false\nCategories=Development;\n",
         bin().display()
     );
-    match std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(dir.join("factory.desktop"), entry)) {
+    match std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(dir.join("mork.desktop"), entry)) {
         Ok(()) => 0,
         Err(e) => fail(&e.to_string()),
     }
 }
 
-/// `factory web` (fac-671): prints the local web bridge's keyed link; refused inside walls.
+/// `mork web` (fac-671): prints the local web bridge's keyed link; refused inside walls.
 pub fn web(home: &Home) -> i32 {
-    let walled =
-        ["FACTORY_JOB", "FACTORY_AGENT_SOCK"].iter().any(|k| std::env::var_os(k).is_some_and(|v| !v.is_empty()));
+    let walled = ["MORK_JOB", "MORK_AGENT_SOCK"].iter().any(|k| std::env::var_os(k).is_some_and(|v| !v.is_empty()));
     if walled {
-        return fail("factory web is refused inside a wall");
+        return fail("mork web is refused inside a wall");
     }
     let path = match config::path() {
         Some(p) => p,
-        None => return fail("factory web: no config path: set FACTORY_CONFIG or HOME"),
+        None => return fail("mork web: no config path: set MORK_CONFIG or HOME"),
     };
     let cfg = match config::read(&path) {
         Ok(c) => c,
-        Err(e) => return fail(&format!("factory web: {e}")),
+        Err(e) => return fail(&format!("mork web: {e}")),
     };
-    let port = match cfg.factory.web_port {
-        None => return fail("factory web: [factory] web_port is not set in factory.toml"),
-        Some(0) => return fail("factory web: web_port = 0 uses an ephemeral port; set a fixed port"),
+    let port = match cfg.mork.web_port {
+        None => return fail("mork web: [mork] web_port is not set in mork.toml"),
+        Some(0) => return fail("mork web: web_port = 0 uses an ephemeral port; set a fixed port"),
         Some(p) => p,
     };
     let key_path = home.web_key();
-    let key = match factory_engine::web::key::read(&key_path) {
+    let key = match mork_engine::web::key::read(&key_path) {
         Ok(k) => k,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return fail("factory web: web.key does not exist yet (the bridge has not started)");
+            return fail("mork web: web.key does not exist yet (the bridge has not started)");
         }
-        Err(e) => return fail(&format!("factory web: {}: {e}", key_path.display())),
+        Err(e) => return fail(&format!("mork web: {}: {e}", key_path.display())),
     };
-    println!("{}", factory_engine::web::key::link(port, &key));
+    println!("{}", mork_engine::web::key::link(port, &key));
     0
 }

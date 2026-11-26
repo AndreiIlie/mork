@@ -1,6 +1,6 @@
-use factory_types::view::Share;
 use iced::Element;
 use iced::widget::Column;
+use mork_types::view::Share;
 
 use crate::app::{App, Message};
 use crate::spans::{self, Span, Tone};

@@ -80,7 +80,7 @@ pub fn is_zombie(pid: i32) -> bool {
 }
 
 /// Unwalled, a job's processes: its process group, every process whose environment carries its
-/// `FACTORY_JOB` (1.4.4.1), and, asked by its supervisor (`sup`), every descendant it adopted.
+/// `MORK_JOB` (1.4.4.1), and, asked by its supervisor (`sup`), every descendant it adopted.
 pub fn unwalled(pgid_of_job: Option<i32>, job: &str, sup: Option<i32>) -> Vec<i32> {
     let me = std::process::id().cast_signed();
     all_pids()
@@ -88,7 +88,7 @@ pub fn unwalled(pgid_of_job: Option<i32>, job: &str, sup: Option<i32>) -> Vec<i3
         .filter(|&p| p != me && !is_zombie(p))
         .filter(|&p| {
             (pgid_of_job.is_some() && pgid(p) == pgid_of_job)
-                || environ_var(p, "FACTORY_JOB").as_deref() == Some(job)
+                || environ_var(p, "MORK_JOB").as_deref() == Some(job)
                 || sup.is_some_and(|s| descends_from(p, s))
         })
         .collect()
@@ -97,7 +97,7 @@ pub fn unwalled(pgid_of_job: Option<i32>, job: &str, sup: Option<i32>) -> Vec<i3
 /// Sends a signal to each pid, ignoring the ones already gone.
 pub fn signal_all(pids: &[i32], sig: i32) {
     for &p in pids {
-        let _ = factory_sys::kill(p, sig);
+        let _ = mork_sys::kill(p, sig);
     }
 }
 
@@ -132,7 +132,7 @@ pub fn end_walled(ns: &str, init: i32) -> Vec<i32> {
     let others = || -> Vec<i32> { in_namespace(ns).into_iter().filter(|&p| p != init && !is_zombie(p)).collect() };
     signal_all(&others(), libc_sig::TERM);
     let _ = wait_until_gone(Duration::from_secs(5), others);
-    let _ = factory_sys::kill(init, libc_sig::KILL);
+    let _ = mork_sys::kill(init, libc_sig::KILL);
     wait_until_gone(Duration::from_secs(10), || in_namespace(ns).into_iter().filter(|&p| !is_zombie(p)).collect())
 }
 

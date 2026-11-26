@@ -4,8 +4,8 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use factory_types::reply::Role;
-use factory_types::state::Message;
+use mork_types::reply::Role;
+use mork_types::state::Message;
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -26,7 +26,7 @@ impl Recorded {
     /// A baseline only when its text matches the fingerprint the previous start recorded.
     pub fn text(&self, key: &str) -> Option<&str> {
         let text = self.texts.get(key)?;
-        (self.digests.get(key) == Some(&factory_types::hash::short(text))).then_some(text.as_str())
+        (self.digests.get(key) == Some(&mork_types::hash::short(text))).then_some(text.as_str())
     }
 }
 
@@ -40,7 +40,7 @@ pub(crate) fn material(state: &State, previous: Option<&Recorded>, build: &str, 
     }
     let mut changed: Vec<&String> = now.keys().filter(|k| old.and_then(|p| p.get(*k)) != now.get(*k)).collect();
     // In the order a session's start gives them.
-    changed.sort_by_key(|k| ["factory", "role:", "contract"].iter().position(|p| k.starts_with(p)));
+    changed.sort_by_key(|k| ["mork", "role:", "contract"].iter().position(|p| k.starts_with(p)));
     let texts = super::manuals::material();
     let mut p = Poster::for_ctx(state, ctx);
     for (place, roles) in listening(state) {
@@ -64,7 +64,7 @@ pub(crate) fn material(state: &State, previous: Option<&Recorded>, build: &str, 
 /// Whether a stored message announces a manual's or the reply contract's change.
 pub(crate) fn is_announcement(m: &Message) -> bool {
     announce::is(m)
-        && (["factory", "contract"].into_iter().any(|key| m.headline == headline(key))
+        && (["mork", "contract"].into_iter().any(|key| m.headline == headline(key))
             || role_headline(&m.headline).is_some())
 }
 
@@ -87,7 +87,7 @@ fn listening(state: &State) -> BTreeMap<String, Vec<Role>> {
         Some(c) => state.cards.get(&c).is_some_and(|c| c.stage.is_live()),
         None => true,
     };
-    let holds = |a: &&factory_types::state::Agent| a.session_started || a.last_prompt.is_some();
+    let holds = |a: &&mork_types::state::Agent| a.session_started || a.last_prompt.is_some();
     let mut out: BTreeMap<String, Vec<Role>> = BTreeMap::new();
     for a in state.agents.values().filter(holds).filter(|a| a.role != Role::Echo && in_use(&a.place)) {
         out.entry(a.place.to_string()).or_default().push(a.role);
@@ -97,7 +97,7 @@ fn listening(state: &State) -> BTreeMap<String, Vec<Role>> {
 
 fn headline(key: &str) -> String {
     let what = match key {
-        "factory" => "The Factory manual".to_owned(),
+        "mork" => "The Mork manual".to_owned(),
         "contract" => "The reply contract".to_owned(),
         k => format!("The {} manual", k.strip_prefix("role:").unwrap_or(k)),
     };
@@ -108,19 +108,19 @@ fn material_words(key: &str, text: &str, previous: Option<&str>) -> (String, Str
     let headline = headline(key);
     let body = if key == "contract" {
         format!(
-            "{headline} with the build the factory runs now. Its whole text follows and replaces the one this session was given.\n\n{}",
+            "{headline} with the build Mork runs now. Its whole text follows and replaces the one this session was given.\n\n{}",
             text.trim()
         )
     } else {
         let name = key.strip_prefix("role:").unwrap_or(key);
-        let notice = format!("{headline} with the build the factory runs now.");
+        let notice = format!("{headline} with the build Mork runs now.");
         match previous {
             Some(old) => format!(
-                "{notice} Removed lines start with `-`, added lines with `+`; surrounding lines give context.\n\n```diff\n{}```\n\nThe complete manual is available with `factory manual {name}`.",
+                "{notice} Removed lines start with `-`, added lines with `+`; surrounding lines give context.\n\n```diff\n{}```\n\nThe complete manual is available with `mork manual {name}`.",
                 diff(old, text)
             ),
             None => format!(
-                "{notice} The previous text could not be recovered. Read the complete manual with `factory manual {name}`."
+                "{notice} The previous text could not be recovered. Read the complete manual with `mork manual {name}`."
             ),
         }
     };

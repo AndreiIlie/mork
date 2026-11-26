@@ -1,20 +1,19 @@
 //! A card's saved branch the push would refuse, rebuilt while nothing of it was published (fac-394): at the
 //! engine's start, a run's start, and a push the checks refused.
 
-use factory_types::action::{Action, ActionStatus};
-use factory_types::card::{Card, Mode};
+use mork_types::action::{Action, ActionStatus};
+use mork_types::card::{Card, Mode};
 use serde_json::json;
 
 use crate::decide::Ctx;
-use crate::decide::actions::DROPPED_BY_ANDREI;
+use crate::decide::actions::DROPPED_BY_OPERATOR;
 use crate::post::Poster;
 
 /// The name a full card's saved branch is rebuilt to: the push's internals check refuses it, and no push of
 /// it, in any run, is done or of an unknown outcome (started, held, its proof lost); none when it stays.
 pub fn rebuilt(p: &Poster<'_>, c: &Card, ctx: Ctx<'_>) -> Option<String> {
-    let words = &ctx.config.internals.words;
     let branch = c.branch.as_deref().filter(|_| c.mode == Mode::Full)?;
-    crate::board::tickets::refused(words, branch)?;
+    crate::board::tickets::refused(&ctx.config.internals, branch)?;
     unpublished(p, c, branch).then(|| crate::board::tickets::branch(p.state, c, ctx.config)).filter(|b| b != branch)
 }
 
@@ -25,14 +24,14 @@ pub fn unpublished(p: &Poster<'_>, c: &Card, branch: &str) -> bool {
 }
 
 // Whether a push of the card to the branch, loaded or ended, may have published it: one an attempt of may have
-// pushed, or one saved before the proof still under way, keeps its doubt; Andrei's own drop frees the name.
+// pushed, or one saved before the proof still under way, keeps its doubt; the operator's own drop frees the name.
 fn pushed(p: &Poster<'_>, c: &Card, branch: &str) -> bool {
     let prefix = format!("push:{}:{branch}:", c.id);
     let published = |s: ActionStatus| matches!(s, ActionStatus::Done | ActionStatus::Started | ActionStatus::Held);
-    let by_andrei = |a: &Action| a.status == ActionStatus::Dropped && a.words.as_deref() == Some(DROPPED_BY_ANDREI);
+    let by_operator = |a: &Action| a.status == ActionStatus::Dropped && a.words.as_deref() == Some(DROPPED_BY_OPERATOR);
     let unproven =
         |a: &Action| a.unwritten == Some(false) || (a.unwritten.is_none() && a.status != ActionStatus::Dropped);
-    let doubted = |a: &Action| (published(a.status) || unproven(a)) && !by_andrei(a);
+    let doubted = |a: &Action| (published(a.status) || unproven(a)) && !by_operator(a);
     let unloaded = p.state.unloaded.actions.range(prefix.clone()..).take_while(|(k, _)| k.starts_with(&prefix));
     p.all_actions().any(|a| a.key.starts_with(&prefix) && doubted(a))
         || unloaded.into_iter().any(|(_, (_, s))| published(*s))

@@ -1,5 +1,5 @@
 [package]
-name = "factory-sys"
+name = "mork-sys"
 description = "The few system calls that need unsafe."
 version.workspace = true
 edition.workspace = true

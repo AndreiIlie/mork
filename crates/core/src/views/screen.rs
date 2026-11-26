@@ -1,10 +1,10 @@
 //! The views (1.5.2, section 5): what is true, worked out from the state and the engine's reads; the window draws them
 //! and derives nothing. The screen is every room, hand, board, memory and note; a place's own view is `place`'s.
 
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Card, Mode};
-use factory_types::view::{HandView, PlaceKind, RoomRow, Screen, TopLine, Under};
-use factory_types::{AgentKey, PlaceId};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Card, Mode};
+use mork_types::view::{HandView, PlaceKind, RoomRow, Screen, TopLine, Under};
+use mork_types::{AgentKey, PlaceId};
 
 use super::findings::folded_parent;
 use super::order::{by_number, live_cards};
@@ -88,7 +88,7 @@ fn grouped<'a>(state: &'a State, ctx: Ctx<'_>) -> Vec<(Under, &'a Card)> {
 }
 
 // A ticketed project's card PR and DevOps tasks beside its id in the rooms column (fac-362).
-fn detail(state: &State, c: &Card, config: &factory_types::config::Config) -> String {
+fn detail(state: &State, c: &Card, config: &mork_types::config::Config) -> String {
     if !crate::board::tickets::has_tickets(config, &c.project) {
         return String::new();
     }
@@ -148,7 +148,7 @@ fn row(state: &State, place: &str, card: Option<&Card>, outside: &Outside) -> Ro
 }
 
 fn hands(state: &State, ctx: Ctx<'_>) -> Vec<HandView> {
-    let mut open: Vec<&factory_types::ask::Ask> = state.asks.values().filter(|a| a.open).collect();
+    let mut open: Vec<&mork_types::ask::Ask> = state.asks.values().filter(|a| a.open).collect();
     open.sort_by_key(|a| (a.color != Color::Red, a.raised_ms, a.id.clone()));
     open.into_iter()
         .map(|a| {
@@ -176,7 +176,7 @@ fn hands(state: &State, ctx: Ctx<'_>) -> Vec<HandView> {
                 cold_at_ms: cache_key
                     .as_ref()
                     .and_then(|k| state.agents.get(k))
-                    .filter(|g| !matches!(g.status, factory_types::state::AgentStatus::Working { .. }))
+                    .filter(|g| !matches!(g.status, mork_types::state::AgentStatus::Working { .. }))
                     .and_then(|g| crate::agents::cache::cold_at(ctx.config, g)),
                 decisions: a
                     .card
@@ -193,11 +193,11 @@ fn hands(state: &State, ctx: Ctx<'_>) -> Vec<HandView> {
 }
 
 // An `approve-brief` hand's sections (fac-696): its card's typed sketch and the mock link its approve covers.
-fn brief(state: &State, a: &factory_types::ask::Ask, ctx: Ctx<'_>) -> Option<factory_types::view::BriefView> {
+fn brief(state: &State, a: &mork_types::ask::Ask, ctx: Ctx<'_>) -> Option<mork_types::view::BriefView> {
     let c = a.card.as_ref().and_then(|id| state.cards.get(id)).filter(|_| a.kind == AskKind::ApproveBrief)?;
     let mock = crate::lifecycle::mock::link(c, ctx.config).filter(|_| crate::lifecycle::mock::briefing(c));
     let sketch = c.sketch.clone().unwrap_or_default();
-    (mock.is_some() || c.sketch.is_some()).then_some(factory_types::view::BriefView {
+    (mock.is_some() || c.sketch.is_some()).then_some(mork_types::view::BriefView {
         changes: sketch.changes,
         code_shape: sketch.code_shape,
         mock,

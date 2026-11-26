@@ -8,8 +8,8 @@ use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, atomic::Ordering};
 use std::time::Instant;
 
-use factory_core::decide::Event;
-use factory_core::state::State;
+use mork_core::decide::Event;
+use mork_core::state::State;
 
 use super::{Engine, Input, Options, Phase, upkeep};
 use crate::jobs::context::Context;
@@ -25,12 +25,12 @@ const FALLBACK: &str = "launch.fallback";
 #[derive(Debug)]
 pub struct Kept {
     pub lock: File,
-    pub factory: RawFd,
+    pub mork: RawFd,
     pub agent: RawFd,
 }
 
 /// The environment variable that hands the kept descriptors to the target of a reload.
-pub const INHERIT: &str = "FACTORY_INHERIT";
+pub const INHERIT: &str = "MORK_INHERIT";
 
 fn lock(home: &Home) -> Result<File, String> {
     let mut f = OpenOptions::new()
@@ -40,10 +40,10 @@ fn lock(home: &Home) -> Result<File, String> {
         .truncate(false)
         .open(home.app_lock())
         .map_err(|e| format!("{}: {e}", home.app_lock().display()))?;
-    if !factory_sys::try_lock_exclusive(&f).map_err(|e| e.to_string())? {
+    if !mork_sys::try_lock_exclusive(&f).map_err(|e| e.to_string())? {
         let mut pid = String::new();
         let _ = f.read_to_string(&mut pid);
-        return Err(format!("a factory already runs on {} (pid {})", home.root().display(), pid.trim()));
+        return Err(format!("Mork already runs on {} (pid {})", home.root().display(), pid.trim()));
     }
     f.set_len(0).map_err(|e| e.to_string())?;
     let _ = write!(f, "{}", std::process::id());
@@ -55,18 +55,13 @@ fn inherited(opts: &Options) -> Option<(File, RawFd, RawFd)> {
     let spec = std::env::var(INHERIT).ok()?;
     let mut fds = spec.split(',').filter_map(|p| p.parse::<RawFd>().ok());
     let (l, f, a) = (fds.next()?, fds.next()?, fds.next()?);
-    let lock = factory_sys::file_from_fd(l).ok()?;
+    let lock = mork_sys::file_from_fd(l).ok()?;
     Some((lock, f, a))
 }
 
 // Commits are authored as `[git] author` (3.10.4), with no trailer.
-fn git_identity(home: &Home, config: &factory_types::config::Config) -> Result<(), String> {
-    let a = config.git.author.trim();
-    let (name, email) = match a.split_once('<') {
-        Some((n, e)) => (n.trim(), e.trim_end_matches('>').trim()),
-        None => (a, ""),
-    };
-    let text = format!("[user]\n\tname = {name}\n\temail = {email}\n");
+fn git_identity(home: &Home, config: &mork_types::config::Config) -> Result<(), String> {
+    let text = crate::seat_homes::git_identity(&config.git.author);
     let path = home.agent_home().join(".gitconfig");
     if std::fs::read_to_string(&path).ok().as_deref() != Some(text.as_str()) {
         crate::files::write_whole(&path, text.as_bytes()).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -80,7 +75,11 @@ fn make_dirs(home: &Home) -> Result<(), String> {
         home.run_dir(),
         home.logs(),
         home.jobs(),
-        home.agent_home().join("work"),
+        home.agent_home(),
+        home.work(),
+        home.homes(),
+        home.caches(),
+        home.login_home(),
         home.builds(),
     ] {
         std::fs::create_dir_all(&d).map_err(|e| format!("{}: {e}", d.display()))?;
@@ -96,11 +95,11 @@ fn open_sockets(
 ) -> Result<(RawFd, RawFd), String> {
     let (fl, al) = match inh {
         Some((f, a)) => (
-            factory_sys::listener_from_fd(f).map_err(|e| e.to_string())?,
-            factory_sys::listener_from_fd(a).map_err(|e| e.to_string())?,
+            mork_sys::listener_from_fd(f).map_err(|e| e.to_string())?,
+            mork_sys::listener_from_fd(a).map_err(|e| e.to_string())?,
         ),
         None => (
-            sockets::bind(&opts.home.factory_sock()).map_err(|e| format!("factory.sock: {e}"))?,
+            sockets::bind(&opts.home.mork_sock()).map_err(|e| format!("mork.sock: {e}"))?,
             sockets::bind(&opts.home.agent_sock()).map_err(|e| format!("agent.sock: {e}"))?,
         ),
     };
@@ -109,7 +108,7 @@ fn open_sockets(
     let (fsx, asx) = (std::sync::mpsc::channel(), std::sync::mpsc::channel());
     forward(fsx.1, ftx);
     forward(asx.1, atx);
-    sockets::serve(fl, Origin::Andrei, Arc::clone(shared), fsx.0);
+    sockets::serve(fl, Origin::Operator, Arc::clone(shared), fsx.0);
     sockets::serve(al, Origin::Agent, Arc::clone(shared), asx.0);
     Ok(fds)
 }
@@ -144,11 +143,8 @@ fn telemetry() -> std::collections::BTreeMap<String, String> {
     std::env::var_os("HOME").map(|h| settings::read_telemetry(std::path::Path::new(&h))).unwrap_or_default()
 }
 
-fn materialize_skills(
-    home: &Home,
-    config: &factory_types::config::Config,
-) -> Result<Option<std::path::PathBuf>, String> {
-    let extra = config.factory.skills.as_deref().map(std::path::Path::new);
+fn materialize_skills(home: &Home, config: &mork_types::config::Config) -> Result<Option<std::path::PathBuf>, String> {
+    let extra = config.mork.skills.as_deref().map(std::path::Path::new);
     crate::builds::skills::materialize(home, extra).map_err(|e| format!("skills: {e}"))
 }
 
@@ -156,7 +152,7 @@ fn materialize_skills(
 // why it is the fallback, if it is.
 fn context(
     opts: &Options,
-    config: factory_types::config::Config,
+    config: mork_types::config::Config,
     choosing: jobs::slice::Choosing,
     skills: Option<std::path::PathBuf>,
 ) -> (Context, Option<String>) {
@@ -218,12 +214,12 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
         Some((l, f, a)) => (l, Some((f, a))),
         None => (lock(&opts.home)?, None),
     };
-    factory_sys::install_term_flag().map_err(|e| e.to_string())?;
+    mork_sys::install_term_flag().map_err(|e| e.to_string())?;
     let shared = Shared::new(opts.commit.clone(), opts.dirty, opts.home.root().display().to_string());
     let (tx, rx) = channel();
-    let (factory, agent) = open_sockets(&opts, &shared, &tx, sock_fds)?;
-    if let Some(port) = config.factory.web_port {
-        let _ = crate::web::start(&opts.home, port, config.factory.web_assets.as_deref().map(std::path::PathBuf::from));
+    let (mork, agent) = open_sockets(&opts, &shared, &tx, sock_fds)?;
+    if let Some(port) = config.mork.web_port {
+        let _ = crate::web::start(&opts.home, port, config.mork.web_assets.as_deref().map(std::path::PathBuf::from));
     }
     let sampled = tx.clone();
     std::thread::spawn(move || crate::resources::watch(|r| sampled.send(Input::Resources(r)).is_ok()));
@@ -234,9 +230,7 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
     // Its probe runs while the state opens and loads (fac-336), its lock held.
     let choosing = jobs::slice::choosing(opts.home.root(), &config.slice);
     let store = open_state(&opts.home, &opts.commit)?;
-    if let Ok(mut v) = shared.state_version.lock() {
-        *v = Some(store.version);
-    }
+    *shared.state_version.lock() = Some(store.version);
     t.step("open_state");
     let reload_note = builds::finish_reload(&opts)?;
     t.step("finish_reload");
@@ -256,9 +250,8 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
         hooks: Default::default(),
         wakes,
         tx,
-        supervisors: 0,
         last_upkeep: None,
-        keep: Kept { lock: lock_file, factory, agent },
+        keep: Kept { lock: lock_file, mork, agent },
         seen: Default::default(),
         limits_read: Default::default(),
         pipe: Default::default(),
@@ -278,7 +271,7 @@ pub fn start(opts: Options) -> Result<(Engine, Receiver<Input>), String> {
     let mut t = Timer::new(&opts);
     let (mut engine, rx, reload_note, fallback) = open(opts, &mut t)?;
     engine.views_cache.claude_accounts = crate::claude_accounts::Accounts::read(
-        &engine.opts.home.agent_home(),
+        &engine.opts.home.login_home(),
         engine.ctx.config.claude_accounts.clone(),
     );
     let shared = Arc::clone(&engine.shared);
@@ -307,7 +300,7 @@ pub fn start(opts: Options) -> Result<(Engine, Receiver<Input>), String> {
     engine.door_recover();
     t.step("door_recover");
     // A SIGTERM while the checks were out: the loop ends at once, and nothing more starts.
-    if factory_sys::term_requested() {
+    if mork_sys::term_requested() {
         t.say(format!("start ended by SIGTERM after {} ms", t.since_process_start()));
         return Ok((engine, rx));
     }
@@ -327,7 +320,7 @@ pub fn start(opts: Options) -> Result<(Engine, Receiver<Input>), String> {
 impl Engine {
     // A train clone no card's candidate and no job holds is a stop's leftover: it goes (fac-68).
     fn sweep_trains(&mut self) {
-        let kept = factory_core::queue::candidates::clones(&self.state);
+        let kept = mork_core::queue::candidates::clones(&self.state);
         let Ok(rd) = std::fs::read_dir(self.opts.home.trains()) else { return };
         for e in rd.flatten() {
             let name = e.file_name().to_string_lossy().into_owned();
@@ -357,7 +350,7 @@ impl Engine {
         let mut said = None;
         if !self.store.said(&note.key).unwrap_or(false) {
             let text = match &note.builds {
-                Some((from, to)) => factory_core::maintenance::changelog::note(&note.text, self.brought(from, to)),
+                Some((from, to)) => mork_core::maintenance::changelog::note(&note.text, self.brought(from, to)),
                 None => note.text,
             };
             said = note.builds.is_some().then(|| text.clone());
@@ -372,7 +365,7 @@ impl Engine {
         }
     }
 
-    fn brought(&self, from: &str, to: &str) -> Result<factory_core::maintenance::changelog::Brought, String> {
+    fn brought(&self, from: &str, to: &str) -> Result<mork_core::maintenance::changelog::Brought, String> {
         let (range, at) = builds::changelog::range(&self.opts.home, &self.ctx.config, from, to)
             .map_err(|e| e.to_string().lines().next().unwrap_or_default().to_owned())?;
         // A card in the range landed after its head was committed: from the range's earliest, a day given to clocks.
@@ -387,7 +380,7 @@ impl Engine {
         let landed: Vec<_> = rows
             .into_iter()
             .filter_map(|(time, card, _, data)| {
-                let id = factory_types::CardId::new(card?);
+                let id = mork_types::CardId::new(card?);
                 let head = data.get("head").and_then(serde_json::Value::as_str).unwrap_or_default().to_owned();
                 // An ended card's landing in the range is read from the store; one outside it isn't listed.
                 let after = data.get("after").and_then(serde_json::Value::as_str);
@@ -398,8 +391,8 @@ impl Engine {
                 let title = self.state.cards.get(&id).map(|c| c.title.clone()).or(stored);
                 let title = title.or_else(|| self.state.board.get(&id).map(|b| b.title.clone())).unwrap_or_default();
                 let actions = self.state.actions.values().chain(&landing);
-                let (before, after) = factory_core::maintenance::changelog::bounds(&data, actions, id.as_str(), time);
-                Some(factory_core::maintenance::changelog::Landed {
+                let (before, after) = mork_core::maintenance::changelog::bounds(&data, actions, id.as_str(), time);
+                Some(mork_core::maintenance::changelog::Landed {
                     card: id.as_str().to_owned(),
                     head,
                     title,
@@ -408,7 +401,7 @@ impl Engine {
                 })
             })
             .collect();
-        Ok(factory_core::maintenance::changelog::brought(&range, &landed))
+        Ok(mork_core::maintenance::changelog::brought(&range, &landed))
     }
 
     // The material the last start journaled is the build before this one's (fac-14) when it is the reload's source;
@@ -424,7 +417,7 @@ impl Engine {
             let digests = serde_json::from_value(v.get("digests")?.clone()).ok()?;
             let build = v.get("build").and_then(|b| b.as_str()).map(str::to_owned);
             let texts = v.get("texts").and_then(|t| serde_json::from_value(t.clone()).ok()).unwrap_or_default();
-            let mut recorded = factory_core::maintenance::material::Recorded { digests, build, texts };
+            let mut recorded = mork_core::maintenance::material::Recorded { digests, build, texts };
             if elsewhere {
                 return None;
             }

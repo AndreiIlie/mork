@@ -3,14 +3,14 @@
 
 use std::borrow::Cow;
 
-use factory_types::config::{Cli, Seat};
-use factory_types::cost::Tokens;
-use factory_types::job::WallMode;
+use mork_types::config::{Cli, Seat};
+use mork_types::cost::Tokens;
+use mork_types::job::WallMode;
 use serde_json::{Value, json};
 
 use super::{StreamState, turn};
 
-/// agy's sign-in under the agent home, its own file where no session bus is (fac-657).
+/// agy's sign-in under a CLI home, its own file where no session bus is (fac-657).
 pub const TOKEN: &str = ".gemini/antigravity-cli/antigravity-oauth-token";
 
 /// `agy …` for a turn: its model named with the seat's effort (`gemini-4-neon-high`, `claude-opus-5-5-high`), the

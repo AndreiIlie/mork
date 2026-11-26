@@ -1,10 +1,10 @@
 //! A turn's end, applied once (2.4): its job settled, its reply checked and applied, a cut retried, a failure raised or
 //! waiting on its limit, and the wake a request during it is owed.
 
-use factory_types::ask::{AskKind, Color};
-use factory_types::reply::{Outcome, Role};
-use factory_types::state::{Agent, AgentStatus, Job, JobStatus, MessageKind, Owed, Sender, Settlement};
-use factory_types::{JobId, SessionId};
+use mork_types::ask::{AskKind, Color};
+use mork_types::reply::{Outcome, Role};
+use mork_types::state::{Agent, AgentStatus, Job, JobStatus, MessageKind, Owed, Sender, Settlement};
+use mork_types::{JobId, SessionId};
 use serde_json::{Value, json};
 
 use super::turns::SessionSeen;
@@ -91,9 +91,10 @@ pub fn ended(state: &State, id: &JobId, end: &JobEnd, ctx: Ctx<'_>) -> Decision 
 fn settle_detached(state: &State, job: &Job, end: &JobEnd, now: i64) -> Decision {
     let how = if job.stop_requested { Settlement::Stopped } else { Settlement::Cut };
     let mut changes = vec![settle(job, how, now)];
-    if matches!(end, JobEnd::Cut { .. })
-        && let Some(mut a) = state.agents.get(&job.owner).filter(|a| !a.held.is_empty()).cloned()
+    if let JobEnd::Cut { session } = end
+        && let Some(mut a) = state.agents.get(&job.owner).filter(|a| session.compacted || !a.held.is_empty()).cloned()
     {
+        a.needs_specification |= session.compacted;
         super::prompt::held::cut(&mut a);
         changes.push(Change::PutAgent(a));
     }
@@ -268,10 +269,10 @@ fn wait_for_limit(state: &State, a: &mut Agent, job: &Job, until: i64) {
 fn retry_of(state: &State, a: &Agent, job: &Job, cut: bool) -> Owed {
     let request = job.corrects.is_none().then(|| super::turns::request_of(state, job));
     let opening = request.filter(|r| r.opening);
-    let cut = cut || (opening.is_some() && job.stdin.starts_with(super::turns::CUT_NOTE));
-    let prompt = &request.unwrap_or(job).stdin;
+    let cut = cut || (opening.is_some() && job.request_text().starts_with(super::turns::CUT_NOTE));
+    let prompt = request.unwrap_or(job).request_text();
     Owed::Retry {
-        prompt: if cut { super::turns::cut_noted(prompt) } else { prompt.clone() },
+        prompt: if cut { super::turns::cut_noted(prompt) } else { prompt.to_owned() },
         resume: a.session_started,
         corrects: job.corrects.clone(),
         head: job.head.clone(),
@@ -368,5 +369,5 @@ fn apply_reply(p: &mut Poster<'_>, a: &mut Agent, job: &Job, reply: &Value, ctx:
 
 enum Accepted {
     Echo(String),
-    Reply(Box<factory_types::reply::Reply>, Vec<crate::messages::places::Route>),
+    Reply(Box<mork_types::reply::Reply>, Vec<crate::messages::places::Route>),
 }

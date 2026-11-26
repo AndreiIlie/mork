@@ -1,42 +1,50 @@
-//! The orchestrators' streams (fac-119, fac-244): every message to Andrei or an orchestrator and every ask opening or
-//! closing, recorded in its transaction, hooked or not, each on one project's stream: its card's, else the factory's.
+//! The orchestrators' streams (fac-119, fac-244): every message to the operator or an orchestrator and every ask opening or
+//! closing, recorded in its transaction, hooked or not, each on one project's stream: its card's, else Mork's.
 
 use std::collections::BTreeMap;
 
-use factory_types::ask::{Ask, AskKind};
-use factory_types::card::Card;
-use factory_types::memory::GENERAL;
-use factory_types::orchestrator::{OrchestratorAsk, OrchestratorEvent, OrchestratorWhat, ReviewSection};
-use factory_types::reply::Intent;
-use factory_types::state::{Agent, Message, MessageKind, ORCHESTRATOR, Place, Sender};
-use factory_types::{AgentKey, AskId, CardId, ProjectId};
+use mork_types::ask::{Ask, AskKind};
+use mork_types::card::Card;
+use mork_types::memory::GENERAL;
+use mork_types::orchestrator::{OrchestratorAsk, OrchestratorEvent, OrchestratorWhat, ReviewSection};
+use mork_types::reply::Intent;
+use mork_types::state::{Agent, Message, MessageKind, ORCHESTRATOR, Place, Sender};
+use mork_types::{AgentKey, AskId, CardId, ProjectId};
 use serde_json::json;
 
 use super::places;
 use crate::decide::{Ctx, Decision};
 use crate::state::{Change, State};
 
-/// Adds a line of the stream for each message to Andrei or an orchestrator the decision posts, and each
+/// Adds a line of the stream for each message to the operator or an orchestrator the decision posts, and each
 /// ask it opens or closes. Room chatter stays out: `watch` and `history` read it.
-pub fn record(state: &State, d: &mut Decision, factory: &ProjectId, now: i64) {
+pub fn record(state: &State, d: &mut Decision, mork: Option<&ProjectId>, now: i64) {
     let mut open: BTreeMap<&AskId, bool> = BTreeMap::new();
     let mut lines = Vec::new();
     for c in &d.changes {
         if let Change::AddMessage(m) = c
             && on_stream(m)
+            && let Some(project) = message_project(state, &d.changes, m, mork)
         {
             let card = card_at(state, &d.changes, &m.place).map(|c| c.id.clone());
-            let project = message_project(state, &d.changes, m, factory);
             lines.push((project, message(m, card)));
         } else if let Change::PutAsk(a) = c {
             let was = open.get(&a.id).copied().unwrap_or_else(|| state.asks.get(&a.id).is_some_and(|x| x.open));
             open.insert(&a.id, a.open);
             // Its buttons as the decision leaves its agent: a failed turn's error raises the ask.
             let agent = |k: &AgentKey| decided(state, &d.changes, k);
-            let project = || ask_project(state, &d.changes, a, factory);
+            let project = || ask_project(state, &d.changes, a, mork);
             match (was, a.open) {
-                (false, true) => lines.push((project(), OrchestratorWhat::AskOpened(ask(a, agent)))),
-                (true, false) => lines.push((project(), OrchestratorWhat::AskClosed(ask(a, agent)))),
+                (false, true) => {
+                    if let Some(project) = project() {
+                        lines.push((project, OrchestratorWhat::AskOpened(ask(a, agent))));
+                    }
+                }
+                (true, false) => {
+                    if let Some(project) = project() {
+                        lines.push((project, OrchestratorWhat::AskClosed(ask(a, agent))));
+                    }
+                }
                 (true, true) | (false, false) => {}
             }
         }
@@ -58,9 +66,9 @@ pub(super) fn message(m: &Message, card: Option<CardId>) -> OrchestratorWhat {
     OrchestratorWhat::Message { place: m.place.clone(), card, from: m.from.label(), text: m.text.clone(), request }
 }
 
-/// `give`: Andrei gives an open ask, but a mock step's, to its project's orchestrator: a `given`
+/// `give`: the operator gives an open ask, but a mock step's, to its project's orchestrator: a `given`
 /// line on its stream, the ask marked as with it until it closes. It answers nothing.
-pub(super) fn give(state: &State, id: &AskId, factory: &ProjectId, now: i64) -> Decision {
+pub(super) fn give(state: &State, id: &AskId, mork: Option<&ProjectId>, now: i64) -> Decision {
     let Some(a) = state.asks.get(id).filter(|a| a.open) else {
         return Decision::refused(format!("no open ask `{id}`"));
     };
@@ -69,36 +77,42 @@ pub(super) fn give(state: &State, id: &AskId, factory: &ProjectId, now: i64) -> 
     }
     if !givable(a) {
         return Decision::refused(format!(
-            "`{id}` waits for Andrei's own `approve`, at a mock step: it is never given"
+            "`{id}` waits for the operator's own `approve`, at a mock step: it is never given"
         ));
     }
     if visual_plan(state, a) {
         return Decision::refused(format!(
-            "`{id}` approves a visual card's plan, its mock included: that approve is Andrei's alone, so it is never given"
+            "`{id}` approves a visual card's plan, its mock included: that approve is the operator's alone, so it is never given"
         ));
     }
+    let Some(project) = ask_project(state, &[], a, mork) else {
+        return Decision::refused(format!("`{id}` belongs to no project, so no orchestrator can take it"));
+    };
     let mut d = Decision::ok(json!({"give": {"ask": id.as_str()}}));
     d.journal("give", a.card.as_ref().map(|c| c.as_str()), json!({"ask": id.as_str()}));
-    let project = ask_project(state, &[], a, factory);
     d.changes.extend(given(a, state.orchestrator_next, now, project, |k| state.agents.get(k)));
     d
 }
 
-/// `opinion`: one advice request on the ask's orchestrator's stream; the ask stays open and Andrei's.
-pub(super) fn opinion(state: &State, id: &AskId, factory: &ProjectId, now: i64) -> Decision {
+/// `opinion`: one advice request on the ask's orchestrator's stream; the ask stays open and the operator's.
+pub(super) fn opinion(state: &State, id: &AskId, mork: Option<&ProjectId>, now: i64) -> Decision {
     let Some(a) = state.asks.get(id).filter(|a| a.open) else {
         return Decision::refused(format!("no open ask `{id}`"));
     };
     if a.given {
         return Decision::refused(format!("`{id}` is already given to its orchestrator"));
     }
+    let Some(project) = ask_project(state, &[], a, mork) else {
+        return Decision::refused(format!(
+            "`{id}` belongs to no project, so no orchestrator can give an opinion on it"
+        ));
+    };
     let mut d = Decision::ok(json!({"opinion": {"ask": id.as_str()}}));
     d.journal("opinion", a.card.as_ref().map(|c| c.as_str()), json!({"ask": id.as_str()}));
     let what = OrchestratorWhat::Opinion {
         ask: ask(a, |k| state.agents.get(k)),
-        text: "Andrei asks for your opinion on this ask. Give it to him in your own chat; answer nothing to the seat. The ask stays his.".to_owned(),
+        text: "The operator asks for your opinion on this ask. Give it to him in your own chat; answer nothing to the seat. The ask stays his.".to_owned(),
     };
-    let project = ask_project(state, &[], a, factory);
     d.changes.push(Change::AddOrchestratorEvent(OrchestratorEvent {
         seq: state.orchestrator_next,
         time: now,
@@ -109,14 +123,18 @@ pub(super) fn opinion(state: &State, id: &AskId, factory: &ProjectId, now: i64) 
 }
 
 /// `orchestrator.review <section> <target>`: one `review` line on that project's orchestrator's stream, read live or at
-/// its next hook. Memory sends record their time, and `general` goes to the factory's orchestrator.
+/// its next hook. Memory sends record their time, and `general` goes to Mork's orchestrator.
 pub(super) fn review(state: &State, section: ReviewSection, target: &str, ctx: Ctx<'_>) -> Decision {
-    let factory = &ctx.config.factory.project;
     let project = if target == GENERAL {
         if section != ReviewSection::Memories {
             return Decision::refused(format!("`{GENERAL}` is the Memory section's alone: name a project"));
         }
-        factory.clone()
+        let Some(mork) = ctx.config.mork.project.as_ref() else {
+            return Decision::refused(format!(
+                "`{GENERAL}` has no orchestrator to send it to: `[mork] project` isn't configured"
+            ));
+        };
+        mork.clone()
     } else if ctx.config.projects.contains_key(&ProjectId::new(target)) {
         ProjectId::new(target)
     } else {
@@ -141,21 +159,21 @@ fn review_event(section: ReviewSection, target: &str, project: ProjectId, seq: u
 fn review_text(section: ReviewSection, target: &str) -> String {
     match section {
         ReviewSection::Memories => format!(
-            "Andrei asks you to review the {target} memory alone, by your factory-cards skill's section \"A project's memory, notes and backlog\", and to report to him what matters."
+            "The operator asks you to review the {target} memory alone, by your mork-cards skill's section \"A project's memory, notes and backlog\", and to report to him what matters."
         ),
         ReviewSection::Notes => format!(
-            "Andrei asks you to review {target}'s notes alone: read them (`factory ctl notes {target}`: survey answers, code smells, feedback, lessons, handoffs and proposals, each tagged by kind and card; a handoff's files are in its `dir`), clean them up (`notes.delete {target} <ids>`), and report to him what matters."
+            "The operator asks you to review {target}'s notes alone: read them (`mork ctl notes {target}`: survey answers, code smells, feedback, lessons, handoffs and proposals, each tagged by kind and card; a handoff's files are in its `dir`), clean them up (`notes.delete {target} <ids>`), and report to him what matters."
         ),
     }
 }
 
 /// Whether an ask may be given to an orchestrator: all but a mock step's,
-/// Andrei's alone (fac-258).
+/// The operator's alone (fac-258).
 pub(super) fn givable(a: &Ask) -> bool {
     a.kind != AskKind::Mock
 }
 
-// A visual card's plan is approved by Andrei alone, whatever its delegation (fac-636).
+// A visual card's plan is approved by the operator alone, whatever its delegation (fac-636).
 fn visual_plan(state: &State, a: &Ask) -> bool {
     a.kind == AskKind::ApproveBrief && a.card.as_ref().and_then(|c| state.cards.get(c)).is_some_and(|c| c.visual)
 }
@@ -183,7 +201,7 @@ pub(super) fn given<'s>(
 /// Main says a project's orchestrator hooked or unhooked: to nobody, so it isn't a line of a stream.
 pub fn hooked(state: &State, project: &ProjectId, hooked: bool, now: i64) -> Decision {
     let text = if hooked {
-        format!("{ORCHESTRATOR}{project} hooked: it reads what reaches Andrei for {project}.")
+        format!("{ORCHESTRATOR}{project} hooked: it reads what reaches the operator for {project}.")
     } else {
         format!("{ORCHESTRATOR}{project} unhooked.")
     };
@@ -198,12 +216,17 @@ pub fn hooked(state: &State, project: &ProjectId, hooked: bool, now: i64) -> Dec
 }
 
 fn on_stream(m: &Message) -> bool {
-    m.to.as_deref().is_some_and(|t| matches!(t, "andrei" | "orchestrator") || t.starts_with(ORCHESTRATOR))
+    m.to.as_deref().is_some_and(|t| matches!(t, "operator" | "orchestrator") || t.starts_with(ORCHESTRATOR))
 }
 
 /// Whose stream a line of `what` goes on (fac-244), the decision's `changes` applied: its card's project,
-/// or with none the factory's own; the engine routes lines kept from before fac-244 by it.
-pub fn project_of(state: &State, changes: &[Change], what: &OrchestratorWhat, factory: &ProjectId) -> ProjectId {
+/// or with none Mork's own when configured.
+pub fn project_of(
+    state: &State,
+    changes: &[Change],
+    what: &OrchestratorWhat,
+    mork: Option<&ProjectId>,
+) -> Option<ProjectId> {
     let (card, place, owner) = match what {
         OrchestratorWhat::Message { place, card, from, .. } => (card.as_ref(), place.as_str(), from.split('/').next()),
         OrchestratorWhat::AskOpened(a) | OrchestratorWhat::AskClosed(a) | OrchestratorWhat::Given(a) => {
@@ -211,10 +234,10 @@ pub fn project_of(state: &State, changes: &[Change], what: &OrchestratorWhat, fa
         }
         OrchestratorWhat::Opinion { ask, .. } => (ask.card.as_ref(), ask.place.as_str(), None),
         OrchestratorWhat::Review { target, .. } => {
-            return target.as_deref().filter(|t| *t != GENERAL).map_or_else(|| factory.clone(), ProjectId::new);
+            return target.as_deref().filter(|t| *t != GENERAL).map(ProjectId::new).or_else(|| mork.cloned());
         }
     };
-    placed(state, changes, card, place, owner).unwrap_or_else(|| factory.clone())
+    placed(state, changes, card, place, owner).or_else(|| mork.cloned())
 }
 
 /// The project of the card `owner` names, as the state has it.
@@ -224,16 +247,16 @@ pub(crate) fn owner_project(state: &State, owner: &str) -> Option<ProjectId> {
 
 // A message to `orchestrator:<project>` is that one's; else where it is posted, or, posted in main,
 // the card its agent works for.
-fn message_project(state: &State, changes: &[Change], m: &Message, factory: &ProjectId) -> ProjectId {
+fn message_project(state: &State, changes: &[Change], m: &Message, mork: Option<&ProjectId>) -> Option<ProjectId> {
     if let Some(p) = m.to.as_deref().and_then(|t| t.strip_prefix(ORCHESTRATOR)) {
-        return ProjectId::new(p);
+        return Some(ProjectId::new(p));
     }
     let owner = if let Sender::Agent(k) = &m.from { k.as_str().split('/').next() } else { None };
-    placed(state, changes, None, m.place.as_str(), owner).unwrap_or_else(|| factory.clone())
+    placed(state, changes, None, m.place.as_str(), owner).or_else(|| mork.cloned())
 }
 
-pub(super) fn ask_project(state: &State, changes: &[Change], a: &Ask, factory: &ProjectId) -> ProjectId {
-    placed(state, changes, a.card.as_ref(), a.place.as_str(), None).unwrap_or_else(|| factory.clone())
+pub(super) fn ask_project(state: &State, changes: &[Change], a: &Ask, mork: Option<&ProjectId>) -> Option<ProjectId> {
+    placed(state, changes, a.card.as_ref(), a.place.as_str(), None).or_else(|| mork.cloned())
 }
 
 // The project of a card, else of the card whose place it is, else of the card `owner` names.

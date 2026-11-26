@@ -1,13 +1,13 @@
 //! One place's view (5.7, 5.8.2): a card's header, its agents and sessions, its conversation, and the commands it offers
 //! now (1.5.2).
 
-use factory_types::about::Summary;
-use factory_types::card::Card;
-use factory_types::reply::Role;
-use factory_types::seen::AgentList;
-use factory_types::state::{Agent, AgentStatus};
-use factory_types::view::{AgentRow, CacheState, PlaceKind, PlaceView};
-use factory_types::{CardId, JobId, PlaceId};
+use mork_types::about::Summary;
+use mork_types::card::Card;
+use mork_types::reply::Role;
+use mork_types::seen::AgentList;
+use mork_types::state::{Agent, AgentStatus};
+use mork_types::view::{AgentRow, CacheState, PlaceKind, PlaceView};
+use mork_types::{CardId, JobId, PlaceId};
 
 use super::conversation::conversation;
 use super::header::header;
@@ -71,12 +71,12 @@ pub fn place(state: &State, place: &str, tail: Option<u64>, outside: &Outside, c
 }
 
 // A folded review's seats, typed apart (fac-696): its foreman by its own key, its reviewers, then any other seat.
-fn folded(state: &State, rc: &Card, outside: &Outside, ctx: Ctx<'_>) -> factory_types::review::FoldedReview {
+fn folded(state: &State, rc: &Card, outside: &Outside, ctx: Ctx<'_>) -> mork_types::review::FoldedReview {
     let foreman = format!("{}/foreman", rc.id);
     let (own, rest): (Vec<_>, Vec<_>) =
         sessions(state, rc, outside, ctx).into_iter().partition(|a| a.agent.as_str() == foreman);
     let (reviewers, others) = rest.into_iter().partition(|a| a.role == Role::Reviewer);
-    factory_types::review::FoldedReview {
+    mork_types::review::FoldedReview {
         card: rc.id.clone(),
         round: super::findings::current_round(state, rc).unwrap_or(1),
         foreman: own.into_iter().next(),
@@ -117,14 +117,14 @@ fn row(state: &State, a: &Agent, outside: &Outside, ctx: Ctx<'_>) -> AgentRow {
         steps: Vec::new(),
         setting,
         pending: crate::agents::models::pending(state, ctx.config, a),
-        choices: crate::agents::models::choices_for(state, ctx.config, a, crate::agents::models::By::Andrei),
-        efforts: crate::agents::models::efforts_for(state, ctx.config, a, crate::agents::models::By::Andrei),
+        choices: crate::agents::models::choices_for(state, ctx.config, a, crate::agents::models::By::Operator),
+        efforts: crate::agents::models::efforts_for(state, ctx.config, a, crate::agents::models::By::Operator),
         turn: None,
         cache: cache_state(ctx.config, a),
     }
 }
 
-fn cache_state(config: &factory_types::config::Config, a: &Agent) -> Option<CacheState> {
+fn cache_state(config: &mork_types::config::Config, a: &Agent) -> Option<CacheState> {
     if matches!(a.status, AgentStatus::Working { .. }) {
         Some(CacheState::Running)
     } else {
@@ -155,7 +155,7 @@ pub(super) fn seats<'a>(state: &'a State, card: &CardId) -> Vec<&'a Agent> {
 
 // An agent's latest turn, only when its job is the agent's own: a child's never shows in its
 // parent's row (fac-96).
-fn own_turn(state: &State, a: &Agent, outside: &Outside) -> Option<factory_types::seen::TurnView> {
+fn own_turn(state: &State, a: &Agent, outside: &Outside) -> Option<mork_types::seen::TurnView> {
     let t = outside.agents.get(&a.key)?.turn.as_ref()?;
     state.jobs.get(&t.job).is_some_and(|j| j.owner == a.key).then(|| (**t).clone())
 }

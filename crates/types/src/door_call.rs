@@ -71,15 +71,15 @@ pub enum Phase {
     Checking,
     /// The allowlist permits unattended dispatch.
     Cleared,
-    /// It waits for Andrei.
+    /// It waits for the operator.
     Asked,
-    /// Andrei said once.
+    /// The operator said once.
     Approved,
-    /// Andrei said no.
+    /// The operator said no.
     Refused,
 }
 
-/// Andrei's `once`: bound to the plan it was given on, used by one dispatch.
+/// The operator's `once`: bound to the plan it was given on, used by one dispatch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Approval {

@@ -5,8 +5,8 @@ use std::io::{Read, Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
-use factory_core::queue::failing::{path, unstyled};
-use factory_types::view::SuiteProgress;
+use mork_core::queue::failing::{path, unstyled};
+use mork_types::view::SuiteProgress;
 
 /// A suite run's output file as read so far.
 #[derive(Debug, Default)]

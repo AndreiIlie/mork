@@ -1,7 +1,7 @@
-use factory_core::state::State;
-use factory_types::config::Cli;
-use factory_types::usage::Limit;
-use factory_types::view::Share;
+use mork_core::state::State;
+use mork_types::config::Cli;
+use mork_types::usage::Limit;
+use mork_types::view::Share;
 use serde_json::{Value, json};
 
 use crate::claude_accounts::Accounts;
@@ -45,7 +45,7 @@ fn readings<'a>(state: &'a State, now: i64, accounts: &Accounts) -> Vec<Reading<
             let stale = reset_ms.is_some_and(|r| r <= now);
             let signed_out = l.cli == Cli::Claude && l.account.as_ref().map(|a| &a.id) != active.map(|a| &a.id);
             let pace = (!stale)
-                .then(|| factory_core::agents::usage::pace(l.percent, reset_ms, length_ms(&l.window), l.seen_ms))
+                .then(|| mork_core::agents::usage::pace(l.percent, reset_ms, length_ms(&l.window), l.seen_ms))
                 .flatten();
             Reading { limit: l, name, window: short_name(&l.window), reset_ms, stale, signed_out, pace }
         })
@@ -77,7 +77,7 @@ fn pool(r: &Reading<'_>) -> bool {
         Cli::Claude => r.limit.bucket == ACCOUNT && ["5h", "week", "fable"].contains(&r.window.as_str()),
         Cli::Codex => r.limit.bucket == ACCOUNT && r.window == "week",
         Cli::Agy => {
-            [ACCOUNT, factory_types::config::AGY_3P_BUCKET].contains(&r.limit.bucket.as_str())
+            [ACCOUNT, mork_types::config::AGY_3P_BUCKET].contains(&r.limit.bucket.as_str())
                 && ["5h", "week"].contains(&r.window.as_str())
         }
     }
@@ -116,11 +116,11 @@ pub(super) fn shares(state: &State, now: i64, accounts: &Accounts) -> Vec<Share>
         .collect()
 }
 
-pub(super) fn week_pools(state: &State, now: i64, accounts: &Accounts) -> Vec<factory_core::views::burn::WeekPool> {
+pub(super) fn week_pools(state: &State, now: i64, accounts: &Accounts) -> Vec<mork_core::views::burn::WeekPool> {
     readings(state, now, accounts)
         .into_iter()
         .filter(|r| pool(r) && r.window == "week")
-        .map(|r| factory_core::views::burn::WeekPool {
+        .map(|r| mork_core::views::burn::WeekPool {
             name: r.name,
             cli: r.limit.cli,
             bucket: r.limit.bucket.clone(),

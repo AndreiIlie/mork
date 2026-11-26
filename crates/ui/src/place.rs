@@ -1,9 +1,9 @@
 //! The place shown (5.7, 5.8). Main has no input, so no draft's images nor Send now either
 //! (fac-230).
 
-use factory_types::view::{AgentRow, CardHeader, Doing, PlaceKind, PlaceView};
 use iced::widget::{Column, column, container, responsive, row, text, text_editor};
 use iced::{Element, Length, Padding, Pixels};
+use mork_types::view::{AgentRow, CardHeader, Doing, PlaceKind, PlaceView};
 
 use crate::app::{App, Message};
 use crate::icons::{self, Icon};
@@ -189,7 +189,7 @@ fn place_name(v: &PlaceView) -> String {
     }
 }
 
-fn child_name(agent: &factory_types::AgentKey) -> &str {
+fn child_name(agent: &mork_types::AgentKey) -> &str {
     agent.as_str().rsplit('/').next().unwrap_or_default()
 }
 

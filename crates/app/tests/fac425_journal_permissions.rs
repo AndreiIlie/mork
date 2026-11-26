@@ -6,20 +6,20 @@ mod common;
 
 use common::door::{answers, ctl_turn};
 use common::{CODEX_FOREMAN, Rig, reply};
-use factory_core::decide::Journal;
-use factory_types::card::{Mode, Stage};
+use mork_core::decide::Journal;
+use mork_types::card::{Mode, Stage};
 use serde_json::json;
 
 #[test]
 fn journal_read_holds_the_seats_project_limit() {
     let mut rig = Rig::new();
-    let repo = rig.t.root.join("factory-repo").display().to_string();
+    let repo = rig.t.root.join("mork-repo").display().to_string();
     let extra = format!(
-        "[projects.first]\nrepo = \"{repo}\"\nboard = \"{repo}\"\ntest = \"true\"\n\
-         [projects.second]\nrepo = \"{repo}\"\nboard = \"{repo}\"\ntest = \"true\"\n{CODEX_FOREMAN}"
+        "[projects.first]\nrepo = \"{repo}\"\nboard = {{ kind = \"markdown\", path = \"{repo}\" }}\ntest = \"true\"\n\
+         [projects.second]\nrepo = \"{repo}\"\nboard = {{ kind = \"markdown\", path = \"{repo}\" }}\ntest = \"true\"\n{CODEX_FOREMAN}"
     );
     rig.write_config(&rig.config(&extra));
-    common::builds::factory_repo(&rig, 1);
+    common::builds::mork_repo(&rig, 1);
     let mut limited = rig.card("ex-1", Mode::Full);
     limited.project = "first".into();
     let mut target = rig.card("ex-2", Mode::Full);

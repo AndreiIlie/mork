@@ -1,10 +1,10 @@
 //! Usage limits in the state (1.4.7.2): the latest value of each window, changed (and
 //! journaled) when a read differs; fresh reads also retain when the window was last seen.
 
-use factory_types::JobId;
-use factory_types::config::{Cli, agy_bucket};
-use factory_types::state::Agent;
-use factory_types::usage::Limit;
+use mork_types::JobId;
+use mork_types::config::{Cli, agy_bucket};
+use mork_types::state::Agent;
+use mork_types::usage::Limit;
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision, SessionSeen};
@@ -27,7 +27,7 @@ pub fn pace(percent: Option<u32>, reset_ms: Option<i64>, length_ms: Option<i64>,
 }
 
 /// A read of some windows: each that differs is put, with one journal line and a stream's position (1.4.7.2). A whole
-/// read (Codex's) lifts a reached window it doesn't list; one newly reached is told to Andrei (fac-119).
+/// read (Codex's) lifts a reached window it doesn't list; one newly reached is told to the operator (fac-119).
 pub fn seen(state: &State, limits: &[Limit], at: Option<&(JobId, u64)>, whole: Option<Cli>, ctx: Ctx<'_>) -> Decision {
     let mut d = Decision::default();
     let fresh: Vec<Limit> = limits
@@ -66,7 +66,7 @@ pub fn seen(state: &State, limits: &[Limit], at: Option<&(JobId, u64)>, whole: O
         .collect();
     let mut p = Poster::for_ctx(state, ctx);
     if !reached.is_empty() {
-        tell_andrei(&mut p, &reached);
+        tell_operator(&mut p, &reached);
     }
     for l in refreshed {
         d.changes.push(Change::PutLimit(l.clone()));
@@ -80,8 +80,8 @@ pub fn seen(state: &State, limits: &[Limit], at: Option<&(JobId, u64)>, whole: O
     d
 }
 
-// Every card waits on a reached limit: Andrei hears of it in main, once per window reached.
-fn tell_andrei(p: &mut Poster<'_>, reached: &[&Limit]) {
+// Every card waits on a reached limit: the operator hears of it in main, once per window reached.
+fn tell_operator(p: &mut Poster<'_>, reached: &[&Limit]) {
     let windows: Vec<String> = reached
         .iter()
         .map(|l| {
@@ -98,8 +98,8 @@ fn tell_andrei(p: &mut Poster<'_>, reached: &[&Limit]) {
         .collect();
     let text = format!("A usage limit was reached: {}. Every turn on it waits for its reset.", windows.join("; "));
     let main = crate::messages::places::MAIN;
-    let to = Some("andrei");
-    p.post(main, factory_types::state::Sender::Engine, to, factory_types::state::MessageKind::Engine, "", &text);
+    let to = Some("operator");
+    p.post(main, mork_types::state::Sender::Engine, to, mork_types::state::MessageKind::Engine, "", &text);
 }
 
 /// When a turn's reached limit resets, if it reached one (1.4.10.2). An agy rejection that gives no reset waits for its

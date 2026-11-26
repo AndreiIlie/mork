@@ -1,8 +1,8 @@
 //! The merge queue (fac-375): each card is verified on its own candidate, and a verified card waits in its project's
 //! queue in order of entry; one card at a time lands at its front, its candidate made again only when the base moved.
 
-use factory_types::Sha;
-use factory_types::card::{Candidate, Card, Landing};
+use mork_types::Sha;
+use mork_types::card::{Candidate, Card, Landing};
 use serde_json::{Value, json};
 
 use super::candidates::{jobs_of, reset, start_on};

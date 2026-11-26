@@ -3,7 +3,7 @@
 ## Time
 
 The engine reads the clock once for a decision, passing the same `now` to core as
-`ctx.now` and to the commit ([runtime/mod.rs: `Engine::apply_with`, `decide`,
+`ctx.now` and to the commit ([runtime/mod.rs: `Engine::apply`, `decide`,
 `commit_decided`](../crates/engine/src/runtime/mod.rs)). Every journal row in that
 transaction carries this time ([store/mod.rs: `Store::commit`](../crates/engine/src/store/mod.rs)).
 The job's `settled_ms` written by the decision uses it too
@@ -74,19 +74,19 @@ returns with `built` and is taken afresh
 
 The card stores only its latest approval, replaced when the brief is agreed
 again ([lifecycle/brief.rs: `approved`](../crates/core/src/lifecycle/brief.rs)).
-Its `brief.approved` row's `by` names Andrei or the card's project's orchestrator
+Its `brief.approved` row's `by` names the operator or the card's project's orchestrator
 whose `approve` is accepted only while its open plan ask is given to it. A
 delegated non-visual plan no longer approves itself: `brief::offer` always raises
 `approve-brief`, and `delegate::give_opened` gives it automatically so the
-orchestrator or Andrei approves it with `approve`. Turning `delegate` on while a
+orchestrator or the operator approves it with `approve`. Turning `delegate` on while a
 plan or seat ask waits gives those open ungiven asks (journaling `give`) without
 approving the plan; switching from delegated to self-sustained re-emits `given`
 stream lines for open already-given seat and non-visual plan asks. A visual card's
-plan is approved by Andrei alone, so its row's `by` is always his
+plan is approved by the operator alone, so its row's `by` is always his
 ([lifecycle/brief.rs: `offer`](../crates/core/src/lifecycle/brief.rs),
 [messages/streams.rs: `give`](../crates/core/src/messages/streams.rs),
 [decide/buzz.rs: `approve_buzz`](../crates/core/src/decide/buzz.rs)).
-Orchestrator approvals are announced as `orchestrator:<project>, on Andrei's
+Orchestrator approvals are announced as `orchestrator:<project>, on the operator's
 delegation,`. Completed cards' older rows recording planner or foreman approvals
 remain readable in the journal.
 

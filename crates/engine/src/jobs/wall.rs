@@ -1,7 +1,7 @@
 //! The wall's argv (1.4.11.3): `/usr/bin/bwrap` with its flags and mounts, then
-//! `factory wall-exec <ports> -- <argv>`, or `--any-port` for its ports.
+//! `mork wall-exec <ports> -- <argv>`, or `--any-port` for its ports.
 
-use factory_types::job::{JobSpec, Mount, WallMode};
+use mork_types::job::{JobSpec, Mount, WallMode};
 use std::path::{Path, PathBuf};
 
 use crate::files::HiddenPath;
@@ -33,6 +33,7 @@ fn push_mount(a: &mut Vec<String>, m: &Mount) {
         Mount::Ro { path } => add(&["--ro-bind", path, path]),
         Mount::RoTry { path } => add(&["--ro-bind-try", path, path]),
         Mount::Rw { path } => add(&["--bind", path, path]),
+        Mount::RwAt { src, dest } => add(&["--bind", src, dest]),
         Mount::RoAt { src, dest } => add(&["--ro-bind", src, dest]),
         Mount::RoTryAt { src, dest } => add(&["--ro-bind-try", src, dest]),
         Mount::Tmpfs { path } => add(&["--tmpfs", path]),
@@ -43,7 +44,7 @@ fn push_mount(a: &mut Vec<String>, m: &Mount) {
     }
 }
 
-/// The whole argv of a walled job. `interactive` drops `--new-session` (`factory login`).
+/// The whole argv of a walled job. `interactive` drops `--new-session` (`mork login`).
 pub fn argv(spec: &JobSpec, interactive: bool) -> Vec<String> {
     argv_with(spec, !interactive, !interactive)
 }
@@ -74,7 +75,7 @@ fn argv_with(spec: &JobSpec, new_session: bool, status: bool) -> Vec<String> {
         a.extend(["--json-status-fd".to_owned(), STATUS_FD.to_string()]);
     }
     a.push("--".into());
-    a.push(spec.factory_bin.clone());
+    a.push(spec.mork_bin.clone());
     a.push("wall-exec".into());
     if spec.wall == WallMode::Partial {
         a.push("--partial".into());
@@ -93,7 +94,7 @@ fn argv_with(spec: &JobSpec, new_session: bool, status: bool) -> Vec<String> {
 pub struct WallPlaces {
     /// The host's top-level entries and the wall's own live folders, as [`system`] supplies them.
     pub system: Vec<Mount>,
-    /// The factory home: an empty tmpfs under the binds, made read-only after them, so the folders holding a bind's
+    /// Mork home: an empty tmpfs under the binds, made read-only after them, so the folders holding a bind's
     /// mount point can't be written even where the home lies under the wall's own `/tmp` (1.4.2.2).
     pub sealed: Option<String>,
     /// The app's home, temporary and runtime folders, hidden beneath the explicit binds.
@@ -103,8 +104,9 @@ pub struct WallPlaces {
     /// A regular empty file owned by the engine, used by the file masks.
     pub empty_file: String,
     pub agent_home: String,
+    pub caches: Vec<(String, String)>,
     /// The installed browsers (fac-114), bound read-only when the folder exists: outside the
-    /// agent home, so no seat changes a binary the others launch.
+    /// writable homes, so no seat changes a binary the others launch.
     pub browsers: Option<String>,
     pub run_dir: String,
     /// Read-only: toolchains, the running binary's folder, `builds/`, the checks folder.
@@ -113,8 +115,7 @@ pub struct WallPlaces {
     pub read_write: Vec<String>,
     /// The seat's credential set, bound at `/run/credentials`.
     pub credentials: Option<String>,
-    /// A turn's skills (fac-88), bound read-only where they are and at each of [`SKILLS_AT`]: Codex finds them
-    /// beside its own under `~/.codex/skills`, agy among its own (fac-657).
+    /// A turn's skills, bound read-only where they are and at [`SKILLS_AT`] for CLI discovery.
     pub skills: Option<String>,
     /// A closing turn's working folder (fac-147): an empty read-only tmpfs where its session ran, so
     /// nothing of a clone there is in the wall, gone or not.
@@ -124,35 +125,29 @@ pub struct WallPlaces {
     /// Files shown empty and read-only (fac-389), each bound from an empty file (source, then destination): a
     /// walled Codex turn's user config, which its app-server would read.
     pub blanked: Vec<(String, String)>,
-    /// Andrei's Claude Code sessions folder (fac-265), bound read-only under the agent home's `.claude`:
+    /// The operator's Claude Code sessions folder (fac-265), bound read-only under the waker home's `.claude`:
     /// only the orchestrator waker's wall has it.
     pub sessions: Option<String>,
-    /// Andrei's Claude Code sockets folder (fac-265), bound read-only where it is; the waker's alone.
+    /// The operator's Claude Code sockets folder (fac-265), bound read-only where it is; the waker's alone.
     pub sockets: Option<String>,
 }
 
-/// Where a wall's agent home holds Claude Code's sessions folder, under it.
+/// Where the waker sees Claude Code's sessions, relative to its HOME.
 pub const SESSIONS_AT: &str = ".claude/sessions";
 
 /// Where a wall holds its project's data folder.
 pub const DATA_AT: &str = "/data";
 
-/// Where a wall's agent home holds the skills, under it: Codex's folder, then agy's.
-pub const SKILLS_AT: [&str; 2] = [".agents/skills", ".gemini/config/skills"];
+/// Where Codex and agy find the installed skills, relative to the seat's HOME.
+pub const SKILLS_AT: &str = ".agents/skills";
 
-/// Makes the skills' mount points as folders before the wall binds over them, through no link a seat planted in the
-/// agent home: nothing is made where one points.
+/// Prepares the skills mount point without following links in the seat's home.
 pub fn skills_at(agent_home: &Path) -> Result<(), String> {
-    for at in SKILLS_AT.map(Path::new) {
-        for rel in at.ancestors().filter(|a| !a.as_os_str().is_empty()).collect::<Vec<_>>().into_iter().rev() {
-            factory_sys::mkdir_beneath(agent_home, rel)
-                .map_err(|e| format!("{}: {e}", agent_home.join(rel).display()))?;
-        }
-    }
-    Ok(())
+    crate::seat_homes::mkdir(agent_home, Path::new(SKILLS_AT))
+        .map_err(|e| format!("{}: {e}", agent_home.join(SKILLS_AT).display()))
 }
 
-/// The variable Playwright and the factory's manuals find the installed browsers by (fac-114).
+/// The variable Playwright and Mork's manuals find the installed browsers by (fac-114).
 pub const BROWSERS_ENV: &str = "PLAYWRIGHT_BROWSERS_PATH";
 
 /// The resolver's file, the one the wall's DNS needs (1.4.11.1).
@@ -195,6 +190,7 @@ fn binds(p: &WallPlaces) -> Vec<Mount> {
     binds.sort_by_key(|b| match b {
         Mount::Ro { path } | Mount::Rw { path } => path.len(),
         Mount::RoTry { .. }
+        | Mount::RwAt { .. }
         | Mount::RoAt { .. }
         | Mount::RoTryAt { .. }
         | Mount::Tmpfs { .. }
@@ -218,7 +214,7 @@ fn hidden_folders(p: &WallPlaces) -> Vec<String> {
 fn source_dest(mount: &Mount) -> Option<(&str, &str)> {
     match mount {
         Mount::Ro { path } | Mount::Rw { path } | Mount::RoTry { path } => Some((path, path)),
-        Mount::RoAt { src, dest } | Mount::RoTryAt { src, dest } => Some((src, dest)),
+        Mount::RwAt { src, dest } | Mount::RoAt { src, dest } | Mount::RoTryAt { src, dest } => Some((src, dest)),
         _ => None,
     }
 }
@@ -226,14 +222,22 @@ fn source_dest(mount: &Mount) -> Option<(&str, &str)> {
 fn mask_destinations(p: &WallPlaces, mounts: &[Mount]) -> Vec<HiddenPath> {
     let sources: Vec<_> = mounts
         .iter()
-        .filter_map(source_dest)
-        .map(|(src, dest)| (std::fs::canonicalize(src).unwrap_or_else(|_| PathBuf::from(src)), Path::new(dest)))
+        .enumerate()
+        .filter_map(|(i, m)| {
+            source_dest(m).map(|(src, dest)| {
+                (i, std::fs::canonicalize(src).unwrap_or_else(|_| PathBuf::from(src)), Path::new(dest))
+            })
+        })
         .collect();
     let mut paths = Vec::new();
     for hidden in &p.masked {
-        for (src, dest) in &sources {
+        for (i, src, dest) in &sources {
             if let Ok(relative) = hidden.path.strip_prefix(src) {
-                paths.push(HiddenPath { path: dest.join(relative), directory: hidden.directory });
+                let path = dest.join(relative);
+                // A later tmpfs already hides the source. Making a mask there would reveal its ancestors.
+                if !mounts[i + 1..].iter().any(|m| matches!(m,Mount::Tmpfs {path: at} if path.starts_with(at))) {
+                    paths.push(HiddenPath { path, directory: hidden.directory });
+                }
             } else if hidden.directory && src.starts_with(&hidden.path) {
                 paths.push(HiddenPath { path: dest.to_path_buf(), directory: src.is_dir() });
             }
@@ -268,10 +272,11 @@ pub fn mounts(p: &WallPlaces) -> Vec<Mount> {
     let hidden = hidden_folders(p);
     m.extend(hidden.iter().map(|path| Mount::Tmpfs { path: path.clone() }));
     m.extend(binds(p));
+    m.extend(p.caches.iter().map(|(src, dest)| Mount::RwAt { src: src.clone(), dest: dest.clone() }));
     m.extend(p.browsers.iter().map(|b| Mount::RoTry { path: b.clone() }));
-    // After the agent home's bind, which would hide it.
+    // The skills must be mounted after the seat's home so the CLI sees them.
     if let Some(s) = &p.skills {
-        m.extend(SKILLS_AT.map(|at| Mount::RoAt { src: s.clone(), dest: format!("{}/{at}", p.agent_home) }));
+        m.push(Mount::RoAt { src: s.clone(), dest: format!("{}/{SKILLS_AT}", p.agent_home) });
     }
     m.extend(p.blanked.iter().map(|(src, dest)| Mount::RoAt { src: src.clone(), dest: dest.clone() }));
     if let Some(c) = &p.credentials {

@@ -1,11 +1,11 @@
 //! Stopping, resuming, closing and ending a card (4.13).
 
-use factory_types::action::{ActionStatus, ActionWhat, BoardEdit};
-use factory_types::ask::AskKind;
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::state::{AgentStatus, MessageKind, Sender};
-use factory_types::work::Purpose;
-use factory_types::{AgentKey, CardId};
+use mork_types::action::{ActionStatus, ActionWhat, BoardEdit};
+use mork_types::ask::AskKind;
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::state::{AgentStatus, MessageKind, Sender};
+use mork_types::work::Purpose;
+use mork_types::{AgentKey, CardId};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision, Intent};
@@ -42,7 +42,7 @@ pub fn stop_in(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
 }
 
 /// Marks a running job stopped at most once in a decision.
-pub(crate) fn stop_job(p: &mut Poster<'_>, mut j: factory_types::state::Job) {
+pub(crate) fn stop_job(p: &mut Poster<'_>, mut j: mork_types::state::Job) {
     if j.stop_requested || p.intents.iter().any(|i| matches!(i, Intent::StopJob { id } if *id == j.id)) {
         return;
     }
@@ -243,6 +243,7 @@ pub(super) fn close(state: &State, id: &str, why: &str, ctx: Ctx<'_>) -> Decisio
     crate::queue::candidates::drop_candidate(&mut p, &mut c);
     crate::reviews::triage::withdraw(&mut p, &mut c);
     c.landing = None;
+    let forge = ctx.config.forge_label(&c.project);
     let pr = c.pr;
     p.put_card(c);
     crate::queue::joins::closed(&mut p, &cid);
@@ -252,21 +253,16 @@ pub(super) fn close(state: &State, id: &str, why: &str, ctx: Ctx<'_>) -> Decisio
     crate::agents::closing::card_ended(&mut p, &cid, true, ctx.config);
     // The head is taken into the mirror first; the clone goes once it is (4.13.6, R8).
     p.intent(Intent::StartJob {
-        purpose: factory_types::work::Purpose::Bundle {
-            card: cid.clone(),
-            base_in: None,
-            recover: None,
-            refresh: None,
-        },
+        purpose: mork_types::work::Purpose::Bundle { card: cid.clone(), base_in: None, recover: None, refresh: None },
     });
     if let Some(n) = pr {
         p.post(
             id,
             Sender::Engine,
-            Some("andrei"),
+            Some("operator"),
             MessageKind::Engine,
             "",
-            &format!("PR {n} stays as it is on Bitbucket."),
+            &format!("PR {n} stays as it is on {forge}."),
         );
     }
     p.journal("card.closed", Some(id), json!({"why": why}));

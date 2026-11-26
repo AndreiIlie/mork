@@ -62,7 +62,7 @@ impl Plan {
 pub enum Route {
     /// On this machine.
     Local { allow: Vec<String> },
-    /// Through Andrei's own ssh alias, as its configured login: a command runs there, a service
+    /// Through the operator's own ssh alias, as its configured login: a command runs there, a service
     /// is reached through a forward of that connection. `misc`: the misc door's any command.
     Ssh { alias: String, allow: Vec<String>, misc: bool },
 }
@@ -121,7 +121,7 @@ pub struct DispatchRequest {
     pub route: Option<Route>,
     #[serde(default)]
     pub plan: Option<Plan>,
-    /// Where a `Get` writes its file: a new one, in the asking turn's `$FACTORY_IO`.
+    /// Where a `Get` writes its file: a new one, in the asking turn's `$MORK_IO`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub into: Option<String>,
     /// The plan's credential, when it names one.

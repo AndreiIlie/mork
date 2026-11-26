@@ -97,7 +97,7 @@ impl Outcome {
     }
 }
 
-/// The part of a reply addressed to Andrei: an ask is a non-empty `ask`.
+/// The part of a reply addressed to the operator: an ask is a non-empty `ask`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Hand {
@@ -111,7 +111,7 @@ pub struct Hand {
     /// Withdraws the seat's open ask unanswered (fac-271); an empty `ask` alone leaves it open.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub withdraw_ask: bool,
-    /// Files of the seat's `io/` folder, `$FACTORY_IO`, shown beside the hand and its ask (fac-278, fac-654).
+    /// Files of the seat's `io/` folder, `$MORK_IO`, shown beside the hand and its ask (fac-278, fac-654).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<String>,
     /// The ask's numbered options, in order (fac-696): none when it offers no choice.
@@ -361,10 +361,14 @@ pub fn echo_schema() -> Value {
 /// A closing turn's feedback about the seat's project (fac-287): what it didn't file, or "nothing".
 pub const FEEDBACK_ANSWER: &str = "feedback";
 
-/// A closing turn's feedback about the factory (fac-593): what it didn't file, or "nothing".
-pub const FACTORY_FEEDBACK_ANSWER: &str = "factory_feedback";
+/// A closing turn's feedback about Mork (fac-593): what it didn't file, or "nothing".
+pub const MORK_FEEDBACK_ANSWER: &str = "mork_feedback";
 
-/// The reply schema of a closing turn (fac-287, fac-592).
-pub fn closing_schema() -> Value {
-    object(json!({FEEDBACK_ANSWER: string(), FACTORY_FEEDBACK_ANSWER: string()}))
+/// The reply schema of a closing turn (fac-287, fac-592, fac-725).
+pub fn closing_schema(with_mork: bool) -> Value {
+    if with_mork {
+        object(json!({FEEDBACK_ANSWER: string(), MORK_FEEDBACK_ANSWER: string()}))
+    } else {
+        object(json!({FEEDBACK_ANSWER: string()}))
+    }
 }

@@ -1,10 +1,10 @@
 //! A full card whose PR is read as merged on Bitbucket, by the train or by hand, whatever its head
 //! (fac-171): it lands at the merge commit, its head kept first, and never comes back to its train.
 
-use factory_types::CardId;
-use factory_types::ask::AskKind;
-use factory_types::card::{Card, Landing};
-use factory_types::work::PrSeen;
+use mork_types::CardId;
+use mork_types::ask::AskKind;
+use mork_types::card::{Card, Landing};
+use mork_types::work::PrSeen;
 use serde_json::Value;
 
 use crate::decide::Ctx;
@@ -27,12 +27,12 @@ pub fn read(p: &mut Poster<'_>, mut c: Card, seen: &PrSeen, head: &str, ctx: Ctx
     c.landing = Some(Landing::HandMerged);
     p.put_card(c);
     // Nothing merges it any more, nor waits on its merge: his approval among it (fac-98).
-    super::landing::none_left(p, &id, "its PR was merged outside the factory");
+    super::landing::none_left(p, &id, "its PR was merged outside Mork");
     asks::close(p, id.as_str(), &[AskKind::ApprovePr]);
     p.fetch(project.as_str());
 }
 
-// Merged outside the factory: the merge commit is the base's new tip, a build's and the early
+// Merged outside Mork: the merge commit is the base's new tip, a build's and the early
 // joins' (1.8.4, 4.12.4; M4.21). Its alarm, which held it, closes with its other asks.
 fn land(p: &mut Poster<'_>, mut c: Card, seen: &PrSeen, head: &str, ctx: Ctx<'_>) {
     // A turn under way could still commit: it ends, and what it committed is kept with the head.
@@ -51,16 +51,16 @@ fn foreign(p: &mut Poster<'_>, c: &Card, seen: &PrSeen) {
     let pushed = c.pushed.as_ref().map_or(String::new(), |x| format!(" (it pushed {})", x.short()));
     let at = seen.merge_commit.as_ref().or(seen.merge_parents.first()).map_or("", |m| m.short());
     let text = format!(
-        "PR {} was merged with head {}, which the factory didn't push{pushed}: {} landed at its merge commit {at}.",
+        "PR {} was merged with head {}, which Mork didn't push{pushed}: {} landed at its merge commit {at}.",
         seen.pr,
         seen.head.short(),
         c.id
     );
-    crate::reviews::cards::to_andrei(p, &c.id, &text);
+    crate::reviews::cards::to_operator(p, &c.id, &text);
 }
 
 /// Its clone removed: the commits of its head that its PR's merge didn't take, which the engine
-/// found in the mirror, are named to Andrei, kept there to carry on in a new card.
+/// found in the mirror, are named to the operator, kept there to carry on in a new card.
 pub fn removed(p: &mut Poster<'_>, id: &CardId, v: &Value) {
     let commits: Vec<&str> = v
         .get("unmerged")
@@ -74,5 +74,5 @@ pub fn removed(p: &mut Poster<'_>, id: &CardId, v: &Value) {
         "{id} landed, but these commits of its head aren't merged: {}. They are kept in the mirror as `refs/cards/{id}`, to carry on in a new card.",
         commits.join("; ")
     );
-    crate::reviews::cards::to_andrei(p, id, &text);
+    crate::reviews::cards::to_operator(p, id, &text);
 }

@@ -1,4 +1,4 @@
-//! The door over ssh (fac-86): Andrei's own alias and the box's own tools, nothing of the Factory's there.
+//! The door over ssh (fac-86): the operator's own alias and the box's own tools, nothing of Mork's there.
 //! A command is one remote string of single-quoted arguments, so the login shell reads each back as one literal word.
 
 use std::collections::BTreeMap;
@@ -82,7 +82,7 @@ pub fn read_argv(tool: &str, n: u64, root: &str, path: &str) -> Vec<String> {
 }
 
 /// ssh's environment: the dispatcher's, and the ssh agent's socket when the engine has one, so a
-/// key of Andrei's that has a passphrase still opens; the agent is never forwarded.
+/// key of the operator's that has a passphrase still opens; the agent is never forwarded.
 pub fn env(mut e: BTreeMap<String, String>) -> BTreeMap<String, String> {
     if let Ok(sock) = std::env::var("SSH_AUTH_SOCK") {
         e.insert("SSH_AUTH_SOCK".to_owned(), sock);
@@ -108,7 +108,7 @@ impl Tunnel {
         let (program, args) = argv.split_first().ok_or("an empty argv")?;
         let mut cmd = Command::new(program);
         cmd.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped()).env_clear().envs(env);
-        factory_sys::prepare_wall_spawn(&mut cmd, None, true);
+        mork_sys::prepare_wall_spawn(&mut cmd, None, true);
         let child = cmd.spawn().map_err(|e| format!("its tunnel didn't start: {e}"))?;
         let group = -i32::try_from(child.id()).unwrap_or(i32::MAX);
         let mut t = Self { child, group };
@@ -137,7 +137,7 @@ impl Tunnel {
     }
 
     fn end(&mut self) {
-        let _ = factory_sys::kill(self.group, super::procs::libc_sig::KILL);
+        let _ = mork_sys::kill(self.group, super::procs::libc_sig::KILL);
         let _ = self.child.kill();
     }
 }
@@ -179,7 +179,7 @@ impl Scratch {
         let name: String = format!("{:x}", Sha256::digest(call.as_bytes())).chars().take(12).collect();
         let lock = tunnels.join(format!("{name}.lock"));
         let held = std::fs::File::create(&lock).map_err(|e| format!("its folder's lock: {e}"))?;
-        if !factory_sys::try_lock_exclusive(&held).unwrap_or(false) {
+        if !mork_sys::try_lock_exclusive(&held).unwrap_or(false) {
             return Err("its folder is held by another dispatch".into());
         }
         let dir = tunnels.join(&name);
@@ -229,12 +229,12 @@ fn sweep(tunnels: &Path) {
         };
         let modified = e.metadata().ok().and_then(|m| m.modified().ok());
         let since = modified.and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok());
-        let age = since.map(|m| clock::real_now_ms() - i64::try_from(m.as_millis()).unwrap_or(i64::MAX));
+        let age = since.map(|m| clock::now_ms() - i64::try_from(m.as_millis()).unwrap_or(i64::MAX));
         if age.is_none_or(|ms| ms < i64::try_from(STALE.as_millis()).unwrap_or(i64::MAX)) {
             continue;
         }
         if let Ok(f) = std::fs::File::open(&path)
-            && factory_sys::try_lock_exclusive(&f).unwrap_or(false)
+            && mork_sys::try_lock_exclusive(&f).unwrap_or(false)
         {
             let _ = std::fs::remove_dir_all(tunnels.join(name));
             let _ = std::fs::remove_file(&path);

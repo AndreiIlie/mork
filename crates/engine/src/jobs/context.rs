@@ -4,24 +4,24 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use factory_types::config::{Config, Seat, Toolchain};
-use factory_types::job::{JobKind, JobSpec, Launch, WallMode};
-use factory_types::{AgentKey, JobId};
+use mork_types::config::{Config, Seat, Toolchain};
+use mork_types::job::{JobKind, JobSpec, Launch, WallMode};
+use mork_types::{AgentKey, JobId};
 
 use super::wall::{self, WallPlaces};
 use crate::paths::Home;
 use crate::{faults, files};
 
-/// The wall's executable: `/usr/bin/bwrap`, or `FACTORY_TEST_BWRAP` (1.10.6).
+/// The wall's executable: `/usr/bin/bwrap`, or `MORK_TEST_BWRAP` (1.10.6).
 pub fn bwrap_path() -> String {
-    faults::test_env("FACTORY_TEST_BWRAP").unwrap_or_else(|| super::wall::BWRAP.into())
+    faults::test_env("MORK_TEST_BWRAP").unwrap_or_else(|| super::wall::BWRAP.into())
 }
 
 /// The wall's mode: full, or with the test settings `partial` or none (1.4.11.6).
 pub fn wall_mode() -> WallMode {
-    if faults::test_env("FACTORY_UNWALLED").as_deref() == Some("1") {
+    if faults::test_env("MORK_UNWALLED").as_deref() == Some("1") {
         WallMode::None
-    } else if faults::test_env("FACTORY_TEST_WALL").as_deref() == Some("partial") {
+    } else if faults::test_env("MORK_TEST_WALL").as_deref() == Some("partial") {
         WallMode::Partial
     } else {
         WallMode::Full
@@ -59,7 +59,7 @@ pub struct Context {
     pub app_tmp: String,
     /// The app's `$XDG_RUNTIME_DIR`, where Claude Code keeps its sockets (fac-265).
     pub app_runtime: String,
-    /// Andrei's own Codex home (`$CODEX_HOME`, else `~/.codex`), never read for a project's MCP
+    /// The operator's own Codex home (`$CODEX_HOME`, else `~/.codex`), never read for a project's MCP
     /// servers (1.4.8, Codex 2).
     pub app_codex_home: PathBuf,
     pub lang: String,
@@ -87,15 +87,15 @@ impl Context {
                 .filter(|v| !v.is_empty())
                 .map_or_else(|| PathBuf::from(var("HOME", "/")).join(".codex"), PathBuf::from),
             lang: var("LANG", "C.UTF-8"),
-            user: var("USER", "factory"),
+            user: var("USER", "mork"),
             telemetry,
             skills: None,
         }
     }
 
-    /// The wall of a seat's turn: none when its seat says so (fac-25), else the factory's.
+    /// The wall of a seat's turn: none when its seat says so (fac-25), else Mork's.
     pub fn wall_of(&self, seat: &Seat) -> WallMode {
-        if seat.wall == factory_types::config::Wall::None { WallMode::None } else { self.mode }
+        if seat.wall == mork_types::config::Wall::None { WallMode::None } else { self.mode }
     }
 
     pub fn bin_dir(&self) -> String {
@@ -103,7 +103,7 @@ impl Context {
     }
 
     fn toolchains(&self, extra: &[Toolchain]) -> Vec<Toolchain> {
-        self.config.factory.toolchains.iter().chain(extra).cloned().collect()
+        self.config.mork.toolchains.iter().chain(extra).cloned().collect()
     }
 
     /// `PATH`: the binary's folder, each toolchain's `bin` in order, then the system's.
@@ -121,11 +121,11 @@ impl Context {
 
     /// The ports a project's job may reach: the config's and the project's own (1.4.11.3).
     pub fn ports(&self, project: Option<&str>) -> Vec<u16> {
-        let mut ports = self.config.factory.ports.clone();
+        let mut ports = self.config.mork.ports.clone();
         ports.extend(
             project
                 .and_then(|p| self.config.projects.get(p))
-                .map(factory_types::config::ProjectConfig::port_list)
+                .map(mork_types::config::ProjectConfig::port_list)
                 .unwrap_or_default(),
         );
         ports.sort_unstable();
@@ -144,8 +144,8 @@ impl Context {
         project.and_then(|p| self.config.projects.get(p)).map(|p| p.toolchains.clone()).unwrap_or_default()
     }
 
-    /// The environment of 1.4.11.4, `FACTORY_IO` naming `io`: a seat's own folder for its turns (fac-654), the job's
-    /// `io/` for any other job. A seat's `env` wins over `[factory] env`.
+    /// The environment of 1.4.11.4, `MORK_IO` naming `io`: a seat's own folder for its turns (fac-654), the job's
+    /// `io/` for any other job. A seat's `env` wins over `[mork] env`.
     pub fn env(
         &self,
         job: &JobId,
@@ -164,38 +164,39 @@ impl Context {
             ("SHELL".to_owned(), "/bin/bash".to_owned()),
             ("TMPDIR".to_owned(), "/tmp".to_owned()),
             (wall::BROWSERS_ENV.to_owned(), s(self.home.browsers())),
-            ("FACTORY_JOB".to_owned(), job.as_str().to_owned()),
-            ("FACTORY_IO".to_owned(), io.display().to_string()),
-            ("FACTORY_AGENT".to_owned(), owner.as_str().to_owned()),
-            ("FACTORY_AGENT_SOCK".to_owned(), s(self.home.agent_sock())),
+            ("MORK_JOB".to_owned(), job.as_str().to_owned()),
+            ("MORK_IO".to_owned(), io.display().to_string()),
+            ("MORK_AGENT".to_owned(), owner.as_str().to_owned()),
+            ("MORK_AGENT_SOCK".to_owned(), s(self.home.agent_sock())),
         ]);
         // The test override of the Landlock ABI reaches `wall-exec` inside the wall, which
         // `--clearenv` would otherwise strip (only with `faults`).
-        if let Some(abi) = faults::test_env("FACTORY_TEST_LANDLOCK_ABI") {
-            e.insert("FACTORY_TEST_LANDLOCK_ABI".into(), abi);
+        if let Some(abi) = faults::test_env("MORK_TEST_LANDLOCK_ABI") {
+            e.insert("MORK_TEST_LANDLOCK_ABI".into(), abi);
         }
         e.extend(self.telemetry.clone());
-        e.extend(self.config.factory.env.clone());
+        e.extend(self.config.mork.env.clone());
         if let Some(seat) = seat {
             e.extend(seat.env.clone());
             // No notes of a seat's own: its memory is the session, the record, the cards and the
             // manuals (fac-25, decision 4). The variable outranks the setting in Claude Code.
-            if seat.cli == factory_types::config::Cli::Claude {
+            if seat.cli == mork_types::config::Cli::Claude {
+                e.insert("CLAUDE_CODE_DISABLE_DEFERRED_TOOL_RESUME".into(), "1".into());
                 e.insert("CLAUDE_CODE_DISABLE_AUTO_MEMORY".into(), "1".into());
                 // Its planner, TaskCreate and the rest, which a headless Claude leaves off (fac-127).
                 e.insert("CLAUDE_CODE_ENABLE_TODO_TOOLS".into(), "1".into());
             }
             // A turn runs the agy it was given: an update mid-turn would change it under the turn.
-            if seat.cli == factory_types::config::Cli::Agy {
+            if seat.cli == mork_types::config::Cli::Agy {
                 e.insert("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "true".into());
-                if let Some(cap) = self.config.factory.context_cap() {
+                if let Some(cap) = self.config.mork.context_cap() {
                     e.insert("AGY_CLI_AUTO_COMPACT_OVERRIDE".into(), cap.to_string());
                 }
             }
             // Only a walled turn has the mount; an unwalled one reads the folder itself (fac-27, decision 2).
             if let Some(c) = &seat.credentials {
                 let at = if self.wall_of(seat) == WallMode::None { c.clone() } else { "/run/credentials".into() };
-                e.insert("FACTORY_CREDENTIALS".into(), at);
+                e.insert("MORK_CREDENTIALS".into(), at);
             }
         }
         e
@@ -244,6 +245,10 @@ impl Context {
         ro.extend(read_only);
         let mut rw = vec![io.display().to_string()];
         rw.extend(read_write);
+        let fixtures = self.home.root().join("fixtures");
+        if faults::TEST_SETTINGS && fixtures.is_dir() {
+            rw.push(fixtures.display().to_string());
+        }
         WallPlaces {
             sealed: Some(s(self.home.root().to_path_buf())),
             agent_home: s(self.home.agent_home()),
@@ -268,9 +273,18 @@ impl Context {
     }
 
     fn hidden_names(&self, extra: &[Toolchain]) -> Result<Vec<files::HiddenPath>, String> {
-        let accounts = self.home.agent_home().join(".claude/accounts");
+        let accounts = self.home.login_home().join(".claude/accounts");
         let mut hidden =
             vec![files::HiddenPath { path: std::fs::canonicalize(&accounts).unwrap_or(accounts), directory: true }];
+        for tickets in self.config.projects.values().filter_map(|p| p.tickets.as_ref()) {
+            let path = Path::new(tickets.token());
+            match std::fs::canonicalize(path) {
+                Ok(path) if path.is_file() => hidden.push(files::HiddenPath { path, directory: false }),
+                Ok(_) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(format!("cannot mask {}: {e}", path.display())),
+            }
+        }
         for entry in self.toolchains(extra) {
             hidden.extend(
                 files::hidden_names(Path::new(&entry.path), &entry.hide)
@@ -295,7 +309,7 @@ impl Context {
         now: i64,
     ) -> JobSpec {
         JobSpec {
-            format: factory_types::job::JOB_FORMAT,
+            format: mork_types::job::JOB_FORMAT,
             id: id.clone(),
             kind,
             owner: owner.clone(),
@@ -305,7 +319,7 @@ impl Context {
             env,
             ports,
             wall: self.mode,
-            factory_bin: self.bin.display().to_string(),
+            mork_bin: self.bin.display().to_string(),
             bwrap: self.bwrap.clone(),
             created_ms: now,
             launch: self.launch,

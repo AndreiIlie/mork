@@ -1,9 +1,9 @@
 //! A board's part of main's Board tab (fac-37); each group stays folded until clicked.
 
-use factory_types::ProjectId;
-use factory_types::view::{BoardGroup, BoardRow, BoardView, MergeQueue};
 use iced::widget::{Column, Row, column, container, row};
 use iced::{Element, Length};
+use mork_types::ProjectId;
+use mork_types::view::{BoardGroup, BoardRow, BoardView, MergeQueue};
 
 use crate::app::{App, Message};
 use crate::board::{self, GAP, TILE_X, TILE_Y};

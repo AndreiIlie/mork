@@ -1,14 +1,14 @@
 //! A review's findings on its PR (fac-111): each comment kept with its finding, resolved once its raiser
-//! verified its fix (`resolve`), or a decision of Andrei's rules it out, said on its thread (fac-349).
+//! verified its fix (`resolve`), or a decision of the operator's rules it out, said on its thread (fac-349).
 
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::ask::AskKind;
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::protocol::{ErrorBody, ErrorCode};
-use factory_types::reply::Finding;
-use factory_types::review::{Raised, Review, Round, Verdict};
-use factory_types::state::{AgentStatus, MessageKind, Sender};
-use factory_types::{ActionId, CardId};
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::ask::AskKind;
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::protocol::{ErrorBody, ErrorCode};
+use mork_types::reply::Finding;
+use mork_types::review::{Raised, Review, Round, Verdict};
+use mork_types::state::{AgentStatus, MessageKind, Sender};
+use mork_types::{ActionId, CardId};
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Decision};
@@ -146,8 +146,8 @@ pub(super) fn reply_declined(p: &mut Poster<'_>, c: &Card, comment: u64, ctx: Ct
     p.act_as(ActionWhat::ReplyComment { card: c.id.clone(), pr, comment, commit, body, repo }, true);
 }
 
-// It names nobody, as nothing posted on a PR does.
-const DECLINED: &str = "Andrei declined this finding.";
+// Neutral wording naming nobody (fac-725).
+const DECLINED: &str = "This finding was declined.";
 
 // Its comment's thread resolved on its PR, the review bot's as its comment was.
 pub(super) fn thread(p: &mut Poster<'_>, c: &Card, comment: u64, ctx: Ctx<'_>) {
@@ -213,7 +213,7 @@ pub(super) fn resolve(state: &State, from: &Sender, card: &CardId, n: u64, decli
 }
 
 // An agent's verification counts in a turn the round under way asked about its commit, given its
-// request, as its verdict does (fac-111); Andrei's command stands at any time.
+// request, as its verdict does (fac-111); the operator's command stands at any time.
 pub(super) fn current(state: &State, from: &Sender, rc: &Card) -> Result<(), String> {
     let Sender::Agent(key) = from else { return Ok(()) };
     let Some(open) = rc.review.as_deref().and_then(Review::open).filter(|o| o.asked.is_some()) else {
@@ -233,14 +233,14 @@ pub(super) fn current(state: &State, from: &Sender, rc: &Card) -> Result<(), Str
     ))
 }
 
-// The foreman of our card a linked review card reviews declines its findings on Andrei's word at any time (fac-638).
+// The foreman of our card a linked review card reviews declines its findings on the operator's word at any time (fac-638).
 fn reviewed_foreman(from: &Sender, rc: &Card) -> bool {
     let of = rc.review.as_ref().and_then(|r| r.of.as_ref());
     matches!(from, Sender::Agent(key) if of.is_some_and(|of| key.as_str() == format!("{of}/foreman")))
 }
 
 /// Whether `resolve` is buzzed: only the raiser of a finding verifies its fix and resolves it, the
-/// review's foreman its own; Andrei may resolve any, and the reviewed card's foreman decline any.
+/// review's foreman its own; the operator may resolve any, and the reviewed card's foreman decline any.
 pub fn buzz(state: &State, from: &Sender, card: &CardId, n: u64, declines: bool) -> Option<ErrorBody> {
     let id = CardId::new(card.as_str().to_lowercase());
     let rc = state.cards.get(&id)?;
@@ -249,7 +249,7 @@ pub fn buzz(state: &State, from: &Sender, card: &CardId, n: u64, declines: bool)
         return None;
     }
     let name = match from {
-        Sender::Andrei | Sender::Orchestrator(_) | Sender::Pa => return None,
+        Sender::Operator | Sender::Orchestrator(_) | Sender::Pa => return None,
         Sender::Agent(key) => key.as_str().strip_prefix(&format!("{id}/")).unwrap_or_default(),
         Sender::Engine => "",
     };
@@ -257,7 +257,7 @@ pub fn buzz(state: &State, from: &Sender, card: &CardId, n: u64, declines: bool)
         return None;
     }
     let words = format!(
-        "#{n} is {}'s finding: only the reviewer that raised a finding verifies its fix and resolves it; Andrei may resolve any, and the reviewed card's foreman decline any with `--declined`.",
+        "#{n} is {}'s finding: only the reviewer that raised a finding verifies its fix and resolves it; the operator may resolve any, and the reviewed card's foreman decline any with `--declined`.",
         x.by
     );
     Some(ErrorBody::new(ErrorCode::Buzz, words))
@@ -329,13 +329,14 @@ pub fn commented(p: &mut Poster<'_>, card: &CardId, id: &ActionId, v: &Value, ct
     if let (Some(asked), Some(landed)) = (asked, landed)
         && asked != landed
     {
-        let text = format!("A comment asked at {asked} landed at {landed} on Bitbucket; it stays there.");
+        let forge = p.card(card).map_or("the forge", |c| ctx.config.forge_label(&c.project));
+        let text = format!("A comment asked at {asked} landed at {landed} on {forge}; it stays there.");
         p.post(
             card.as_str(),
             Sender::Engine,
             Some("foreman"),
             MessageKind::Update,
-            "comment moved on Bitbucket",
+            &format!("comment moved on {forge}"),
             &text,
         );
     }

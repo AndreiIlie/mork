@@ -1,14 +1,14 @@
 //! A card's membership of its merge queue (fac-10, fac-375): verified once its gates pass, it enters at the back; a
 //! run that can't be trusted holds it, with a red ask, until `/resume`; it leaves without its candidate.
 
-use factory_types::action::{Action, ActionStatus};
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Card, FixImport, Landing, Stage};
-use factory_types::reply::Role;
-use factory_types::state::{MessageKind, Sender};
-use factory_types::suites::Told;
-use factory_types::work::Purpose;
-use factory_types::{CardId, Sha};
+use mork_types::action::{Action, ActionStatus};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Card, FixImport, Landing, Stage};
+use mork_types::reply::Role;
+use mork_types::state::{MessageKind, Sender};
+use mork_types::suites::Told;
+use mork_types::work::Purpose;
+use mork_types::{CardId, Sha};
 use serde_json::{Value, json};
 
 use super::candidates::{current, drop_candidate, stale};
@@ -90,7 +90,9 @@ pub fn enter(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
             &id,
             Role::Foreman,
             "Write the PR wording",
-            crate::board::tickets::WORDING_REQUEST,
+            &crate::board::tickets::wording_request(
+                ctx.config.projects.get(&project).map_or("forge", |p| p.forge.skill()),
+            ),
         );
     }
 }
@@ -157,9 +159,9 @@ pub fn drop_landing_actions(p: &mut Poster<'_>, card: &CardId, words: &str, obso
     }
 }
 
-/// Said in the card's room, to Andrei, waking nobody.
-pub fn say(p: &mut Poster<'_>, id: &factory_types::CardId, headline: &str, text: &str) {
-    p.post(id.as_str(), Sender::Engine, Some("andrei"), MessageKind::Engine, headline, text);
+/// Said in the card's room, to the operator, waking nobody.
+pub fn say(p: &mut Poster<'_>, id: &mork_types::CardId, headline: &str, text: &str) {
+    p.post(id.as_str(), Sender::Engine, Some("operator"), MessageKind::Engine, headline, text);
 }
 
 /// A new head while the card is merging: its code changed, so it leaves for its gates and is verified again once they

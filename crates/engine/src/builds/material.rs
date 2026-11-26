@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use factory_core::maintenance::material::Recorded;
+use mork_core::maintenance::material::Recorded;
 
 use crate::jobs::launch;
 use crate::paths::Home;
@@ -17,7 +17,7 @@ pub fn recover(home: &Home, recorded: &mut Recorded) {
     if !binary.is_file() {
         return;
     }
-    let current = factory_core::maintenance::manuals::digests();
+    let current = mork_core::maintenance::manuals::digests();
     for key in current.keys().filter(|k| k.as_str() != "contract") {
         if recorded.digests.get(key) == current.get(key) || recorded.text(key).is_some() {
             continue;
@@ -32,7 +32,7 @@ pub fn recover(home: &Home, recorded: &mut Recorded) {
         let Some(text) = out.ok().filter(|o| o.status.success()).and_then(|o| String::from_utf8(o.stdout).ok()) else {
             continue;
         };
-        if recorded.digests.get(key) == Some(&factory_types::hash::short(&text)) {
+        if recorded.digests.get(key) == Some(&mork_types::hash::short(&text)) {
             recorded.texts.insert(key.clone(), text);
         }
     }

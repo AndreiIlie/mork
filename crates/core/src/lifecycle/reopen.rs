@@ -1,12 +1,12 @@
-//! Andrei's `mock <card>` (fac-591): a visual card's approved mock reopened in the same run, at any stage until its
+//! The operator's `mock <card>` (fac-591): a visual card's approved mock reopened in the same run, at any stage until its
 //! final landing starts; the whole submission withdrawn and the build held until the mock's approve.
 
-use factory_types::CardId;
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::ask::AskKind;
-use factory_types::card::{Card, Gates, MockStep, Mode, Rebrief, Stage};
-use factory_types::landing::Landing;
-use factory_types::state::Job;
+use mork_types::CardId;
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::ask::AskKind;
+use mork_types::card::{Card, Gates, MockStep, Mode, Rebrief, Stage};
+use mork_types::landing::Landing;
+use mork_types::state::Job;
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -73,7 +73,7 @@ pub(super) fn landing_started(state: &State, c: &Card) -> bool {
     final_step || pr_merge || state.actions.values().any(dispatched)
 }
 
-/// Why a card's submission is withdrawn: Andrei reopened its mock, or it went back to brief (fac-638).
+/// Why a card's submission is withdrawn: the operator reopened its mock, or it went back to brief (fac-638).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Back {
     Mock,
@@ -83,7 +83,7 @@ pub(super) enum Back {
 impl Back {
     fn why(self, id: &CardId) -> String {
         match self {
-            Self::Mock => format!("Andrei reopened {id}'s mock"),
+            Self::Mock => format!("The operator reopened {id}'s mock"),
             Self::Brief => format!("{id} went back to brief"),
         }
     }
@@ -152,14 +152,13 @@ pub(super) fn continued(p: &mut Poster<'_>, mut c: Card, from: usize, back: Back
     let id = c.id.clone();
     let all = notes_of(p.state, &c);
     let total = all.len();
-    let gone = factory_types::decisions::withdrawn(&all);
+    let gone = mork_types::decisions::withdrawn(&all);
     let since: Vec<String> = all
         .iter()
         .zip(gone)
         .enumerate()
         .filter(|(i, (n, g))| {
-            !g && factory_types::decisions::number(total, *i) > from
-                && factory_types::decisions::decision_words(n).is_some()
+            !g && mork_types::decisions::number(total, *i) > from && mork_types::decisions::decision_words(n).is_some()
         })
         .map(|(_, (n, _))| n.clone())
         .collect();

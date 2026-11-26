@@ -1,4 +1,4 @@
-//! The config, `factory.toml` (1.14), with the project table of 4.1 and the seats of 3.1.
+//! The config, `mork.toml` (1.14), with the project table of 4.1 and the seats of 3.1.
 
 use std::collections::BTreeMap;
 
@@ -9,15 +9,15 @@ mod seats;
 pub use crate::job::SliceConfig;
 pub use crate::ports::Ports;
 pub use seats::{
-    AGY_3P_BUCKET, AGY_PRICES, ANDREI_MODELS, CLAUDE_BLOCKED, CODEX_PRICES, Cli, Effort, MODEL_CATALOG, ModelOverride,
-    OPUS, PickModel, Picks, ROSTER, ReviewKind, ReviewPicks, SEAT_DEFAULTS, SOL, Seat, SeatOverride, SeatPhase,
-    Standing, Wall, agy_bucket, barred, cli_of_model, foreman_seat, moved_to_codex,
+    AGY_3P_BUCKET, AGY_PRICES, CLAUDE_BLOCKED, CODEX_PRICES, Cli, Effort, MODEL_CATALOG, ModelOverride,
+    OPERATOR_MODELS, OPUS, PickModel, Picks, ROSTER, ReviewKind, ReviewPicks, SEAT_DEFAULTS, SOL, Seat, SeatOverride,
+    SeatPhase, Standing, Wall, agy_bucket, barred, cli_of_model, foreman_seat, moved_to_codex,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    pub factory: FactoryConfig,
+    pub mork: MorkConfig,
     pub git: GitConfig,
     #[serde(default)]
     pub internals: Internals,
@@ -53,8 +53,9 @@ pub struct Toolchain {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct FactoryConfig {
-    pub project: crate::ProjectId,
+pub struct MorkConfig {
+    #[serde(default)]
+    pub project: Option<crate::ProjectId>,
     #[serde(default = "d_editor")]
     pub editor: String,
     #[serde(default = "d_true")]
@@ -70,10 +71,14 @@ pub struct FactoryConfig {
     #[serde(default)]
     pub toolchains: Vec<Toolchain>,
     #[serde(default)]
+    pub caches: Vec<String>,
+    #[serde(default)]
+    pub cache_files: Vec<String>,
+    #[serde(default)]
     pub env: BTreeMap<String, String>,
     #[serde(default = "d_poll")]
     pub poll_seconds: u64,
-    /// The folder Andrei installed Vite and sass in with npm (fac-258): the visual cards' mock host.
+    /// The folder the operator installed Vite and sass in with npm (fac-258): the visual cards' mock host.
     #[serde(default)]
     pub vite: Option<String>,
     /// Loopback TCP port for the local web bridge (fac-671); none disables the bridge, 0 picks an ephemeral port.
@@ -90,12 +95,12 @@ pub struct FactoryConfig {
     pub skills: Option<String>,
 }
 
-/// Default, minimum, and maximum non-zero `[factory] context_cap` values in tokens (fac-681).
+/// Default, minimum, and maximum non-zero `[mork] context_cap` values in tokens (fac-681).
 pub const CONTEXT_CAP_DEFAULT: u64 = 200_000;
 pub const CONTEXT_CAP_MIN: u64 = 100_000;
 pub const CONTEXT_CAP_MAX: u64 = 1_000_000;
 
-impl FactoryConfig {
+impl MorkConfig {
     /// Active auto-compaction context cap in tokens, or none when disabled (`0`) (fac-681).
     pub fn context_cap(&self) -> Option<u64> {
         (self.context_cap > 0).then_some(self.context_cap)
@@ -120,17 +125,23 @@ pub struct GitConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Internals {
+    #[serde(default)]
+    pub hide: bool,
     #[serde(default = "d_words")]
     pub words: Vec<String>,
 }
 
 impl Default for Internals {
     fn default() -> Self {
-        Self { words: d_words() }
+        Self { hide: false, words: d_words() }
     }
 }
 
 impl Config {
+    pub fn forge_label(&self, project: &crate::ProjectId) -> &'static str {
+        self.projects.get(project).filter(|p| p.forge.hosted()).map_or("the forge", |p| p.forge.label())
+    }
+
     /// Configured project names in file order, then any omitted names alphabetically.
     pub fn ordered_projects(&self) -> impl Iterator<Item = &crate::ProjectId> {
         let rest = self.projects.keys().filter(|name| !self.project_order.contains(name));
@@ -138,12 +149,79 @@ impl Config {
     }
 }
 
-/// `{ workspace, slug }` of a Bitbucket project.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct BitbucketRepo {
-    pub workspace: String,
-    pub slug: String,
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum BoardConfig {
+    Markdown { path: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum ForgeConfig {
+    Local { backup: Option<String> },
+    Bitbucket { workspace: String, slug: String, review_tag: Option<String> },
+}
+
+impl Default for ForgeConfig {
+    fn default() -> Self {
+        Self::Local { backup: None }
+    }
+}
+
+impl ForgeConfig {
+    pub fn hosted(&self) -> bool {
+        !matches!(self, Self::Local { .. })
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Local { .. } => "local",
+            Self::Bitbucket { .. } => "Bitbucket",
+        }
+    }
+
+    pub fn skill(&self) -> &'static str {
+        match self {
+            Self::Local { .. } => "joins-and-the-train",
+            Self::Bitbucket { .. } => "bitbucket",
+        }
+    }
+
+    pub fn repo_key(&self) -> Option<String> {
+        match self {
+            Self::Local { .. } => None,
+            Self::Bitbucket { workspace, slug, .. } => Some(format!("{workspace}/{slug}")),
+        }
+    }
+
+    pub fn pr_link(&self, pr: u64) -> Option<String> {
+        match self {
+            Self::Local { .. } => None,
+            Self::Bitbucket { workspace, slug, .. } => {
+                Some(format!("https://bitbucket.org/{workspace}/{slug}/pull-requests/{pr}"))
+            }
+        }
+    }
+
+    pub fn has_review_trigger(&self) -> bool {
+        matches!(self, Self::Bitbucket { review_tag: Some(_), .. })
+    }
+
+    pub fn backup(&self) -> Option<&String> {
+        match self {
+            Self::Local { backup } => backup.as_ref(),
+            Self::Bitbucket { .. } => None,
+        }
+    }
+
+    pub fn project_view(&self) -> serde_json::Value {
+        match self {
+            Self::Local { .. } => serde_json::json!({"kind": "local"}),
+            Self::Bitbucket { workspace, slug, .. } => {
+                serde_json::json!({"kind":"bitbucket", "workspace":workspace, "slug":slug})
+            }
+        }
+    }
 }
 
 /// `statuses`: the board statuses a started and a merged card move to.
@@ -182,10 +260,37 @@ pub struct TunnelConfig {
 
 /// `[projects.<name>.tickets]`: a project's issue-tracker API and ticket page URL prefix (fac-721).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct TicketsConfig {
-    pub api: String,
-    pub page: String,
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum TicketsConfig {
+    AzureDevops { api: String, page: String, token: String },
+}
+
+impl TicketsConfig {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::AzureDevops { .. } => "Azure DevOps",
+        }
+    }
+    pub fn max_id(&self) -> u64 {
+        match self {
+            Self::AzureDevops { .. } => i32::MAX as u64,
+        }
+    }
+    pub fn api(&self) -> &str {
+        match self {
+            Self::AzureDevops { api, .. } => api,
+        }
+    }
+    pub fn page(&self) -> &str {
+        match self {
+            Self::AzureDevops { page, .. } => page,
+        }
+    }
+    pub fn token(&self) -> &str {
+        match self {
+            Self::AzureDevops { token, .. } => token,
+        }
+    }
 }
 
 /// `[projects.<name>]` (4.1).
@@ -196,11 +301,8 @@ pub struct ProjectConfig {
     #[serde(default = "d_base")]
     pub base: String,
     #[serde(default)]
-    pub bitbucket: Option<BitbucketRepo>,
-    /// A local project's remote for non-forced pushes of the base after each landing.
-    #[serde(default)]
-    pub backup: Option<String>,
-    pub board: String,
+    pub forge: ForgeConfig,
+    pub board: BoardConfig,
     #[serde(default)]
     pub statuses: Statuses,
     #[serde(default)]
@@ -208,11 +310,11 @@ pub struct ProjectConfig {
     #[serde(default)]
     pub install: Option<String>,
     /// A long-lived shell command each full card's clone serves its preview with (fac-196), run
-    /// after `install` in a wall of its own, `FACTORY_PORT` its card's port; none, no preview.
+    /// after `install` in a wall of its own, `MORK_PORT` its card's port; none, no preview.
     #[serde(default)]
     pub preview: Option<String>,
     pub test: String,
-    /// The command `factory test --file <path>…` runs, the paths appended to it as the checks' are
+    /// The command `mork test --file <path>…` runs, the paths appended to it as the checks' are
     /// (fac-154); none, and `--file` is refused. The merge train never uses it.
     #[serde(default)]
     pub test_file: Option<String>,
@@ -234,15 +336,12 @@ pub struct ProjectConfig {
     /// The Claude Code session a haiku wakes for this project (fac-265).
     #[serde(default)]
     pub orchestrator_session: Option<String>,
-    /// Whether this project's orchestrator reads queued wakes with `factory ctl wakes` (fac-663).
+    /// Whether this project's orchestrator reads queued wakes with `mork ctl wakes` (fac-663).
     #[serde(default)]
     pub orchestrator_waits: bool,
     /// Issue-tracker URLs for a project whose cards and PRs track external tickets (fac-721).
     #[serde(default)]
     pub tickets: Option<TicketsConfig>,
-    /// Pull request title tag that triggers automatic review into any destination branch (fac-721).
-    #[serde(default)]
-    pub review_tag: Option<String>,
 }
 
 impl ProjectConfig {
@@ -253,7 +352,7 @@ impl ProjectConfig {
 }
 
 /// The keys each table must have (1.14, 4.1): the table, then its keys.
-pub const REQUIRED: &[(&str, &[&str])] = &[("factory", &["project"]), ("git", &["author"])];
+pub const REQUIRED: &[(&str, &[&str])] = &[("mork", &[]), ("git", &["author"])];
 /// A project's required keys.
 pub const PROJECT_REQUIRED: &[&str] = &["repo", "board", "test"];
 
@@ -277,7 +376,7 @@ fn d_poll() -> u64 {
 }
 
 fn d_words() -> Vec<String> {
-    let mut w: Vec<String> = ["Claude", "Codex", "Anthropic", "OpenAI", "the factory", "foreman", "fable", "astra"]
+    let mut w: Vec<String> = ["Claude", "Codex", "Anthropic", "OpenAI", "foreman", "fable", "astra"]
         .iter()
         .map(|s| (*s).to_owned())
         .collect();

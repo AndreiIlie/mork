@@ -3,9 +3,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_types::ProjectId;
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::card::BoardCard;
+use mork_types::ProjectId;
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::card::BoardCard;
 
 use super::{Ctx, Decision, Intent};
 use crate::post::Poster;
@@ -59,20 +59,20 @@ fn timed_fetches(p: &mut Poster<'_>, ctx: Ctx<'_>) {
     let mut projects: BTreeSet<ProjectId> =
         p.state.cards.values().filter(|c| c.stage.is_live()).map(|c| c.project.clone()).collect();
     let idle = p.state.lookbacks.iter().filter(|(project, reads)| {
-        ctx.config.projects.get(*project).is_some_and(|pc| pc.bitbucket.is_some())
+        ctx.config.projects.get(*project).is_some_and(|pc| pc.forge.hosted())
             && reads.values().any(|c| c.commit.is_some())
     });
     projects.extend(idle.map(|(project, _)| project.clone()));
     for project in projects {
-        let on_bitbucket = ctx.config.projects.get(&project).is_some_and(|pc| pc.bitbucket.is_some());
-        if on_bitbucket && p.state.world.token_refused.is_some() {
+        let on_hosted_forge = ctx.config.projects.get(&project).is_some_and(|pc| pc.forge.hosted());
+        if on_hosted_forge && p.state.world.token_refused.is_some() {
             continue;
         }
         let fetches: Vec<&Action> = p
             .all_actions()
             .filter(|a| matches!(&a.what, ActionWhat::Fetch { project: x, .. } if *x == project))
             .collect();
-        // One under way, or held for Andrei (2.5.7), and no other is made.
+        // One under way, or held for the operator (2.5.7), and no other is made.
         let under_way = fetches
             .iter()
             .any(|a| matches!(a.status, ActionStatus::Pending | ActionStatus::Started | ActionStatus::Held));
@@ -85,7 +85,7 @@ fn timed_fetches(p: &mut Poster<'_>, ctx: Ctx<'_>) {
 
 // A fetch that failed runs again at the next poll: one poll interval after each failure.
 fn retry_fetches(p: &mut Poster<'_>, ctx: Ctx<'_>) {
-    let every = i64::try_from(ctx.config.factory.poll_seconds).unwrap_or(60).saturating_mul(1000);
+    let every = i64::try_from(ctx.config.mork.poll_seconds).unwrap_or(60).saturating_mul(1000);
     let now = p.now;
     let again: Vec<Action> = p
         .all_actions()

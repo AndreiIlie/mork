@@ -3,8 +3,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use factory_types::JobId;
-use factory_types::seen::{Detail, DetailKind, ReadPoint, StepView, TurnView};
+use mork_types::JobId;
+use mork_types::seen::{Detail, DetailKind, ReadPoint, StepView, TurnView};
 
 use super::{Step, StreamState};
 use crate::files::sha256_hex;

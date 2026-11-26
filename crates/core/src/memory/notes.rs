@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_types::command::TextList;
-use factory_types::config::Config;
-use factory_types::note::{NewNote, Note, NoteWhat, ProjectNotes};
-use factory_types::state::{Agent, Sender};
-use factory_types::{AgentKey, CardId, Command, ProjectId};
+use mork_types::command::TextList;
+use mork_types::config::Config;
+use mork_types::note::{NewNote, Note, NoteWhat, ProjectNotes};
+use mork_types::state::{Agent, Sender};
+use mork_types::{AgentKey, CardId, Command, ProjectId};
 use serde_json::json;
 
 use super::handoffs::{citing_cards, handoff_dir};
@@ -31,9 +31,9 @@ fn known(project: &ProjectId, ctx: Ctx<'_>) -> Result<(), String> {
     ctx.config.projects.contains_key(project).then_some(()).ok_or_else(|| format!("no project `{project}`"))
 }
 
-// A note with no project is the factory's: nothing accounted for it.
-pub(crate) fn under<'a>(note: &'a Note, factory: &'a ProjectId) -> &'a ProjectId {
-    note.project.as_ref().unwrap_or(factory)
+// A note with no project falls back to Mork project when one is configured; else under none.
+pub(crate) fn under<'a>(note: &'a Note, mork: Option<&'a ProjectId>) -> Option<&'a ProjectId> {
+    note.project.as_ref().or(mork)
 }
 
 fn what(
@@ -117,14 +117,18 @@ fn add(
         let a = state.agents.get(key).ok_or_else(|| format!("no seat `{key}`"))?;
         let (own, card) = origin(state, a);
         let own = own.ok_or("this seat has no card's project to file a note under")?;
-        let factory = &ctx.config.factory.project;
-        // Feedback and a lesson may be the factory's, whichever project's card the seat is on (fac-592, fac-593).
-        let to_factory =
-            project == Some(factory) && matches!(what, NoteWhat::Feedback { .. } | NoteWhat::Lesson { .. });
-        if project.is_some_and(|p| *p != own) && !to_factory {
-            return Err(format!(
-                "this seat files notes under its own project, `{own}`; only feedback and a lesson may go to the factory's, `--project {factory}`"
-            ));
+        let mork = ctx.config.mork.project.as_ref();
+        // Feedback and a lesson may be Mork's, whichever project's card the seat is on (fac-592, fac-593).
+        let to_mork =
+            mork.is_some() && project == mork && matches!(what, NoteWhat::Feedback { .. } | NoteWhat::Lesson { .. });
+        if project.is_some_and(|p| *p != own) && !to_mork {
+            let msg = match mork {
+                Some(mork) => format!(
+                    "this seat files notes under its own project, `{own}`; only feedback and a lesson may go to Mork's, `--project {mork}`"
+                ),
+                None => format!("this seat files notes under its own project, `{own}`"),
+            };
+            return Err(msg);
         }
         (project.cloned().unwrap_or(own), card, Some(key.clone()))
     } else {
@@ -158,8 +162,8 @@ pub(crate) fn put(
 }
 
 fn list(state: &State, project: &ProjectId, ctx: Ctx<'_>) -> Decision {
-    let factory = &ctx.config.factory.project;
-    let notes: Vec<&Note> = state.notes.values().rev().filter(|n| under(n, factory) == project).collect();
+    let mork = ctx.config.mork.project.as_ref();
+    let notes: Vec<&Note> = state.notes.values().rev().filter(|n| under(n, mork) == Some(project)).collect();
     Decision::ok(json!({"notes": {"project": project, "notes": notes}}))
 }
 
@@ -167,7 +171,9 @@ fn list(state: &State, project: &ProjectId, ctx: Ctx<'_>) -> Decision {
 pub fn view(state: &State, config: &Config) -> Vec<ProjectNotes> {
     let mut projects: BTreeMap<ProjectId, Vec<Note>> = BTreeMap::new();
     for n in state.notes.values().rev() {
-        projects.entry(under(n, &config.factory.project).clone()).or_default().push(n.clone());
+        if let Some(project) = under(n, config.mork.project.as_ref()) {
+            projects.entry(project.clone()).or_default().push(n.clone());
+        }
     }
     let order: Vec<_> = config.ordered_projects().collect();
     let mut out: Vec<_> = projects.into_iter().map(|(project, notes)| ProjectNotes { project, notes }).collect();
@@ -179,11 +185,11 @@ fn delete(state: &State, from: &Sender, project: &ProjectId, ids: &[String], ctx
     if ids.is_empty() {
         return Err("notes.delete requires at least one id".into());
     }
-    let factory = &ctx.config.factory.project;
+    let mork = ctx.config.mork.project.as_ref();
     let mut selected = BTreeSet::new();
     for id in ids {
         let id = id.parse::<u64>().map_err(|_| format!("`{id}` isn't a note id"))?;
-        if !state.notes.get(&id).is_some_and(|n| under(n, factory) == project) {
+        if !state.notes.get(&id).is_some_and(|n| under(n, mork) == Some(project)) {
             return Err(format!("project `{project}` has no note {id}"));
         }
         selected.insert(id);

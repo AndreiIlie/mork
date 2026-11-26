@@ -7,10 +7,10 @@ use std::path::{Path, PathBuf};
 
 use crate::suite::Binary;
 
-/// The train's phase, set by the engine on its run of the factory's own suite.
-pub const PHASE: &str = "FACTORY_TRAIN_PHASE";
+/// The train's phase, set by the engine on its run of Mork's own suite.
+pub const PHASE: &str = "MORK_TRAIN_PHASE";
 /// The file a test binary of the walled phase records its skipped wall tests in.
-pub const RECORD: &str = "FACTORY_WALL_TESTS";
+pub const RECORD: &str = "MORK_WALL_TESTS";
 
 /// A phase of the train's run of the suite.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,14 +21,18 @@ pub enum Phase {
     Unwalled,
 }
 
-/// The phase `FACTORY_TRAIN_PHASE` names, an error for a name it can't be. None is an older engine's
+/// The phase `MORK_TRAIN_PHASE` names, an error for a name it can't be. None is an older engine's
 /// train, or no train: the suite runs once as before, until fac-123 refuses it after fac-65's reload.
 pub fn phase() -> Result<Option<Phase>, String> {
-    match std::env::var(PHASE).as_deref() {
-        Err(_) | Ok("") => Ok(None),
-        Ok("walled") => Ok(Some(Phase::Walled)),
-        Ok("unwalled") => Ok(Some(Phase::Unwalled)),
-        Ok(other) => Err(format!("{PHASE}={other}: the train's phase is walled or unwalled")),
+    let Some(val) = std::env::var_os(PHASE) else {
+        return Ok(None);
+    };
+    match val.to_str() {
+        Some("") => Ok(None),
+        Some("walled") => Ok(Some(Phase::Walled)),
+        Some("unwalled") => Ok(Some(Phase::Unwalled)),
+        Some(other) => Err(format!("{PHASE}={other}: the train's phase is walled or unwalled")),
+        None => Err(format!("{PHASE} is not valid UTF-8: the train's phase is walled or unwalled")),
     }
 }
 
@@ -82,8 +86,8 @@ pub fn rerun(binaries: Vec<Binary>, dir: &Path) -> Result<Vec<Binary>, String> {
             return Err(format!("{}: {gone} was recorded, and the rebuilt binary has no such test", b.name));
         }
         b.args = std::iter::once("--exact").chain(names).map(str::to_owned).collect();
-        // `FACTORY_UNWALLED=1` from the project's test command would skip them again.
-        b.env.push(("FACTORY_UNWALLED".to_owned(), "0".to_owned()));
+        // MORK_UNWALLED=1 from the project's test command would skip these tests again.
+        b.env.push(("MORK_UNWALLED".to_owned(), "0".to_owned()));
         out.push(b);
     }
     Ok(out)

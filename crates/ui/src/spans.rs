@@ -1,11 +1,11 @@
 //! What each line says, and in which of the palette's colours (5.2): worked out apart from the
 //! widgets, so the tests read it without pixels.
 
-use factory_types::Command;
-use factory_types::ask::Color as Light;
-use factory_types::card::Mode;
-use factory_types::reply::Role;
-use factory_types::view::{
+use mork_types::Command;
+use mork_types::ask::Color as Light;
+use mork_types::card::Mode;
+use mork_types::reply::Role;
+use mork_types::view::{
     AgentLight, AgentRow, Author, CacheState, CardHeader, Doing, Fact, Master, Phase, Resources, Share, StageAt,
     TopLine, Update,
 };
@@ -72,7 +72,7 @@ pub fn agent_light(l: AgentLight) -> Tone {
 
 /// The top line's name and pin.
 pub fn top_head(t: &TopLine) -> Vec<Span> {
-    vec![Span::new("factory", Tone::Bright).bold(), Span::new(GAP, Tone::Dim), Span::new(pin(t), Tone::Dim)]
+    vec![Span::new("mork", Tone::Bright).bold(), Span::new(GAP, Tone::Dim), Span::new(pin(t), Tone::Dim)]
 }
 
 /// Words of the update after the pin, each with the button that follows it (fac-19).
@@ -386,7 +386,7 @@ pub fn role(r: Role) -> Tone {
 /// An author's colour (5.2).
 pub fn author(a: &Author) -> Tone {
     match a {
-        Author::Andrei => Tone::Bright,
+        Author::Operator => Tone::Bright,
         Author::Engine => Tone::Dim,
         Author::Orchestrator { .. } | Author::Pa => Tone::Green,
         Author::Agent { role: r, .. } => role(*r),
@@ -396,9 +396,9 @@ pub fn author(a: &Author) -> Tone {
 /// An author's name in a message's line (5.2).
 pub fn author_name(a: &Author) -> String {
     match a {
-        Author::Andrei => "andrei".to_owned(),
+        Author::Operator => "operator".to_owned(),
         Author::Engine => "engine".to_owned(),
-        Author::Orchestrator { project } => format!("{}{}", factory_types::state::ORCHESTRATOR, clean(project)),
+        Author::Orchestrator { project } => format!("{}{}", mork_types::state::ORCHESTRATOR, clean(project)),
         Author::Pa => "pa".to_owned(),
         Author::Agent { label, .. } => clean(label),
     }

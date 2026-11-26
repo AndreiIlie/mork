@@ -1,9 +1,9 @@
-//! The config file (1.14): `$FACTORY_CONFIG`, else `~/.config/factory/factory.toml`. Unknown keys,
+//! The config file (1.14): `$MORK_CONFIG`, else `~/.config/mork/mork.toml`. Unknown keys,
 //! wrong types and missing required keys are errors naming their line, or their key and table.
 
 use std::path::{Path, PathBuf};
 
-use factory_types::config::{
+use mork_types::config::{
     CONTEXT_CAP_MAX, CONTEXT_CAP_MIN, Cli, Config, PROJECT_REQUIRED, REQUIRED, SEAT_DEFAULTS, SeatOverride, Standing,
     Wall, moved_to_codex,
 };
@@ -70,11 +70,11 @@ impl From<ConfigError> for String {
 }
 
 pub fn path() -> Option<PathBuf> {
-    if let Some(p) = std::env::var_os("FACTORY_CONFIG").filter(|v| !v.is_empty()) {
+    if let Some(p) = std::env::var_os("MORK_CONFIG").filter(|v| !v.is_empty()) {
         return Some(PathBuf::from(p));
     }
     let home = std::env::var_os("HOME").filter(|v| !v.is_empty())?;
-    Some(PathBuf::from(home).join(".config/factory/factory.toml"))
+    Some(PathBuf::from(home).join(".config/mork/mork.toml"))
 }
 
 /// Reads and checks the config.
@@ -129,18 +129,19 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
         }
     }
     walled_seats(text, &config)?;
-    if config.factory.max_test_runs < 1 {
+    if config.mork.max_test_runs < 1 {
         return Err(ConfigError::Value {
             line: line_at(text, "max_test_runs"),
             message: "`max_test_runs` must be a whole number from 1".into(),
         });
     }
-    if config.factory.context_cap != 0 && !(CONTEXT_CAP_MIN..=CONTEXT_CAP_MAX).contains(&config.factory.context_cap) {
+    if config.mork.context_cap != 0 && !(CONTEXT_CAP_MIN..=CONTEXT_CAP_MAX).contains(&config.mork.context_cap) {
         return Err(ConfigError::Value {
-            line: key_line(text, Some("factory"), "context_cap"),
+            line: key_line(text, Some("mork"), "context_cap"),
             message: format!("`context_cap` must be 0 or between {CONTEXT_CAP_MIN} and {CONTEXT_CAP_MAX}"),
         });
     }
+    crate::config_checks::caches(text, &mut config.mork)?;
     slice(text, &config.slice)?;
     crate::config_checks::check(text, &config)?;
     Ok(config)
@@ -170,7 +171,7 @@ fn named(o: &SeatOverride, at: Standing) -> bool {
 }
 
 // What systemd itself would refuse, refused here with its line: else every job's start fails.
-fn slice(text: &str, s: &factory_types::config::SliceConfig) -> Result<(), ConfigError> {
+fn slice(text: &str, s: &mork_types::config::SliceConfig) -> Result<(), ConfigError> {
     for (key, w) in [("cpu_weight", s.cpu_weight), ("io_weight", s.io_weight)] {
         if !(1..=10_000).contains(&w) {
             let message = format!("`{key}` must be a whole number from 1 to 10000");
@@ -192,7 +193,7 @@ fn slice(text: &str, s: &factory_types::config::SliceConfig) -> Result<(), Confi
     Ok(())
 }
 
-fn check_projects(text: &str) -> Result<Vec<factory_types::ProjectId>, ConfigError> {
+fn check_projects(text: &str) -> Result<Vec<mork_types::ProjectId>, ConfigError> {
     let table = toml::de::DeTable::parse(text).map_err(|e| located(text, &e))?;
     let projects = table.get_ref().get("projects").and_then(|v| v.get_ref().as_table());
     let mut found = Vec::new();
@@ -207,7 +208,7 @@ fn check_projects(text: &str) -> Result<Vec<factory_types::ProjectId>, ConfigErr
                 message: format!("project `{name}` must choose either `orchestrator_waits` or `orchestrator_session`"),
             });
         }
-        found.push((key.span().start, factory_types::ProjectId::new(name)));
+        found.push((key.span().start, mork_types::ProjectId::new(name)));
     }
     found.sort_by_key(|(at, _)| *at);
     Ok(found.into_iter().map(|(_, n)| n).collect())
@@ -294,8 +295,8 @@ fn located(text: &str, e: &toml::de::Error) -> ConfigError {
 mod tests {
     use super::{ConfigError, parse};
 
-    const WAKE_PROJECT: &str = "[factory]\nproject = \"example.com\"\n[git]\nauthor = \"A <a@b>\"\n\
-                               [projects.\"example.com\"]\nrepo = \"/repo\"\nboard = \"/board\"\ntest = \"true\"\n";
+    const WAKE_PROJECT: &str = "[mork]\nproject = \"example.com\"\n[git]\nauthor = \"A <a@b>\"\n\
+                               [projects.\"example.com\"]\nrepo = \"/repo\"\nboard = { kind = \"markdown\", path = \"/board\" }\ntest = \"true\"\n";
 
     #[test]
     fn wake_keys_are_mutually_exclusive() {
@@ -312,6 +313,19 @@ mod tests {
     }
 
     #[test]
+    fn seat_cache_paths() -> Result<(), ConfigError> {
+        let parse_lists = |lists: &str| parse(&WAKE_PROJECT.replace("[git]", &format!("{lists}\n[git]")));
+        for entry in ["", ".", "p/./q", "../p", "/p"] {
+            assert!(parse_lists(&format!("caches = [{entry:?}]")).is_err());
+        }
+        assert!(parse_lists("caches=['a']\ncache_files=['a']").is_err());
+        let cfg = parse_lists("caches=['a/b','a']\ncache_files=['a/f','b/f']")?;
+        assert_eq!(cfg.mork.caches, ["a"]);
+        assert_eq!(cfg.mork.cache_files, ["b/f"]);
+        Ok(())
+    }
+
+    #[test]
     fn a_project_can_enable_waiting_wakes() -> Result<(), ConfigError> {
         let config = parse(&format!("{WAKE_PROJECT}orchestrator_waits = true\n"))?;
         assert!(config.projects.get("example.com").is_some_and(|p| p.orchestrator_waits));
@@ -320,7 +334,7 @@ mod tests {
 
     #[test]
     fn retired_config_keys_are_refused() {
-        let base = "[factory]\nproject = \"f\"\n[git]\nauthor = \"A <a@b>\"\n";
+        let base = "[mork]\nproject = \"f\"\n[git]\nauthor = \"A <a@b>\"\n";
         for seat in ["assistant", "opus", "astra", "fable", "mocker", "builder"] {
             let text = format!("{base}[seats.{seat}]\ncli = \"claude\"\n");
             assert!(matches!(parse(&text), Err(ConfigError::UnknownSeat { name, .. }) if name == seat));
@@ -340,12 +354,12 @@ mod tests {
 
     #[test]
     fn context_cap_defaults_validates_bounds_and_allows_zero() -> Result<(), ConfigError> {
-        let base = "[factory]\nproject = \"f\"\n";
+        let base = "[mork]\nproject = \"f\"\n";
         let tail = "[git]\nauthor = \"A <a@b>\"\n";
-        assert_eq!(parse(&format!("{base}{tail}"))?.factory.context_cap(), Some(200_000));
-        assert_eq!(parse(&format!("{base}context_cap = 0\n{tail}"))?.factory.context_cap(), None);
-        assert_eq!(parse(&format!("{base}context_cap = 100000\n{tail}"))?.factory.context_cap(), Some(100_000));
-        assert_eq!(parse(&format!("{base}context_cap = 1000000\n{tail}"))?.factory.context_cap(), Some(1_000_000));
+        assert_eq!(parse(&format!("{base}{tail}"))?.mork.context_cap(), Some(200_000));
+        assert_eq!(parse(&format!("{base}context_cap = 0\n{tail}"))?.mork.context_cap(), None);
+        assert_eq!(parse(&format!("{base}context_cap = 100000\n{tail}"))?.mork.context_cap(), Some(100_000));
+        assert_eq!(parse(&format!("{base}context_cap = 1000000\n{tail}"))?.mork.context_cap(), Some(1_000_000));
         for bad in [1, 99_999, 1_000_001] {
             let text = format!("{base}context_cap = {bad}\n{tail}");
             let Err(ConfigError::Value { line, message }) = parse(&text) else {
@@ -354,6 +368,28 @@ mod tests {
             assert_eq!(line, 3);
             assert!(message.contains("context_cap"), "{message}");
         }
+        Ok(())
+    }
+
+    #[test]
+    fn optional_mork_project_and_internals_hide_defaults() -> Result<(), ConfigError> {
+        let no_project = "[mork]\n[git]\nauthor = \"A <a@b>\"\n";
+        let cfg = parse(no_project)?;
+        assert_eq!(cfg.mork.project, None);
+        assert!(!cfg.internals.hide);
+
+        let with_hide = "[mork]\n[git]\nauthor = \"A <a@b>\"\n[internals]\nhide = true\n";
+        assert!(parse(with_hide)?.internals.hide);
+
+        let scalar_mork = "mork = \"nope\"\n[git]\nauthor = \"A <a@b>\"\n";
+        let Err(ConfigError::NotATable { line, name, .. }) = parse(scalar_mork) else {
+            panic!("expected scalar mork to fail as NotATable");
+        };
+        assert_eq!(line, 1);
+        assert_eq!(name, "mork");
+
+        let missing_mork = "[git]\nauthor = \"A <a@b>\"\n";
+        assert!(matches!(parse(missing_mork), Err(ConfigError::Toml { .. })));
         Ok(())
     }
 }

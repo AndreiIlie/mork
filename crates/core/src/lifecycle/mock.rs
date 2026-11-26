@@ -1,11 +1,11 @@
 //! A visual card's planner makes its mock in the spec conversation, on the baseline step's pages, and the plan's approve
-//! ends it; Andrei's reopen after it is a step of its own (fac-499, fac-591, fac-633, fac-636).
+//! ends it; the operator's reopen after it is a step of its own (fac-499, fac-591, fac-633, fac-636).
 
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Card, MockStep, Mode, Stage};
-use factory_types::config::Config;
-use factory_types::reply::{Outcome, Reply, Role};
-use factory_types::state::{Agent, Job, Owed, Sender};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Card, MockStep, Mode, Stage};
+use mork_types::config::Config;
+use mork_types::reply::{Outcome, Reply, Role};
+use mork_types::state::{Agent, Job, Owed, Sender};
 use serde_json::json;
 
 use crate::agents::prompt::held::{self, Sections};
@@ -16,15 +16,15 @@ use crate::post::Poster;
 use crate::state::State;
 
 /// The mock's folder in the card's clone: untracked, never committed, kept aside while the clone is gone.
-pub const FOLDER: &str = ".git/factory-mock";
+pub const FOLDER: &str = ".git/mork-mock";
 /// The mock host's output, in the clone where git doesn't see it.
-pub const LOG: &str = ".git/factory-mock-host/host.log";
+pub const LOG: &str = ".git/mork-mock-host/host.log";
 /// The host's own files, its Vite configuration and cache, beside the mock and apart from it.
-pub const HOST: &str = ".git/factory-mock-host";
+pub const HOST: &str = ".git/mork-mock-host";
 /// The engine's request to the planner to make the mock: an offer counts only from a turn that read the latest.
 pub(super) const HEADLINE: &str = "Mock the approved plan";
 
-/// Whether a card's mock is open at build: Andrei's reopen.
+/// Whether a card's mock is open at build: the operator's reopen.
 pub fn open(c: &Card) -> bool {
     c.stage == Stage::Build && c.mock.is_some_and(|m| m.step == MockStep::Open)
 }
@@ -34,7 +34,7 @@ pub fn baseline(c: &Card) -> bool {
     c.mock.is_some_and(|m| m.step == MockStep::Baseline)
 }
 
-/// Whether a card's mock is open at brief: its planner's to change with Andrei, beside the plan (fac-636).
+/// Whether the card's mock is open at brief (fac-636).
 pub fn briefing(c: &Card) -> bool {
     c.stage == Stage::Brief && c.mock.is_some_and(|m| m.step == MockStep::Open)
 }
@@ -78,47 +78,47 @@ pub(crate) fn starting(p: &mut Poster<'_>, a: &Agent) {
 
 /// The mock's link, while a Vite host is set and the card has its port.
 pub(crate) fn link(c: &Card, config: &Config) -> Option<String> {
-    config.factory.vite.as_ref()?;
+    config.mork.vite.as_ref()?;
     c.mock.and_then(|m| m.port).map(|port| super::preview::url(&c.id, port))
 }
 
 /// Every live card whose mock host should run, with its port: from its step's opening until the card
 /// ends, unless visual mode turned off skipped it.
-pub fn wanted(state: &State) -> Vec<(factory_types::CardId, u16)> {
+pub fn wanted(state: &State) -> Vec<(mork_types::CardId, u16)> {
     let live = state.cards.values().filter(|c| c.stage.is_live() && c.mode == Mode::Full);
     let kept = live.filter_map(|c| c.mock.filter(|m| m.step != MockStep::Skipped).map(|m| (c, m)));
     kept.filter_map(|(c, m)| Some((c.id.clone(), m.port?))).collect()
 }
 
-const OFFER: &str = "When the mock is ready, offer it with its link in your hand's message, asking nothing, and end `brief-ready`: that raises a mock ask in the card's spec room with an approve button, Andrei's alone. Every turn of yours takes the offer down and closes the ask; approve is refused until you offer again. Your next clear `brief-ready` raises a new ask and notifies Andrei again, unless a message to you was left unread: that message already owes you another turn. While the mock is open his words in the spec room reach you, and those in the build room the foreman: change the mock and record each change he asks for as a decision on the card. The foreman neither offers the mock nor relays his comments. The plan is never recapped or challenged again. His approve ends the mock and asks the foreman for the build, or to continue it after a reopened mock, with no final recap. No build turn starts beside the mock: on a reopen, one already under way may finish meanwhile, without submitting, and you don't wait for it.";
+const OFFER: &str = "When the mock is ready, offer it with its link in your hand's message, asking nothing, and end `brief-ready`: that raises a mock ask in the card's spec room with an approve button, the operator's alone. Every turn of yours takes the offer down and closes the ask; approve is refused until you offer again. Your next clear `brief-ready` raises a new ask and notifies the operator again, unless a message to you was left unread: that message already owes you another turn. While the mock is open his words in the spec room reach you, and those in the build room the foreman: change the mock and record each change he asks for as a decision on the card. The foreman neither offers the mock nor relays his comments. The plan is never recapped or challenged again. His approve ends the mock and asks the foreman for the build, or to continue it after a reopened mock, with no final recap. No build turn starts beside the mock: on a reopen, one already under way may finish meanwhile, without submitting, and you don't wait for it.";
 
-const OFFER_ALONE: &str = "When the mock is ready, offer it with its link in your hand's message, asking nothing, and end `brief-ready`: that raises a mock ask in the card's room with an approve button, Andrei's alone. Every turn of yours takes the offer down and closes the ask; approve is refused until you offer again. Your next clear `brief-ready` raises a new ask and notifies Andrei again, unless a message to you was left unread: that message already owes you another turn. While the mock is open his words in the card's room reach you: change the mock and record each change he asks for as a decision on the card. Edit no tracked repository files and do not submit `built` while the mock is open. The plan is never recapped again. His approve ends the mock and asks you to continue the build, with no final recap.";
+const OFFER_ALONE: &str = "When the mock is ready, offer it with its link in your hand's message, asking nothing, and end `brief-ready`: that raises a mock ask in the card's room with an approve button, the operator's alone. Every turn of yours takes the offer down and closes the ask; approve is refused until you offer again. Your next clear `brief-ready` raises a new ask and notifies the operator again, unless a message to you was left unread: that message already owes you another turn. While the mock is open his words in the card's room reach you: change the mock and record each change he asks for as a decision on the card. Edit no tracked repository files and do not submit `built` while the mock is open. The plan is never recapped again. His approve ends the mock and asks you to continue the build, with no final recap.";
 
 pub(super) fn request(c: &Card, config: &Config) -> String {
     let id = &c.id;
     let served = served(c, config);
     if c.no_planner {
         return format!(
-            "Andrei reopened {id}'s approved mock: change it as he asks in the card's room. The build waits for the mock's approve, and `built` is refused until then. Make the mock in your clone's `{FOLDER}/` (untracked, never committed), {served}. Edit no tracked repository files while the mock is open. Keep any mock already there, an earlier run's included, and change it to the approved plan. Changes to the mock must follow the project's own written rules for its look. {OFFER_ALONE}"
+            "The operator reopened {id}'s approved mock: change it as he asks in the card's room. The build waits for the mock's approve, and `built` is refused until then. Make the mock in your clone's `{FOLDER}/` (untracked, never committed), {served}. Edit no tracked repository files while the mock is open. Keep any mock already there, an earlier run's included, and change it to the approved plan. Changes to the mock must follow the project's own written rules for its look. {OFFER_ALONE}"
         );
     }
     format!(
-        "Andrei reopened {id}'s approved mock: change it as he asks in the card's spec room. The build waits for the mock's approve: no foreman turn starts until then, and one under way finishes without submitting. Start the mock at once: don't wait for a turn under way, which doesn't use the mock's folder. Make the mock in your clone's `{FOLDER}/` (untracked, never committed), {served}. The rest of the clone is read-only to you. Keep any mock already there, an earlier run's included, and change it to the approved plan. Changes to the mock must follow the project's own written rules for its look. {OFFER}"
+        "The operator reopened {id}'s approved mock: change it as he asks in the card's spec room. The build waits for the mock's approve: no foreman turn starts until then, and one under way finishes without submitting. Start the mock at once: don't wait for a turn under way, which doesn't use the mock's folder. Make the mock in your clone's `{FOLDER}/` (untracked, never committed), {served}. The rest of the clone is read-only to you. Keep any mock already there, an earlier run's included, and change it to the approved plan. Changes to the mock must follow the project's own written rules for its look. {OFFER}"
     )
 }
 
 /// Where the mock is served, or that nothing serves it and the seat raises that in its hand's `ask`.
 pub(super) fn served(c: &Card, config: &Config) -> String {
-    match (link(c, config), config.factory.vite.is_some()) {
+    match (link(c, config), config.mork.vite.is_some()) {
         (Some(link), _) => format!(
             "which the engine serves with Vite at {link}, its `index.html` first, the clone readable so it can import the project's SASS and files; its output in `{LOG}`"
         ),
-        (None, true) => "but no port of the factory's range was free for its host, so nothing serves it: raise that in your hand's `ask`".to_owned(),
-        (None, false) => "but the factory has no Vite host set (factory.toml's `[factory] vite`), so nothing serves it: raise that in your hand's `ask`".to_owned(),
+        (None, true) => "but no port of Mork's range was free for its host, so nothing serves it: raise that in your hand's `ask`".to_owned(),
+        (None, false) => "but Mork has no Vite host set (mork.toml's `[mork] vite`), so nothing serves it: raise that in your hand's `ask`".to_owned(),
     }
 }
 
-/// `approve` of a card in its mock step, past the buzz: Andrei's approval of its offered mock.
+/// `approve` of a card in its mock step, past the buzz: the operator's approval of its offered mock.
 pub(super) fn approve(state: &State, c: Card, ctx: Ctx<'_>) -> Decision {
     let mut p = Poster::for_ctx(state, ctx);
     let id = c.id.clone();
@@ -207,7 +207,7 @@ fn approval_text(c: &Card) -> String {
 /// Whether a job read the engine's last request of `headline` in `place`, of seq `from` on, before it launched or
 /// during it: an earlier turn cannot offer a later mock's work, nor end a later baseline step.
 pub(super) fn read_request(p: &Poster<'_>, place: &str, headline: &str, from: u64, job: &Job) -> bool {
-    let asks = |m: &&factory_types::state::Message| m.seq >= from && m.from == Sender::Engine && m.headline == headline;
+    let asks = |m: &&mork_types::state::Message| m.seq >= from && m.from == Sender::Engine && m.headline == headline;
     let asked = p.state.messages_in(place).filter(asks).last();
     asked.is_some_and(|m| {
         job.seen.is_some_and(|seen| m.seq < seen) || p.agent(&job.owner).is_some_and(|a| a.taken.contains(&m.seq))
@@ -215,17 +215,17 @@ pub(super) fn read_request(p: &Poster<'_>, place: &str, headline: &str, from: u6
 }
 
 // The approved plan stays fixed; decisions requested at the mock augment it without another brief.
-const STEP: &str = "## The mock\n\nThe plan is approved. Mock only the surfaces it names, following the project's written rules for its look, in the mock's folder: the rest of the clone is read-only to you. Offer the mock with its link, asking nothing, by ending `brief-ready`. Every turn of yours takes the offer down and closes its approve ask. Your next clear `brief-ready` raises a new ask and notifies Andrei again, unless a message to you was left unread: that message already owes you another turn. Approve is refused while the offer is down. Record changes Andrei asks for as decisions on the card and make them in the mock. Never return to brief, recap the plan or have it challenged again. Only Andrei's approve ends the mock, or visual mode turned off; either asks the foreman for the build, or to continue it, with no final recap. No build turn starts beside the mock: on a reopen, one already under way may finish meanwhile, without submitting, and you don't wait for it.";
+const STEP: &str = "## The mock\n\nThe plan is approved. Mock only the surfaces it names, following the project's written rules for its look, in the mock's folder: the rest of the clone is read-only to you. Offer the mock with its link, asking nothing, by ending `brief-ready`. Every turn of yours takes the offer down and closes its approve ask. Your next clear `brief-ready` raises a new ask and notifies the operator again, unless a message to you was left unread: that message already owes you another turn. Approve is refused while the offer is down. Record changes the operator asks for as decisions on the card and make them in the mock. Never return to brief, recap the plan or have it challenged again. Only the operator's approve ends the mock, or visual mode turned off; either asks the foreman for the build, or to continue it, with no final recap. No build turn starts beside the mock: on a reopen, one already under way may finish meanwhile, without submitting, and you don't wait for it.";
 
-const STEP_ALONE: &str = "## The mock\n\nThe plan is approved. Mock only the surfaces it names, following the project's written rules for its look, in the mock's folder: edit no tracked repository files while the mock is open, and `built` is refused until it ends. Offer the mock with its link, asking nothing, by ending `brief-ready`. Every turn of yours takes the offer down and closes its approve ask. Your next clear `brief-ready` raises a new ask and notifies Andrei again, unless a message to you was left unread: that message already owes you another turn. Approve is refused while the offer is down. Record changes Andrei asks for as decisions on the card and make them in the mock. Never return to brief or recap the plan again. Only Andrei's approve ends the mock, or visual mode turned off; either asks you to continue the build, with no final recap.";
+const STEP_ALONE: &str = "## The mock\n\nThe plan is approved. Mock only the surfaces it names, following the project's written rules for its look, in the mock's folder: edit no tracked repository files while the mock is open, and `built` is refused until it ends. Offer the mock with its link, asking nothing, by ending `brief-ready`. Every turn of yours takes the offer down and closes its approve ask. Your next clear `brief-ready` raises a new ask and notifies the operator again, unless a message to you was left unread: that message already owes you another turn. Approve is refused while the offer is down. Record changes the operator asks for as decisions on the card and make them in the mock. Never return to brief or recap the plan again. Only the operator's approve ends the mock, or visual mode turned off; either asks you to continue the build, with no final recap.";
 
 /// The open mock's context for its holder, or a waiting foreman seat, sent when changed.
 pub(crate) fn standing(c: &Card, holder: bool, s: &mut Sections<'_>, out: &mut String) {
     if !holder {
         let text = if c.no_planner {
-            "\n## The mock\n\nThe card's room foreman makes and offers the mock, and takes Andrei's comments in the card's room. You do not mock or relay comments. Andrei reopened it: no new turn of yours starts until it ends, and `built` is refused. Wait for the mock's approval or visual mode off.\n"
+            "\n## The mock\n\nThe card's room foreman makes and offers the mock, and takes the operator's comments in the card's room. You do not mock or relay comments. The operator reopened it: no new turn of yours starts until it ends, and `built` is refused. Wait for the mock's approval or visual mode off.\n"
         } else {
-            "\n## The mock\n\nThe planner makes and offers the mock, and takes Andrei's comments in the spec room. You do not mock or relay comments. Andrei reopened it: no new turn of yours starts until it ends, and `built` is refused. Wait for the engine's request for the build, or to continue it, after the mock's approval or visual mode off.\n"
+            "\n## The mock\n\nThe planner makes and offers the mock, and takes the operator's comments in the spec room. You do not mock or relay comments. The operator reopened it: no new turn of yours starts until it ends, and `built` is refused. Wait for the engine's request for the build, or to continue it, after the mock's approval or visual mode off.\n"
         };
         if s.sends("specification", text) {
             out.push_str(text);
@@ -247,27 +247,32 @@ pub(crate) fn standing(c: &Card, holder: bool, s: &mut Sections<'_>, out: &mut S
     } else {
         "the build waits for its approve, and a build turn under way since before finishes without submitting: mock without waiting for it"
     };
-    out.push_str(&format!("Where it stands: Andrei reopened the approved mock; {waits}. {now}"));
+    out.push_str(&format!("Where it stands: the operator reopened the approved mock; {waits}. {now}"));
 }
 
-/// The brief-time mock's rule for its specification holder, in its requests and its standing section (fac-636, fac-688).
-pub(super) fn at_brief_rule(c: &Card) -> &'static str {
-    if c.no_planner {
-        "The mock is yours to change with Andrei beside the plan, as the `agreeing-a-specification` skill says: edit only `.git/factory-mock/` and leave tracked repository files untouched before approval, record each change he asks for as a decision, render the mock from its link before each recap, which is the plan and the mock together, and leave it untouched while a recap waits for approve. The plan, its mock included, waits for Andrei's own approve: it is never given to an orchestrator."
+/// The brief-time mock's rule for its specification holder, in its requests and its standing section.
+pub(super) fn at_brief_rule(c: &Card) -> String {
+    let freeze = if c.no_planner {
+        "While the recap waits for approve, leave the mock untouched until the operator's comment withdraws it."
     } else {
-        "The mock is yours to change with Andrei beside the plan, as the `agreeing-a-specification` skill says: record each change he asks for as a decision, render the mock from its link before each recap, which is the plan and the mock together, and leave it untouched while a recap is under challenge or waits for approve. The plan, its mock included, waits for Andrei's own approve: it is never given to an orchestrator."
-    }
+        "While the recap is under challenge or waits for approve, leave the mock untouched until the foreman's \
+         objection arrives or the operator's comment withdraws the recap."
+    };
+    format!(
+        "Render and inspect the existing baseline. Raise the design direction, information hierarchy and concrete \
+         changes in your design ask. Leave the mock untouched until the operator confirms them or, on a self-sustained \
+         card, the orchestrator confirms them. On a delegated card, say the ask needs the operator's own answer. \
+         Record the decisions and apply the confirmed changes together in the first draft. \
+         Follow the `visual-mocks` skill and the project's written rules for its look. Confine mock \
+         edits to `{FOLDER}/` and leave tracked files untouched before approval. Record each refinement as a decision \
+         and render the mock from its link in the wall's headless Chromium before each recap. The recap is the plan \
+         and the mock together. {freeze} Only the operator approves them. After approval, edit the mock only on his reopen."
+    )
 }
-
-// A served mock under challenge or waiting approve must stay what the recap showed; nothing but this rule holds it.
-const AT_BRIEF: &str = "## The mock\n\nThis card is visual. The baseline of today's pages is in the mock's folder, the rest of the clone read-only to you: change it there with Andrei through the conversation, following the project's written rules for its look, and record each change he asks for as a decision on the card. Render the mock from its link in the wall's headless Chromium before each recap: a recap is the plan and the mock together, and Andrei's comment withdraws both. While a recap is under the foreman's challenge or waits for approve, leave the served mock untouched: edit it only once Andrei's comment withdrew the recap or the foreman's objection came, then recap again. The plan's approve, Andrei's own, ends the mock with it: after it you make no mock unless Andrei reopens it.";
-
-const AT_BRIEF_ALONE: &str = "## The mock\n\nThis card is visual. The baseline of today's pages is in the mock's folder: edit only `.git/factory-mock/` and leave tracked repository files untouched before approval. Change the mock there with Andrei through the conversation, following the project's written rules for its look, and record each change he asks for as a decision on the card. Render the mock from its link in the wall's headless Chromium before each recap: a recap is the plan and the mock together, and Andrei's comment withdraws both. While a recap waits for approve, leave the served mock untouched: edit it only once Andrei's comment withdrew the recap, then recap again. The plan's approve, Andrei's own, ends the mock with it: after it you make no mock unless Andrei reopens it.";
 
 /// The brief-time mock's standing section for its specification holder, sent when changed.
 pub(crate) fn at_brief(c: &Card, s: &mut Sections<'_>, out: &mut String) {
-    let body = if c.no_planner { AT_BRIEF_ALONE } else { AT_BRIEF };
-    let text = format!("\n{body}\n");
+    let text = format!("\n## The mock\n\n{}\n", at_brief_rule(c));
     if s.sends("mock", &text) {
         out.push_str(&text);
     }
@@ -277,16 +282,14 @@ pub(crate) fn at_brief(c: &Card, s: &mut Sections<'_>, out: &mut String) {
 pub fn line(state: &State, a: &Agent, config: &Config) -> Option<String> {
     let id = crate::messages::places::card_of(state, &a.place)?;
     let c = state.cards.get(&id).filter(|c| c.visual && c.mode == Mode::Full)?;
-    let served = match (link(c, config), config.factory.vite.is_some()) {
+    let served = match (link(c, config), config.mork.vite.is_some()) {
         (Some(link), _) => format!("serves it with Vite at {link} until the card ends, its output in `{LOG}`"),
         (None, true) => "serves it with Vite once its baseline step opens at brief".to_owned(),
-        (None, false) => {
-            "serves nothing: the factory has no Vite host set (factory.toml's `[factory] vite`)".to_owned()
-        }
+        (None, false) => "serves nothing: Mork has no Vite host set (mork.toml's `[mork] vite`)".to_owned(),
     };
     let who = if c.no_planner { "foreman" } else { "planner" };
     Some(format!(
-        "{id} is a visual card: its mock, a baseline of today's pages that its {who} changes with Andrei beside the plan and that the plan's approve approves with it, is kept in its clone's `{FOLDER}/`, untracked and never committed; an earlier run's mock is put back there when a later run's clone is made, and its baseline seat keeps it. The engine {served}. No seat starts or stops its host."
+        "{id} is a visual card: at brief its {who} edits the baseline only after the visual direction is confirmed. The plan's approve includes the mock. The mock is kept in the clone's `{FOLDER}/`, untracked and never committed; an earlier run's mock is put back there when a later run's clone is made, and its baseline seat keeps it. The engine {served}. No seat starts or stops its host."
     ))
 }
 

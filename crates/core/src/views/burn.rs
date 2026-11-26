@@ -2,9 +2,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_types::config::{Cli, agy_bucket};
-use factory_types::cost::Tokens;
-use factory_types::usage::{CardsLeft, DayBurn, RecentBurn, RoleBurn};
+use mork_types::config::{Cli, agy_bucket};
+use mork_types::cost::Tokens;
+use mork_types::usage::{CardsLeft, DayBurn, ModelCache, RecentBurn, RoleBurn};
 use serde_json::Value;
 
 /// Seven days in milliseconds.
@@ -67,22 +67,12 @@ pub fn recent(
     parents: &BTreeMap<String, String>,
     week_pools: &[WeekPool],
 ) -> RecentBurn {
-    let (total_cents, unknown, roles, cache_hit_percent) = roles_and_cache(cost_rows);
+    let (total_cents, unknown, roles, cache_by_model) = roles_and_cache(cost_rows);
     let ended = ended_runs(stage_rows);
     let (ended_cards, average_cents) = average_burn(&ended, card_rows, parents);
     let cards_left = tightest_cards_left(week_pools, cost_rows, parents);
     let daily = Vec::new();
-    RecentBurn {
-        since_ms,
-        total_cents,
-        unknown,
-        roles,
-        ended_cards,
-        average_cents,
-        cache_hit_percent,
-        cards_left,
-        daily,
-    }
+    RecentBurn { since_ms, total_cents, unknown, roles, ended_cards, average_cents, cache_by_model, cards_left, daily }
 }
 
 // A time's local day, counted from the epoch, at one fixed offset: the screen's current one.
@@ -123,10 +113,10 @@ pub fn daily(now_ms: i64, tz_offset_min: i32, cost_rows: &[Row<'_>], landed_rows
         .collect()
 }
 
-fn roles_and_cache(cost_rows: &[Row<'_>]) -> (u64, bool, Vec<RoleBurn>, Option<u32>) {
+fn roles_and_cache(cost_rows: &[Row<'_>]) -> (u64, bool, Vec<RoleBurn>, Vec<ModelCache>) {
     let mut by_role: BTreeMap<String, (u64, bool)> = BTreeMap::new();
     let (mut total_micros, mut total_unknown) = (0u64, false);
-    let (mut cache_read, mut cache_denom) = (0u128, 0u128);
+    let mut by_model = BTreeMap::new();
     for (_, _, kind, data) in cost_rows {
         if *kind != "cost" {
             continue;
@@ -140,12 +130,7 @@ fn roles_and_cache(cost_rows: &[Row<'_>]) -> (u64, bool, Vec<RoleBurn>, Option<u
             entry.0 = entry.0.saturating_add(delta);
             entry.1 |= unknown;
         }
-        if let Some(t) = data.get("tokens").and_then(|v| serde_json::from_value::<Tokens>(v.clone()).ok()) {
-            cache_read = cache_read.saturating_add(u128::from(t.cache_read));
-            let prompt =
-                u128::from(t.input).saturating_add(u128::from(t.cache_read)).saturating_add(u128::from(t.cache_write));
-            cache_denom = cache_denom.saturating_add(prompt);
-        }
+        count_prompt_tokens(&mut by_model, data);
     }
     let mut roles: Vec<RoleBurn> = by_role
         .into_iter()
@@ -153,9 +138,24 @@ fn roles_and_cache(cost_rows: &[Row<'_>]) -> (u64, bool, Vec<RoleBurn>, Option<u
         .filter(|r| r.cents > 0 || r.unknown)
         .collect();
     roles.sort_by(|a, b| b.cents.cmp(&a.cents).then_with(|| a.role.cmp(&b.role)));
-    let cache_hit =
-        (cache_denom > 0).then(|| u32::try_from((cache_read * 100 + cache_denom / 2) / cache_denom).ok()).flatten();
-    (total_micros.div_ceil(10_000), total_unknown, roles, cache_hit)
+    let cache_by_model = by_model
+        .into_iter()
+        .map(|((cli, model), (reads, prompt))| ModelCache {
+            cli: cli.to_owned(),
+            model: model.to_owned(),
+            cache_hit_percent: (reads * 100 + prompt / 2).checked_div(prompt).and_then(|pct| u32::try_from(pct).ok()),
+        })
+        .collect();
+    (total_micros.div_ceil(10_000), total_unknown, roles, cache_by_model)
+}
+
+fn count_prompt_tokens<'a>(by_model: &mut BTreeMap<(&'a str, &'a str), (u128, u128)>, data: &'a Value) {
+    let (Some(cli), Some(model)) = (data["cli"].as_str(), data["model"].as_str()) else { return };
+    let (reads, prompt) = by_model.entry((cli, model)).or_default();
+    if let Some(t) = data.get("tokens").and_then(|v| serde_json::from_value::<Tokens>(v.clone()).ok()) {
+        *reads += u128::from(t.cache_read);
+        *prompt += u128::from(t.input) + u128::from(t.cache_read) + u128::from(t.cache_write);
+    }
 }
 
 fn slice_run<'a>(rows: &'a [Row<'a>], run: u64) -> &'a [Row<'a>] {

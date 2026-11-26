@@ -1,9 +1,9 @@
 //! A foreman's finished children wake it once (fac-528): a completion report reaching it outside a turn while another
 //! of its children is at work is held, and the held reports wake it when the last child at work stops.
 
-use factory_types::AgentKey;
-use factory_types::reply::Role;
-use factory_types::state::{Agent, AgentStatus, HeldReports, Owed, Sender};
+use mork_types::AgentKey;
+use mork_types::reply::Role;
+use mork_types::state::{Agent, AgentStatus, HeldReports, Owed, Sender};
 
 use crate::messages::places::{self, Who};
 use crate::post::Poster;

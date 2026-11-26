@@ -11,10 +11,10 @@ use crate::ids::{ActionId, CardId, Sha};
 /// (`100644 <blob>`), a deleted file's zeros. A rename is a deletion and an addition.
 pub type Contents = BTreeMap<String, String>;
 
-/// A review card's review: of a Factory card's branch in the train, or of a PR or a branch.
+/// A review card's review: of a Mork card's branch in the train, or of a PR or a branch.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Review {
-    /// The Factory card whose branch it reviews in the train; none for a PR or a branch.
+    /// The Mork card whose branch it reviews in the train; none for a PR or a branch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub of: Option<CardId>,
     /// Opened by `review.merge`: approval merging remains enabled into the PR's destination.
@@ -49,7 +49,7 @@ pub struct Review {
     /// A PR entry's latest train run, ended: what an approval of its head merges on (fac-111).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished: Option<Finished>,
-    /// The head an approval of Andrei's was read on while its finished run had failed there: he is
+    /// The head an approval of the operator's was read on while its finished run had failed there: he is
     /// told once that it doesn't merge (fac-111).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval: Option<Sha>,
@@ -80,7 +80,7 @@ pub struct Raised {
     pub comment: Option<u64>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub resolved: bool,
-    /// Resolved as one Andrei's decision rules out: its thread is told so once its comment is posted (fac-349).
+    /// Resolved as one the operator's decision rules out: its thread is told so once its comment is posted (fac-349).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub declined: bool,
     /// Closed when an unsent failed round's submission was withdrawn, not verified fixed (fac-651).
@@ -152,6 +152,9 @@ pub struct Round {
     /// The commit its reviewers read, and the base its diff is against.
     pub commit: Sha,
     pub base: Sha,
+    /// Existing tests and assertions the checks flagged against this round's base.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub test_changes: Vec<String>,
     /// Files reviewed as `commit` has them: an entry's source-head changes, otherwise unread, unapproved content.
     /// Later rounds omit paths matching their own base in both this candidate and the last round with a verdict.
     pub files: Contents,

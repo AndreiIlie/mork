@@ -43,7 +43,7 @@ pub enum Purpose {
     /// has one, with `on` merged in, made in a disposable clone of its own (`clone`, its tag).
     Candidate { card: CardId, head: Sha, on: Sha, pushed: Option<Sha>, clone: i64 },
     /// The candidate's install, owed checks against `on`, and suite; `test` binds its pass key.
-    /// `unwalled` runs the factory's deferred wall tests outside every wall (fac-65).
+    /// `unwalled` runs Mork's deferred wall tests outside every wall (fac-65).
     TrainRun {
         card: CardId,
         commit: Sha,
@@ -56,7 +56,7 @@ pub enum Purpose {
     },
     /// The project's suite on a review card's head, before its review (4.4.1, 4.16.2).
     Suite { card: CardId, head: Sha },
-    /// A build of the factory's own repo at a commit: a card of it landed there (1.8.4, M3.22).
+    /// A build of Mork's own repo at a commit: a card of it landed there (1.8.4, M3.22).
     Build { commit: Sha },
 }
 
@@ -103,7 +103,7 @@ pub enum RebasedPrevious {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Cloned {
     pub at: Sha,
-    /// The numbers of the findings Andrei resolved on the review card (fac-298).
+    /// The numbers of the findings the operator resolved on the review card (fac-298).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resolved: Vec<u64>,
     /// The open findings' threads as this round read them, including failed reads (fac-448).
@@ -231,7 +231,7 @@ pub struct PrSeen {
     pub pr: u64,
     pub state: PrState,
     pub head: Sha,
-    /// Andrei's approval stands on the current head (4.11.1).
+    /// The operator's approval stands on the current head (4.11.1).
     pub approved: bool,
     /// For a merged PR: the merge commit's parents, when the mirror holds it.
     pub merge_parents: Vec<Sha>,
@@ -256,6 +256,8 @@ pub enum PrState {
 /// A colleague's open PR (4.16.1).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpenPr {
+    #[serde(default)]
+    pub review_requested: bool,
     pub pr: u64,
     pub author: String,
     pub title: String,

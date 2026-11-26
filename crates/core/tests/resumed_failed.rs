@@ -8,11 +8,11 @@ mod common;
 use std::collections::BTreeMap;
 
 use common::{Sim, reply};
-use factory_core::decide::{Event, JobEnd};
-use factory_types::CardId;
-use factory_types::card::Stage;
-use factory_types::state::Owed;
-use factory_types::work::Purpose;
+use mork_core::decide::{Event, JobEnd};
+use mork_types::CardId;
+use mork_types::card::Stage;
+use mork_types::state::Owed;
+use mork_types::work::Purpose;
 use serde_json::json;
 
 const CARD: &str = "web-1";
@@ -22,7 +22,7 @@ const PLANNER: &str = "web-1/planner";
 fn resumed_failed_turn_reads_later_news_and_the_next_turn_none_again() {
     let mut s = Sim::new();
     s.board(CARD, "web");
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
+    s.operator(json!({"start": {"card": CARD}})).unwrap();
     s.settle_actions();
     let id = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
     s.end_job(&id, json!({}));
@@ -30,7 +30,7 @@ fn resumed_failed_turn_reads_later_news_and_the_next_turn_none_again() {
     assert_eq!(s.stage(CARD), Stage::Brief);
     s.turn(PLANNER, reply("working", "Reading"));
 
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Join request."}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Join request."}})).unwrap();
     let (id, failed) = s.turn_started_with_argv(PLANNER, &["x"]);
     assert!(failed.contains("Join request."));
     s.apply(Event::JobEnded { id, end: JobEnd::Failed { words: "bwrap: no clone".into() } });
@@ -40,15 +40,15 @@ fn resumed_failed_turn_reads_later_news_and_the_next_turn_none_again() {
     edited.title = "Later announcement.".into();
     s.apply(Event::BoardsRead { cards: vec![edited], prefixes: BTreeMap::new() });
     assert!(!s.owed(PLANNER), "the announcement must not wake the errored seat");
-    s.andrei(json!({"resume": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"resume": {"agent": PLANNER}})).unwrap();
     assert!(matches!(s.state.agents[PLANNER].owed, Some(Owed::Wake)));
     let (id, resumed) = s.turn_started_with_argv(PLANNER, &["x"]);
     assert!(resumed.contains("Join request."), "the failed turn's news is given back");
     assert!(resumed.contains("Later announcement."), "the resumed turn reads news posted since");
-    let session = factory_core::decide::SessionSeen { started: true, ..Default::default() };
+    let session = mork_core::decide::SessionSeen { started: true, ..Default::default() };
     s.apply(Event::JobEnded { id, end: JobEnd::Finished { reply: Ok(reply("working", "Joined")), session } });
 
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Next words."}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Next words."}})).unwrap();
     let (_, next) = s.turn_started_with_argv(PLANNER, &["x"]);
     assert!(next.contains("Next words."));
     assert!(!next.contains("Join request."), "news already read is not given again");

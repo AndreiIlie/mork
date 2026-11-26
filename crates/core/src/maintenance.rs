@@ -1,5 +1,5 @@
-//! The factory's upkeep of itself: its own updates and reloads, what they brought, the manuals they carry and the
-//! material compared across them, the store's backups and pruning, and the outward actions held for Andrei.
+//! Mork's upkeep of itself: its own updates and reloads, what they brought, the manuals they carry and the
+//! material compared across them, the store's backups and pruning, and the outward actions held for the operator.
 
 pub mod changelog;
 pub mod manuals;
@@ -8,7 +8,7 @@ pub mod reload;
 pub mod updates;
 pub mod upkeep;
 
-use factory_types::Command;
+use mork_types::Command;
 
 use crate::decide::{Ctx, Decision};
 use crate::state::State;

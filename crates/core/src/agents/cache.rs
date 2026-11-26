@@ -1,7 +1,7 @@
 //! Assumed prompt-cache lifetimes per CLI and seat warmth checks (fac-670).
 
-use factory_types::config::{Cli, Config};
-use factory_types::state::Agent;
+use mork_types::config::{Cli, Config};
+use mork_types::state::Agent;
 
 const MINUTE_MS: i64 = 60_000;
 /// Assumed Claude prompt-cache lifetime in ms.

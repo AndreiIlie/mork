@@ -1,4 +1,4 @@
-// 1.4.11.3: the domain `factory wall-exec` sets before it execs a job.
+// 1.4.11.3: the domain `mork wall-exec` sets before it execs a job.
 
 use std::io;
 

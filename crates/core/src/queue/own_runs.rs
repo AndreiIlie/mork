@@ -1,20 +1,20 @@
-//! `factory test --run` on the factory's own project (fac-73): inside a card's wall no inner wall can start and the
+//! `mork test --run` on Mork's own project (fac-73): inside a card's wall no inner wall can start and the
 //! app's tests build only with its `faults`; a run there gets both, and the fakes on the first port range.
 
-use factory_types::config::ProjectConfig;
+use mork_types::config::ProjectConfig;
 
-const APP: &str = "factory-app";
-const FAULTS: &str = "factory-app/faults";
+const APP: &str = "mork-app";
+const FAULTS: &str = "mork-app/faults";
 
-/// The argv of a run lease of the factory's own project: `command` under `env` with the test settings, and the app's
+/// The argv of a run lease of Mork's own project: `command` under `env` with the test settings, and the app's
 /// `faults` added to a `cargo test` that builds the app and names no features.
 pub fn argv(project: &ProjectConfig, command: &[String]) -> Vec<String> {
     if command.is_empty() {
         return Vec::new();
     }
-    let mut argv = vec!["env".to_owned(), "FACTORY_UNWALLED=1".to_owned()];
+    let mut argv = vec!["env".to_owned(), "MORK_UNWALLED=1".to_owned()];
     if let Some(p) = project.ports.iter().find(|p| p.from < p.to) {
-        argv.push(format!("FACTORY_TEST_PORTS={}-{}", p.from, p.to));
+        argv.push(format!("MORK_TEST_PORTS={}-{}", p.from, p.to));
     }
     let mut command = command.to_vec();
     if let Some(at) = cargo_test(&command).filter(|&at| builds_the_app(&command[at + 1..])) {
@@ -29,24 +29,24 @@ pub fn walls_argv(project: &ProjectConfig, words: &[String]) -> Result<Vec<Strin
     let production = words.first().is_some_and(|w| w == "--no-default-features");
     let words = &words[usize::from(production)..];
     let Some(file) = words.first() else {
-        return Err("`factory test --walls` needs a plain test-file name".into());
+        return Err("`mork test --walls` needs a plain test-file name".into());
     };
     if file.is_empty()
         || file.starts_with('-')
         || !file.bytes().all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b))
     {
-        return Err("`factory test --walls` needs a plain test-file name, without a path or flag".into());
+        return Err("`mork test --walls` needs a plain test-file name, without a path or flag".into());
     }
     if words.len() > 2
         || words.get(1).is_some_and(|w| {
             w.is_empty() || w.starts_with('-') || w.chars().any(|c| c.is_whitespace() || c.is_control())
         })
     {
-        return Err("`factory test --walls` accepts at most one filter word that is no flag".into());
+        return Err("`mork test --walls` accepts at most one filter word that is no flag".into());
     }
-    let mut argv = vec!["env".into(), "-u".into(), "FACTORY_UNWALLED".into()];
+    let mut argv = vec!["env".into(), "-u".into(), "MORK_UNWALLED".into()];
     if let Some(p) = project.ports.iter().find(|p| p.from < p.to) {
-        argv.push(format!("FACTORY_TEST_PORTS={}-{}", p.from, p.to));
+        argv.push(format!("MORK_TEST_PORTS={}-{}", p.from, p.to));
     }
     argv.extend(["cargo".into(), "test".into(), "-p".into(), APP.into(), "--test".into(), file.clone()]);
     if production {

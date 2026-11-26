@@ -32,7 +32,7 @@ pub fn send(
     (max_bytes, timeout_ms): (u64, u64),
     stop: Option<&AtomicBool>,
 ) -> io::Result<Captured> {
-    // The ssh agent's socket too, for a key of Andrei's with a passphrase; never forwarded.
+    // The ssh agent's socket too, for a key of the operator's with a passphrase; never forwarded.
     let env = super::door_ssh::env(bounded::door_env());
     let stdin = format!("{line}\n");
     let max = usize::try_from(max_bytes).unwrap_or(usize::MAX).saturating_mul(8).saturating_add(65_536);

@@ -2,13 +2,13 @@
 //! layouts keep copy actions and card titles consistent across shapes (fac-33).
 
 use crate::activity::Entry;
-use factory_types::chat::ChatTurn;
-use factory_types::reply::Finding;
-use factory_types::view::{MessageView, PlaceView};
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{Column, column, container, responsive, row};
 use iced::{Element, Length, Padding};
+use mork_types::chat::ChatTurn;
+use mork_types::reply::Finding;
+use mork_types::view::{MessageView, PlaceView};
 
 use crate::app::{App, Message};
 use crate::shape::{self, Shape};
@@ -204,7 +204,7 @@ fn block<'a>(app: &'a App, t: &Titles, m: &'a MessageView, id: String, offset: i
     }
     let press = shape::foldable(m).then_some(Message::Fold(m.seq));
     let block = with_findings(clickable(id, col, press), m, unfolded, t);
-    if !shape::for_andrei(m) {
+    if !shape::for_operator(m) {
         return block;
     }
     container(block).width(Length::Fill).padding(PANEL_PAD).style(theme::panel).into()

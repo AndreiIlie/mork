@@ -1,4 +1,4 @@
-//! `factory work <order.json>`: the git of a clone, run inside its wall (1.2.4, 4.2); the merge train's work in a
+//! `mork work <order.json>`: the git of a clone, run inside its wall (1.2.4, 4.2); the merge train's work in a
 //! clone of its own is `runner`'s (fac-68). Each writes what the engine reads into the job's `io/`.
 
 use std::path::Path;
@@ -82,13 +82,13 @@ pub enum Order {
         install: Option<String>,
         checks: Option<super::runner::FinalChecks>,
         test: Option<String>,
-        /// The factory's own suite's phase in the train, its `FACTORY_TRAIN_PHASE` (fac-65).
+        /// Mork's own suite's phase in the train, its `MORK_TRAIN_PHASE` (fac-65).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         phase: Option<String>,
     },
 }
 
-/// What stopped a work order, printed by `factory work` (1.12.4).
+/// What stopped a work order, printed by `mork work` (1.12.4).
 #[derive(Debug)]
 pub enum WorkError {
     /// git couldn't run.
@@ -195,7 +195,7 @@ pub(super) fn fetch_in(dir: &Path, b: &BundleIn) -> Result<(), WorkError> {
 }
 
 // Where a base's tip lands before origin/<base> moves to it.
-const BASE_IN: &str = "refs/factory/base-in";
+const BASE_IN: &str = "refs/mork/base-in";
 
 // origin/<base> moves to the tip brought in, never back from a newer one a refresh brought (fac-333).
 fn fetch_forward(dir: &Path, b: &BundleIn) -> Result<(), WorkError> {
@@ -415,8 +415,8 @@ mod tests {
         std::fs::create_dir_all(&io).unwrap();
         std::fs::create_dir_all(&dst).unwrap();
         let ins = [
-            bundle_ref(src, &io.join("prev.bundle"), "refs/factory/prev", commits.0, "refs/rounds/1"),
-            bundle_ref(src, &io.join("curr.bundle"), "refs/factory/curr", commits.1, "refs/remotes/origin/card"),
+            bundle_ref(src, &io.join("prev.bundle"), "refs/mork/prev", commits.0, "refs/rounds/1"),
+            bundle_ref(src, &io.join("curr.bundle"), "refs/mork/curr", commits.1, "refs/remotes/origin/card"),
         ];
         let refs: Vec<&BundleIn> = ins.iter().collect();
         let at = Start { branch: "card", start: "refs/remotes/origin/card", local_base: None };
@@ -444,13 +444,12 @@ mod tests {
         let b1 = commit(&src, &[("a.txt", "1\n")], "b1");
         let c2 = commit(&src, &[("a.txt", "2\n")], "c2");
         let b2 = commit(&src, &[("a.txt", "2\n"), ("base_only.txt", "x\n")], "b2");
-        let from = bundle_ref(&src, &io.join("curr.bundle"), "refs/factory/curr", &c2, "refs/remotes/origin/card");
-        let extra =
-            vec![bundle_ref(&src, &io.join("base.bundle"), "refs/factory/new-base", &b2, "refs/factory/new-base")];
+        let from = bundle_ref(&src, &io.join("curr.bundle"), "refs/mork/curr", &c2, "refs/remotes/origin/card");
+        let extra = vec![bundle_ref(&src, &io.join("base.bundle"), "refs/mork/new-base", &b2, "refs/mork/new-base")];
         let ins: Vec<&BundleIn> = extra.iter().chain([&from]).collect();
         let at = Start { branch: "card", start: "refs/remotes/origin/card", local_base: None };
         clone(&dst, &io, &ins, &at, &[], &extra, None).unwrap();
-        assert_eq!(git(&dst, &["for-each-ref", "refs/factory/"]).unwrap(), "");
+        assert_eq!(git(&dst, &["for-each-ref", "refs/mork/"]).unwrap(), "");
         let base_diff = git(&dst, &["diff", "--name-only", &b1, &b2]).unwrap();
         assert!(base_diff.contains("base_only.txt"), "missing base diff: {base_diff}");
         let _ = std::fs::remove_dir_all(&root);
@@ -475,7 +474,7 @@ mod tests {
         let (rebased, diff, dst) = run_rebased_clone(&root, &src, "clean", (&b1, &b2), (&c1, &c2));
         assert_eq!(rebased, json!({"status": "projected", "conflicted": false, "conflicts": []}));
         assert_eq!(git(&dst, &["rev-parse", "refs/rounds/1"]).unwrap(), c1);
-        assert_eq!(git(&dst, &["for-each-ref", "refs/factory/"]).unwrap(), "");
+        assert_eq!(git(&dst, &["for-each-ref", "refs/mork/"]).unwrap(), "");
         assert!(diff.contains("-card-top") && diff.contains("+card-top-fixed"), "missing card fix: {diff}");
         assert!(!diff.contains("other.txt") && !diff.contains("master-bot"), "leaked base changes: {diff}");
 

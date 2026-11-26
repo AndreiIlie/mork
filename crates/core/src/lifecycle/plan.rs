@@ -1,11 +1,11 @@
 //! A card's plan (fac-36, fac-128): `deliverables` cuts it and `plan.task` marks its current task, waking nobody;
-//! `plan` posts one deliverable's tasks to the foreman, waking it only for Andrei or an orchestrator (fac-577).
+//! `plan` posts one deliverable's tasks to the foreman, waking it only for the operator or an orchestrator (fac-577).
 
-use factory_types::card::{Card, Deliverable, Plan};
-use factory_types::command::{Pick, TextList};
-use factory_types::reply::{Intent, Role};
-use factory_types::state::{MessageKind, Sender};
-use factory_types::{CardId, Command};
+use mork_types::card::{Card, Deliverable, Plan};
+use mork_types::command::{Pick, TextList};
+use mork_types::reply::{Intent, Role};
+use mork_types::state::{MessageKind, Sender};
+use mork_types::{CardId, Command};
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Decision};
@@ -201,7 +201,7 @@ fn task_of(name: &str, tasks: &[String], pick: &Pick) -> Result<usize, String> {
 }
 
 // `plan <card> <deliverable> <tasks>`: its tasks replaced, its first current and itself current, posted in the card's
-// room to the foreman: an agent's for its next news (fac-577), Andrei's or an orchestrator's waking it as their words do.
+// room to the foreman: an agent's for its next news (fac-577), the operator's or an orchestrator's waking it as their words do.
 fn publish(state: &State, from: &Sender, card: &CardId, n: &Pick, text: &TextList, ctx: Ctx<'_>) -> Decision {
     let mut c = match live(state, card) {
         Ok(c) => c,
@@ -229,7 +229,7 @@ fn publish(state: &State, from: &Sender, card: &CardId, n: &Pick, text: &TextLis
     let kind = if wakes { MessageKind::Request } else { MessageKind::Update };
     let mut p = Poster::for_ctx(state, ctx);
     let seq = p.post(c.id.as_str(), from.clone(), Some("foreman"), kind, "", &words);
-    // A plan informs and wants nothing back (fac-18): an agent's is an update, Andrei's has no kind.
+    // A plan informs and wants nothing back (fac-18): an agent's is an update, the operator's has no kind.
     if let (Some(m), Sender::Agent(_)) = (p.last_message(), from) {
         m.intent = Some(Intent::Update);
     }

@@ -3,7 +3,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use factory_types::review::Contents;
+use mork_types::review::Contents;
 
 use super::{GitError, git, git_env};
 use crate::paths::Home;
@@ -20,7 +20,7 @@ pub fn ensure(home: &Home, project: &str) -> Result<std::path::PathBuf, GitError
     Ok(m)
 }
 
-/// Fetches every branch of `from` (a URL, or Andrei's checkout) into the mirror's own branches.
+/// Fetches every branch of `from` (a URL, or the operator's checkout) into the mirror's own branches.
 /// `env` carries the token, never the argv.
 pub fn fetch(home: &Home, mirror: &Path, from: &str, env: &[(String, String)]) -> Result<(), GitError> {
     git_env(home, mirror, &["fetch", "-q", "--prune", "--no-tags", from, "+refs/heads/*:refs/heads/*"], FETCH, env)
@@ -132,10 +132,10 @@ pub fn contents_at(home: &Home, mirror: &Path, commit: &str, paths: &[&str]) -> 
     Ok(out)
 }
 
-/// Points `refs/factory/<name>` at a commit and writes it as a bundle: what a wall job takes
+/// Points `refs/mork/<name>` at a commit and writes it as a bundle: what a wall job takes
 /// into a clone (4.2.2, 4.2.4). The ref's name is what the job fetches.
 pub fn bundle_out(home: &Home, mirror: &Path, name: &str, commit: &str, out: &Path) -> Result<String, GitError> {
-    let r = format!("refs/factory/{name}");
+    let r = format!("refs/mork/{name}");
     git(home, mirror, &["update-ref", &r, commit], FETCH)?;
     let out_s = out.display().to_string();
     git(home, mirror, &["bundle", "create", "-q", &out_s, &r], FETCH)?;
@@ -216,35 +216,44 @@ pub fn messages(home: &Home, mirror: &Path, from: &str, to: &str, base: &str) ->
     git(home, mirror, &["log", "--format=%B", to, "--not", from, base], FETCH)
 }
 
-/// The lines a push adds, for the leak check: every commit's own patch (a secret added then removed
-/// is still published), binary files as text, and the whole change, merge lines included (R3).
-pub fn added_lines(home: &Home, mirror: &Path, from: &str, to: &str) -> Result<Vec<(String, u64, String)>, GitError> {
+/// The kind and location of a known secret added by any commit in the range or its final diff.
+pub fn added_secret(
+    home: &Home,
+    mirror: &Path,
+    from: &str,
+    to: &str,
+    secrets: &crate::secrets::Secrets,
+) -> Result<Option<String>, String> {
     let range = format!("{from}..{to}");
-    let flags = ["--no-color", "--no-ext-diff", "--text", "--unified=0"];
-    // A merge commit is diffed against each of its parents: a line its join adds is seen (M3.4).
-    let mut log = vec!["log", "-p", "--diff-merges=separate", "--format="];
+    let flags = ["--no-color", "--no-ext-diff", "--no-textconv", "--text", "--unified=0"];
+    // A merge commit is diffed against each parent so additions in its resolution are checked.
+    let mut log = vec!["log", "-p", "--diff-merges=separate", "--format=commit %H"];
     log.extend(flags);
     log.push(&range);
     let mut diff = vec!["diff"];
     diff.extend(flags);
     diff.extend([from, to]);
-    let mut out = patch_lines(&git(home, mirror, &log, FETCH)?);
-    out.extend(patch_lines(&git(home, mirror, &diff, FETCH)?));
-    Ok(out)
+    for args in [log, diff] {
+        let patch = git(home, mirror, &args, FETCH).map_err(|e| secrets.mask(&e.to_string()))?;
+        if let Some(hit) = patch_secret(&patch, to, secrets) {
+            return Ok(Some(hit));
+        }
+    }
+    Ok(None)
 }
 
-// A `+++ ` line names the file only between hunks: inside one, `+++ x` is the added line `++ x`, which a hunk's
-// counts tell apart (M4.3).
-fn patch_lines(patch: &str) -> Vec<(String, u64, String)> {
-    let mut file = String::new();
+// Within a hunk, `+++ x` adds the text `++ x`; only outside a hunk does it name a file.
+fn patch_secret<'a>(patch: &'a str, mut commit: &'a str, secrets: &crate::secrets::Secrets) -> Option<String> {
+    let mut file = "";
     let mut n = 0u64;
     let (mut old, mut new) = (0u64, 0u64);
-    let mut out = Vec::new();
     for l in patch.lines() {
         if old > 0 || new > 0 {
             match l.as_bytes().first() {
                 Some(b'+') => {
-                    out.push((file.clone(), n, l[1..].to_owned()));
+                    if let Some(kind) = secrets.hit(&l[1..]) {
+                        return Some(secrets.mask(&format!("{kind}, in {file}:{n} (commit {commit})")));
+                    }
                     n += 1;
                     new = new.saturating_sub(1);
                 }
@@ -256,8 +265,10 @@ fn patch_lines(patch: &str) -> Vec<(String, u64, String)> {
                     new = new.saturating_sub(1);
                 }
             }
+        } else if let Some(at) = l.strip_prefix("commit ") {
+            commit = at;
         } else if let Some(f) = l.strip_prefix("+++ ") {
-            file = f.strip_prefix("b/").unwrap_or(f).to_owned();
+            file = f.strip_prefix("b/").unwrap_or(f).trim_end_matches('\t');
         } else if let Some(h) = l.strip_prefix("@@ ") {
             // `@@ -a,b +c,d @@`: a missing count is 1.
             let side = |sign: char| -> (u64, u64) {
@@ -270,5 +281,41 @@ fn patch_lines(patch: &str) -> Vec<(String, u64, String)> {
             old = side('-').1;
         }
     }
-    out
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    // why: a failed fixture setup must fail the test.
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+    use crate::secrets::Secrets;
+
+    #[test]
+    fn removed_credential_is_located_in_history_without_quoting_it() {
+        let dir = std::env::temp_dir().join(format!("mork-test-secret-diff-{}", crate::random::salt()));
+        std::fs::create_dir(&dir).unwrap();
+        let home = Home::new(dir.join("home"));
+        let run = |args: &[&str]| git(&home, &dir, args, FETCH).unwrap();
+        run(&["init", "-q"]);
+        run(&["config", "user.name", "Example"]);
+        run(&["config", "user.email", "example@example.invalid"]);
+        run(&["commit", "--allow-empty", "-qm", "base"]);
+        let base = run(&["rev-parse", "HEAD"]);
+        let token = "synthetic-credential";
+        let mut secrets = Secrets::default();
+        secrets.add("a credential", token);
+        std::fs::write(dir.join("fixture"), format!("first line\n++ {token}\n")).unwrap();
+        run(&["add", "fixture"]);
+        run(&["commit", "-qm", "add fixture"]);
+        let added = run(&["rev-parse", "HEAD"]);
+        run(&["rm", "fixture"]);
+        run(&["commit", "-qm", "delete fixture"]);
+        let head = run(&["rev-parse", "HEAD"]);
+        assert_eq!(added_secret(&home, &dir, &added, &head, &secrets).unwrap(), None);
+        let hit = added_secret(&home, &dir, &base, &head, &secrets).unwrap();
+        assert_eq!(hit, Some(format!("a credential, in fixture:2 (commit {added})")));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

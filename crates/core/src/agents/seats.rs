@@ -1,9 +1,9 @@
-//! A seat's own place and pause (3.3, 4.13.7): Andrei's DM with it opened, its turn stopped, resumed, or held when
+//! A seat's own place and pause (3.3, 4.13.7): the operator's DM with it opened, its turn stopped, resumed, or held when
 //! it couldn't run.
 
-use factory_types::reply::Role;
-use factory_types::state::{Agent, AgentStatus, Job, Owed, Place, Settlement};
-use factory_types::{AgentKey, CardId, JobId};
+use mork_types::reply::Role;
+use mork_types::state::{Agent, AgentStatus, Job, Owed, Place, Settlement};
+use mork_types::{AgentKey, CardId, JobId};
 use serde_json::json;
 
 use super::turns::CUT_NOTE;
@@ -12,7 +12,7 @@ use crate::messages::places;
 use crate::post::{Poster, new_agent};
 use crate::state::{Change, State};
 
-/// `dm`: opens a DM between Andrei and one of a card's agents (3.3).
+/// `dm`: opens a DM between the operator and one of a card's agents (3.3).
 pub(super) fn dm(state: &State, card: &CardId, r: Role, ctx: Ctx<'_>) -> Decision {
     let id = CardId::new(card.as_str().to_lowercase());
     let card = id.as_str();
@@ -116,7 +116,8 @@ pub fn resumed(state: &State, a: &mut Agent) {
         AgentStatus::Error { .. } => fresh(a),
         // A stop still settling: its turn reruns with the cut note once it has (M1.9), never a closing turn.
         AgentStatus::Working { .. } if stopping.is_some() && a.retiring.is_none() => {
-            let prompt = super::turns::cut_noted(stopping.map_or(&last, |j| &super::turns::request_of(state, j).stdin));
+            let prompt =
+                super::turns::cut_noted(stopping.map_or(&last, |j| super::turns::request_of(state, j).request_text()));
             a.owed = Some(retry(state, a, prompt, stopping));
         }
         AgentStatus::Stopped
@@ -147,7 +148,7 @@ fn retry(state: &State, a: &Agent, prompt: String, job: Option<&Job>) -> Owed {
     // A refused correction's turn runs as the one it corrected, when that turn's prompt is the one run (fac-626).
     let ran = job.map(|j| j.corrects.as_ref().and_then(|c| state.jobs.get(c)).unwrap_or(j));
     let request = ran.filter(|j| j.corrects.is_none()).map(|j| super::turns::request_of(state, j));
-    let opening = request.filter(|r| r.opening && prompt.ends_with(&r.stdin));
+    let opening = request.filter(|r| r.opening && prompt.ends_with(r.request_text()));
     let asked = opening.and(ran).or(job);
     Owed::Retry {
         resume: a.session_started,

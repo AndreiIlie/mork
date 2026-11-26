@@ -30,7 +30,7 @@ pub const SUDO_PW: &str = "SENTINEL-sudo-pw-13";
 pub const SENTINELS: [&str; 9] =
     [HOST_PW, MONGO_PW, REMOTE_PW, REMOTE_MONGO_PW, LIBRA_KEY, LIBRA_SECRET, LIBRA_TOKEN, LIBRA_REFRESH, SUDO_PW];
 
-/// Andrei's own ssh aliases, each its box's host, login and keys; distinct from the target id.
+/// The operator's own ssh aliases, each its box's host, login and keys; distinct from the target id.
 pub const STAGING_ALIAS: &str = "ex-staging-box";
 pub const PRODUCTION_ALIAS: &str = "ex-prod-box";
 
@@ -40,7 +40,7 @@ impl Rig {
         self.t.root.join("remote")
     }
 
-    /// Andrei's synthetic access file, outside the walls, readable by its owner alone.
+    /// The operator's synthetic access file, outside the walls, readable by its owner alone.
     pub fn access_file(&self) -> PathBuf {
         self.t.root.join("access.md")
     }
@@ -65,13 +65,13 @@ impl Rig {
         let never = self.t.root.join("never-read");
         let tunnel_ran = self.t.root.join("tunnel-ran");
         let text = format!(
-            "# Andrei's access (synthetic, for tests)\n\n\
+            "# The operator's access (synthetic, for tests)\n\n\
              [access:host-db]\nuser = door_ro\npassword = {HOST_PW}\n\n\
              [access:host-mongo]\nuser = door_ro\npassword = {MONGO_PW}\n\n\
              [access:app-db]\nuser = door_ro\npassword = {REMOTE_PW}\n\n\
              [access:app-mongo]\nuser = door_ro\npassword = {REMOTE_MONGO_PW}\n\n\
              [access:libra-api]\nconsumer_key = {LIBRA_KEY}\nconsumer_secret = {LIBRA_SECRET}\n\n\
-             [access:sudo]\nuser = andrei\npassword = {SUDO_PW}\n\
+             [access:sudo]\nuser = operator\npassword = {SUDO_PW}\n\
              credentials_file = {never}\ntunnel_command = touch {tunnel_ran}\n",
             never = never.display(),
             tunnel_ran = tunnel_ran.display(),
@@ -102,7 +102,7 @@ impl Rig {
 
     /// A door fake's runs, with their literal argv and stdin.
     pub fn door_runs(&self, name: &str) -> Vec<Value> {
-        factory_fakes::door::runs(&self.log_path(), name)
+        mork_fakes::door::runs(&self.log_path(), name)
     }
 }
 
@@ -139,7 +139,7 @@ fn ssh_target(id: &str, alias: &str, r: &std::path::Display) -> String {
     )
 }
 
-/// `factory ctl door …`'s arguments.
+/// `mork ctl door …`'s arguments.
 pub fn door_args(target: &str, op: &str, params: Value) -> Vec<String> {
     ["door", "--target", target, "--op", op, "--params", &params.to_string()].iter().map(|s| (*s).to_owned()).collect()
 }
@@ -160,7 +160,7 @@ pub fn remote_commands(rig: &Rig, word: &str) -> usize {
         .count()
 }
 
-/// A fake Codex's turn of `agent` that runs `factory ctl` with each of `calls`, then replies.
+/// A fake Codex's turn of `agent` that runs `mork ctl` with each of `calls`, then replies.
 pub fn ctl_turn(agent: &str, phrase: Option<&str>, calls: &[Vec<String>], reply: Value) -> Value {
     let mut steps = vec![json!({"do": "thread-started"})];
     steps.extend(calls.iter().map(|c| json!({"do": "ctl", "args": c})));
@@ -168,8 +168,8 @@ pub fn ctl_turn(agent: &str, phrase: Option<&str>, calls: &[Vec<String>], reply:
     json!({"fake": "codex", "agent": agent, "phrase": phrase, "steps": steps})
 }
 
-/// What each `factory ctl` of a job answered, in order: its JSON, or its error.
-pub fn answers(rig: &Rig, job: &factory_types::state::Job) -> Vec<Value> {
+/// What each `mork ctl` of a job answered, in order: its JSON, or its error.
+pub fn answers(rig: &Rig, job: &mork_types::state::Job) -> Vec<Value> {
     rig.out_lines(job)
         .into_iter()
         .filter(|v| v["type"] == "fake-ctl")
@@ -185,11 +185,24 @@ pub fn answers(rig: &Rig, job: &factory_types::state::Job) -> Vec<Value> {
 /// calls' folders, store ids, every state row), JSON escapes decoded at every depth.
 pub fn everything(rig: &Rig) -> String {
     let mut out = String::new();
-    let dirs: Vec<PathBuf> =
-        ["jobs", "records", "logs", "agent-home", "door/receipts", "door/calls", "door/tunnels", "door/stores"]
-            .iter()
-            .map(|d| rig.fhome().join(d))
-            .collect();
+    let dirs: Vec<PathBuf> = [
+        "jobs",
+        "records",
+        "logs",
+        "fixtures",
+        "agent-home",
+        "homes",
+        "work",
+        "caches",
+        "logins",
+        "door/receipts",
+        "door/calls",
+        "door/tunnels",
+        "door/stores",
+    ]
+    .iter()
+    .map(|d| rig.fhome().join(d))
+    .collect();
     for dir in dirs {
         for f in walk(&dir) {
             out.push_str(&String::from_utf8_lossy(&std::fs::read(&f).unwrap_or_default()));
@@ -210,7 +223,7 @@ pub fn decoded_fully(text: &str) -> String {
     let mut all = String::new();
     let mut t = text.to_owned();
     loop {
-        let next = factory_engine::door::redact::unescape_json(&t);
+        let next = mork_engine::door::redact::unescape_json(&t);
         if next == t {
             return all;
         }

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use factory_types::card::Card;
+use mork_types::card::Card;
 
 use crate::state::State;
 

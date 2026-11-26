@@ -1,15 +1,15 @@
 //! Changing a model keeps its seat's wall, tools, credentials and authority (fac-96, fac-115); what a seat runs is
 //! its roster's row for where it stands (fac-399).
 
-use factory_types::card::{Card, Mode};
-use factory_types::config::{
-    ANDREI_MODELS, Cli, Config, Effort, MODEL_CATALOG, PickModel, ROSTER, ReviewKind, SEAT_DEFAULTS, Seat, SeatPhase,
+use mork_types::card::{Card, Mode};
+use mork_types::config::{
+    Cli, Config, Effort, MODEL_CATALOG, OPERATOR_MODELS, PickModel, ROSTER, ReviewKind, SEAT_DEFAULTS, Seat, SeatPhase,
     Standing, Wall, barred, cli_of_model,
 };
-use factory_types::reply::Role;
-use factory_types::state::{Agent, Choice, Fresh, MessageKind, Sender};
-use factory_types::view::{ModelChoice, Setting};
-use factory_types::{AgentKey, CardId, Command};
+use mork_types::reply::Role;
+use mork_types::state::{Agent, Choice, Fresh, MessageKind, Sender};
+use mork_types::view::{ModelChoice, Setting};
+use mork_types::{AgentKey, CardId, Command};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -25,7 +25,7 @@ fn choices(config: &Config, by: By) -> Vec<ModelChoice> {
         Standing::ALL.into_iter().filter_map(move |at| config.seat_in(d.0, at)).map(|s| (s.cli, s.model, s.label))
     });
     let roster = ROSTER.iter().map(|r| (r.3, r.4.to_owned(), r.5.to_owned()));
-    let catalog = MODEL_CATALOG.iter().chain(ANDREI_MODELS.iter().filter(|_| by == By::Andrei));
+    let catalog = MODEL_CATALOG.iter().chain(OPERATOR_MODELS.iter().filter(|_| by == By::Operator));
     let catalog = catalog.map(|(cli, model, label)| (*cli, (*model).to_owned(), (*label).to_owned()));
     let picks = config.picks.iter().flat_map(|p| [&p.researcher, &p.reviewer.inside, &p.reviewer.outside]).flatten();
     let picks = picks.map(|m| (m.cli, m.model.clone(), m.label.clone()));
@@ -74,17 +74,17 @@ pub fn reround(p: &mut Poster<'_>, id: &CardId) {
         if !matches!(a.role, Role::Foreman | Role::Reviewer) || a.retiring.as_ref().is_some_and(|r| r.remove) {
             continue;
         }
-        let Some(c) = a.choice.as_mut().filter(|c| c.by == "factory.toml") else { continue };
+        let Some(c) = a.choice.as_mut().filter(|c| c.by == "mork.toml") else { continue };
         c.phase = None;
         p.put_agent(a);
     }
 }
 
-/// Who chooses a model: Andrei bypasses allowlists; a foreman uses the child's list. Every selection keeps its wall.
+/// Who chooses a model: the operator bypasses allowlists; a foreman uses the child's list. Every selection keeps its wall.
 /// Any other sender keeps its own authority.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum By {
-    Andrei,
+    Operator,
     Foreman,
     Other,
 }
@@ -93,7 +93,7 @@ impl By {
     /// The chooser a command's sender is, by its agent's role.
     pub fn of(state: &State, from: &Sender) -> Self {
         match from {
-            Sender::Andrei => Self::Andrei,
+            Sender::Operator => Self::Operator,
             Sender::Agent(k) if state.agents.get(k).is_some_and(|a| a.role == Role::Foreman) => Self::Foreman,
             Sender::Agent(_) | Sender::Engine | Sender::Orchestrator(_) | Sender::Pa => Self::Other,
         }
@@ -102,7 +102,7 @@ impl By {
     // A stored choice's chooser, by its `by`: a card's foreman is `<card>/foreman`, its DM's `<card>/foreman/dm`.
     fn made(c: &Choice) -> Self {
         match c.by.as_str() {
-            "andrei" => Self::Andrei,
+            "operator" => Self::Operator,
             by if by.ends_with("/foreman") || by.ends_with("/foreman/dm") => Self::Foreman,
             _ => Self::Other,
         }
@@ -110,7 +110,7 @@ impl By {
 }
 
 fn restricted(a: &Agent, by: By) -> bool {
-    by != By::Andrei
+    by != By::Operator
         && (super::children::is_child(a) || (by == By::Foreman && matches!(a.role, Role::Researcher | Role::Reviewer)))
 }
 
@@ -153,20 +153,20 @@ fn walls_kept(seat: &Seat, cli: Cli) -> bool {
     seat.wall != Wall::None || (cli != Cli::Agy && (seat.cli == Cli::Codex || cli == Cli::Claude))
 }
 
-// Fable and Astra are offered to Andrei's own pick alone (fac-558, fac-615); a session already on one keeps it.
+// Fable and Astra are offered to the operator's own pick alone (fac-558, fac-615); a session already on one keeps it.
 fn offers(config: &Config, a: &Agent, at: Standing, by: By) -> Vec<ModelChoice> {
     let Some(seat) = config.seat_in(&a.seat, at) else { return Vec::new() };
-    let kept = |m: &ModelChoice| walls_kept(&seat, m.cli) && (by == By::Andrei || !barred(&m.model));
+    let kept = |m: &ModelChoice| walls_kept(&seat, m.cli) && (by == By::Operator || !barred(&m.model));
     candidates(config, a, at, by).into_iter().filter(kept).collect()
 }
 
-// A chooser held to its picks chooses high or xhigh alone, whatever they list (fac-558); Andrei's own pick takes every
+// A chooser held to its picks chooses high or xhigh alone, whatever they list (fac-558); the operator's own pick takes every
 // effort, max included (fac-615), and defaults and launched sessions run as configured.
 const PICKED_EFFORTS: [Effort; 2] = [Effort::High, Effort::Xhigh];
 
 fn efforts_of(a: &Agent, by: By) -> &'static [Effort] {
     let others = if restricted(a, by) { &PICKED_EFFORTS[..] } else { &Effort::OFFERED };
-    if by == By::Andrei { &Effort::ALL } else { others }
+    if by == By::Operator { &Effort::ALL } else { others }
 }
 
 /// The available efforts; a restricted chooser's union is checked against the selected model at selection.
@@ -297,7 +297,7 @@ pub(super) fn launch(state: &State, config: &Config, a: &mut Agent, now: i64) ->
     let here = |c: &Choice| c.phase == Some(at.phase);
     let picked = a.pending.take().filter(|p| here(p) && offered(config, a, at, p));
     let kept = a.choice.as_ref().filter(|c| here(c)).map(|c| c.by.clone());
-    let by = picked.map(|p| p.by).or(kept).unwrap_or_else(|| "factory.toml".to_owned());
+    let by = picked.map(|p| p.by).or(kept).unwrap_or_else(|| "mork.toml".to_owned());
     let phase = Some(at.phase);
     a.choice = Some(Choice { cli: to.cli, model: to.model.clone(), effort: to.effort, by: by.clone(), phase });
     let from = from?;
@@ -326,7 +326,7 @@ pub(super) fn switch_line(state: &State, key: &AgentKey, s: &Switch, ctx: Ctx<'_
     let place = card.as_ref().map_or_else(|| a.place.to_string(), |c| c.as_str().to_owned());
     let text = switched(key, s, card.is_some());
     let mut p = crate::post::Poster::new(state, ctx.now);
-    p.post(&place, Sender::Engine, Some("andrei"), MessageKind::Engine, "", &text);
+    p.post(&place, Sender::Engine, Some("operator"), MessageKind::Engine, "", &text);
     p.finish(d);
     d.journal(
         "pick.switch",
@@ -357,7 +357,7 @@ fn model_of(
         None => None,
         Some(w) => Some(Cli::parse(w).ok_or_else(|| format!("`{w}` isn't a CLI: claude, codex or agy"))?),
     };
-    if by != By::Andrei && barred(want) {
+    if by != By::Operator && barred(want) {
         return Err(retired(want));
     }
     let models = offers(config, a, at, by);
@@ -391,7 +391,7 @@ fn model_of(
         [] => {
             let on = cli.map(|c| format!(" on {}", cli_name(c))).unwrap_or_default();
             Err(format!(
-                "no seat runs `{want}`{on}: the models are {}; a new one is configured in factory.toml first",
+                "no seat runs `{want}`{on}: the models are {}; a new one is configured in mork.toml first",
                 list.join(", ")
             ))
         }
@@ -402,24 +402,24 @@ fn model_of(
 }
 
 fn retired(want: &str) -> String {
-    format!("`{want}` is Andrei's own pick alone: Fable and Astra take no spawn, start or other pick")
+    format!("`{want}` is the operator's own pick alone: Fable and Astra take no spawn, start or other pick")
 }
 
-// Why a model named, by id or its label's first word, isn't offered: a wall bars it, or it is Andrei's alone (fac-615).
+// Why a model named, by id or its label's first word, isn't offered: a wall bars it, or it is the operator's alone (fac-615).
 fn withheld(config: &Config, a: &Agent, at: Standing, by: By, want: &str, cli: Option<Cli>) -> Option<String> {
     let word = |m: &ModelChoice| m.label.split_whitespace().next().is_some_and(|w| w.eq_ignore_ascii_case(want));
     let named = |m: &ModelChoice| cli.is_none_or(|c| m.cli == c) && (m.model == want || word(m));
     let hidden: Vec<ModelChoice> = candidates(config, a, at, by).into_iter().filter(named).collect();
-    if hidden.iter().any(|m| by == By::Andrei || !barred(&m.model)) {
+    if hidden.iter().any(|m| by == By::Operator || !barred(&m.model)) {
         return Some(format!("`{}` runs unwalled, its deny list Claude Code's alone: choose a Claude model", a.key));
     }
     (!hidden.is_empty()).then(|| retired(want))
 }
 
 const OFFERED_EFFORTS: &str = "low, medium, high or xhigh";
-const ANDREI_EFFORTS: &str = "low, medium, high, xhigh or max";
+const OPERATOR_EFFORTS: &str = "low, medium, high, xhigh or max";
 
-/// Validates spawn and pick against the seat's wall and one CLI/model/effort entry; Andrei bypasses the allowlist.
+/// Validates spawn and pick against the seat's wall and one CLI/model/effort entry; the operator bypasses the allowlist.
 pub fn selection(
     config: &Config,
     a: &Agent,
@@ -435,7 +435,7 @@ pub fn selection(
         None => model_of(config, a, at, &now.model, Some(now.cli.as_str()), by)?,
         Some(want) => model_of(config, a, at, want, cli, by)?,
     };
-    let names = if by == By::Andrei { ANDREI_EFFORTS } else { OFFERED_EFFORTS };
+    let names = if by == By::Operator { OPERATOR_EFFORTS } else { OFFERED_EFFORTS };
     let effort = match effort.map(str::trim) {
         None => now.effort,
         Some(word) => Effort::parse(word).ok_or_else(|| format!("`{word}` isn't an effort: {names}"))?,
@@ -445,8 +445,9 @@ pub fn selection(
         let valid = list.split_last().map_or_else(String::new, |(l, r)| format!("{} or {l}", r.join(", ")));
         return Err(format!("{} takes no `{}`: name an effort, {valid}", m.label, effort.as_str()));
     }
-    if by != By::Andrei && !Effort::OFFERED.contains(&effort) {
-        return Err(format!("`{}` is Andrei's own pick alone: name an effort, {OFFERED_EFFORTS}", effort.as_str()));
+    if by != By::Operator && !Effort::OFFERED.contains(&effort) {
+        let e = effort.as_str();
+        return Err(format!("`{e}` is the operator's own pick alone: name an effort, {OFFERED_EFFORTS}"));
     }
     if !allowed(config, a, at, m.cli, &m.model, effort, by) {
         let efforts = permissions(config, a, at)
@@ -471,7 +472,7 @@ pub(super) fn pick(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) ->
     let Some(agent) = state.agents.get(&key) else { return Decision::refused(format!("no agent `{key}`")) };
     let by = match from {
         Sender::Agent(k) => k.as_str().to_owned(),
-        Sender::Andrei | Sender::Engine => "andrei".to_owned(),
+        Sender::Operator | Sender::Engine => "operator".to_owned(),
         Sender::Orchestrator(_) | Sender::Pa => from.label(),
     };
     let at = standing(state, agent);

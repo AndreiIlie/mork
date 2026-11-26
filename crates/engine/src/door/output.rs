@@ -1,8 +1,8 @@
 //! Door answers keep decoded values masked and byte cuts valid, with whole rows or documents
 //! retained where possible (fac-1).
 
-use factory_types::door::Output;
-use factory_types::door_plan::{Bounds, Plan, Ran};
+use mork_types::door::Output;
+use mork_types::door_plan::{Bounds, Plan, Ran};
 use serde_json::{Value, json};
 
 use super::redact::Redactor;
@@ -194,8 +194,8 @@ mod tests {
         Plan::Sql { login: login(), host: "h".into(), port: 1, database: "d".into(), query: "q".into() }
     }
 
-    fn login() -> factory_types::door_config::Login {
-        factory_types::door_config::Login { section: "s".into(), user: "user".into(), password: "password".into() }
+    fn login() -> mork_types::door_config::Login {
+        mork_types::door_config::Login { section: "s".into(), user: "user".into(), password: "password".into() }
     }
 
     // Second review, finding 1: secrets spelled as JSON escapes must also be masked.

@@ -1,7 +1,7 @@
 //! How each message of the conversation draws (fac-39), worked out apart from the widgets so the
 //! tests read it without pixels: its shape, its header, its folded preview and what it folds.
 
-use factory_types::view::{Author, Line, MessageView};
+use mork_types::view::{Author, Line, MessageView};
 
 use crate::spans::{self, Span, Tone, first_line};
 use crate::text::clean;
@@ -11,9 +11,9 @@ use crate::{markdown, time};
 pub enum Shape {
     /// An engine request to an agent: a thin divider, its label and time, its text unfolding under it.
     Divider,
-    /// Andrei's words: a bubble on the right.
+    /// The operator's words: a bubble on the right.
     Bubble,
-    /// Words for Andrei: a header, the words whole under it, a hand's ask, what it folds.
+    /// Words for the operator: a header, the words whole under it, a hand's ask, what it folds.
     Block,
     /// The traffic around him: a header and one dim line that unfolds.
     Preview,
@@ -23,7 +23,7 @@ pub enum Shape {
 pub fn shape(m: &MessageView) -> Shape {
     match m.kind {
         Line::Marker => Shape::Divider,
-        Line::Andrei => Shape::Bubble,
+        Line::Operator => Shape::Bubble,
         Line::Engine => Shape::Block,
         Line::Agent if m.hand.is_some() || for_people(m.to.as_deref()) => Shape::Block,
         Line::Agent => Shape::Preview,
@@ -33,7 +33,7 @@ pub fn shape(m: &MessageView) -> Shape {
 // The labels that post in the place without reaching an agent (3.4.2).
 fn for_people(to: Option<&str>) -> bool {
     to.is_none_or(|t| {
-        matches!(t, "andrei" | "orchestrator" | "pa" | "room" | "runner" | "factory") || t.starts_with("orchestrator:")
+        matches!(t, "operator" | "orchestrator" | "pa" | "room" | "runner" | "mork") || t.starts_with("orchestrator:")
     })
 }
 
@@ -47,9 +47,9 @@ pub fn foldable(m: &MessageView) -> bool {
     }
 }
 
-/// Whether a block is an agent's message addressed to Andrei, drawn as a panel.
-pub fn for_andrei(m: &MessageView) -> bool {
-    m.kind == Line::Agent && m.to.as_deref() == Some("andrei")
+/// Whether a block is an agent's message addressed to the operator, drawn as a panel.
+pub fn for_operator(m: &MessageView) -> bool {
+    m.kind == Line::Agent && m.to.as_deref() == Some("operator")
 }
 
 /// A block's words, or its headline when it has none.

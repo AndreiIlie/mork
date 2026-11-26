@@ -43,6 +43,8 @@ pub enum Mount {
     RoTry { path: String },
     /// The path, read-write, at the same place.
     Rw { path: String },
+    /// A cache shared at the same relative path in each seat home.
+    RwAt { src: String, dest: String },
     /// A source bound read-only at another place (`/run/credentials`).
     RoAt { src: String, dest: String },
     /// A source bound read-only at another place, if it exists (`/data`).
@@ -66,10 +68,10 @@ pub enum Mount {
 pub enum WallMode {
     /// The whole wall: mounts and every Landlock rule (ABI 6 or more).
     Full,
-    /// Mounts, and whatever Landlock rules the kernel has (`FACTORY_TEST_WALL=partial`).
+    /// Mounts, and whatever Landlock rules the kernel has (`MORK_TEST_WALL=partial`).
     Partial,
     /// No wall at all: a seat configured `wall = "none"` (fac-25), or every job with the tests'
-    /// `FACTORY_UNWALLED=1`.
+    /// `MORK_UNWALLED=1`.
     None,
 }
 
@@ -91,7 +93,7 @@ pub struct JobSpec {
     pub ports: Option<Vec<u16>>,
     pub wall: WallMode,
     /// The binary whose `wall-exec` starts the job inside the wall.
-    pub factory_bin: String,
+    pub mork_bin: String,
     /// The bwrap executable.
     pub bwrap: String,
     pub created_ms: i64,
@@ -128,7 +130,7 @@ pub enum Launch {
     /// As it is: the tests' default, and a job.json written before fac-143.
     #[default]
     Plain,
-    /// In `factory_work.slice`, through `systemd-run --user --scope`.
+    /// In `mork_work.slice`, through `systemd-run --user --scope`.
     Slice,
     /// Under `nice -n 19 ionice -c3`, where `systemd-run --user` isn't available.
     Nice,
@@ -168,7 +170,7 @@ pub struct ExitRecord {
     pub error: Option<String>,
 }
 
-/// `[slice]` of `factory.toml`: the weights and memory cap of `factory_work.slice`, where every
+/// `[slice]` of `mork.toml`: the weights and memory cap of `mork_work.slice`, where every
 /// job runs (fac-143).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

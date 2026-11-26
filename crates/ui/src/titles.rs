@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::view::Screen;
+use mork_types::view::Screen;
 
 use crate::markdown::{Block, Run};
 use crate::text::clean;

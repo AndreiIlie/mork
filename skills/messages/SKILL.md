@@ -1,11 +1,11 @@
 ---
 name: messages
-description: "Use when writing a message to another agent or an orchestrator, or raising a hand to Andrei: the three kinds and how an exchange ends, and the factory ctl say form."
+description: "Use when writing a message to another agent or an orchestrator, or raising a hand to the operator: the three kinds and how an exchange ends, and Mork ctl say form."
 ---
 
 # Messages
 
-The rule is the Factory manual's ("Messages"): a message is words, it wakes the agent it reaches unless handed to its running turn, and it does nothing else.
+The rule is the Mork manual's ("Messages"): a message is words, it wakes the agent it reaches unless handed to its running turn, and it does nothing else.
 
 **Kinds.**
 `request` asks and wants a response; `response` answers one and wants nothing back; `update` informs and wants nothing back.
@@ -18,13 +18,13 @@ Questions nest:
 - "Wednesday.": a response, to the second request.
 - "I didn't eat today.": a response, to the first.
 
-An ask to Andrei about something on a screen carries a screenshot of it where you can render it.
+An ask to the operator about something on a screen carries a screenshot of it where you can render it.
 For a web page, use the wall's headless Chromium, as the `visual-mocks` skill says.
 When the project has a preview skill of its own among your skills, follow its rendering rules.
-For an ask to Andrei about the factory's native window, use the words shown on screen.
-To show Andrei a layout or a mechanism, or to hand an agent a picture, put a screenshot or a diagram in your seat's `io/` (`FACTORY_IO`) and list its full path in the `images` of your hand (shown beside your message and ask) or of a message (carried into its recipient's turn).
+For an ask to the operator about Mork's native window, use the words shown on screen.
+To show the operator a layout or a mechanism, or to hand an agent a picture, put a screenshot or a diagram in your seat's `io/` (`MORK_IO`) and list its full path in the `images` of your hand (shown beside your message and ask) or of a message (carried into its recipient's turn).
 The engine copies each file, so later edits don't change it.
-`factory ctl say <place> --kind <kind> <text>` gives it too.
+`mork ctl say <place> --kind <kind> <text>` gives it too.
 The news says each message with its kind's verb: `ex-550/foreman asks researcher-1: …`, `ex-550/researcher-1 answers foreman: …`, `ex-550/researcher-1 notes to foreman: …`.
 
 A parent seat's message to its child lands in the child's DM.
@@ -33,20 +33,20 @@ A researcher's parent is the seat that spawned it.
 A full card with a planner has two rooms, each with one seat: the build room, `<card>`, the foreman's, and the spec room, `<card>/spec`, the planner's; an unaddressed message in either reaches its seat at every stage.
 The foreman and the planner write to each other by name, `planner` and `foreman`, at every stage: their messages, and their unnamed words said in the other's room, land in the card's challenge place, `<card>/challenge`, which the window shows nowhere, and their steps sending them show without the text, as does a `say` whose place or recipient its command line doesn't show.
 The planner answers the foreman's DM by `foreman/dm`, which reaches that seat alone.
-Andrei's or an orchestrator's word naming the other room's seat is refused: `planner` in the build room, `foreman` in the spec room.
+The operator's or an orchestrator's word naming the other room's seat is refused: `planner` in the build room, `foreman` in the spec room.
 Opening the planner's ask opens the spec room for the reply.
 A card started with no planner has one room: an unaddressed message there reaches its foreman at every stage, `planner` is refused, and the foreman holds the specification itself, raising open questions in its hand's `ask`.
 Never send the orchestrator a specification question as a message (`say` or a reply's `messages`): every specification question goes in your hand's `ask`, which the engine automatically gives to the project's orchestrator on a delegated or self-sustained card.
 Direct request messages to `orchestrator` are for mechanical needs only.
 
-Your session's start says exactly whom you reach from where you are; a change comes as a Factory announcement.
+Your session's start says exactly whom you reach from where you are; a change comes as a Mork announcement.
 Nothing counts an exchange's turns or stops it: loops are discouraged by what the kinds mean.
 
-**Writing to Andrei,** only in your hand's `ask`, then ending your turn to wait for his answer:
+**Writing to the operator,** only in your hand's `ask`, then ending your turn to wait for his answer:
 
-For a decision ask, the Factory manual's measure wins over every line below: cut what does not fit, never move it to the message or another ask.
+For a decision ask, the Mork manual's measure wins over every line below: cut what does not fit, never move it to the message or another ask.
 An answer to his question is one or two plain sentences, detail only when he asks; a report he asked for is complete; a failure is in full.
-A planner or foreman whose system prompt carries Andrei's output style writes by that style where it differs from this form and these lines.
+A planner or foreman whose system prompt carries the operator's output style writes by that style where it differs from this form and these lines.
 
 - His question is a question, never a hint: answer it first, yes or no, with what the code says, in your hand only (a message too shows it twice).
   An angry question still wants an answer, not a build or a rewrite: his questions test the quality of your work.

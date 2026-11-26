@@ -1,11 +1,11 @@
 //! A visual card's baseline step (fac-636, fac-688): before agreeing the specification, the foreman's baseline seat
-//! reproduces today's pages in the mock's folder, which the specification holder then changes with Andrei at brief.
+//! reproduces today's pages in the mock's folder, which the specification holder then changes at brief.
 
-use factory_types::AgentKey;
-use factory_types::card::{Card, Mock, MockStep, Mode, Stage};
-use factory_types::config::Config;
-use factory_types::reply::{Outcome, Reply, Role};
-use factory_types::state::{Agent, Job, Sender};
+use mork_types::AgentKey;
+use mork_types::card::{Card, Mock, MockStep, Mode, Stage};
+use mork_types::config::Config;
+use mork_types::reply::{Outcome, Reply, Role};
+use mork_types::state::{Agent, Job, Sender};
 use serde_json::json;
 
 use super::mock::{self, FOLDER};
@@ -38,14 +38,14 @@ pub(super) fn open(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
 fn request(c: &Card, config: &Config) -> String {
     let id = &c.id;
     let (wait, after) = if c.no_planner {
-        ("before agreeing the specification", "lets you agree the specification and change the mock")
+        ("before agreeing the specification", "lets you agree the visual direction")
     } else {
         ("the planner's turns wait for it", "lets the planner on")
     };
     format!(
         "{id} is a visual card: its mock is made in the spec conversation, before the plan's approve, on a baseline of \
          the pages it changes as they stand today. Build that baseline now: {wait}. Read the \
-         card and the code and name those pages. Then spawn the card's baseline seat, `factory ctl spawn {id} baseline \
+         card and the code and name those pages. Then spawn the card's baseline seat, `mork ctl spawn {id} baseline \
          '<task>'`, on its configured default (name no model or effort), and task it to reproduce each page as it \
          stands today in the clone's `{FOLDER}/`, {}, as the `visual-mocks` skill's \"Visual mode\" says. \
          It keeps any mock already in the folder, an earlier run's restored one included, and fills only the surfaces \
@@ -137,7 +137,7 @@ pub(super) fn recap_withheld(p: &mut Poster<'_>, c: &Card, who: &Who, job: &Job)
     if !c.visual || who.role != holder {
         return false;
     }
-    let ready = |m: &&factory_types::state::Message| {
+    let ready = |m: &&mork_types::state::Message| {
         m.seq >= c.first_seq
             && m.from == Sender::Engine
             && (m.headline == READY || (c.no_planner && m.headline == super::start::AGREE_HEADLINE))
@@ -147,16 +147,13 @@ pub(super) fn recap_withheld(p: &mut Poster<'_>, c: &Card, who: &Who, job: &Job)
     let early = last.is_some_and(|seq| job.seen.is_none_or(|seen| seen <= seq));
     let text = if mock::baseline(c) {
         if c.no_planner {
-            "The card's baseline is still being built, so this recap isn't offered: a visual card's recap is its plan \
-             and its mock together. End the baseline step with `built` first, then change the mock and recap."
+            "End the baseline step with `built`, get the visual direction confirmed, then edit the mock and recap."
         } else {
-            "The card's baseline is still being built, so this recap isn't offered: a visual card's recap is its plan \
-             and its mock together. Your next turn starts once the foreman ends the baseline step; recap then, on the \
-             mock."
+            "Once the foreman ends the baseline step, get the visual direction confirmed, then edit the mock and recap."
         }
     } else if early {
-        "This turn began before the baseline was ready, so its recap isn't offered: a visual card's recap is its plan \
-         and its mock together. Read the mock from its link, change it with Andrei as the plan needs, then recap again."
+        "This turn began before the baseline was ready, so get the visual direction confirmed in your next \
+         turn, then edit the mock and recap."
     } else {
         return false;
     };
@@ -219,10 +216,10 @@ pub(super) fn turned_off(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
     if under_way {
         let text = match agree_body {
             Some(body) => format!(
-                "Andrei turned {id}'s visual mode off while its baseline was built: there is no mock.\n\n{body}"
+                "The operator turned {id}'s visual mode off while its baseline was built: there is no mock.\n\n{body}"
             ),
             None => format!(
-                "Andrei turned {id}'s visual mode off while its baseline was built: there is no mock. Go on agreeing \
+                "The operator turned {id}'s visual mode off while its baseline was built: there is no mock. Go on agreeing \
                  the specification."
             ),
         };

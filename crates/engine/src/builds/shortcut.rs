@@ -1,7 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-/// Links `~/.local/bin/factory` to `bin`, refusing to replace anything but a factory-build link.
+/// Links `~/.local/bin/mork` to `bin`, refusing to replace anything but a Mork build link.
 pub fn link_path(user_home: &Path, bin: &Path) -> io::Result<PathBuf> {
     let link = destination(user_home)?;
     crate::files::link_whole(&link, bin)?;
@@ -28,15 +28,15 @@ fn destination(user_home: &Path) -> io::Result<PathBuf> {
 }
 
 fn replaceable(user_home: &Path) -> io::Result<PathBuf> {
-    let link = user_home.join(".local/bin/factory");
+    let link = user_home.join(".local/bin/mork");
     match std::fs::symlink_metadata(&link) {
         Ok(meta) => {
             let target = std::fs::read_link(&link).ok();
             let a_build = meta.file_type().is_symlink()
-                && target.as_ref().and_then(|t| t.file_name()).is_some_and(|n| n == "factory");
+                && target.as_ref().and_then(|t| t.file_name()).is_some_and(|n| n == "mork");
             if !a_build {
                 return Err(io::Error::other(format!(
-                    "{} is there and isn't a link to a factory build ({}); move it away first",
+                    "{} is there and isn't a link to a Mork build ({}); move it away first",
                     link.display(),
                     target.map_or_else(|| "a file".to_owned(), |t| format!("a link to {}", t.display()))
                 )));

@@ -20,8 +20,8 @@ pub struct SuiteNews {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "to", rename_all = "kebab-case")]
 pub enum Told {
-    /// Said to Andrei in a card's room.
-    Andrei { card: CardId, text: String },
+    /// Said to the operator in a card's room.
+    Operator { card: CardId, text: String },
     /// A request to a card's seat, waking it.
     Agent { card: CardId, role: Role, headline: String, text: String },
     /// A request to a card's foreman held until the base's tip reaches its clone (fac-144).

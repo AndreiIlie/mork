@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use factory_types::memory::MemoryFile;
+use mork_types::memory::MemoryFile;
 
 pub(super) fn close_file<'a>(
     files: impl Iterator<Item = &'a MemoryFile>,

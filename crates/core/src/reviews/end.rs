@@ -1,12 +1,12 @@
 //! A review card's rounds ended (fac-95, fac-111): one superseded by a new head, the reviewers whose work is over
 //! released, our card's branch card ended with it, and a colleague's PR's card with its PR (fac-161).
 
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::reply::Role;
-use factory_types::review::{Proofs, Raised, Review, Round, Verdict};
-use factory_types::work::{PrSeen, PrState};
-use factory_types::{CardId, Sha};
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::reply::Role;
+use mork_types::review::{Proofs, Raised, Review, Round, Verdict};
+use mork_types::work::{PrSeen, PrState};
+use mork_types::{CardId, Sha};
 use serde_json::{Value, json};
 
 use super::gate::{agents_of, card_for};
@@ -28,7 +28,7 @@ pub fn withdrawn(
     held: bool,
     why: &str,
     afresh: bool,
-    config: &factory_types::config::Config,
+    config: &mork_types::config::Config,
 ) {
     let Some(mut rc) = card_for(p, subject) else { return };
     let mut gone = Vec::new();
@@ -88,7 +88,7 @@ pub(crate) fn keep_open_submitted(p: &mut Poster<'_>, subject: &Card, head: &Sha
     true
 }
 
-/// The round under way reviews a head no longer current, or one Andrei asked again at its branch's
+/// The round under way reviews a head no longer current, or one the operator asked again at its branch's
 /// tip (none): superseded, its foreman told. The new head's round is asked once its candidate is made.
 pub fn supersede(p: &mut Poster<'_>, rc: Card, head: Option<&Sha>) {
     if head.is_some_and(|h| rc.review.as_deref().and_then(Review::open).is_some_and(|o| reviews_head(o, h))) {
@@ -96,7 +96,7 @@ pub fn supersede(p: &mut Poster<'_>, rc: Card, head: Option<&Sha>) {
     }
     let of = super::gate::subject_of(&rc).cloned().unwrap_or_else(|| rc.id.clone());
     let why = head.map_or_else(
-        || format!("Andrei asked {of}'s review again at its branch's tip"),
+        || format!("The operator asked {of}'s review again at its branch's tip"),
         |h| format!("{of} has a new head, {}", h.short()),
     );
     superseded(p, rc, head, &why);
@@ -130,7 +130,7 @@ fn superseded(p: &mut Poster<'_>, mut rc: Card, head: Option<&Sha>, why: &str) {
 
 /// The reviewers of a review card with no finding of theirs left to verify, released: their work is
 /// over. One with an open finding stays, for the round that verifies its fix.
-pub(super) fn release(p: &mut Poster<'_>, id: &CardId, config: &factory_types::config::Config) {
+pub(super) fn release(p: &mut Poster<'_>, id: &CardId, config: &mork_types::config::Config) {
     let Some(rc) = p.card(id) else { return };
     let keep: Vec<String> = rc
         .review
@@ -202,12 +202,12 @@ pub fn merged(p: &mut Poster<'_>, c: Card, v: &Value, ctx: Ctx<'_>) {
     if ends_with_pr(&c) {
         with_pr(p, c, &format!("{text} The review card ends."), ctx);
     } else {
-        super::cards::to_andrei(p, &c.id, &text);
+        super::cards::to_operator(p, &c.id, &text);
     }
 }
 
 /// A PR read that isn't open: its live review card ends, merged or declined (a superseded PR is
-/// declined), but for a merge of the factory's under way, whose return ends it (fac-161).
+/// declined), but for a merge of Mork's under way, whose return ends it (fac-161).
 pub fn closed(p: &mut Poster<'_>, c: Card, seen: &PrSeen, ctx: Ctx<'_>) {
     if !ends_with_pr(&c) || c.pr != Some(seen.pr) {
         return;
@@ -218,7 +218,8 @@ pub fn closed(p: &mut Poster<'_>, c: Card, seen: &PrSeen, ctx: Ctx<'_>) {
         PrState::Merged => "merged",
         PrState::Declined | PrState::Superseded => "declined",
     };
-    with_pr(p, c, &format!("PR {} was {how} on Bitbucket: the review card ends.", seen.pr), ctx);
+    let forge = ctx.config.forge_label(&c.project);
+    with_pr(p, c, &format!("PR {} was {how} on {forge}: the review card ends.", seen.pr), ctx);
 }
 
 /// A live PR's review card, which ends with its PR: never our card's branch gate, which ends with it.
@@ -226,7 +227,7 @@ pub(super) fn ends_with_pr(c: &Card) -> bool {
     c.mode == Mode::Review && c.pr.is_some() && c.stage.is_live() && super::gate::subject_of(c).is_none()
 }
 
-// Whether the factory's merge of the card's PR is waiting or under way: its own, or our card's.
+// Whether Mork's merge of the card's PR is waiting or under way: its own, or our card's.
 fn merging(p: &Poster<'_>, c: &Card) -> bool {
     let of = |card: &CardId| *card == c.id || p.card(card).is_some_and(|o| o.project == c.project);
     p.all_actions().any(|a| {
@@ -238,6 +239,6 @@ fn merging(p: &Poster<'_>, c: &Card) -> bool {
 // A review card ended with its PR, as `done` ends it, its room told why: an entry given up in its
 // train, what was built on it is made again without it.
 fn with_pr(p: &mut Poster<'_>, c: Card, words: &str, ctx: Ctx<'_>) {
-    super::cards::to_andrei(p, &c.id, words);
+    super::cards::to_operator(p, &c.id, words);
     crate::lifecycle::stops::ended(p, c, ctx);
 }

@@ -1,4 +1,4 @@
-//! Asks (3.5.5, 4.4.5): something waiting on Andrei.
+//! Asks (3.5.5, 4.4.5): something waiting on the operator.
 
 use serde::{Deserialize, Serialize};
 
@@ -32,15 +32,15 @@ pub enum AskKind {
     Alarm,
     Token,
     NewPr,
-    /// A door call waits for Andrei's `once` or `no` (fac-1): his alone.
+    /// A door call waits for the operator's `once` or `no` (fac-1): his alone.
     Door,
-    /// A visual card's mock step waits for Andrei's `approve` of the mock (fac-258): his alone.
+    /// A visual card's mock step waits for the operator's `approve` of the mock (fac-258): his alone.
     Mock,
-    /// A failed review round waits for Andrei's triage when delegation is off or on a delegated stalemate, or an explicitly given orchestrator's (fac-680, fac-689, fac-694).
+    /// A failed review round waits for the operator's triage when delegation is off or on a delegated stalemate, or an explicitly given orchestrator's (fac-680, fac-689, fac-694).
     Triage,
 }
 
-/// Something waiting on Andrei.
+/// Something waiting on the operator.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ask {
     pub id: crate::AskId,

@@ -28,13 +28,15 @@ pub enum BuildError {
     },
     /// A reload or a pin the checks refuse (1.8.6.1); a rollback names the state's backups (1.8.8).
     Refused {
-        why: factory_core::maintenance::reload::Refusal,
+        why: mork_core::maintenance::reload::Refusal,
         backups: Option<String>,
     },
     /// The build, or what it left, is wrong: why.
     Bad(String),
-    /// The factory project isn't configured.
+    /// Mork project isn't configured.
     NoProject(String),
+    /// No self-build project is configured (`[mork] project` is unset).
+    NoSelfBuild,
     /// `pin.next` doesn't fit this start (1.8.6.6).
     Reload(String),
 }
@@ -47,7 +49,8 @@ impl std::fmt::Display for BuildError {
             Self::Refused { why, backups: Some(b) } => write!(f, "{why}; the state's backups: {b}"),
             Self::Refused { why, backups: None } => write!(f, "{why}"),
             Self::Bad(why) | Self::Reload(why) => write!(f, "{why}"),
-            Self::NoProject(p) => write!(f, "[factory] project names `{p}`, which isn't configured"),
+            Self::NoProject(p) => write!(f, "[mork] project names `{p}`, which isn't configured"),
+            Self::NoSelfBuild => write!(f, "no self-build project is configured (`[mork] project` is unset)"),
         }
     }
 }
@@ -92,8 +95,8 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    pub fn ranges(&self) -> factory_core::maintenance::reload::Manifest {
-        factory_core::maintenance::reload::Manifest {
+    pub fn ranges(&self) -> mork_core::maintenance::reload::Manifest {
+        mork_core::maintenance::reload::Manifest {
             state_oldest: self.state_oldest,
             state_newest: self.state_newest,
             job_formats: self.job_formats.clone(),
@@ -103,7 +106,7 @@ impl Manifest {
 }
 
 pub fn binary(home: &Home, commit: &str) -> PathBuf {
-    home.builds().join(commit).join("factory")
+    home.builds().join(commit).join("mork")
 }
 
 /// A build's manifest, when the build exists: a full commit's folder, its binary a file.
@@ -144,7 +147,7 @@ fn open_in_io(io_dir: &Path, name: &str) -> Result<std::fs::File, BuildError> {
     if std::fs::symlink_metadata(io_dir).map_or(true, |m| !m.is_dir()) {
         return Err(BuildError::Bad("the build's io folder isn't a folder".into()));
     }
-    let f = factory_sys::open_no_follow(&io_dir.join(name)).map_err(io(format!("no {name} the build made")))?;
+    let f = mork_sys::open_no_follow(&io_dir.join(name)).map_err(io(format!("no {name} the build made")))?;
     if !f.metadata().is_ok_and(|m| m.is_file()) {
         return Err(BuildError::Bad(format!("the build's {name} isn't a file")));
     }
@@ -181,15 +184,15 @@ pub fn install(home: &Home, commit: &str, io_dir: &Path) -> Result<(), BuildErro
         reply_schemas: list(&v["reply_schemas"]),
         built_ms: clock::now_ms(),
     };
-    let mut bin = open_in_io(io_dir, "factory")?;
+    let mut bin = open_in_io(io_dir, "mork")?;
     let tmp = home.builds().join(format!(".tmp-{commit}"));
     let _ = std::fs::remove_dir_all(&tmp);
     let at = tmp.display().to_string();
     std::fs::create_dir_all(&tmp).map_err(io(&at))?;
-    let mut out = std::fs::File::create(tmp.join("factory")).map_err(io(&at))?;
+    let mut out = std::fs::File::create(tmp.join("mork")).map_err(io(&at))?;
     std::io::copy(&mut bin, &mut out).map_err(io("the binary can't be copied"))?;
     out.sync_all().map_err(io(&at))?;
-    factory_sys::chmod(&tmp.join("factory"), 0o755).map_err(io(&at))?;
+    mork_sys::chmod(&tmp.join("mork"), 0o755).map_err(io(&at))?;
     files::write_json(&tmp.join("manifest.json"), &m).map_err(io(&at))?;
     std::fs::rename(&tmp, home.builds().join(commit)).map_err(io(&at))?;
     let _ = std::fs::remove_dir_all(home.builds().join("src").join(commit));
@@ -200,12 +203,10 @@ fn list(v: &serde_json::Value) -> Vec<u32> {
     v.as_array().into_iter().flatten().filter_map(|x| u32::try_from(x.as_u64()?).ok()).collect()
 }
 
-/// The factory's own repo, as Andrei's checkout has it, and its base (1.8.1).
-pub fn factory_repo(config: &factory_types::config::Config) -> Result<(PathBuf, String), BuildError> {
-    let p = config
-        .projects
-        .get(&config.factory.project)
-        .ok_or_else(|| BuildError::NoProject(config.factory.project.to_string()))?;
+/// Mork's own repo, as the operator's checkout has it, and its base (1.8.1).
+pub fn mork_repo(config: &mork_types::config::Config) -> Result<(PathBuf, String), BuildError> {
+    let id = config.mork.project.as_ref().ok_or(BuildError::NoSelfBuild)?;
+    let p = config.projects.get(id).ok_or_else(|| BuildError::NoProject(id.to_string()))?;
     Ok((PathBuf::from(&p.repo), p.base.clone()))
 }
 
@@ -214,12 +215,13 @@ pub fn prepare(
     ctx: &crate::jobs::context::Context,
     commit: &str,
     now: i64,
-) -> Result<factory_types::job::JobSpec, BuildError> {
+) -> Result<mork_types::job::JobSpec, BuildError> {
     let home = &ctx.home;
-    let (checkout, _) = factory_repo(&ctx.config)?;
-    // The factory's mirror when it exists and holds the commit (a merge only Bitbucket made is
-    // there, never in the checkout, M5.14); else Andrei's checkout (1.8.3, step 2).
-    let mirror = home.mirrors().join(ctx.config.factory.project.as_str());
+    let id_project = ctx.config.mork.project.as_ref().ok_or(BuildError::NoSelfBuild)?;
+    let (checkout, _) = mork_repo(&ctx.config)?;
+    // Mork's mirror when it exists and holds the commit (a merge only Bitbucket made is
+    // there, never in the checkout, M5.14); else the operator's checkout (1.8.3, step 2).
+    let mirror = home.mirrors().join(id_project.as_str());
     let in_mirror = mirror.join("HEAD").exists().then(|| git::resolve(home, &mirror, commit).ok()).flatten();
     let (repo, full) = match in_mirror {
         Some(full) => (mirror, full),
@@ -244,19 +246,19 @@ pub fn prepare(
     if !out.status.success() {
         return Err(BuildError::Bad(format!("tar: {}", String::from_utf8_lossy(&out.stderr).trim())));
     }
-    let owner = factory_types::AgentKey::new("factory/build");
-    let id = factory_core::state::names::job_id(now, &owner, crate::random::salt());
+    let owner = mork_types::AgentKey::new("mork/build");
+    let id = mork_core::state::names::job_id(now, &owner, crate::random::salt());
     let io = home.job(id.as_str()).join("io");
-    // The factory's repo is a project like any other: its toolchains and ports (1.8.1).
-    let project = Some(ctx.config.factory.project.as_str());
+    // Mork's repo is a project like any other: its toolchains and ports (1.8.1).
+    let project = Some(id_project.as_str());
     let toolchains = ctx.project_toolchains(project);
     let mut env = ctx.env(&id, &owner, None, &toolchains, &io);
-    env.insert("FACTORY_BUILD_COMMIT".into(), full.clone());
+    env.insert("MORK_BUILD_COMMIT".into(), full.clone());
     let (t, i) = (quote(&target.display().to_string()), quote(&io.display().to_string()));
     // `sh` exports its own `PWD`; the build's processes get only the wall's (1.4.11.4). The binary is copied to
     // `io/` inside the wall and that copy prints the manifest: the shared target is never read outside (M1.1, M1.2).
     let script = format!(
-        "env -u PWD cargo build --release --locked --target-dir {t} && cp {t}/release/factory {i}/factory && env -u PWD {i}/factory version --json > {i}/manifest.json"
+        "env -u PWD cargo build --release --locked --target-dir {t} && cp {t}/release/mork {i}/mork && env -u PWD {i}/mork version --json > {i}/manifest.json"
     );
     let argv = vec!["/bin/sh".into(), "-c".into(), script];
     let places = ctx
@@ -265,7 +267,7 @@ pub fn prepare(
     let src_s = src.display().to_string();
     Ok(ctx.spec(
         &id,
-        factory_types::job::JobKind::Build,
+        mork_types::job::JobKind::Build,
         &owner,
         argv,
         &src_s,
@@ -280,12 +282,12 @@ fn quote(path: &str) -> String {
     format!("'{}'", path.replace('\'', "'\\''"))
 }
 
-pub fn commit_of(spec: &factory_types::job::JobSpec) -> String {
-    spec.env.get("FACTORY_BUILD_COMMIT").cloned().unwrap_or_default()
+pub fn commit_of(spec: &mork_types::job::JobSpec) -> String {
+    spec.env.get("MORK_BUILD_COMMIT").cloned().unwrap_or_default()
 }
 
 /// After a build job ended: put the build in place, or clean up and say why not.
-pub fn finish(home: &Home, spec: &factory_types::job::JobSpec, exit_ok: bool, err: &str) -> Result<(), BuildError> {
+pub fn finish(home: &Home, spec: &mork_types::job::JobSpec, exit_ok: bool, err: &str) -> Result<(), BuildError> {
     let commit = commit_of(spec);
     let io = home.job(spec.id.as_str()).join("io");
     let result = if exit_ok {
@@ -302,39 +304,39 @@ pub fn finish(home: &Home, spec: &factory_types::job::JobSpec, exit_ok: bool, er
 
 /// What the unsettled jobs need a target to read: their formats, and their reply schemas'
 /// versions (2.3.6).
-pub fn unsettled(state: &factory_core::state::State) -> factory_core::maintenance::reload::Unsettled {
-    let mut u = factory_core::maintenance::reload::Unsettled::default();
+pub fn unsettled(state: &mork_core::state::State) -> mork_core::maintenance::reload::Unsettled {
+    let mut u = mork_core::maintenance::reload::Unsettled::default();
     for j in state.jobs.values().filter(|j| j.settled.is_none()) {
         u.formats.push(j.spec.format);
         if let Some(schema) = j.io_files.get("schema.json") {
             let v = serde_json::from_str(schema).unwrap_or_default();
-            u.reply_schemas.push(factory_types::reply::version_of(&v));
+            u.reply_schemas.push(mork_types::reply::version_of(&v));
         }
     }
     u
 }
 
 /// The checks a reload makes before anything changes (1.8.6.1), one function for the engine and
-/// `factory pin` with none running (1.12.6); a rollback the state is too new for names its backups (1.8.8).
+/// `mork pin` with none running (1.12.6); a rollback the state is too new for names its backups (1.8.8).
 pub fn check_target(
     home: &Home,
-    config: &factory_types::config::Config,
+    config: &mork_types::config::Config,
     commit: &str,
     state_version: u32,
-    unsettled: &factory_core::maintenance::reload::Unsettled,
+    unsettled: &mork_core::maintenance::reload::Unsettled,
     under_way: bool,
 ) -> Result<String, BuildError> {
-    use factory_core::maintenance::reload::Refusal;
-    let (repo, base) = factory_repo(config)?;
+    use mork_core::maintenance::reload::Refusal;
+    let (repo, base) = mork_repo(config)?;
     let full = git::resolve(home, &repo, commit).map_err(|e| BuildError::Refused {
         why: Refusal::NoBuild { short: format!("{commit}: {e}") },
         backups: None,
     })?;
-    let target = factory_core::maintenance::reload::Target {
+    let target = mork_core::maintenance::reload::Target {
         manifest: manifest(home, &full).map(|m| m.ranges()),
         on_master: git::on_master(home, &repo, &base, &full) == Some(true),
     };
-    match factory_core::maintenance::reload::refusal(&full, &target, state_version, unsettled, under_way) {
+    match mork_core::maintenance::reload::refusal(&full, &target, state_version, unsettled, under_way) {
         Some(why @ Refusal::StateVersion { .. }) => Err(BuildError::Refused { why, backups: Some(backups(home)) }),
         Some(why) => Err(BuildError::Refused { why, backups: None }),
         None => Ok(full),

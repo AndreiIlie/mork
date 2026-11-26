@@ -1,14 +1,17 @@
 use std::collections::BTreeMap;
 use std::fs::{self, Permissions};
-use std::io::{Read, Write};
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+use std::io::Read;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use factory_types::usage::Account;
+use mork_types::usage::Account;
 use serde_json::Value;
 
-use crate::{clock, random};
+use crate::{
+    clock,
+    login_files::{self, Destination},
+};
 
 const EVERY: Duration = Duration::from_secs(1);
 
@@ -82,7 +85,12 @@ pub(crate) struct Switch {
 }
 
 impl Switch {
-    pub fn prepare(home: &Path, name: &str, configured: &BTreeMap<String, String>) -> Result<Self, String> {
+    pub fn prepare(
+        home: &Path,
+        logins: &Path,
+        name: &str,
+        configured: &BTreeMap<String, String>,
+    ) -> Result<Self, String> {
         if !configured.contains_key(name) {
             return Err(format!("no saved Claude account `{name}`"));
         }
@@ -94,21 +102,24 @@ impl Switch {
             .filter_map(|saved| Login::read(saved_path(home, saved, "claude")).ok().map(|login| (saved, login)))
             .collect();
         saved.insert(name, Login::read(saved_path(home, name, "claude"))?);
-        let current = home_login.account().ok_or("the home's Claude login matches no saved account")?;
+        let current = home_login.account().ok_or("the active Claude login matches no saved account")?;
         let from = saved
             .iter()
             .find(|(_, login)| login.account().is_some_and(|account| account.id == current.id))
             .map(|(name, _)| *name)
-            .ok_or("the home's Claude login matches no saved account")?;
+            .ok_or("the active Claude login matches no saved account")?;
         if from == name {
-            return Err(format!("the shared home is already on `{name}`"));
+            return Err(format!("Claude account `{name}` is already active"));
         }
         let old = saved.remove(from).ok_or("the current saved login is missing")?;
         let target = saved.remove(name).ok_or("the target saved login is missing")?;
         if target.account().is_none() {
             return Err(format!("the saved account `{name}` has no Claude login"));
         }
-        let home_credentials = WholeFile::read(home.join(".claude/.credentials.json"))?;
+        let credential = Path::new(login_files::CLAUDE);
+        let active = Destination::new(logins, credential)
+            .map_err(|e| format!("could not read {}: {e}", logins.join(credential).display()))?;
+        let home_credentials = WholeFile::open(active)?;
         let old_credentials = WholeFile::read(saved_path(home, from, "credentials"))?;
         let target_credentials = WholeFile::read(saved_path(home, name, "credentials"))?;
         let old_json = old.with_login(&home_login.json)?;
@@ -127,10 +138,17 @@ impl Switch {
     }
 
     pub fn apply(&self) -> Result<(), String> {
-        let staged = self.files.iter().map(|(file, bytes)| file.stage(bytes)).collect::<Result<Vec<_>, _>>()?;
+        let staged = self
+            .files
+            .iter()
+            .map(|(file, bytes)| {
+                file.destination
+                    .stage(bytes, Some(file.permissions.clone()))
+                    .map_err(|e| format!("could not stage {}: {e}", file.destination.path.display()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         for file in staged {
-            fs::rename(&file.temporary, &file.destination)
-                .map_err(|e| format!("could not replace {}: {e}", file.destination.display()))?;
+            file.commit().map_err(|e| e.to_string())?;
         }
         Ok(())
     }
@@ -147,7 +165,7 @@ impl Login {
         let json = serde_json::from_slice::<Value>(&file.bytes)
             .ok()
             .filter(Value::is_object)
-            .ok_or_else(|| format!("{} is not a JSON object", file.path.display()))?;
+            .ok_or_else(|| format!("{} is not a JSON object", file.destination.path.display()))?;
         Ok(Self { file, json })
     }
 
@@ -157,67 +175,46 @@ impl Login {
 
     fn with_login(&self, login: &Value) -> Result<Vec<u8>, String> {
         let mut json = self.json.clone();
-        let object = json.as_object_mut().ok_or("the Claude configuration is not an object")?;
-        for field in ["oauthAccount", "userID"] {
-            match login.get(field) {
-                Some(value) => {
-                    object.insert(field.to_owned(), value.clone());
-                }
-                None => {
-                    object.remove(field);
-                }
-            }
-        }
+        account_fields(&mut json, login)?;
         serde_json::to_vec_pretty(&json).map_err(|_| "could not encode the Claude configuration".to_owned())
     }
 }
 
+pub(crate) fn account_fields(json: &mut Value, login: &Value) -> Result<(), String> {
+    let object = json.as_object_mut().ok_or("the Claude configuration is not an object")?;
+    for field in ["oauthAccount", "userID"] {
+        match login.get(field) {
+            Some(value) => {
+                object.insert(field.to_owned(), value.clone());
+            }
+            None => {
+                object.remove(field);
+            }
+        }
+    }
+    Ok(())
+}
+
 struct WholeFile {
-    path: PathBuf,
+    destination: Destination,
     bytes: Vec<u8>,
     permissions: Permissions,
 }
 
 impl WholeFile {
     fn read(path: PathBuf) -> Result<Self, String> {
+        Self::open(Destination::in_login_home(path))
+    }
+
+    fn open(destination: Destination) -> Result<Self, String> {
         let read = || -> std::io::Result<_> {
-            let mut file = fs::File::open(&path)?;
+            let mut file = destination.open()?;
             let permissions = file.metadata()?.permissions();
             let mut bytes = Vec::new();
             file.read_to_end(&mut bytes)?;
             Ok((bytes, permissions))
         };
-        let (bytes, permissions) = read().map_err(|e| format!("could not read {}: {e}", path.display()))?;
-        Ok(Self { path, bytes, permissions })
-    }
-
-    fn stage(&self, bytes: &[u8]) -> Result<Staged, String> {
-        let temporary = self.path.with_extension(format!("{}.tmp", random::uuid()));
-        // Login bytes must never pass through a temporary file with the default public mode.
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&temporary)
-            .map_err(|e| format!("could not prepare {}: {e}", self.path.display()))?;
-        let staged = Staged { temporary, destination: self.path.clone() };
-        let mut write = || -> std::io::Result<()> {
-            file.write_all(bytes)?;
-            file.set_permissions(self.permissions.clone())?;
-            file.sync_all()
-        };
-        write().map_err(|e| format!("could not write {}: {e}", self.path.display()))?;
-        Ok(staged)
-    }
-}
-
-struct Staged {
-    temporary: PathBuf,
-    destination: PathBuf,
-}
-
-impl Drop for Staged {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.temporary);
+        let (bytes, permissions) = read().map_err(|e| format!("could not read {}: {e}", destination.path.display()))?;
+        Ok(Self { destination, bytes, permissions })
     }
 }

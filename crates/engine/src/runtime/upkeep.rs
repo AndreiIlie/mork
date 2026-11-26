@@ -9,9 +9,9 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::{Duration, UNIX_EPOCH};
 
-use factory_core::maintenance::upkeep;
-use factory_core::messages::places;
-use factory_types::state::Agent;
+use mork_core::maintenance::upkeep;
+use mork_core::messages::places;
+use mork_types::state::Agent;
 
 use super::Engine;
 use crate::paths::Home;
@@ -100,7 +100,7 @@ impl Engine {
     // job writes it, and nothing in it changed for as long as a settled job's folder is kept (fac-654).
     fn prune_seat_ios(&self, now: i64) {
         let busy: BTreeSet<PathBuf> = (self.state.jobs.values().filter(|j| j.settled.is_none()))
-            .filter_map(|j| j.spec.env.get("FACTORY_IO").map(PathBuf::from))
+            .filter_map(|j| j.spec.env.get("MORK_IO").map(PathBuf::from))
             .collect();
         let live = |a: &&Agent| a.retiring.is_some() || !places::ended(&self.state, a.place.as_str());
         let owned = |name: &OsStr| {
@@ -112,6 +112,12 @@ impl Engine {
                 continue;
             }
             if newest_ms(&self.opts.home.seat_ios(), &entry.file_name()) < now - upkeep::KEEP_JOBS {
+                if let Some(id) = entry.file_name().to_str() {
+                    let home = self.opts.home.seat_home(id);
+                    if home.exists() && std::fs::remove_dir_all(home).is_err() {
+                        continue;
+                    }
+                }
                 let _ = std::fs::remove_dir_all(entry.path());
             }
         }
@@ -123,11 +129,11 @@ impl Engine {
 fn newest_ms(seats: &Path, name: &OsStr) -> i64 {
     let mut newest = 0;
     let mut pending: Vec<(Rc<File>, OsString)> = Vec::new();
-    let mut next = factory_sys::open_beneath(seats, Path::new(name)).ok();
+    let mut next = mork_sys::open_beneath(seats, Path::new(name)).ok();
     loop {
         if let Some(dir) = next.take().map(Rc::new) {
             newest = newest.max(dir.metadata().ok().and_then(|m| modified_ms(&m)).unwrap_or(0));
-            for entry in factory_sys::read_dir_of(&dir).into_iter().flatten().flatten() {
+            for entry in mork_sys::read_dir_of(&dir).into_iter().flatten().flatten() {
                 let Ok(meta) = entry.metadata() else { continue };
                 newest = newest.max(modified_ms(&meta).unwrap_or(0));
                 if meta.is_dir() {
@@ -136,7 +142,7 @@ fn newest_ms(seats: &Path, name: &OsStr) -> i64 {
             }
         }
         let Some((parent, name)) = pending.pop() else { return newest };
-        next = factory_sys::open_dir_beneath(&parent, Path::new(&name)).ok();
+        next = mork_sys::open_dir_beneath(&parent, Path::new(&name)).ok();
     }
 }
 
@@ -157,7 +163,7 @@ mod tests {
     // fac-654 review: a file far below a seat's folder keeps it as one at its top does, whatever its folders' times.
     #[test]
     fn fac654_a_seats_newest_change_is_read_at_any_depth() {
-        let seats = std::env::temp_dir().join(format!("factory-test-seat-ios-{}", std::process::id()));
+        let seats = std::env::temp_dir().join(format!("mork-test-seat-ios-{}", std::process::id()));
         let seat = seats.join("20200101-seat");
         let deep: PathBuf = (0..8).fold(seat.clone(), |p, n| p.join(format!("d{n}")));
         std::fs::create_dir_all(&deep).unwrap();

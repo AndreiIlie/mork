@@ -1,4 +1,4 @@
-use factory_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
 use serde_json::json;
 
 use super::Poster;
@@ -47,7 +47,7 @@ impl Poster<'_> {
 
     /// A new fetch of a project: its time is after every fetch of it there is, so its natural
     /// key (project, time) never names an earlier fetch, whatever the clock says.
-    pub fn fetch(&mut self, project: &str) -> factory_types::ActionId {
+    pub fn fetch(&mut self, project: &str) -> mork_types::ActionId {
         let last = self.last_fetch(project);
         let at = last.map_or(self.now, |l| self.now.max(l + 1));
         self.act(ActionWhat::Fetch { project: project.into(), at })
@@ -55,13 +55,13 @@ impl Poster<'_> {
 
     /// Decides an outward action (2.5): its natural key first. One already pending, started or
     /// done is the same action, and nothing new is made; its id is returned.
-    pub fn act(&mut self, what: ActionWhat) -> factory_types::ActionId {
+    pub fn act(&mut self, what: ActionWhat) -> mork_types::ActionId {
         self.act_as(what, false)
     }
 
     /// As `act`, or `anew`, an action of its own, whatever there is alike: a finding raised again
     /// once resolved is commented again, its occurrence told apart by its caller (fac-111).
-    pub fn act_as(&mut self, what: ActionWhat, anew: bool) -> factory_types::ActionId {
+    pub fn act_as(&mut self, what: ActionWhat, anew: bool) -> mork_types::ActionId {
         let base = what.key();
         // A board write keyed by its content is the same write when it is done too (M3.16); one
         // the engine decides keeps R6's rule: one done is history.
@@ -91,10 +91,10 @@ impl Poster<'_> {
         // The key stays unique in the state: one an earlier action had is made this one's own.
         let key = if taken { format!("{base}@{id}") } else { base };
         let held = what
-            .bitbucket()
+            .forge()
             .then(|| self.state.world.token_refused.clone())
             .flatten()
-            .map(|w| format!("{}{w}", crate::decide::token::TOKEN_HOLD));
+            .map(|w| format!("{}{w}", crate::decide::token::hold_prefix(self.token_forge)));
         let unwritten = crate::board::retry::proof(&what);
         let a = Action {
             id: id.clone(),
@@ -121,7 +121,7 @@ impl Poster<'_> {
 
     /// A new action's id: one above every id there is, stored or not loaded (fac-336), since a count
     /// would reuse an id once there are gaps.
-    pub fn next_action_id(&self) -> factory_types::ActionId {
+    pub fn next_action_id(&self) -> mork_types::ActionId {
         let top = self
             .state
             .actions
@@ -129,6 +129,6 @@ impl Poster<'_> {
             .chain(self.actions.keys())
             .filter_map(|k| k.strip_prefix("act-")?.parse::<u64>().ok())
             .fold(self.state.unloaded.action_top, u64::max);
-        factory_types::ActionId::new(format!("act-{}", top + 1))
+        mork_types::ActionId::new(format!("act-{}", top + 1))
     }
 }

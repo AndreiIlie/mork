@@ -1,7 +1,7 @@
 //! A failed suite's output as the train tells it (fac-144): what failed, read from its whole
 //! output, before its tail, and where the whole of it is kept.
 
-use factory_types::work::Failing;
+use mork_types::work::Failing;
 
 // A run with many failures must still fit a foreman's message: the full log has the rest.
 const BLOCK: usize = 20;

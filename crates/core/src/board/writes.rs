@@ -1,10 +1,10 @@
 //! A board write's content is decided when it is made (2.5, 4.18, M3.16): the engine writes exactly that, and recovers
 //! by it after a crash.
 
-use factory_types::action::{ActionWhat, BoardEdit};
-use factory_types::card::BoardCard;
-use factory_types::hash::short;
-use factory_types::{CardId, ProjectId};
+use mork_types::action::{ActionWhat, BoardEdit};
+use mork_types::card::BoardCard;
+use mork_types::hash::short;
+use mork_types::{CardId, ProjectId};
 
 use super::notes::Written;
 use crate::board;
@@ -131,7 +131,7 @@ fn made(
     }
 }
 
-/// Every note the factory wrote into this card's board file, in whichever folder it then was, dated when its action
+/// Every note Mork wrote into this card's board file, in whichever folder it then was, dated when its action
 /// was made, its lines as they went in: what tells a note's lines from the description.
 pub fn written(state: &State, project: &ProjectId, file: &str) -> Vec<Written> {
     let here = |(p, w): &(&ProjectId, Written)| *p == project && w.of(file);
@@ -144,9 +144,9 @@ pub fn name(file: &str) -> &str {
 }
 
 /// The note a recorded board write put in, as [`written`] reads it: its project, and the note.
-pub fn written_note(a: &factory_types::action::Action) -> Option<(&ProjectId, Written)> {
+pub fn written_note(a: &mork_types::action::Action) -> Option<(&ProjectId, Written)> {
     let ActionWhat::ChangeBoardCard { edit, project, file, dest, .. } = &a.what else { return None };
-    if a.status == factory_types::action::ActionStatus::Dropped {
+    if a.status == mork_types::action::ActionStatus::Dropped {
         return None;
     }
     let (who, text) = match edit {

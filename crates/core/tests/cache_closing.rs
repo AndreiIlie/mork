@@ -7,15 +7,15 @@
 mod common;
 
 use common::{Sim, reply};
-use factory_core::agents::{cache, closing, models, turns};
-use factory_core::decide::{Event, JobEnd, SessionSeen};
-use factory_core::views::{outside::Outside, place::place, screen::screen};
-use factory_types::card::Stage;
-use factory_types::config::{Cli, Effort};
-use factory_types::state::{Agent, Owed};
-use factory_types::view::CacheState;
-use factory_types::work::Purpose;
-use factory_types::{AgentKey, JobId};
+use mork_core::agents::{cache, closing, models, turns};
+use mork_core::decide::{Event, JobEnd, SessionSeen};
+use mork_core::views::{outside::Outside, place::place, screen::screen};
+use mork_types::card::Stage;
+use mork_types::config::{Cli, Effort};
+use mork_types::state::{Agent, Owed};
+use mork_types::view::CacheState;
+use mork_types::work::Purpose;
+use mork_types::{AgentKey, JobId};
 use serde_json::{Value, json};
 
 const CARD: &str = "web-1";
@@ -43,14 +43,14 @@ fn recap_reply() -> Value {
 }
 
 fn closing_reply() -> Value {
-    json!({"feedback": "nothing", "factory_feedback": "nothing"})
+    json!({"feedback": "nothing", "mork_feedback": "nothing"})
 }
 
 // Starts a full card, clones it, and runs three planner turns with tools ending in a challenged recap ready to approve.
 fn ready_to_approve() -> Sim {
     let mut s = Sim::new();
     s.board(CARD, "web");
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
+    s.operator(json!({"start": {"card": CARD}})).unwrap();
     s.settle_actions();
     let id = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
     s.end_job(&id, json!({}));
@@ -58,9 +58,9 @@ fn ready_to_approve() -> Sim {
     assert_eq!(s.stage(CARD), Stage::Brief);
 
     run_with_tools(&mut s, PLANNER, reply("working", "Scout 1"));
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Continue."}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Continue."}})).unwrap();
     run_with_tools(&mut s, PLANNER, reply("working", "Scout 2"));
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Recap now."}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Recap now."}})).unwrap();
     run_with_tools(&mut s, PLANNER, recap_reply());
     s.turn(FOREMAN, reply("working", "No objection"));
     s
@@ -69,8 +69,8 @@ fn ready_to_approve() -> Sim {
 #[test]
 fn closing_turn_keeps_session_effort_and_ignores_pending_pick() {
     let mut s = ready_to_approve();
-    s.andrei(json!({"pick": {"agent": PLANNER, "effort": "low"}})).unwrap();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"pick": {"agent": PLANNER, "effort": "low"}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     let planner = agent(&s, PLANNER);
     assert!(closing::ending_turn(&planner));
     let seat = models::seat(&s.config, &planner).unwrap();
@@ -81,13 +81,13 @@ fn closing_turn_keeps_session_effort_and_ignores_pending_pick() {
 #[test]
 fn warm_planner_closes_at_approval_and_keeps_held_request() {
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     assert_eq!(s.stage(CARD), Stage::Build);
     assert!(s.owed(PLANNER), "warm planner is due for its closing turn while the card is at build");
     assert!(closing::ending_turn(&agent(&s, PLANNER)));
 
     let id = s.turn_started(PLANNER);
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Spec question."}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Spec question."}})).unwrap();
     finish_with_tools(&mut s, &id, closing_reply());
 
     let planner = agent(&s, PLANNER);
@@ -107,7 +107,7 @@ fn stopped_running_brief_turn_at_approval_is_stamped_and_still_closes() {
     s.state.agents.insert(key, a);
     let detached = s.turn_started(PLANNER);
     // Keep the recap offered so approval stops this running turn.
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
 
     let planner = agent(&s, PLANNER);
     assert!(planner.retiring.is_some(), "running brief turn counts as warm at approval");
@@ -122,23 +122,23 @@ fn stopped_running_brief_turn_at_approval_is_stamped_and_still_closes() {
 fn cold_seat_at_card_end_skips_closing_turn() {
     let mut s = ready_to_approve();
     s.now += cache::CLAUDE_MS + 1000;
-    s.andrei(json!({"close": {"card": CARD, "why": "Done."}})).unwrap();
+    s.operator(json!({"close": {"card": CARD, "why": "Done."}})).unwrap();
     assert!(!s.state.agents.contains_key(&AgentKey::new(PLANNER)), "cold removed seat goes immediately");
 
     // Report card ended (`done`, remove = false): cold seat stays without retiring.
     let mut s = Sim::new();
     s.board("web-2", "web");
-    s.andrei(json!({"start": {"card": "web-2", "mode": "report"}})).unwrap();
+    s.operator(json!({"start": {"card": "web-2", "mode": "report"}})).unwrap();
     s.settle_actions();
     let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == "web-2"))[0].clone();
     s.end_job(&clone, json!({}));
     s.settle_actions();
     for _ in 0..3 {
         run_with_tools(&mut s, "web-2/foreman", reply("working", "Step"));
-        s.andrei(json!({"say": {"place": "web-2", "text": "More."}})).unwrap();
+        s.operator(json!({"say": {"place": "web-2", "text": "More."}})).unwrap();
     }
     s.now += cache::CODEX_MS + 1000;
-    s.andrei(json!({"done": {"card": "web-2"}})).unwrap();
+    s.operator(json!({"done": {"card": "web-2"}})).unwrap();
     let f = agent(&s, "web-2/foreman");
     assert!(f.retiring.is_none(), "cold kept seat skips closing turn");
 }
@@ -146,8 +146,8 @@ fn cold_seat_at_card_end_skips_closing_turn() {
 #[test]
 fn owed_closing_turn_and_correction_expire_when_cold() {
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Hold this."}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Hold this."}})).unwrap();
     assert!(s.owed(PLANNER));
 
     s.now += cache::CLAUDE_MS + 1000;
@@ -159,7 +159,7 @@ fn owed_closing_turn_and_correction_expire_when_cold() {
 
     // Queued correction of a refused closing reply (`asked == true`) also expires on tick when cold.
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     let id = s.turn_started(PLANNER);
     finish_with_tools(&mut s, &id, json!({"feedback": ""}));
     assert!(matches!(agent(&s, PLANNER).owed, Some(Owed::Correction { .. })));
@@ -178,20 +178,20 @@ fn owed_closing_turn_and_correction_expire_when_cold() {
 fn planner_asked_again_at_card_end_only_if_it_ran_since_approval() {
     // No turns since approval closing turn: skipped at close even while warm.
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     run_with_tools(&mut s, PLANNER, closing_reply());
     assert_eq!(agent(&s, PLANNER).ran.closed, 3);
-    s.andrei(json!({"close": {"card": CARD, "why": "Stop."}})).unwrap();
+    s.operator(json!({"close": {"card": CARD, "why": "Stop."}})).unwrap();
     assert!(!s.state.agents.contains_key(&AgentKey::new(PLANNER)), "no second closing turn without a turn since");
 
     // One turn since approval closing turn while warm: asked again at close.
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     run_with_tools(&mut s, PLANNER, closing_reply());
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Clarify."}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Clarify."}})).unwrap();
     s.turn(PLANNER, reply("working", "Clarified"));
     assert_eq!(agent(&s, PLANNER).ran.turns, 4);
-    s.andrei(json!({"close": {"card": CARD, "why": "Stop."}})).unwrap();
+    s.operator(json!({"close": {"card": CARD, "why": "Stop."}})).unwrap();
     assert!(agent(&s, PLANNER).retiring.is_some(), "warm planner with a turn since gets second closing turn");
 }
 
@@ -199,7 +199,7 @@ fn planner_asked_again_at_card_end_only_if_it_ran_since_approval() {
 fn last_turn_ms_stamps_only_model_turns_clears_on_fresh_and_round_trips() {
     let mut s = Sim::new();
     s.board(CARD, "web");
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
+    s.operator(json!({"start": {"card": CARD}})).unwrap();
     s.settle_actions();
     let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
     s.end_job(&clone, json!({}));
@@ -211,7 +211,7 @@ fn last_turn_ms_stamps_only_model_turns_clears_on_fresh_and_round_trips() {
     assert_eq!(agent(&s, PLANNER).last_turn_ms, None);
 
     // Turn reaches the model: last_turn_ms is stamped and survives serde round trip.
-    s.andrei(json!({"resume": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"resume": {"agent": PLANNER}})).unwrap();
     run_with_tools(&mut s, PLANNER, reply("working", "Ran"));
     let stamped = agent(&s, PLANNER).last_turn_ms.expect("stamped on completed turn");
     let raw = serde_json::to_string(&agent(&s, PLANNER)).unwrap();
@@ -220,14 +220,14 @@ fn last_turn_ms_stamps_only_model_turns_clears_on_fresh_and_round_trips() {
 
     // Cold seat fails immediately without answering or tools: last_turn_ms does not advance.
     s.now += cache::CLAUDE_MS + 1000;
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Wake."}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Wake."}})).unwrap();
     let id = s.turn_started(PLANNER);
     let failed = JobEnd::Finished { reply: Err("limit".into()), session: SessionSeen::default() };
     s.apply(Event::JobEnded { id, end: failed });
     assert_eq!(agent(&s, PLANNER).last_turn_ms, Some(stamped), "immediate failure does not warm a cold seat");
 
     // `fresh` clears last_turn_ms.
-    s.andrei(json!({"fresh": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"fresh": {"agent": PLANNER}})).unwrap();
     assert_eq!(agent(&s, PLANNER).last_turn_ms, None);
 }
 
@@ -235,7 +235,7 @@ fn last_turn_ms_stamps_only_model_turns_clears_on_fresh_and_round_trips() {
 fn views_report_cache_state_and_waiting_hand_cold_at() {
     let mut s = Sim::new();
     s.board(CARD, "web");
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
+    s.operator(json!({"start": {"card": CARD}})).unwrap();
     s.settle_actions();
     let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
     s.end_job(&clone, json!({}));
@@ -271,10 +271,10 @@ fn views_report_cache_state_and_waiting_hand_cold_at() {
 fn pending_fresh_applies_after_approval_closing_turn_and_detached_brief_turn() {
     // 1. `fresh` sent while the approval closing turn runs takes effect on settle, before the held wake.
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     let id = s.turn_started(PLANNER);
-    s.andrei(json!({"fresh": {"agent": PLANNER}})).unwrap();
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Follow-up."}})).unwrap();
+    s.operator(json!({"fresh": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Follow-up."}})).unwrap();
     finish_with_tools(&mut s, &id, closing_reply());
 
     let planner = agent(&s, PLANNER);
@@ -287,7 +287,7 @@ fn pending_fresh_applies_after_approval_closing_turn_and_detached_brief_turn() {
     // 2. `fresh` pending over a brief turn detached by approval (with no closing turn) applies immediately.
     let mut s = Sim::new();
     s.board(CARD, "web");
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
+    s.operator(json!({"start": {"card": CARD}})).unwrap();
     s.settle_actions();
     let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
     s.end_job(&clone, json!({}));
@@ -298,8 +298,8 @@ fn pending_fresh_applies_after_approval_closing_turn_and_detached_brief_turn() {
     a.owed = Some(Owed::Wake);
     s.state.agents.insert(AgentKey::new(PLANNER), a);
     let _detached = s.turn_started(PLANNER);
-    s.andrei(json!({"fresh": {"agent": PLANNER}})).unwrap();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"fresh": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
 
     let planner = agent(&s, PLANNER);
     assert!(planner.retiring.is_none());
@@ -310,9 +310,9 @@ fn pending_fresh_applies_after_approval_closing_turn_and_detached_brief_turn() {
 #[test]
 fn cold_limit_hit_in_closing_turn_keeps_not_before_for_held_wake() {
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     let id = s.turn_started(PLANNER);
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "After reset."}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "After reset."}})).unwrap();
     // Turn ends past cold_at with a usage limit and no model answer/tools.
     s.now += cache::CLAUDE_MS + 1000;
     let reset_sec = (s.now + 30 * 60_000) / 1000;
@@ -334,23 +334,23 @@ fn cold_limit_hit_in_closing_turn_keeps_not_before_for_held_wake() {
 fn stopping_and_resuming_approval_closing_turn_does_not_replay_feedback_prompt() {
     // 1. Stop during approval closing turn, let it settle, then resume.
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     let id = s.turn_started(PLANNER);
-    s.andrei(json!({"stop": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"stop": {"agent": PLANNER}})).unwrap();
     s.apply(Event::JobEnded { id, end: JobEnd::Stopped });
     assert!(agent(&s, PLANNER).retiring.is_none());
     assert!(agent(&s, PLANNER).paused);
-    s.andrei(json!({"resume": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"resume": {"agent": PLANNER}})).unwrap();
     let planner = agent(&s, PLANNER);
     assert!(!planner.paused);
     assert_eq!(planner.owed, None, "resume does not replay the stopped closing turn as an ordinary turn");
 
     // 2. Stop and immediately resume while the approval closing turn is still stopping.
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     let id = s.turn_started(PLANNER);
-    s.andrei(json!({"stop": {"agent": PLANNER}})).unwrap();
-    s.andrei(json!({"resume": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"stop": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"resume": {"agent": PLANNER}})).unwrap();
     s.apply(Event::JobEnded { id, end: JobEnd::Stopped });
     let planner = agent(&s, PLANNER);
     assert!(planner.retiring.is_none());
@@ -359,10 +359,10 @@ fn stopping_and_resuming_approval_closing_turn_does_not_replay_feedback_prompt()
 
     // 3. Stop during approval closing turn with a held spec request keeps the wake for resume.
     let mut s = ready_to_approve();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     let id = s.turn_started(PLANNER);
-    s.andrei(json!({"say": {"place": format!("{CARD}/spec"), "text": "Spec question during closing."}})).unwrap();
-    s.andrei(json!({"stop": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"say": {"place": format!("{CARD}/spec"), "text": "Spec question during closing."}})).unwrap();
+    s.operator(json!({"stop": {"agent": PLANNER}})).unwrap();
     s.apply(Event::JobEnded { id, end: JobEnd::Stopped });
     let planner = agent(&s, PLANNER);
     assert!(planner.retiring.is_none());
@@ -370,7 +370,7 @@ fn stopping_and_resuming_approval_closing_turn_does_not_replay_feedback_prompt()
     assert_eq!(planner.owed, Some(Owed::Wake), "held spec request stays owed after stopping closing turn");
     assert!(!s.owed(PLANNER), "paused seat does not run until resumed");
 
-    s.andrei(json!({"resume": {"agent": PLANNER}})).unwrap();
+    s.operator(json!({"resume": {"agent": PLANNER}})).unwrap();
     assert!(!agent(&s, PLANNER).paused);
     assert!(s.owed(PLANNER), "resuming delivers the held spec request");
 }

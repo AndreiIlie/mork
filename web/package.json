@@ -1,5 +1,5 @@
 {
-  "name": "factory-web",
+  "name": "mork-web",
   "private": true,
   "type": "module",
   "scripts": {

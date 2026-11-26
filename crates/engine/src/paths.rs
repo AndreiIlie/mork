@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-/// One factory's home folder.
+/// One Mork home folder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Home {
     root: PathBuf,
@@ -13,16 +13,16 @@ impl Home {
         Self { root: root.into() }
     }
 
-    /// `$FACTORY_HOME`, else `$XDG_DATA_HOME/factory`, else `~/.local/share/factory`.
+    /// `$MORK_HOME`, else `$XDG_DATA_HOME/mork`, else `~/.local/share/mork`.
     pub fn from_env() -> Option<Self> {
-        if let Some(h) = std::env::var_os("FACTORY_HOME").filter(|v| !v.is_empty()) {
+        if let Some(h) = std::env::var_os("MORK_HOME").filter(|v| !v.is_empty()) {
             return Some(Self::new(h));
         }
         if let Some(x) = std::env::var_os("XDG_DATA_HOME").filter(|v| !v.is_empty()) {
-            return Some(Self::new(PathBuf::from(x).join("factory")));
+            return Some(Self::new(PathBuf::from(x).join("mork")));
         }
         let home = std::env::var_os("HOME").filter(|v| !v.is_empty())?;
-        Some(Self::new(PathBuf::from(home).join(".local/share/factory")))
+        Some(Self::new(PathBuf::from(home).join(".local/share/mork")))
     }
 
     pub fn root(&self) -> &Path {
@@ -31,8 +31,8 @@ impl Home {
     pub fn app_lock(&self) -> PathBuf {
         self.root.join("app.lock")
     }
-    pub fn factory_sock(&self) -> PathBuf {
-        self.root.join("factory.sock")
+    pub fn mork_sock(&self) -> PathBuf {
+        self.root.join("mork.sock")
     }
     pub fn run_dir(&self) -> PathBuf {
         self.root.join("run")
@@ -49,7 +49,7 @@ impl Home {
     pub fn job(&self, id: &str) -> PathBuf {
         self.jobs().join(id)
     }
-    /// The seats' own `io/` folders (fac-654), each its `$FACTORY_IO` for its lifetime.
+    /// The seats' own `io/` folders (fac-654), each its `$MORK_IO` for its lifetime.
     pub fn seat_ios(&self) -> PathBuf {
         self.root.join("io")
     }
@@ -57,10 +57,28 @@ impl Home {
     pub fn seat_io(&self, id: &str) -> PathBuf {
         self.seat_ios().join(id)
     }
+    pub fn homes(&self) -> PathBuf {
+        self.root.join("homes")
+    }
+    pub fn seat_home(&self, io: &str) -> PathBuf {
+        self.homes().join(&crate::files::sha256_hex(io.as_bytes())[..16])
+    }
+    pub fn login_home(&self) -> PathBuf {
+        self.root.join("login-home")
+    }
+    pub fn logins(&self) -> PathBuf {
+        self.root.join("logins")
+    }
+    pub fn caches(&self) -> PathBuf {
+        self.root.join("caches")
+    }
+    pub fn work(&self) -> PathBuf {
+        self.root.join("work")
+    }
     pub fn builds(&self) -> PathBuf {
         self.root.join("builds")
     }
-    /// The installed browsers (fac-114): read-only in every wall, put there outside the factory.
+    /// The installed browsers (fac-114): read-only in every wall, put there outside Mork.
     pub fn browsers(&self) -> PathBuf {
         self.root.join("browsers")
     }

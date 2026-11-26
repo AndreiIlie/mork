@@ -1,13 +1,13 @@
 //! Starting a card (4.3): refused with nothing made, or recorded `starting` first; then the fetch, the clone and
 //! `install`, the board's status, and the mode's first turn.
 
-use factory_types::action::ActionStatus;
-use factory_types::card::{BoardCard, Card, Mode, Stage};
-use factory_types::config::{SeatPhase, Standing};
-use factory_types::reply::Role;
-use factory_types::state::{Agent, Choice, Sender};
-use factory_types::work::Purpose;
-use factory_types::{ActionId, CardId};
+use mork_types::action::ActionStatus;
+use mork_types::card::{BoardCard, Card, Mode, Stage};
+use mork_types::config::{SeatPhase, Standing};
+use mork_types::reply::Role;
+use mork_types::state::{Agent, Choice, Sender};
+use mork_types::work::Purpose;
+use mork_types::{ActionId, CardId};
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Decision, Intent};
@@ -52,7 +52,7 @@ fn startable(p: &Poster<'_>, id: &CardId, ctx: Ctx<'_>) -> Result<(), String> {
 
 // One port per live card (4.3.4).
 pub(super) fn port(p: &Poster<'_>, ctx: Ctx<'_>) -> Option<u16> {
-    let (from, to) = ctx.config.factory.port_range.split_once('-')?;
+    let (from, to) = ctx.config.mork.port_range.split_once('-')?;
     let (from, to): (u16, u16) = (from.trim().parse().ok()?, to.trim().parse().ok()?);
     let live = p.state.cards.values().filter(|c| c.stage.is_live());
     // A mock host's port is taken too (fac-258).
@@ -79,7 +79,7 @@ fn start_in(
     c.description = bc.description.clone();
     c.carries = carries;
     if let Some(rid) = reviewed(p, id, prior.as_ref(), mode, &c, ctx) {
-        return Err(format!("{rid}, Andrei's review of {id}'s branch, is under way: `done {rid}` first"));
+        return Err(format!("{rid}, the operator's review of {id}'s branch, is under way: `done {rid}` first"));
     }
     let visual = super::visual::of_run(&c, options.visual, prior.as_ref())?;
     super::stops::stop_owed(p, id, ctx);
@@ -97,7 +97,7 @@ fn start_in(
         c.delegated = true;
         c.self_sustained = options.self_sustained;
     } else {
-        // Delegated until Andrei turns it off, a new run too (fac-172); else by its project's auto (fac-381).
+        // Delegated until the operator turns it off, a new run too (fac-172); else by its project's auto (fac-381).
         c.delegated = prior.as_ref().is_some_and(|c| c.delegated) || crate::messages::auto::on(p.state, &c.project);
         c.self_sustained = prior.as_ref().is_some_and(|c| c.delegated && c.self_sustained);
     }
@@ -240,7 +240,7 @@ fn picked(
     let at = Standing { phase, review: None };
     let s =
         crate::agents::models::selection(ctx.config, &a, at, model, effort, None, crate::agents::models::By::Other)?;
-    let by = if from.is_orchestrator() { from.label() } else { "andrei".to_owned() };
+    let by = if from.is_orchestrator() { from.label() } else { "operator".to_owned() };
     a.pending = Some(Choice { cli: s.model.cli, model: s.model.model, effort: s.effort, by, phase: Some(phase) });
     Ok(Some(a))
 }
@@ -248,7 +248,7 @@ fn picked(
 /// A fetch returned: the cards starting on its project get their base tip, their branch and
 /// their clone; a colleague's review card its own (fac-95).
 pub fn fetched(p: &mut Poster<'_>, project: &str, result: &Value, ctx: Ctx<'_>) {
-    let Some(tip) = result.get("base_tip").and_then(Value::as_str).map(factory_types::Sha::new) else { return };
+    let Some(tip) = result.get("base_tip").and_then(Value::as_str).map(mork_types::Sha::new) else { return };
     let starting: Vec<Card> = p
         .state
         .cards
@@ -276,12 +276,12 @@ pub fn fetched(p: &mut Poster<'_>, project: &str, result: &Value, ctx: Ctx<'_>) 
 
 // Where a later run's clone starts (fac-111): a head its run took and never published goes on;
 // else its branch's tip as this fetch read it, a publication's merge or a newer push in it.
-fn continued_at(c: &Card, branch: &str, result: &Value) -> Option<factory_types::Sha> {
+fn continued_at(c: &Card, branch: &str, result: &Value) -> Option<mork_types::Sha> {
     if c.continues.is_none() && c.pushed.is_none() {
         return None;
     }
     let unpublished = c.continues.clone().filter(|h| c.pushed_head.as_ref() != Some(h));
-    let tip = result.get("tips").and_then(|t| t.get(branch)).and_then(Value::as_str).map(factory_types::Sha::new);
+    let tip = result.get("tips").and_then(|t| t.get(branch)).and_then(Value::as_str).map(mork_types::Sha::new);
     unpublished.or(tip).or_else(|| c.continues.clone())
 }
 
@@ -297,7 +297,7 @@ pub fn cloned(p: &mut Poster<'_>, mut card: Card, v: &Value, ctx: Ctx<'_>) {
         p.intent(Intent::DropMock { card: card.id.clone() });
     }
     if let Some(fork) = v.get("fork").and_then(Value::as_str) {
-        card.fork = Some(factory_types::Sha::new(fork));
+        card.fork = Some(mork_types::Sha::new(fork));
         p.put_card(card.clone());
     }
     let install = ctx.config.projects.get(&card.project).and_then(|pr| pr.install.clone());
@@ -414,12 +414,12 @@ pub(super) fn first(card: &Card) -> String {
          every later recap is challenged again. With no objections the engine offers the plan at once. \
          Otherwise settle them with the foreman by messages, as long as it takes, changing the plan for the \
          objections you take, then recap it: your messages to `foreman` and its to you pass in the card's \
-         challenge place, which no window shows. Andrei's words reach you in this spec room, the foreman his in \
+         challenge place, which no window shows. The operator's words reach you in this spec room, the foreman his in \
          the build room. One it still holds after your refusal goes in your hand's `ask` with both \
          positions, one at a time, at every delegation level (never decide it alone). An offered plan never \
          approves itself: it raises an `approve-brief` ask (given to the project's orchestrator automatically on \
-         a delegated non-visual card) and waits for `approve` from Andrei, or from the project's orchestrator \
-         while that ask is given to it; a visual card's waits for Andrei's own. At approval your work at brief \
+         a delegated non-visual card) and waits for `approve` from the operator, or from the project's orchestrator \
+         while that ask is given to it; a visual card's waits for the operator's own. At approval your work at brief \
          ends and the foreman takes the build."
     )
 }
@@ -428,7 +428,7 @@ pub(super) fn first(card: &Card) -> String {
 fn alone(card: &Card) -> String {
     let id = &card.id;
     let writes = if card.visual {
-        "Edit no tracked repository files before approval: only `.git/factory-mock/` is yours to edit at brief."
+        "Edit no tracked repository files before approval. Edit `.git/mork-mock/` only after the visual direction is confirmed."
     } else {
         "Write, edit and commit nothing before approval."
     };
@@ -444,8 +444,8 @@ fn alone(card: &Card) -> String {
          shape in the hand's `changes` and `code_shape`, in the skill's plain line forms, the long plan in its \
          `message`, and end `brief-ready`. No seat challenges it: an offered plan never approves itself; it raises an `approve-brief` \
          ask (given to the project's orchestrator automatically on a delegated non-visual card) and waits for \
-         `approve` from Andrei, or from the project's orchestrator while that ask is given to it; a visual card's \
-         waits for Andrei's own. At approval your brief researchers are released, and the build request comes to you \
+         `approve` from the operator, or from the project's orchestrator while that ask is given to it; a visual card's \
+         waits for the operator's own. At approval your brief researchers are released, and the build request comes to you \
          in this session."
     )
 }

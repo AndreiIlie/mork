@@ -3,12 +3,12 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::config::ProjectConfig;
-use factory_types::lease::{Lease, LeaseKind};
-use factory_types::reply::Role;
-use factory_types::state::Sender;
-use factory_types::work::Purpose;
-use factory_types::{AgentKey, CardId, JobId};
+use mork_types::config::ProjectConfig;
+use mork_types::lease::{Lease, LeaseKind};
+use mork_types::reply::Role;
+use mork_types::state::Sender;
+use mork_types::work::Purpose;
+use mork_types::{AgentKey, CardId, JobId};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision, Intent};
@@ -19,12 +19,12 @@ use crate::state::{Change, State};
 pub const RECLAIM_MS: i64 = 30_000;
 
 /// Why an agent's suite is refused, with arguments or none (fac-10, fac-65).
-pub const WHOLE_SUITE: &str = "only verification and the merge queue run the suite's command, with arguments or none, once the card's checks pass: test what you touched with `factory test --run <command>`, a narrow crate, test or filter";
+pub const WHOLE_SUITE: &str = "only verification and the merge queue run the suite's command, with arguments or none, once the card's checks pass: test what you touched with `mork test --run <command>`, a narrow crate, test or filter";
 
 /// The holder of the engine's own leases.
 pub const ENGINE: &str = "engine";
 
-pub(crate) fn live(p: &Poster<'_>) -> BTreeMap<factory_types::LeaseId, Lease> {
+pub(crate) fn live(p: &Poster<'_>) -> BTreeMap<mork_types::LeaseId, Lease> {
     let mut all = p.state.leases.clone();
     for c in &p.other {
         if let Change::PutLease(l) = c {
@@ -45,7 +45,7 @@ pub(crate) fn no_slot(p: &Poster<'_>, project: &str, card: Option<&CardId>, ctx:
         Some("its project's leases are being reclaimed")
     } else if of_project.len() as u64 >= slots {
         Some("its project's slots are taken")
-    } else if all.len() as u64 >= ctx.config.factory.max_test_runs {
+    } else if all.len() as u64 >= ctx.config.mork.max_test_runs {
         Some("the machine's test runs are taken")
     } else if card.is_some()
         && all
@@ -58,7 +58,7 @@ pub(crate) fn no_slot(p: &Poster<'_>, project: &str, card: Option<&CardId>, ctx:
     }
 }
 
-fn new_id(p: &Poster<'_>) -> factory_types::LeaseId {
+fn new_id(p: &Poster<'_>) -> mork_types::LeaseId {
     let all = live(p);
     let mut n = 0;
     loop {
@@ -79,7 +79,7 @@ pub(crate) fn grant(p: &mut Poster<'_>, l: Lease) {
     p.other.push(Change::PutLease(l));
 }
 
-fn place_of(state: &State, key: &AgentKey) -> Option<(CardId, factory_types::ProjectId)> {
+fn place_of(state: &State, key: &AgentKey) -> Option<(CardId, mork_types::ProjectId)> {
     let agent = state.agents.get(key)?;
     let card = crate::messages::places::card_of(state, &agent.place).and_then(|c| state.cards.get(&c))?;
     Some((card.id.clone(), card.project.clone()))
@@ -101,8 +101,8 @@ pub fn lease(state: &State, from: &Sender, kind: &str, command: &[String], ctx: 
     let Some((key, (card, project))) = agent_of(from).and_then(|k| place_of(state, k).map(|w| (k, w))) else {
         return Decision::refused("no clone to test in");
     };
-    // Andrei's rule (fac-10, fac-375): only verification and the merge queue run the suite; before, an agent tests
-    // only what it touched. Its arguments can't be trusted to narrow it: the factory's ignores them (fac-65).
+    // The operator's rule (fac-10, fac-375): only verification and the merge queue run the suite; before, an agent tests
+    // only what it touched. Its arguments can't be trusted to narrow it: Mork's ignores them (fac-65).
     if kind == LeaseKind::Suite {
         return Decision::refused(WHOLE_SUITE);
     }
@@ -138,7 +138,7 @@ pub fn lease(state: &State, from: &Sender, kind: &str, command: &[String], ctx: 
 
 fn leased(mut p: Poster<'_>, l: Lease, command: &[String], what: Option<&serde_json::Value>, ctx: Ctx<'_>) -> Decision {
     let id = l.id.clone();
-    let own = l.project == ctx.config.factory.project;
+    let own = ctx.config.mork.project.as_ref() == Some(&l.project);
     let argv = argv(ctx.config.projects.get(&l.project), own, l.kind, command);
     let mut v = json!({"lease": {"id": id, "argv": argv}});
     if let (LeaseKind::Walls, Some(card)) = (l.kind, &l.card) {
@@ -158,10 +158,10 @@ fn leased(mut p: Poster<'_>, l: Lease, command: &[String], what: Option<&serde_j
 fn no_file_run(project: &str, command: &[String], ctx: Ctx<'_>) -> Option<String> {
     if ctx.config.projects.get(project).and_then(|p| p.test_file.as_ref()).is_none() {
         Some(format!(
-            "{project} has no one-file command (`test_file` in factory.toml): test what you touched with `factory test --run <program> <args>…`"
+            "{project} has no one-file command (`test_file` in mork.toml): test what you touched with `mork test --run <program> <args>…`"
         ))
     } else if command.is_empty() {
-        Some("`factory test --file` needs the paths of the files to test".to_owned())
+        Some("`mork test --file` needs the paths of the files to test".to_owned())
     } else {
         None
     }
@@ -179,7 +179,7 @@ fn checks_run(state: &State, key: &AgentKey, project: &str, ctx: Ctx<'_>) -> ser
 }
 
 // Review clones lack `origin/<base>`: their checks compare against the card's fork or base tip.
-fn fork_of(state: &State, key: &AgentKey) -> Option<factory_types::Sha> {
+fn fork_of(state: &State, key: &AgentKey) -> Option<mork_types::Sha> {
     let agent = state.agents.get(key)?;
     let c = crate::messages::places::card_of(state, &agent.place).and_then(|c| state.cards.get(&c))?;
     c.fork.clone().or(c.base_tip.clone())
@@ -209,7 +209,7 @@ fn argv(project: Option<&ProjectConfig>, own: bool, kind: LeaseKind, command: &[
             v.extend(command.iter().cloned());
             v
         }
-        // The factory's own tests, run inside a card's wall (fac-73).
+        // Mork's own tests, run inside a card's wall (fac-73).
         (LeaseKind::Run, Some(p)) if own => super::own_runs::argv(p, command),
         // An agent's suite is refused before any slot (fac-65).
         (LeaseKind::Run | LeaseKind::Suite | LeaseKind::File | LeaseKind::Walls, _) | (LeaseKind::Checks, None) => {
@@ -325,8 +325,8 @@ pub fn expire(p: &mut Poster<'_>, ctx: Ctx<'_>) {
     start_waiting(p, ctx);
 }
 
-fn engine_lease(card: &CardId) -> factory_types::LeaseId {
-    factory_types::LeaseId::new(format!("{ENGINE}-{card}"))
+fn engine_lease(card: &CardId) -> mork_types::LeaseId {
+    mork_types::LeaseId::new(format!("{ENGINE}-{card}"))
 }
 
 fn engine_run_of(p: &Poster<'_>, card: &CardId) -> bool {

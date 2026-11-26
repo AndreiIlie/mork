@@ -3,14 +3,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Card, Landing, Stage};
-use factory_types::landing::HeldRound;
-use factory_types::reply::Role;
-use factory_types::review::{PendingTriage, Raised, Round, TriageItem, Verdict};
-use factory_types::state::Sender;
-use factory_types::suites::Told;
-use factory_types::{AskId, CardId};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Card, Landing, Stage};
+use mork_types::landing::HeldRound;
+use mork_types::reply::Role;
+use mork_types::review::{PendingTriage, Raised, Round, TriageItem, Verdict};
+use mork_types::state::Sender;
+use mork_types::suites::Told;
+use mork_types::{AskId, CardId};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -435,7 +435,7 @@ fn findings_block(
     let triaged = by.map_or(String::new(), |from| format!(" Triaged by {}.", actor(from, &pending.ask)));
     let mut head = format!(
         "Review round {} of {} failed, on commit {}.{moved}{triaged} \
-         Findings to address below ({}), each by its place in this round (`<i>-` for its proofs) and its number on {} (`factory ctl resolve {} <n>`).",
+         Findings to address below ({}), each by its place in this round (`<i>-` for its proofs) and its number on {} (`mork ctl resolve {} <n>`).",
         pending.round,
         c.id,
         pending.commit.short(),
@@ -467,8 +467,8 @@ fn findings_block(
 
 fn actor(from: &Sender, ask: &AskId) -> String {
     match from {
-        Sender::Andrei => "Andrei".to_owned(),
-        Sender::Orchestrator(_) => format!("{}, on Andrei's delegation, answering {ask}", from.label()),
+        Sender::Operator => "the operator".to_owned(),
+        Sender::Orchestrator(_) => format!("{}, on the operator's delegation, answering {ask}", from.label()),
         Sender::Agent(_) | Sender::Engine | Sender::Pa => from.label(),
     }
 }

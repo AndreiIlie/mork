@@ -7,7 +7,7 @@ const REFRESH_MS = 60_000;
 function isRecentBurn(value: unknown): value is RecentBurn {
   if (typeof value !== "object" || value === null) return false;
   const b = value as Partial<RecentBurn>;
-  return typeof b.total_cents === "number" && typeof b.ended_cards === "number" && Array.isArray(b.roles);
+  return typeof b.total_cents === "number" && typeof b.ended_cards === "number" && Array.isArray(b.roles) && Array.isArray(b.cache_by_model);
 }
 
 /** Reads the engine's rolling 7-day burn summary on open and every 60s while the bridge link is live. */

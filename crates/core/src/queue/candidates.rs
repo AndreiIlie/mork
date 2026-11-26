@@ -1,12 +1,12 @@
 //! A card's candidates (fac-68, fac-375): each made of its card's head on the base's tip, in a clone of its own; given
 //! up, its jobs stop before its clone goes. A result for a given-up candidate only removes its clone.
 
-use factory_types::action::ActionWhat;
-use factory_types::ask::AskKind;
-use factory_types::card::{Candidate, Card, Landing};
-use factory_types::state::Job;
-use factory_types::work::{Made, Purpose};
-use factory_types::{CardId, Sha};
+use mork_types::action::ActionWhat;
+use mork_types::ask::AskKind;
+use mork_types::card::{Candidate, Card, Landing};
+use mork_types::state::Job;
+use mork_types::work::{Made, Purpose};
+use mork_types::{CardId, Sha};
 use serde_json::json;
 
 use super::members::{hold, say};

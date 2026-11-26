@@ -1,11 +1,11 @@
-//! What wakes a project's orchestrator (fac-265): one line the factory writes for each stream event it relays and for a
+//! What wakes a project's orchestrator (fac-265): one line Mork writes for each stream event it relays and for a
 //! card that ended. The haiku's prompt is made of these lines alone, so no seat's words may be in one.
 
-use factory_types::ProjectId;
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::card::Card;
-use factory_types::note::{Note, NoteWhat};
-use factory_types::orchestrator::OrchestratorWhat;
+use mork_types::ProjectId;
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::card::Card;
+use mork_types::note::{Note, NoteWhat};
+use mork_types::orchestrator::OrchestratorWhat;
 
 use crate::state::State;
 
@@ -23,7 +23,7 @@ pub fn line(state: &State, what: &OrchestratorWhat) -> Option<String> {
     })
 }
 
-fn given_line(state: &State, a: &factory_types::orchestrator::OrchestratorAsk) -> String {
+fn given_line(state: &State, a: &mork_types::orchestrator::OrchestratorAsk) -> String {
     match a.card.as_ref().and_then(|id| state.cards.get(id)).filter(|c| c.delegated) {
         Some(c) => format!("ask given to you ({}): {}", c.delegation(), a.ask),
         None => format!("ask given to you: {}", a.ask),
@@ -44,10 +44,10 @@ pub fn settled(state: &State, card: &Card) -> bool {
 }
 
 /// The line for a card whose run ended, done or closed, and what it left among the notes `notes` lists under its
-/// project (fac-592), the factory's a seat of another project's card filed not counted; no title, a seat's words.
-pub fn ended(state: &State, card: &Card, factory: &ProjectId) -> String {
+/// project (fac-592), Mork's a seat of another project's card filed not counted; no title, a seat's words.
+pub fn ended(state: &State, card: &Card, mork: Option<&ProjectId>) -> String {
     let mut counts = [0usize; 5];
-    let kept = |n: &&Note| n.card.as_ref() == Some(&card.id) && crate::memory::under(n, factory) == &card.project;
+    let kept = |n: &&Note| n.card.as_ref() == Some(&card.id) && crate::memory::under(n, mork) == Some(&card.project);
     for n in state.notes.values().filter(kept) {
         // A survey answer is kept from before the closing turn: no card ends leaving one now.
         let kind = match n.what {

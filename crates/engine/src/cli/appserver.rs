@@ -1,7 +1,7 @@
 //! Codex's app-server stream (fac-389): a walled turn's notifications, read as its exec stream is. The reply is the
 //! turn's last agent message; a message steered in was read if it reached the turn before that message.
 
-use factory_types::seen::DetailKind;
+use mork_types::seen::DetailKind;
 use serde_json::Value;
 
 use super::{StreamState, codex, turn};

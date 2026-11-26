@@ -37,7 +37,7 @@ impl From<io::Error> for ReadError {
 pub fn accept_key(client_key: &str) -> String {
     let input = format!("{}{WS_GUID}", client_key.trim());
     let digest = sha1(input.as_bytes());
-    crate::token::base64(&digest)
+    crate::encoding::base64(&digest)
 }
 
 // Pure-Rust FIPS 180-4 SHA-1 used only for RFC 6455's Sec-WebSocket-Accept handshake value.

@@ -201,11 +201,12 @@ fn find_text(root: &std::path::Path, needle: &[u8], skip: &[String], out: &mut V
     }
 }
 
-// `$JOB` in a path is this job's id (`FACTORY_JOB`), so a spec can name the job's own folder; `$IO` its
-// `FACTORY_IO`, its seat's folder (fac-654).
+// `$JOB` in a path is this job's id (`MORK_JOB`), so a spec can name the job's own folder; `$IO` its
+// `MORK_IO`, its seat's folder (fac-654).
 fn fill(p: &str) -> String {
-    let p = p.replace("$IO", &std::env::var("FACTORY_IO").unwrap_or_default());
-    p.replace("$JOB", &std::env::var("FACTORY_JOB").unwrap_or_default())
+    let p = p.replace("$HOME", &std::env::var("HOME").unwrap_or_default());
+    let p = p.replace("$IO", &std::env::var("MORK_IO").unwrap_or_default());
+    p.replace("$JOB", &std::env::var("MORK_JOB").unwrap_or_default())
 }
 
 // Keyed by the path as the spec wrote it.

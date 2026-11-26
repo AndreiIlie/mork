@@ -1,4 +1,4 @@
-//! The orchestrators' streams (fac-119, fac-244): what reaches Andrei, as lines each project's
+//! The orchestrators' streams (fac-119, fac-244): what reaches the operator, as lines each project's
 //! orchestrator's hook reads, kept until written to it.
 
 use serde::{Deserialize, Serialize};
@@ -11,14 +11,14 @@ use crate::ids::{AskId, CardId, PlaceId};
 pub struct OrchestratorEvent {
     pub seq: u64,
     pub time: i64,
-    /// Whose stream it is on: its card's project, or with none the factory's own (fac-244).
+    /// Whose stream it is on: its card's project, or with none Mork's own (fac-244).
     pub project: crate::ProjectId,
     #[serde(flatten)]
     pub what: OrchestratorWhat,
 }
 
-/// What happened: a message to Andrei or the orchestrator, an ask opened, closed or given to it, or a
-/// section Andrei sent it to review or an ask he wants advice on.
+/// What happened: a message to the operator or the orchestrator, an ask opened, closed or given to it, or a
+/// section the operator sent it to review or an ask he wants advice on.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "kebab-case")]
 pub enum OrchestratorWhat {
@@ -33,14 +33,14 @@ pub enum OrchestratorWhat {
     },
     AskOpened(OrchestratorAsk),
     AskClosed(OrchestratorAsk),
-    /// Andrei gave the orchestrator this ask (fac-119's button).
+    /// The operator gave the orchestrator this ask (fac-119's button).
     Given(OrchestratorAsk),
-    /// Andrei wants advice in the orchestrator's own chat; the ask stays his (fac-239).
+    /// The operator wants advice in the orchestrator's own chat; the ask stays his (fac-239).
     Opinion {
         ask: OrchestratorAsk,
         text: String,
     },
-    /// Andrei sent one project's part of the Memory or Notes tab to review (fac-230, fac-249's
+    /// The operator sent one project's part of the Memory or Notes tab to review (fac-230, fac-249's
     /// buttons). A line kept from before them has no target: the whole section.
     Review {
         section: ReviewSection,
@@ -51,7 +51,7 @@ pub enum OrchestratorWhat {
     },
 }
 
-/// A section of main's tabs Andrei sends to review (fac-230).
+/// A section of main's tabs the operator sends to review (fac-230).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ReviewSection {

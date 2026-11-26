@@ -3,16 +3,16 @@
 mod common;
 
 use common::{Sim, sha};
-use factory_core::decide::{Event, Intent, JobEnd, SessionSeen};
-use factory_types::action::ActionWhat;
-use factory_types::card::Stage;
-use factory_types::work::Purpose;
+use mork_core::decide::{Event, Intent, JobEnd, SessionSeen};
+use mork_types::action::ActionWhat;
+use mork_types::card::Stage;
+use mork_types::work::Purpose;
 use serde_json::json;
 
 // why: a missing card in the start response is a test failure.
 #[allow(clippy::unwrap_used)]
 fn begin_lookback(s: &mut Sim, project: &str) -> String {
-    s.andrei(json!({"lookback": {"project": project}})).unwrap()["lookback"]["card"].as_str().unwrap().to_owned()
+    s.operator(json!({"lookback": {"project": project}})).unwrap()["lookback"]["card"].as_str().unwrap().to_owned()
 }
 
 fn assert_stayed_done(s: &mut Sim, id: &str) {
@@ -35,7 +35,7 @@ fn done_stops_lookback_clone_and_blocks_revival_with_or_without_stop() {
         s.settle_actions();
         let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card, .. } if card.as_str() == lb))[0].clone();
         s.intents.clear();
-        s.andrei(json!({"done": {"card": lb}})).unwrap();
+        s.operator(json!({"done": {"card": lb}})).unwrap();
         assert_eq!(s.intents.iter().filter(|i| **i == Intent::StopJob { id: clone.clone() }).count(), 1);
         assert!(s.state.jobs[&clone].stop_requested);
         s.settle_actions();
@@ -63,7 +63,7 @@ fn done_blocks_report_revival_and_retries_on_clone_or_install_end() {
     for (i, (on_install, unstopped, end)) in cases.into_iter().enumerate() {
         let id = format!("web-{}", i + 10);
         s.board(&id, "web");
-        s.andrei(json!({"start": {"card": id, "mode": "report"}})).unwrap();
+        s.operator(json!({"start": {"card": id, "mode": "report"}})).unwrap();
         s.settle_actions();
         let mut job = s.open_jobs(|p| matches!(p, Purpose::Clone { card, .. } if card.as_str() == id))[0].clone();
         if on_install {
@@ -71,7 +71,7 @@ fn done_blocks_report_revival_and_retries_on_clone_or_install_end() {
             job = s.open_jobs(|p| matches!(p, Purpose::Install { card, .. } if card.as_str() == id))[0].clone();
         }
         s.intents.clear();
-        s.andrei(json!({"done": {"card": id}})).unwrap();
+        s.operator(json!({"done": {"card": id}})).unwrap();
         assert_eq!(s.intents.iter().filter(|i| **i == Intent::StopJob { id: job.clone() }).count(), 1);
         assert!(s.state.jobs[&job].stop_requested);
         s.settle_actions();
@@ -86,16 +86,17 @@ fn done_blocks_report_revival_and_retries_on_clone_or_install_end() {
 #[test]
 fn ending_card_with_running_train_job_stops_once_and_releases_train_clone() {
     let mut s = Sim::new();
-    let rc = s.andrei(json!({"review.branch": {"project": "web", "branch": "feat"}})).unwrap()["review.branch"]["card"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+    let rc =
+        s.operator(json!({"review.branch": {"project": "web", "branch": "feat"}})).unwrap()["review.branch"]["card"]
+            .as_str()
+            .unwrap()
+            .to_owned();
     let fetch = s.action_of(|w| matches!(w, ActionWhat::Fetch { project, .. } if project.as_str() == "web"));
     s.returned(&fetch.id, Ok(json!({"base_tip": sha("base1"), "tips": {"feat": sha("h1")}})));
     let cand = s.open_jobs(|p| matches!(p, Purpose::Candidate { card, .. } if card.as_str() == rc))[0].clone();
     let Purpose::Candidate { clone, .. } = s.purpose(&cand) else { panic!("expected candidate job") };
     s.intents.clear();
-    s.andrei(json!({"done": {"card": rc}})).unwrap();
+    s.operator(json!({"done": {"card": rc}})).unwrap();
     assert_eq!(s.intents.iter().filter(|i| **i == Intent::StopJob { id: cand.clone() }).count(), 1);
     assert!(!s.has_action(|w| matches!(w, ActionWhat::RemoveTrain { card, .. } if card.as_str() == rc)));
     s.settle_actions();
@@ -115,7 +116,7 @@ fn ending_card_with_running_train_job_stops_once_and_releases_train_clone() {
         panic!("expected candidate job");
     };
     s.intents.clear();
-    s.andrei(json!({"close": {"card": "web-1", "why": "dropped"}})).unwrap();
+    s.operator(json!({"close": {"card": "web-1", "why": "dropped"}})).unwrap();
     assert_eq!(s.intents.iter().filter(|i| **i == Intent::StopJob { id: full_cand.clone() }).count(), 1);
     assert!(!s.has_action(|w| matches!(w, ActionWhat::RemoveTrain { card, .. } if card.as_str() == "web-1")));
     s.end_job(&full_cand, json!({}));

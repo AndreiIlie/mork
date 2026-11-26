@@ -4,7 +4,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use factory_types::job::{Claim, ExitRecord, JobSpec, RunInfo};
+use mork_types::job::{Claim, ExitRecord, JobSpec, RunInfo};
 
 use crate::files;
 
@@ -17,7 +17,7 @@ impl ShortTemp {
     pub fn new(target: &Path) -> io::Result<Self> {
         let target = fs::canonicalize(target)?;
         for _ in 0..16 {
-            let path = PathBuf::from("/tmp").join(format!("fac-{}", crate::random::uuid()));
+            let path = PathBuf::from("/tmp").join(format!("mork-{}", crate::random::uuid()));
             match std::os::unix::fs::symlink(&target, &path) {
                 Ok(()) => return Ok(Self { path }),
                 Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
@@ -57,9 +57,9 @@ impl JobDir {
     pub fn io(&self) -> PathBuf {
         self.dir.join("io")
     }
-    /// The folder its `spec`'s `FACTORY_IO` names: a seat's own for its turns (fac-654), else its `io/`.
-    pub fn factory_io(&self, spec: &JobSpec) -> PathBuf {
-        spec.env.get("FACTORY_IO").map_or_else(|| self.io(), PathBuf::from)
+    /// The folder its `spec`'s `MORK_IO` names: a seat's own for its turns (fac-654), else its `io/`.
+    pub fn mork_io(&self, spec: &JobSpec) -> PathBuf {
+        spec.env.get("MORK_IO").map_or_else(|| self.io(), PathBuf::from)
     }
     pub fn lock(&self) -> PathBuf {
         self.dir.join("lock")
@@ -102,7 +102,7 @@ impl JobDir {
         files::read_json(&self.spec_path())
     }
     /// The account captured before this Claude job started; none for an older job or an unknown account.
-    pub fn usage_account(&self) -> Option<factory_types::usage::Account> {
+    pub fn usage_account(&self) -> Option<mork_types::usage::Account> {
         files::read_json(&self.dir.join("usage-account.json")).ok().flatten()
     }
 
@@ -126,7 +126,7 @@ impl JobDir {
     /// Whether a supervisor holds the lock now.
     pub fn lock_held(&self) -> bool {
         match fs::File::open(self.lock()) {
-            Ok(f) => matches!(factory_sys::lock_is_free(&f), Ok(false)),
+            Ok(f) => matches!(mork_sys::lock_is_free(&f), Ok(false)),
             Err(_) => false,
         }
     }
@@ -182,7 +182,7 @@ pub fn make_seat_io(io_dir: &Path) -> io::Result<()> {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "no seat io/ folder"));
     };
     fs::create_dir_all(parent)?;
-    factory_sys::mkdir_beneath(parent, Path::new(name))
+    mork_sys::mkdir_beneath(parent, Path::new(name))
 }
 
 /// Writes a file at `rel` in a seat's `io/` folder: the seat writes that folder between its turns, so each folder
@@ -192,9 +192,9 @@ pub fn write_seat_file(io_dir: &Path, rel: &str, bytes: &[u8]) -> io::Result<()>
     let mut at = PathBuf::new();
     for part in rel.parent().into_iter().flat_map(Path::components) {
         at.push(part);
-        factory_sys::mkdir_beneath(io_dir, &at)?;
+        mork_sys::mkdir_beneath(io_dir, &at)?;
     }
-    factory_sys::write_beneath(io_dir, rel, bytes)
+    mork_sys::write_beneath(io_dir, rel, bytes)
 }
 
 fn write_account(dir: &Path, spec: &JobSpec) -> io::Result<()> {
@@ -202,7 +202,9 @@ fn write_account(dir: &Path, spec: &JobSpec) -> io::Result<()> {
         return Ok(());
     }
     let Some(home) = spec.env.get("HOME") else { return Ok(()) };
-    let config = files::read_json::<serde_json::Value>(&Path::new(home).join(".claude.json")).ok().flatten();
+    let config = crate::login_files::regular(Path::new(home), Path::new(".claude.json"))
+        .ok()
+        .and_then(|file| serde_json::from_reader::<_, serde_json::Value>(file).ok());
     if let Some(account) = config.as_ref().and_then(crate::cli::limits::claude_account) {
         files::write_json(&dir.join("usage-account.json"), &account)?;
     }

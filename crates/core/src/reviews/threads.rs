@@ -1,7 +1,7 @@
-use factory_types::Sha;
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::card::Card;
-use factory_types::review::{Raised, Threads};
+use mork_types::Sha;
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::card::Card;
+use mork_types::review::{Raised, Threads};
 use serde_json::json;
 
 use crate::post::Poster;
@@ -63,7 +63,7 @@ pub(super) fn silent(f: &Raised) -> bool {
 pub(super) fn notice(p: &Poster<'_>, card: &Card) -> String {
     let Some(review) = card.review.as_ref() else { return String::new() };
     let mut out = String::new();
-    let posted = |id: &factory_types::ActionId| p.action(id.as_str()).is_some_and(|a| a.status == ActionStatus::Done);
+    let posted = |id: &mork_types::ActionId| p.action(id.as_str()).is_some_and(|a| a.status == ActionStatus::Done);
     let round = super::findings::run_round(card);
     for f in review.raised.iter().filter(|f| f.round < round) {
         let words = if f.dropped.as_ref().is_some_and(posted) {

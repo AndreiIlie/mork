@@ -1,9 +1,9 @@
 // Recovery at start (1.4.6): each job the state doesn't record as settled is looked at,
 // and the table says what to do.
 
-use factory_core::agents::recovery::{Observed, Recovery, recover};
-use factory_core::decide::{Event, JobEnd};
-use factory_types::JobId;
+use mork_core::agents::recovery::{Observed, Recovery, recover};
+use mork_core::decide::{Event, JobEnd};
+use mork_types::JobId;
 
 use super::Engine;
 
@@ -32,7 +32,7 @@ impl Engine {
             run: dir.run_path().exists(),
         };
         let job = self.state.jobs.get(id);
-        let walls = job.is_some_and(|j| matches!(j.purpose, Some(factory_types::work::Purpose::WallTests { .. })));
+        let walls = job.is_some_and(|j| matches!(j.purpose, Some(mork_types::work::Purpose::WallTests { .. })));
         let stop = job.is_some_and(|j| j.stop_requested) || walls;
         match recover(o, stop) {
             Recovery::SettleStopped => {
@@ -56,3 +56,6 @@ impl Engine {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

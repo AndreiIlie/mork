@@ -7,8 +7,8 @@
 mod common;
 
 use common::{Sim, sha};
-use factory_types::state::MessageKind;
-use factory_types::work::Purpose;
+use mork_types::state::MessageKind;
+use mork_types::work::Purpose;
 use serde_json::{Value, json};
 
 const CARD: &str = "web-1";
@@ -32,7 +32,7 @@ fn finish_round_one_and_move_base(s: &mut Sim) {
     s.round_ends(CARD, &[], &[finding]);
     s.proofs_copied();
     s.suite(CARD, 0);
-    s.andrei(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
+    s.operator(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
     s.settle_actions();
     s.imported(CARD);
     s.tip = "base2";
@@ -135,7 +135,7 @@ fn moved_base_projection_survives_install() {
     s.round_ends(CARD, &[], &[finding]);
     s.proofs_copied();
     s.suite(CARD, 0);
-    s.andrei(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
+    s.operator(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
     s.settle_actions();
     s.imported(CARD);
     s.tip = "base2";

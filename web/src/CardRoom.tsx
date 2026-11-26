@@ -13,7 +13,7 @@ import { PageHeader } from "./ui/Page";
 import { SplitPane } from "./ui/SplitPane";
 import { TextLink } from "./ui/TextLink";
 
-// A hand sent to an orchestrator opens whole only when picked; by default the oldest hand waiting on Andrei does.
+// A hand sent to an orchestrator opens whole only when picked; by default the oldest hand waiting on the operator does.
 function pickHand(hands: HandView[], own: HandView[], picked: string | null): HandView | undefined {
   return hands.find((h) => h.ask === picked) ?? [...own].sort((a, b) => a.raised_ms - b.raised_ms)[0];
 }
@@ -244,7 +244,7 @@ export function CardRoom({
       <main className="flex min-w-0 flex-1 items-center justify-center p-8">
         <div className="max-w-[420px] text-center">
           <h1 className="text-heading-16 text-gray-1000">Loading {parent ?? cardId}…</h1>
-          <p className="mt-2 text-copy-14 text-gray-900">Waiting for the factory to send the card&apos;s room.</p>
+          <p className="mt-2 text-copy-14 text-gray-900">Waiting for Mork to send the card&apos;s room.</p>
         </div>
       </main>
     );
@@ -254,7 +254,7 @@ export function CardRoom({
       <main className="flex min-w-0 flex-1 items-center justify-center p-8">
         <div className="max-w-[420px] text-center">
           <h1 className="text-heading-16 text-gray-1000">No room for {cardId}</h1>
-          <p className="mt-2 text-copy-14 text-gray-900">This card has no room in the factory.</p>
+          <p className="mt-2 text-copy-14 text-gray-900">This card has no room in Mork.</p>
           <div className="mt-6">
             <Button tier="secondary" onClick={() => navigate("/")}>
               Back to Board

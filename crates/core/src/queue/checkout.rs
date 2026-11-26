@@ -1,9 +1,9 @@
-//! A local `/merge` in Andrei's checkout (4.11.3): every refusal and choice is made here (1.12.1, M3.35); the engine
+//! A local `/merge` in the operator's checkout (4.11.3): every refusal and choice is made here (1.12.1, M3.35); the engine
 //! rereads the facts right before it moves anything and acts at once on this answer.
 
 use serde::{Deserialize, Serialize};
 
-/// What the engine read of Andrei's checkout, right before the move.
+/// What the engine read of the operator's checkout, right before the move.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Facts {
     /// The branch checked out (`HEAD`), empty when detached.
@@ -55,16 +55,16 @@ pub fn decide(f: &Facts) -> Move {
         return Move::BaseMoved;
     }
     if f.on != f.base {
-        return Move::Refused(format!("Andrei's checkout is on `{}`, not on {}", f.on, f.base));
+        return Move::Refused(format!("The operator's checkout is on `{}`, not on {}", f.on, f.base));
     }
     let touched = |p: &str| f.touched.iter().find(|t| collides(t, p));
     if let Some(p) = f.changed.iter().find(|p| touched(p).is_some()) {
-        return Move::Refused(format!("{p} has local changes in Andrei's checkout, and the merge changes it"));
+        return Move::Refused(format!("{p} has local changes in the operator's checkout, and the merge changes it"));
     }
     for p in f.loose.iter().chain(&f.ignored) {
         if let Some(t) = touched(p) {
             return Move::Refused(format!(
-                "{p}, untracked or ignored in Andrei's checkout, stands where the merge writes {t}"
+                "{p}, untracked or ignored in the operator's checkout, stands where the merge writes {t}"
             ));
         }
     }

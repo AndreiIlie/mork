@@ -1,4 +1,4 @@
-//! The door (fac-1): parameters are typed strictly per operation. `OPS` is where `factory ctl
+//! The door (fac-1): parameters are typed strictly per operation. `OPS` is where `mork ctl
 //! door --help` comes from, and a test holds it equal to the types.
 
 use std::collections::BTreeMap;
@@ -55,8 +55,8 @@ pub struct FileCat {
     pub path: String,
 }
 
-/// `file.get`: a named-root file copied into the asking turn's `$FACTORY_IO`, or an orchestrator's private
-/// `<factory home>/door/files/<call id>-<file name>`, kept 14 days (fac-173, fac-409).
+/// `file.get`: a named-root file copied into the asking turn's `$MORK_IO`, or an orchestrator's private
+/// `<mork home>/door/files/<call id>-<file name>`, kept 14 days (fac-173, fac-409).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FileGet {
@@ -76,7 +76,7 @@ pub struct ShRun {
     pub args: BTreeMap<String, Value>,
 }
 
-/// `misc.run`: any other command; it always comes to Andrei.
+/// `misc.run`: any other command; it always comes to the operator.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MiscRun {
@@ -124,7 +124,7 @@ impl Op {
             "file.get" => Self::FileGet(typed(op, params)?),
             "sh.run" => Self::ShRun(typed(op, params)?),
             "misc.run" => Self::MiscRun(typed(op, params)?),
-            other => return Err(OpError::Unsupported(format!("no operation `{other}`: see factory ctl door --help"))),
+            other => return Err(OpError::Unsupported(format!("no operation `{other}`: see mork ctl door --help"))),
         })
     }
 
@@ -252,7 +252,7 @@ pub const OPS: &[OpSpec] = &[
     OpSpec {
         name: "file.get",
         returns: "file",
-        about: "a regular file under a named root, copied byte for byte into your io/ folder, $FACTORY_IO, or for an orchestrator outside a turn into <factory home>/door/files/<call id>-<file name> (private, kept 14 days), up to 20 MB; no symlink, no `..`",
+        about: "a regular file under a named root, copied byte for byte into your io/ folder, $MORK_IO, or for an orchestrator outside a turn into <mork home>/door/files/<call id>-<file name> (private, kept 14 days), up to 20 MB; no symlink, no `..`",
         params: &[req("root", "string", "a named root"), req("path", "string", "relative to the root")],
     },
     OpSpec {
@@ -264,7 +264,7 @@ pub const OPS: &[OpSpec] = &[
     OpSpec {
         name: "misc.run",
         returns: "text",
-        about: "any other command, as an argv; it always comes to Andrei, every time",
+        about: "any other command, as an argv; it always comes to the operator, every time",
         params: &[req("argv", "string list", "the program and its arguments")],
     },
 ];
@@ -296,7 +296,7 @@ pub mod status {
     pub const ASK_RAISED: &str = "ask raised";
     pub const UNSUPPORTED: &str = "unsupported";
     pub const NOT_ALLOWED: &str = "not allowed";
-    /// Its outcome is unknown, and it is held for Andrei: it is never run again blind.
+    /// Its outcome is unknown, and it is held for the operator: it is never run again blind.
     pub const HELD: &str = "held";
     /// Pending dispatch or running: the answer comes when it ends.
     pub const UNDER_WAY: &str = "under way";
@@ -316,7 +316,7 @@ pub const UNSTOPPED: &str =
     "its query was cut at its deadline or cap and its server didn't take the kill: it may still run there";
 
 /// Whether an operation only reads. Only a call that can change something (`sh.run`, `misc.run`)
-/// is held for Andrei when its outcome is unclear; a read fails and is asked again.
+/// is held for the operator when its outcome is unclear; a read fails and is asked again.
 pub fn is_read(op: &str) -> bool {
     matches!(op, "sql.select" | "mongo.find" | "file.cat" | "file.get" | "file.tail" | "libra.get")
 }
@@ -326,16 +326,16 @@ pub fn is_read(op: &str) -> bool {
 pub const CALLER_WENT: &str = "stopped: its caller went away";
 
 /// The words an ask's requester is answered with.
-pub const WAITING: &str = "waiting for Andrei";
+pub const WAITING: &str = "waiting for the operator";
 
 /// The one line every role file carries (fac-1, decision 11).
-pub const ROLE_LINE: &str = "For anything outside your wall, see `factory ctl door --help`; misc.run asks Andrei.";
+pub const ROLE_LINE: &str = "For anything outside your wall, see `mork ctl door --help`; misc.run asks the operator.";
 
-/// `factory ctl door --help`, made from `OPS`.
+/// `mork ctl door --help`, made from `OPS`.
 pub fn help() -> String {
     let mut out = String::from(
-        "factory ctl door --target <target> --op <op> --params '<JSON object>'\n\n\
-         factory ctl door --target staging --op sql.select --params \"$(cat <<'JSON'\n\
+        "mork ctl door --target <target> --op <op> --params '<JSON object>'\n\n\
+         mork ctl door --target staging --op sql.select --params \"$(cat <<'JSON'\n\
          {\"query\": \"SELECT id FROM app.users WHERE name = 'O''Neil'\"}\n\
          JSON\n\
          )\"\n\n\
@@ -354,8 +354,8 @@ pub fn help() -> String {
          A queued non-read call nobody waits on, including an approved misc.run or a sh.run pending across a restart,\n\
          has no queue time limit and runs when its target is free.\n\
          Direct calls never post news when their caller disconnects; a same-turn retry still gets a finished call's answer.\n\
-         An outside call, including every misc.run, raises Andrei's ask (`ask raised`, waiting for\n\
-         Andrei); his `once` runs it once, his `no` refuses it, and the outcome arrives in your next\n\
+         An outside call, including every misc.run, raises the operator's ask (`ask raised`, waiting for\n\
+         the operator); his `once` runs it once, his `no` refuses it, and the outcome arrives in your next\n\
          turn's news (as does a held call's outcome). An op not listed here is `unsupported`; what no adapter may do is `not allowed`.\n\
          A call is never repeated blind: the same call in the same turn is the same call. A read whose outcome is\n\
          unclear answers `failed`, \"cut, ask again\": asking again runs it anew; an unclear sh.run or misc.run is `held`.\n\
@@ -367,9 +367,9 @@ pub fn help() -> String {
          A sql.select answer cut at the target's size cap has null \"server_us\" and \"server_us_why\":\n\
          the answer was cut at that cap before the query's time could be read from its server.\n\
          A read that completed and was only trimmed afterwards keeps its server time.\n\
-         Calls run as Andrei's own logins (his ssh aliases, his accounts on the services), which\n\
-         could do more: the Factory holds them to what is listed here.\n\
-         factory ctl door --target <target> --help lists a target's services, logs and commands.\n\nOperations:\n",
+         Calls run as the operator's own logins (his ssh aliases, his accounts on the services), which\n\
+         could do more: Mork holds them to what is listed here.\n\
+         mork ctl door --target <target> --help lists a target's services, logs and commands.\n\nOperations:\n",
     );
     for op in OPS {
         out.push_str(&format!("  {} → {}: {}\n", op.name, op.returns, op.about));

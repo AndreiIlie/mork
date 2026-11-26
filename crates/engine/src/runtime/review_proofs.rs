@@ -1,4 +1,4 @@
-// A review clone's whole `.git/factory/` survives replacement, its proofs reaching our fixer (fac-276, fac-601).
+// A review clone's whole `.git/mork/` survives replacement, its proofs reaching our fixer (fac-276, fac-601).
 // Agent-written paths are reached beneath their clones without following symlinks (R9).
 
 use std::fs::{File, Permissions};
@@ -6,15 +6,15 @@ use std::io::{self, Read as _};
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 
-use factory_core::decide::Event;
-use factory_core::reviews::verdict::{proofs_copy, proofs_round};
-use factory_types::CardId;
+use mork_core::decide::Event;
+use mork_core::reviews::verdict::{proofs_copy, proofs_round};
+use mork_types::CardId;
 
 use super::Engine;
 use super::work::fresh_dir;
 
 // What a review clone keeps through its rounds, its proofs among it.
-const KEPT: &str = ".git/factory";
+const KEPT: &str = ".git/mork";
 
 // What a review clone's proofs can make the engine read: folders deep, entries, and bytes in all.
 const DEPTH: usize = 8;
@@ -37,22 +37,22 @@ impl Engine {
     }
 }
 
-/// A review clone's folder, made empty but for its `.git/factory/`, its proofs and handoff among it, which
+/// A review clone's folder, made empty but for its `.git/mork/`, its proofs and handoff among it, which
 /// its seats find again in a later round.
 pub(super) fn fresh_review_dir(home: &crate::paths::Home, card: &CardId, dir: &Path) -> Result<(), String> {
     // The review foreman's handoff goes on to the card's final copy, through every round (fac-287): copied
     // aside before its folder moves, so a put-back cut short still leaves it where the final copy looks.
     super::handoff::set_aside_handoff(home, card, dir)?;
     let aside = home.proofs().join(card.as_str());
-    set_aside(dir, &aside).map_err(|e| format!("{card}'s .git/factory wasn't set aside: {e}"))?;
+    set_aside(dir, &aside).map_err(|e| format!("{card}'s .git/mork wasn't set aside: {e}"))?;
     fresh_dir(dir)?;
     // Git initializes over this directory, so restoring the folder need not wait for the clone job.
-    put_back(dir, &aside).map_err(|e| format!("{card}'s .git/factory wasn't put back: {e}"))?;
+    put_back(dir, &aside).map_err(|e| format!("{card}'s .git/mork wasn't put back: {e}"))?;
     // The folder brought the handoff back whole, links and folders included: its copy aside is spent.
     super::handoff::drop_aside(&home.handoffs().join(card.as_str())).map_err(|e| format!("{card}'s handoff: {e}"))
 }
 
-/// Removes the clone, keeping its whole `.git/factory/` for a review a later head reopens (fac-416).
+/// Removes the clone, keeping its whole `.git/mork/` for a review a later head reopens (fac-416).
 /// Failed moves leave the folder at its last name for the next try.
 pub(super) fn remove_clone(dir: &Path, aside: &Path, keep: bool) -> io::Result<()> {
     let kept = keep && set_aside(dir, aside)?;
@@ -75,8 +75,8 @@ fn set_aside(dir: &Path, aside: &Path) -> io::Result<bool> {
     }
     if present {
         let (root, rel) = location(base)?;
-        factory_sys::mkdir_beneath(root, rel)?;
-        factory_sys::move_dir_beneath(dir, Path::new(KEPT), base, name)?;
+        mork_sys::mkdir_beneath(root, rel)?;
+        mork_sys::move_dir_beneath(dir, Path::new(KEPT), base, name)?;
     }
     Ok(saved || present)
 }
@@ -86,12 +86,12 @@ fn put_back(dir: &Path, aside: &Path) -> io::Result<()> {
     if !folder_at(base, name)? {
         return Ok(());
     }
-    factory_sys::mkdir_beneath(dir, Path::new(".git"))?;
-    factory_sys::move_dir_beneath(base, name, dir, Path::new(KEPT))
+    mork_sys::mkdir_beneath(dir, Path::new(".git"))?;
+    mork_sys::move_dir_beneath(base, name, dir, Path::new(KEPT))
 }
 
 fn folder_at(root: &Path, rel: &Path) -> io::Result<bool> {
-    match factory_sys::open_beneath(root, rel) {
+    match mork_sys::open_beneath(root, rel) {
         Ok(dir) if dir.metadata()?.is_dir() => Ok(true),
         Ok(_) => Err(io::Error::other(format!("{} isn't a folder", root.join(rel).display()))),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
@@ -137,7 +137,7 @@ fn gather_round(from: &Path, round: u32) -> io::Result<Vec<Proof>> {
 
 fn gather_in<'a>(from: &'a Path, root: &Path, (depth, entries): (usize, usize)) -> io::Result<Scan<'a>> {
     let mut scan = Scan { from, root: root.to_path_buf(), entries, bytes: BYTES, problem: None, found: Vec::new() };
-    let dir = match factory_sys::open_beneath(from, root) {
+    let dir = match mork_sys::open_beneath(from, root) {
         Ok(dir) => dir,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(scan),
         Err(e) => return Err(e),
@@ -158,11 +158,11 @@ fn place(to: &Path, dest: &str, found: &[Proof]) -> io::Result<()> {
         let mut folders: Vec<&Path> = file.ancestors().skip(1).filter(|a| a.components().count() > 1).collect();
         folders.reverse();
         for folder in folders {
-            factory_sys::mkdir_beneath(to, folder)?;
+            mork_sys::mkdir_beneath(to, folder)?;
         }
-        factory_sys::write_beneath(to, &file, &p.bytes)?;
+        mork_sys::write_beneath(to, &file, &p.bytes)?;
         if p.exec {
-            factory_sys::open_beneath(to, &file)?.set_permissions(Permissions::from_mode(0o700))?;
+            mork_sys::open_beneath(to, &file)?.set_permissions(Permissions::from_mode(0o700))?;
         }
     }
     Ok(())
@@ -176,7 +176,7 @@ impl Scan<'_> {
     // The regular files in the open folder `dir`, at `rel` under the root, down to `depth` folders:
     // each folder read through its descriptor, a symlink or anything else skipped.
     fn walk(&mut self, dir: &File, rel: &Path, depth: usize) {
-        let entries = match factory_sys::read_dir_of(dir) {
+        let entries = match mork_sys::read_dir_of(dir) {
             Ok(entries) => entries,
             Err(e) => return self.fail(format!("{} couldn't be listed: {e}", rel.display())),
         };
@@ -203,7 +203,7 @@ impl Scan<'_> {
         if depth <= 1 {
             return self.fail(format!("{} is nested deeper than {DEPTH} folders", rel.display()));
         }
-        match factory_sys::open_dir_beneath(dir, Path::new(name)) {
+        match mork_sys::open_dir_beneath(dir, Path::new(name)) {
             Ok(sub) => self.walk(&sub, rel, depth - 1),
             Err(e) => self.fail(format!("{} couldn't be opened: {e}", rel.display())),
         }
@@ -211,7 +211,7 @@ impl Scan<'_> {
 
     // The file as it is when opened, still a regular file and within the bytes left.
     fn read(&mut self, rel: PathBuf) {
-        let file = match factory_sys::open_beneath(self.from, &self.root.join(&rel)) {
+        let file = match mork_sys::open_beneath(self.from, &self.root.join(&rel)) {
             Ok(file) => file,
             Err(e) => return self.fail(format!("{} couldn't be opened: {e}", rel.display())),
         };

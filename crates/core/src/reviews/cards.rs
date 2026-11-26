@@ -1,12 +1,12 @@
 //! Review cards, of a colleague's PR or branch, or our card's PR reviewed again: made, or reused with their
 //! rounds, findings and raisers (fac-98, fac-111), and entered in the train on their fetched head.
 
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Card, Mode};
-use factory_types::review::{Review, Verdict};
-use factory_types::state::{MessageKind, Sender};
-use factory_types::work::OpenPr;
-use factory_types::{CardId, Sha};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Card, Mode};
+use mork_types::review::{Review, Verdict};
+use mork_types::state::{MessageKind, Sender};
+use mork_types::work::OpenPr;
+use mork_types::{CardId, Sha};
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Decision};
@@ -26,14 +26,14 @@ pub fn branch_id(project: &str, branch: &str) -> CardId {
     CardId::new(format!("branch-{project}-{slug}"))
 }
 
-/// `review <project> <n>`, or Andrei's `review.merge`: a review card of the PR, its diff against
+/// `review <project> <n>`, or the operator's `review.merge`: a review card of the PR, its diff against
 /// the PR's destination, cloned at its source commit.
 pub(super) fn review(state: &State, project: &str, n: u64, merge: bool, ctx: Ctx<'_>) -> Decision {
     let Some(cfg) = ctx.config.projects.get(project) else {
         return Decision::refused(format!("no project `{project}`"));
     };
-    if cfg.bitbucket.is_none() {
-        return Decision::refused(format!("{project} isn't on Bitbucket: it has no PRs to review"));
+    if !cfg.forge.hosted() {
+        return Decision::refused(format!("{project}'s forge is local: it has no PRs to review"));
     }
     let Some(pr) = state.world.open_prs.get(project).and_then(|all| all.iter().find(|x| x.pr == n)).cloned() else {
         return Decision::refused(format!("PR {n} isn't open on {project} as the poller last read it"));
@@ -48,7 +48,7 @@ pub(super) fn review(state: &State, project: &str, n: u64, merge: bool, ctx: Ctx
     opened(p, &id, project, if merge { "review.merge" } else { "review" })
 }
 
-/// A PR's review card made, Andrei's or by itself (fac-98), with its room, its `new-pr` ask closed; an
+/// A PR's review card made, the operator's or by itself (fac-98), with its room, its `new-pr` ask closed; an
 /// ended one reopens with its rounds, approvals, findings, threads and raisers (fac-111). Its fetch is the caller's.
 pub(super) fn start(p: &mut Poster<'_>, project: &str, pr: &OpenPr, review: Review) -> CardId {
     let (n, id) = (pr.pr, card_id(project, pr.pr));
@@ -73,7 +73,7 @@ pub(super) fn start(p: &mut Poster<'_>, project: &str, pr: &OpenPr, review: Revi
     let data = json!({"run": run, "mode": "review", "pr": n, "merge": review.merge, "auto": review.auto});
     c.review = Some(Box::new(review));
     p.put_card(c);
-    let open: Vec<factory_types::AskId> = p
+    let open: Vec<mork_types::AskId> = p
         .all_asks()
         .filter(|a| a.open && a.kind == AskKind::NewPr && a.text.starts_with(&format!("new PR {n} ")))
         .map(|a| a.id.clone())
@@ -149,7 +149,7 @@ fn carried(mut r: Review) -> Review {
     r.finished = None;
     r.next = None;
     for x in r.rounds.iter_mut().filter(|x| x.verdict.is_none()) {
-        x.verdict = Some(factory_types::review::Verdict::Superseded);
+        x.verdict = Some(mork_types::review::Verdict::Superseded);
     }
     r
 }
@@ -265,7 +265,7 @@ fn review_card(state: &State, id: &CardId) -> Result<Card, String> {
     Ok(rc.clone())
 }
 
-/// Says a review card's news to Andrei, in its room.
-pub fn to_andrei(p: &mut Poster<'_>, id: &CardId, text: &str) {
-    p.post(id.as_str(), Sender::Engine, Some("andrei"), MessageKind::Engine, "", text);
+/// Says a review card's news to the operator, in its room.
+pub fn to_operator(p: &mut Poster<'_>, id: &CardId, text: &str) {
+    p.post(id.as_str(), Sender::Engine, Some("operator"), MessageKind::Engine, "", text);
 }

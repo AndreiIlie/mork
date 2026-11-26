@@ -4,11 +4,11 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use factory_core::decide::JobEnd;
-use factory_types::config::ProjectConfig as Project;
-use factory_types::job::JobKind;
-use factory_types::work::{CheckRun, Checkout, FinalRun, Purpose};
-use factory_types::{CardId, Sha};
+use mork_core::decide::JobEnd;
+use mork_types::config::ProjectConfig as Project;
+use mork_types::job::JobKind;
+use mork_types::work::{CheckRun, Checkout, FinalRun, Purpose};
+use mork_types::{CardId, Sha};
 use serde_json::Value;
 
 use super::Engine;
@@ -16,7 +16,7 @@ use super::work::{Plan, finished, json_of, plan};
 use crate::jobs::runner::FinalChecks;
 use crate::jobs::work::Order;
 
-// A train's run of `project` in its candidate's clone `dir`. The factory's `own` suite runs in the
+// A train's run of `project` in its candidate's clone `dir`. Mork's `own` suite runs in the
 // train's two phases: the second outside every wall, without the install the first ran (fac-65).
 fn train_plan(
     purpose: &Purpose,
@@ -94,7 +94,7 @@ impl Engine {
         self.opts.home.trains().join(format!("{card}-{clone}"))
     }
 
-    // The candidate's clone read-write, the checks folder read-only (M3.28). The factory's own suite
+    // The candidate's clone read-write, the checks folder read-only (M3.28). Mork's own suite
     // is told its phase; its second, outside every wall, finds the install done by the first (fac-65).
     pub(super) fn plan_train_run(&self, purpose: &Purpose) -> Result<Plan, String> {
         let Purpose::TrainRun { card, clone, .. } = purpose else {
@@ -107,7 +107,7 @@ impl Engine {
             k.folder = self.checks_mount(&k.folder);
         }
         let dir = self.train_dir(card, *clone).display().to_string();
-        let own = c.project == self.ctx.config.factory.project;
+        let own = self.ctx.config.mork.project.as_ref() == Some(&c.project);
         train_plan(purpose, (c.project.as_str(), &p), own, self.work_argv(), dir)
     }
 
@@ -130,9 +130,9 @@ impl Engine {
         if run.ran && run.exit != Some(0) {
             let log = io.join("suite.out");
             let whole = std::fs::read_to_string(&log).unwrap_or_default();
-            run.failing = factory_core::queue::failing::read(&whole, &packages(&dir));
+            run.failing = mork_core::queue::failing::read(&whole, &packages(&dir));
             let failing = run.failing.as_deref();
-            run.output = factory_core::queue::suite_log::told(&whole, &run.output, &log.display().to_string(), failing);
+            run.output = mork_core::queue::suite_log::told(&whole, &run.output, &log.display().to_string(), failing);
             // Its log's copies (fac-164).
             let c = self.card(card)?;
             run.logs = self.suite_logs(&c, &log, job);

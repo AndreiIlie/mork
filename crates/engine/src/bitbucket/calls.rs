@@ -1,17 +1,15 @@
-//! The Bitbucket side of the outward actions (2.5, 4.10–4.11, 4.16) and of the poller.
-//! A refusal is mapped to 2.5.7's failures.
-
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
-use factory_types::Sha;
-use factory_types::work::{ActionFailure, OpenPr, PrSeen, PrState};
+use mork_types::Sha;
+use mork_types::work::{ActionFailure, OpenPr, PrSeen, PrState};
 use serde_json::{Value, json};
 
 use super::client::{Answer, BitbucketError, Repo};
 use super::parse;
 use crate::clock;
+use crate::lock::Lock;
 
 /// 2.5.7's failure for a refused answer: 401 is the token's, 404 a PR that's gone (F-B11).
 pub fn failure(a: &Answer) -> ActionFailure {
@@ -38,7 +36,7 @@ fn listed(e: BitbucketError) -> ActionFailure {
 /// The full hashes Bitbucket's commit call gave for its short ones, per repository: kept across
 /// polls, so a head costs one call, once (fac-361).
 #[derive(Debug, Clone, Default)]
-pub struct Fulls(Arc<Mutex<BTreeMap<(String, String), String>>>);
+pub struct Fulls(Arc<Lock<BTreeMap<(String, String), String>>>);
 
 impl Fulls {
     /// A commit's full hash, as kept or as Bitbucket's commit call answers; never the short one. No
@@ -49,7 +47,7 @@ impl Fulls {
         }
         let key = (format!("{}/{}", repo.workspace, repo.slug), hash.to_owned());
         // Held across the call, so two threads missing one head make one call: these calls are rare.
-        let mut kept = self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut kept = self.0.lock();
         if let Some(full) = kept.get(&key) {
             return Ok(full.clone());
         }
@@ -66,7 +64,7 @@ impl Fulls {
     }
 }
 
-/// The open PR a branch has into `base`, if any: the review bot reads it, before Andrei's token writes
+/// The open PR a branch has into `base`, if any: the review bot reads it, before the operator's token writes
 /// (fac-111).
 pub fn open_of_branch(repo: &Repo, branch: &str, base: &str) -> Result<Option<Value>, ActionFailure> {
     let all = prs_of_branch(repo, branch)?;
@@ -93,7 +91,7 @@ pub fn open_pr(
     branch: &str,
     base: &str,
     (title, description): (&str, &str),
-) -> Result<Value, ActionFailure> {
+) -> Result<u64, ActionFailure> {
     let body = json!({
         "title": title,
         "description": description,
@@ -107,12 +105,12 @@ pub fn open_pr(
         .get("id")
         .and_then(Value::as_u64)
         .ok_or_else(|| ActionFailure::Failed { words: "the PR's answer has no id".into() })?;
-    Ok(json!({"pr": pr}))
+    Ok(pr)
 }
 
 /// A branch's open PR published again: given the title and the description. Its reviewers are
 /// sent as they stand, since the update replaces that list.
-pub fn retitle(repo: &Repo, open: &Value, (title, description): (&str, &str)) -> Result<Value, ActionFailure> {
+pub fn retitle(repo: &Repo, open: &Value, (title, description): (&str, &str)) -> Result<u64, ActionFailure> {
     let pr = open
         .get("id")
         .and_then(Value::as_u64)
@@ -129,7 +127,7 @@ pub fn retitle(repo: &Repo, open: &Value, (title, description): (&str, &str)) ->
         body["reviewers"] = Value::Array(reviewers);
     }
     call(repo.put(&format!("/pullrequests/{pr}"), &body))?;
-    Ok(json!({"pr": pr}))
+    Ok(pr)
 }
 
 /// The PRs of a branch in every state, newest first (F-B2): what a crash's check reads.
@@ -141,36 +139,35 @@ pub fn prs_of_branch(repo: &Repo, branch: &str) -> Result<Vec<Value>, ActionFail
 }
 
 /// Posts an inline comment, or one on the whole PR with no file (F-B9); where Bitbucket anchored it.
-pub fn comment(repo: &Repo, pr: u64, file: &str, line: u64, body: &str) -> Result<Value, ActionFailure> {
+pub fn comment(
+    repo: &Repo,
+    pr: u64,
+    file: &str,
+    line: u64,
+    body: &str,
+) -> Result<crate::forge::Comment, ActionFailure> {
     let mut req = json!({"content": {"raw": body}});
     if !file.is_empty() {
         req["inline"] = json!({"path": file, "to": line});
     }
     let a = call(repo.post(&format!("/pullrequests/{pr}/comments"), &req))?;
-    Ok(landing_of(&a.body, file, line))
+    Ok(super::comment(&a.body))
 }
 
 /// Posts a reply under the comment whose finding remains open.
-pub fn reply(repo: &Repo, pr: u64, comment: u64, body: &str) -> Result<Value, ActionFailure> {
+pub fn reply(repo: &Repo, pr: u64, comment: u64, body: &str) -> Result<Option<u64>, ActionFailure> {
     let req = json!({"content": {"raw": body}, "parent": {"id": comment}});
     let a = call(repo.post(&format!("/pullrequests/{pr}/comments"), &req))?;
-    Ok(json!({"id": a.body.get("id")}))
-}
-
-/// Where a comment asked at `file:line` landed, with its id: a post's answer, or a crash's check.
-pub fn landing_of(c: &Value, file: &str, line: u64) -> Value {
-    let path = c.pointer("/inline/path").and_then(Value::as_str).unwrap_or("");
-    let to = c.pointer("/inline/to").and_then(Value::as_u64).unwrap_or(0);
-    json!({"id": c.get("id"), "asked": format!("{file}:{line}"), "landed": format!("{path}:{to}")})
+    Ok(a.body.get("id").and_then(Value::as_u64))
 }
 
 /// Resolves a comment's thread (fac-111); one resolved already, Bitbucket's 409, is resolved.
-pub fn resolve(repo: &Repo, pr: u64, comment: u64) -> Result<Value, ActionFailure> {
+pub fn resolve(repo: &Repo, pr: u64, comment: u64) -> Result<bool, ActionFailure> {
     let a = repo.post(&format!("/pullrequests/{pr}/comments/{comment}/resolve"), &json!({}));
     let a = a.map_err(|e| ActionFailure::Failed { words: e.to_string() })?;
     match a.status {
-        _ if a.ok() => Ok(json!({"resolved": comment})),
-        409 => Ok(json!({"resolved": comment, "already": true})),
+        _ if a.ok() => Ok(false),
+        409 => Ok(true),
         _ => Err(failure(&a)),
     }
 }
@@ -202,20 +199,6 @@ pub fn thread_root(repo: &Repo, pr: u64, comment: u64) -> Result<Value, ActionFa
     Ok(call(repo.get(&format!("/pullrequests/{pr}/comments/{comment}")))?.body)
 }
 
-/// A comment already posted with this body at this place, as F-B10 lists them: one on the whole
-/// PR has no file.
-pub fn posted(all: &[Value], file: &str, line: u64, body: &str) -> Option<Value> {
-    let at = |c: &Value| match c.get("inline").filter(|i| !i.is_null()) {
-        None => file.is_empty(),
-        Some(i) => {
-            i.get("path").and_then(Value::as_str) == Some(file) && i.get("to").and_then(Value::as_u64) == Some(line)
-        }
-    };
-    all.iter()
-        .find(|c| c.pointer("/content/raw").and_then(Value::as_str) == Some(body) && at(c))
-        .map(|c| landing_of(c, file, line))
-}
-
 /// Merges a PR (`merge_commit`, no message), following a 202's task to its end (F-B6); its merge commit's hash as
 /// Bitbucket gives it, made full by the mirror. `close` deletes its source branch; else the PR's choice holds.
 pub fn merge(repo: &Repo, pr: u64, close: bool) -> Result<String, ActionFailure> {
@@ -223,7 +206,8 @@ pub fn merge(repo: &Repo, pr: u64, close: bool) -> Result<String, ActionFailure>
     if close {
         body["close_source_branch"] = json!(true);
     }
-    let a = call(repo.post(&format!("/pullrequests/{pr}/merge"), &body))?;
+    let response = repo.post(&format!("/pullrequests/{pr}/merge"), &body);
+    let a = merge_answer(response)?;
     if a.status != 202 {
         return hash_of(&a.body);
     }
@@ -231,7 +215,7 @@ pub fn merge(repo: &Repo, pr: u64, close: bool) -> Result<String, ActionFailure>
         a.location.clone().ok_or_else(|| ActionFailure::Failed { words: "a 202 with no task to follow".into() })?;
     let start = clock::instant();
     while clock::elapsed(start) < Duration::from_secs(600) {
-        let t = call(repo.get(&task))?;
+        let t = merge_answer(repo.get(&task))?;
         match t.body.get("task_status").and_then(Value::as_str) {
             Some("PENDING") => clock::sleep(Duration::from_millis(500)),
             Some("SUCCESS") => return hash_of(t.body.get("merge_result").unwrap_or(&Value::Null)),
@@ -245,6 +229,20 @@ pub fn merge(repo: &Repo, pr: u64, close: bool) -> Result<String, ActionFailure>
     Err(ActionFailure::Failed { words: "the merge task was still pending after 10 minutes".into() })
 }
 
+fn merge_answer(response: Result<Answer, BitbucketError>) -> Result<Answer, ActionFailure> {
+    if let Ok(a) = &response
+        && a.status == 400
+        && a.words().contains("merge conflicts")
+    {
+        return Err(ActionFailure::Conflict {
+            words: format!("Bitbucket answered 400: {}", a.words()),
+            tip: None,
+            files: Vec::new(),
+        });
+    }
+    call(response)
+}
+
 fn hash_of(pr: &Value) -> Result<String, ActionFailure> {
     pr.pointer("/merge_commit/hash")
         .and_then(Value::as_str)
@@ -254,7 +252,7 @@ fn hash_of(pr: &Value) -> Result<String, ActionFailure> {
 
 /// Reads a PR's state, head and merge commit, both full; approval must stand now and belong to that
 /// head (fac-98). Uses paginated activity when needed for the head or approval, matching its head to the PR's.
-pub fn read_pr(repo: &Repo, pr: u64, approver: &str, fulls: &Fulls) -> Result<(PrSeen, Option<String>), ActionFailure> {
+pub fn read_pr(repo: &Repo, pr: u64, approver: &str, fulls: &Fulls) -> Result<PrSeen, ActionFailure> {
     let p = call(repo.get(&format!("/pullrequests/{pr}")))?.body;
     let approves = !approver.is_empty() && parse::approves(&p, approver);
     let act = if approves || p.pointer("/source/commit/hash").is_none() {
@@ -278,16 +276,15 @@ pub fn read_pr(repo: &Repo, pr: u64, approver: &str, fulls: &Fulls) -> Result<(P
     let approved = approves && parse::approved_on(&act, approver, &head);
     let head = fulls.of(repo, &head)?;
     let merge = p.pointer("/merge_commit/hash").and_then(Value::as_str).map(|h| fulls.of(repo, h)).transpose()?;
-    let seen = PrSeen {
+    Ok(PrSeen {
         pr,
         state,
         approved,
         head: Sha::new(head),
         merge_parents: Vec::new(),
-        merge_commit: merge.clone().map(Sha::new),
+        merge_commit: merge.map(Sha::new),
         dest: p.pointer("/destination/branch/name").and_then(Value::as_str).map(str::to_owned),
-    };
-    Ok((seen, merge))
+    })
 }
 
 /// The open PRs (F-B3), their heads full; `ours` when the token's account opened them.
@@ -310,7 +307,7 @@ pub fn identity(repo: &Repo, approver: Option<&str>) -> Result<Option<String>, B
         401 => Ok(Some(format!("Bitbucket refuses the token (401): {}", a.words()))),
         s if (200..300).contains(&s) => Ok(approver
             .filter(|w| parse::is_account(&a.body, w))
-            .map(|_| "the token is Andrei's own account".to_owned())),
+            .map(|_| "the token is the operator's own account".to_owned())),
         _ => Err(BitbucketError::Answered(a)),
     }
 }

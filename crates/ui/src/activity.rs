@@ -2,12 +2,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_types::chat::ChatTurn;
-use factory_types::chat::took;
-use factory_types::seen::{Detail, DetailKind, TurnView};
-use factory_types::view::MessageView;
 use iced::widget::{Column, container, responsive};
 use iced::{Element, Length, Padding};
+use mork_types::chat::ChatTurn;
+use mork_types::chat::took;
+use mork_types::seen::{Detail, DetailKind, TurnView};
+use mork_types::view::MessageView;
 
 use crate::app::{App, Message};
 use crate::spans::Tone;
@@ -84,7 +84,7 @@ fn line(words: String, tone: Tone) -> Element<'static, Message> {
 
 fn detail(d: &Detail) -> String {
     let prefix = if d.sub { "↳ " } else { "" };
-    let text = factory_types::chat::line(&crate::text::clean(&d.text));
+    let text = mork_types::chat::line(&crate::text::clean(&d.text));
     format!("{prefix}{text}")
 }
 
@@ -105,7 +105,7 @@ fn lines<'a>(t: &TurnView, messages: &'a [MessageView], now: Option<i64>) -> Vec
         let Some(s) = t.steps.get(i) else { continue };
         lines.extend(thought(s.thought_ms));
         lines.extend(s.details.iter().filter(|d| d.kind == DetailKind::Text).map(|d| Row::Words(detail(d))));
-        let words = factory_types::chat::line(&crate::text::clean(&s.words));
+        let words = mork_types::chat::line(&crate::text::clean(&s.words));
         let time = match (s.start_ms, s.end_ms.or(now)) {
             (Some(start), Some(end)) => format!(" · {}", took(end - start)),
             _ => String::new(),

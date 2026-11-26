@@ -1,12 +1,12 @@
-use factory_types::CardId;
-use factory_types::card::Card;
-use factory_types::note::{Note, NoteWhat};
+use mork_types::CardId;
+use mork_types::card::Card;
+use mork_types::note::{Note, NoteWhat};
 
 use crate::post::Poster;
 use crate::state::State;
 
 /// The folder in a card's clone a foreman leaves its handoff in, for the orchestrator.
-pub const HANDOFF: &str = ".git/factory/handoff";
+pub const HANDOFF: &str = ".git/mork/handoff";
 
 /// Where a card's run's handoff is kept, under its project's records.
 pub fn handoff_dir(card: &CardId, run: u32) -> String {

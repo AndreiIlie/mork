@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
 use serde_json::Value;
 
 /// A commit the new build has and the old one hasn't.

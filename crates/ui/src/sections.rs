@@ -1,12 +1,12 @@
 //! The side column's first three sections (fac-105): card, sessions' context and cost, and the
 //! files its turns produced.
 
-use factory_types::about::{CardAbout, SeatCost};
-use factory_types::cost::Tokens;
-use factory_types::seen::OutputFile;
-use factory_types::view::{AgentRow, CardHeader, PlaceView, StageAt};
 use iced::widget::{Column, row};
 use iced::{Element, Length};
+use mork_types::about::{CardAbout, SeatCost};
+use mork_types::cost::Tokens;
+use mork_types::seen::OutputFile;
+use mork_types::view::{AgentRow, CardHeader, PlaceView, StageAt};
 
 use crate::app::{App, Message};
 use crate::icons::{self, Icon};

@@ -65,7 +65,7 @@ pub fn parse(text: &str) -> Result<CardFile, BoardError> {
     read(text, &[])
 }
 
-/// Reads a card's file, its notes told apart by the notes the factory wrote.
+/// Reads a card's file, its notes told apart by the notes Mork wrote.
 pub fn read(text: &str, written: &[Written]) -> Result<CardFile, BoardError> {
     let lines: Vec<&str> = text.lines().map(|l| l.trim_end_matches('\r')).collect();
     let end = front(&lines)?;

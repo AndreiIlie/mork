@@ -3,12 +3,12 @@
 mod common;
 
 use common::{Sim, reply};
-use factory_core::views::outside::Outside;
-use factory_core::views::screen::screen;
-use factory_types::ask::{Ask, AskKind, Choices};
-use factory_types::card::Stage;
-use factory_types::state::Sender;
-use factory_types::work::Purpose;
+use mork_core::views::outside::Outside;
+use mork_core::views::screen::screen;
+use mork_types::ask::{Ask, AskKind, Choices};
+use mork_types::card::Stage;
+use mork_types::state::Sender;
+use mork_types::work::Purpose;
 use serde_json::{Value, json};
 
 const CARD: &str = "web-1";
@@ -19,7 +19,7 @@ const FOREMAN: &str = "web-1/foreman";
 fn start_no_planner() -> Sim {
     let mut s = Sim::new();
     s.board(CARD, "web");
-    s.andrei(json!({"start": {"card": CARD, "no-planner": true}})).unwrap();
+    s.operator(json!({"start": {"card": CARD, "no-planner": true}})).unwrap();
     s.settle_actions();
     let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
     s.end_job(&clone, json!({}));
@@ -98,10 +98,10 @@ fn a_recaps_typed_sketch_heads_its_plan_and_shows_on_its_approve_hand() {
 fn an_answers_choice_is_kept_and_one_the_ask_lacks_is_refused() {
     let mut s = start_no_planner();
     s.turn(FOREMAN, asking(1));
-    let refused = s.andrei(json!({"say": {"place": CARD, "text": "3", "choice": 3}}));
+    let refused = s.operator(json!({"say": {"place": CARD, "text": "3", "choice": 3}}));
     assert!(refused.is_err(), "option 3 isn't offered: {refused:?}");
     assert!(open_ask(&s, AskKind::Answer).open);
-    s.andrei(json!({"say": {"place": CARD, "text": "2", "choice": 2}})).expect("option 2 is offered");
+    s.operator(json!({"say": {"place": CARD, "text": "2", "choice": 2}})).expect("option 2 is offered");
     let answer = s.messages(CARD).into_iter().rfind(|m| m.text == "2").expect("the answer");
     assert_eq!(answer.choice, Some(2));
     assert!(!s.state.asks.values().any(|a| a.open && a.kind == AskKind::Answer));

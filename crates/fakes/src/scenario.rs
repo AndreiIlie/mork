@@ -1,4 +1,4 @@
-//! Scenarios (1.10.2): `FAKE_SCENARIO` says what each run of a fake does, matched by its `FACTORY_AGENT`, run number
+//! Scenarios (1.10.2): `FAKE_SCENARIO` says what each run of a fake does, matched by its `MORK_AGENT`, run number
 //! or a phrase in its prompt; the first run entry whose given keys all match is played, else the fake's default.
 
 use serde::Deserialize;
@@ -10,7 +10,7 @@ pub enum Step {
     /// Claude's `system/init`, or agy's `init`, with the session id or conversation from its argv.
     Init,
     /// A result whose `structured_output` is `value` (`{io}`, `{job}`, `{jobs}` and `{seats}` in it are this
-    /// turn's `$FACTORY_IO`, its job's folder, the jobs' folder and the seats' `io/` folders).
+    /// turn's `$MORK_IO`, its job's folder, the jobs' folder and the seats' `io/` folders).
     Reply {
         value: Value,
         /// The session's cost total it reports (`total_cost_usd`), 0.01 when not given.
@@ -58,12 +58,12 @@ pub enum Step {
     Probe {
         spec: Value,
     },
-    /// Runs `factory ctl` with these arguments (`{io}` and the others in them as in `Reply`), and prints
+    /// Runs `mork ctl` with these arguments (`{io}` and the others in them as in `Reply`), and prints
     /// `{"type":"fake-ctl",…}`.
     Ctl {
         args: Vec<String>,
     },
-    /// `cargo build` makes `<--target-dir>/release/factory`, a script running this build as `FACTORY_BUILD_COMMIT`
+    /// `cargo build` makes `<--target-dir>/release/mork`, a script running this build as `MORK_BUILD_COMMIT`
     /// (1.10.6) or `commit`; with `link`, a symlink to that path instead.
     CargoBuild {
         #[serde(default)]

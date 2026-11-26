@@ -5,10 +5,10 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use factory_core::views::outside::{AgentSeen, LookbackCounts, Outside};
-use factory_types::lookback::Read;
-use factory_types::view::{Master, Phase as ViewPhase, Resources};
-use factory_types::{CardId, ProjectId, Sha};
+use mork_core::views::outside::{AgentSeen, LookbackCounts, Outside};
+use mork_types::lookback::Read;
+use mork_types::view::{Master, Phase as ViewPhase, Resources};
+use mork_types::{CardId, ProjectId, Sha};
 
 use super::{Engine, Phase};
 use crate::{builds, clock, git};
@@ -24,7 +24,7 @@ pub struct Cache {
     pub(crate) claude_accounts: crate::claude_accounts::Accounts,
     pub tz_offset_min: i32,
     pub master: Master,
-    /// The factory repo's master tip, as Andrei's checkout has it, when git can say.
+    /// Mork repo's master tip, as the operator's checkout has it, when git can say.
     pub tip: Option<String>,
     pub base_ahead: BTreeMap<CardId, u32>,
     pub lookback_counts: LookbackCounts,
@@ -53,7 +53,7 @@ impl Engine {
     /// The reads behind the views, again when they are old, on a thread of their own: git and
     /// `date` never hold the engine's loop (1.5). Their result comes back as an input.
     pub(super) fn refresh_outside(&mut self) {
-        if self.views_cache.claude_accounts.refresh(&self.opts.home.agent_home()) {
+        if self.views_cache.claude_accounts.refresh(&self.opts.home.login_home()) {
             self.align_claude_readings();
             self.publish_screen();
         }
@@ -140,12 +140,12 @@ impl Engine {
             let context = seen
                 .context
                 .as_ref()
-                .and_then(|x| self.ctx.config.factory.effective_window(x.window).map(|w| (x.used, w)));
+                .and_then(|x| self.ctx.config.mork.effective_window(x.window).map(|w| (x.used, w)));
             let (steps, doing, turn) = (seen.steps.clone(), seen.doing.clone(), seen.turn.clone());
             o.agents.insert(key.clone(), AgentSeen { steps, doing, context, turn, list: seen.list.clone() });
         }
         for p in &self.pipe.slots.parked {
-            if let factory_types::state::Sender::Agent(k) = &p.from {
+            if let mork_types::state::Sender::Agent(k) = &p.from {
                 o.slot_waits.insert(k.clone());
             }
         }
@@ -160,10 +160,10 @@ impl Engine {
         let from = rows.iter().rposition(|(_, _, k, _)| k == "card.start").unwrap_or(0);
         let marks: Vec<(i64, &str, &serde_json::Value)> =
             rows[from..].iter().map(|(t, _, k, d)| (*t, k.as_str(), d)).collect();
-        let (points, cost) = factory_core::views::timeline::points(&marks);
+        let (points, cost) = mork_core::views::timeline::points(&marks);
         o.timelines.insert(id.clone(), points);
         o.card_costs.insert(id.clone(), cost.div_ceil(10_000));
-        o.seat_costs.insert(id.clone(), factory_core::views::timeline::seat_costs(&marks));
+        o.seat_costs.insert(id.clone(), mork_core::views::timeline::seat_costs(&marks));
         // A turn that reported no cost is journaled as unknown, its share counted as nothing.
         if marks
             .iter()
@@ -172,7 +172,7 @@ impl Engine {
             o.card_costs_unknown.insert(id.clone());
         }
         let turns = self.state.jobs.values().filter(|j| {
-            j.kind == factory_types::job::JobKind::Turn && j.owner.as_str().split('/').next() == Some(id.as_str())
+            j.kind == mork_types::job::JobKind::Turn && j.owner.as_str().split('/').next() == Some(id.as_str())
         });
         o.outputs.insert(id.clone(), crate::jobs::outputs::produced(&self.opts.home, turns));
         let clone = self.opts.home.clones().join(id.as_str());
@@ -192,9 +192,11 @@ fn tz_offset(home: &crate::paths::Home) -> i32 {
     h.zip(m).map_or(0, |(h, m)| sign * (h * 60 + m))
 }
 
-// Andrei's checkout is never fetched (1.8.9); unknown when Git can't say.
-fn master(home: &crate::paths::Home, config: &factory_types::config::Config) -> Master {
-    let (Some(pin), Some(project)) = (builds::pin(home), config.projects.get(&config.factory.project)) else {
+// The operator's checkout is never fetched (1.8.9); unknown when Git can't say.
+fn master(home: &crate::paths::Home, config: &mork_types::config::Config) -> Master {
+    let (Some(pin), Some(project)) =
+        (builds::pin(home), config.mork.project.as_ref().and_then(|p| config.projects.get(p)))
+    else {
         return Master::Unknown;
     };
     let range = format!("{pin}..{}", project.base);
@@ -206,9 +208,9 @@ fn master(home: &crate::paths::Home, config: &factory_types::config::Config) -> 
     }
 }
 
-// Read as `master` is: Andrei's checkout, never fetched.
-fn tip(home: &crate::paths::Home, config: &factory_types::config::Config) -> Option<String> {
-    let project = config.projects.get(&config.factory.project)?;
+// Read as `master` is: the operator's checkout, never fetched.
+fn tip(home: &crate::paths::Home, config: &mork_types::config::Config) -> Option<String> {
+    let project = config.mork.project.as_ref().and_then(|p| config.projects.get(p))?;
     let base = &project.base;
     let spec =
         if base.starts_with("refs/") { format!("{base}^{{commit}}") } else { format!("refs/heads/{base}^{{commit}}") };
@@ -219,7 +221,7 @@ fn tip(home: &crate::paths::Home, config: &factory_types::config::Config) -> Opt
 
 fn bases_ahead(
     home: &crate::paths::Home,
-    config: &factory_types::config::Config,
+    config: &mork_types::config::Config,
     heads: &[(CardId, String, ProjectId)],
 ) -> BTreeMap<CardId, u32> {
     let mut out = BTreeMap::new();
@@ -237,15 +239,14 @@ fn bases_ahead(
 
 fn lookback_counts(
     home: &crate::paths::Home,
-    config: &factory_types::config::Config,
+    config: &mork_types::config::Config,
     cursors: Vec<(ProjectId, Read, Sha)>,
 ) -> LookbackCounts {
     cursors
         .into_iter()
         .filter_map(|(project, read, commit)| {
             let p = config.projects.get(&project)?;
-            let repo =
-                if p.bitbucket.is_some() { home.mirrors().join(project.as_str()) } else { p.repo.clone().into() };
+            let repo = if p.forge.hosted() { home.mirrors().join(project.as_str()) } else { p.repo.clone().into() };
             let range = format!("{commit}..refs/heads/{}", p.base);
             let n = git::git(home, &repo, &["rev-list", "--count", "--end-of-options", &range, "--"], GIT).ok()?;
             Some(((project, read), (commit, n.trim().parse().ok()?)))

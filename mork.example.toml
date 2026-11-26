@@ -1,10 +1,8 @@
-# Copy to ~/.config/factory/factory.toml and adjust paths for your machine.
+# Copy to ~/.config/mork/mork.toml and adjust paths for your machine.
 
-[factory]
-# Identifies Mork's own repo for self-rebuilds (and unwalled self-tests).
-# Keep this distinct from your application's [projects.<name>] entry below
-# unless you are developing Mork itself.
-project = "mork"
+[mork]
+# Optional: set `project = "mork"` only if you are developing Mork itself
+# (enables self-rebuilds and two-phase wall verification on Mork's own repo).
 
 # Bound read-only into every sandbox wall; each `bin` joins PATH in order.
 toolchains = [
@@ -12,6 +10,9 @@ toolchains = [
   { path = "/home/you/.rustup" },
   { path = "/home/you/.cargo/bin", bin = "." },
 ]
+# Optional download caches shared read-write across private per-seat homes.
+caches = [".cargo/registry", ".npm/_cacache"]
+cache_files = [".cargo/.package-cache", ".cargo/.package-cache-mutate"]
 env = { RUSTUP_HOME = "/home/you/.rustup" }
 context_cap = 400000
 max_test_runs = 4
@@ -47,10 +48,11 @@ outside = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
 [projects.my-app]
 repo = "/path/to/my-app"
 base = "main"
-board = "/path/to/my-app-board"
+board = { kind = "markdown", path = "/path/to/my-app-board" }
+forge = { kind = "local" }
 slots = 3
 test = "cargo test"
 # Optional:
 # checks = { command = "cargo clippy -- -D warnings", folder = "/path/to/my-app" }
 # install = "npm ci"
-# preview = "PORT=$FACTORY_PORT npm run dev"
+# preview = "PORT=$MORK_PORT npm run dev"

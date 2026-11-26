@@ -1,4 +1,4 @@
-use factory_types::state::{Agent, AgentStatus};
+use mork_types::state::{Agent, AgentStatus};
 
 use crate::messages::places::Who;
 
@@ -11,6 +11,7 @@ pub fn new_agent(who: &Who) -> Agent {
         place: who.place.clone(),
         session: None,
         session_started: false,
+        needs_specification: false,
         status: AgentStatus::Idle,
         owed: None,
         seen: 0,

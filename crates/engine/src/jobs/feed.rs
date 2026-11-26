@@ -7,7 +7,7 @@ use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::os::fd::AsRawFd;
 use std::process::ChildStdin;
 
-use factory_types::job::JobSpec;
+use mork_types::job::JobSpec;
 
 use super::folder::JobDir;
 use crate::cli::live::{Delivery, Driver};
@@ -48,7 +48,7 @@ impl Feed {
     /// The turn's stdin, once it started; the pipe dropped, the turn reads its end.
     pub fn attach(&mut self, pipe: Option<ChildStdin>) {
         let Some(pipe) = pipe else { return };
-        match factory_sys::set_nonblocking(pipe.as_raw_fd()) {
+        match mork_sys::set_nonblocking(pipe.as_raw_fd()) {
             Ok(()) => self.pipe = Some(pipe),
             Err(e) => eprintln!("supervisor: the turn's stdin can't be written without waiting: {e}"),
         }

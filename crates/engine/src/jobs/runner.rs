@@ -123,7 +123,7 @@ fn suite(dir: &Path, io: &Path, test: &str, phase: Option<&str>) -> Result<(Opti
     let err = out.try_clone().map_err(io_err("suite.out"))?;
     let mut sh = Command::new("sh");
     if let Some(phase) = phase {
-        sh.env("FACTORY_TRAIN_PHASE", phase);
+        sh.env("MORK_TRAIN_PHASE", phase);
     }
     let tmp = (phase == Some("unwalled"))
         .then(|| super::folder::ShortTemp::new(&std::env::temp_dir()))

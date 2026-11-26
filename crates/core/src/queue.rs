@@ -23,8 +23,8 @@ pub mod suite_news;
 pub mod train;
 pub mod wall_runs;
 
-use factory_types::Command;
-use factory_types::state::Sender;
+use mork_types::Command;
+use mork_types::state::Sender;
 
 use crate::decide::{Ctx, Decision};
 use crate::state::State;

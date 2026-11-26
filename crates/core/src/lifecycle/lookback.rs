@@ -1,9 +1,9 @@
 //! Look-back report cards have no board file; each run owns its range until its completion advances the cursor.
 
-use factory_types::ask::AskKind;
-use factory_types::card::{Card, Mode};
-use factory_types::lookback::{Cursor, INPUT_FILE, Read, Run};
-use factory_types::{CardId, ProjectId, Sha};
+use mork_types::ask::AskKind;
+use mork_types::card::{Card, Mode};
+use mork_types::lookback::{Cursor, INPUT_FILE, Read, Run};
+use mork_types::{CardId, ProjectId, Sha};
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Decision};
@@ -131,7 +131,7 @@ fn description(run: &Run, started_ms: i64, prepared: bool) -> String {
     }
     format!(
         "{scope}{inputs}\n\nThe commit is fixed for this run. Load the `looking-back` skill and follow its `{}` recipe. \
-         Leave grouped proposals and a short report. End with `report-ready`. Andrei's `done` records the run once the report is ready.",
+         Leave grouped proposals and a short report. End with `report-ready`. The operator's `done` records the run once the report is ready.",
         spec.name,
     )
 }

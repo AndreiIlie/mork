@@ -8,12 +8,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
 
-use factory_engine::paths::Home;
-use factory_types::Command;
-use factory_types::view::{Phase, PlaceView, Screen};
-use factory_ui::app::{App, Effect, Message as UiMessage, WindowOp};
-use factory_ui::session::UiSession;
 use iced::futures::channel::mpsc as fmpsc;
+use mork_engine::paths::Home;
+use mork_types::Command;
+use mork_types::view::{Phase, PlaceView, Screen};
+use mork_ui::app::{App, Effect, Message as UiMessage, WindowOp};
+use mork_ui::session::UiSession;
 use serde_json::{Value, json};
 
 /// What reaches the window: its own messages, and what the engine sent.
@@ -77,7 +77,7 @@ pub fn read_session(home: &Home) -> UiSession {
     std::fs::read(home.ui_session())
         .ok()
         .and_then(|b| serde_json::from_slice::<UiSession>(&b).ok())
-        .filter(|s| s.format == factory_ui::session::FORMAT)
+        .filter(|s| s.format == mork_ui::session::FORMAT)
         .unwrap_or_default()
 }
 
@@ -86,7 +86,7 @@ pub fn read_session(home: &Home) -> UiSession {
 pub fn save_session(home: &Home, session: &UiSession) {
     // Written whole, under a temporary name first: another build reads it (1.3.1, M4.25).
     if let Ok(text) = serde_json::to_vec(session) {
-        let _ = factory_engine::files::write_whole(&home.ui_session(), &text);
+        let _ = mork_engine::files::write_whole(&home.ui_session(), &text);
     }
 }
 
@@ -96,11 +96,11 @@ pub fn editor(home: &Home, argv: &[String], clone: &str, path: &str) -> bool {
     let inside = std::fs::canonicalize(clone)
         .and_then(|root| std::fs::canonicalize(path).map(|real| real.starts_with(&root) && real.is_file()));
     if !matches!(inside, Ok(true)) {
-        eprintln!("factory: {path} isn't a file of its clone: no editor started");
+        eprintln!("mork: {path} isn't a file of its clone: no editor started");
         return false;
     }
-    if let Err(e) = factory_engine::jobs::launch::editor(home.root(), argv) {
-        eprintln!("factory: the editor didn't start: {e}");
+    if let Err(e) = mork_engine::jobs::launch::editor(home.root(), argv) {
+        eprintln!("mork: the editor didn't start: {e}");
         return false;
     }
     true
@@ -109,11 +109,11 @@ pub fn editor(home: &Home, argv: &[String], clone: &str, path: &str) -> bool {
 /// An HTTP or HTTPS page, in the system's browser.
 pub fn page(home: &Home, url: &str) -> bool {
     if !web_url(url) {
-        eprintln!("factory: {url:?} isn't a web page's address: nothing opened");
+        eprintln!("mork: {url:?} isn't a web page's address: nothing opened");
         return false;
     }
-    if let Err(e) = factory_engine::jobs::launch::browser(home.root(), url) {
-        eprintln!("factory: the browser didn't start: {e}");
+    if let Err(e) = mork_engine::jobs::launch::browser(home.root(), url) {
+        eprintln!("mork: the browser didn't start: {e}");
         return false;
     }
     true
@@ -127,10 +127,10 @@ fn web_url(url: &str) -> bool {
 /// Reports the window's owned forwards over its inbox, without exposing a socket command.
 pub fn tunnels(
     home: Home,
-    configured: std::collections::BTreeMap<String, factory_types::config::TunnelConfig>,
+    configured: std::collections::BTreeMap<String, mork_types::config::TunnelConfig>,
     tx: fmpsc::UnboundedSender<Msg>,
-) -> mpsc::Sender<factory_engine::jobs::web_tunnels::Request> {
-    factory_engine::jobs::web_tunnels::start(home, configured, move |name, status| {
+) -> mpsc::Sender<mork_engine::jobs::web_tunnels::Request> {
+    mork_engine::jobs::web_tunnels::start(home, configured, move |name, status| {
         tx.unbounded_send(Msg::Ui(UiMessage::TunnelStatus(name, status))).is_ok()
     })
 }
@@ -138,33 +138,33 @@ pub fn tunnels(
 /// A file a card's agent turn produced, in the system's viewer (fac-105): a copy of a regular
 /// file beneath its seat's `io/` folder `seat` (fac-654), of a kind the viewer shows. Why it wasn't, for the window.
 pub fn output(home: &Home, seat: &str, name: &str) -> Result<(), String> {
-    factory_engine::jobs::outputs::open(home, seat, name).map_err(|e| {
+    mork_engine::jobs::outputs::open(home, seat, name).map_err(|e| {
         let why = format!("{name} of the io/ folder {seat} wasn't opened: {e}");
-        eprintln!("factory: {why}");
+        eprintln!("mork: {why}");
         why
     })
 }
 
 /// A message's image in the system's viewer (fac-278): a copy of a PNG or JPEG a reply published or
-/// a seat named in its `io/` folder, or one Andrei pasted. Why it wasn't, for the window.
+/// a seat named in its `io/` folder, or one the operator pasted. Why it wasn't, for the window.
 pub fn image(home: &Home, path: &str) -> Result<(), String> {
-    factory_engine::jobs::outputs::open_image(home, path).map_err(|e| {
+    mork_engine::jobs::outputs::open_image(home, path).map_err(|e| {
         let why = format!("{path} wasn't opened: {e}");
-        eprintln!("factory: {why}");
+        eprintln!("mork: {why}");
         why
     })
 }
 
-/// The window's connection to `factory.sock`, on a thread: made again whenever it closes (a
+/// The window's connection to `mork.sock`, on a thread: made again whenever it closes (a
 /// reload, a restart).
 pub fn link(home: Home, tx: fmpsc::UnboundedSender<Msg>, outs: mpsc::Receiver<Out>, mut place: String) {
     std::thread::spawn(move || {
         let outs = outs;
         loop {
-            if let Ok(stream) = UnixStream::connect(home.factory_sock()) {
+            if let Ok(stream) = UnixStream::connect(home.mork_sock()) {
                 serve(stream, &tx, &outs, &mut place);
             }
-            factory_engine::clock::sleep(Duration::from_millis(300));
+            mork_engine::clock::sleep(Duration::from_millis(300));
         }
     });
 }
@@ -208,16 +208,17 @@ fn serve(stream: UnixStream, tx: &fmpsc::UnboundedSender<Msg>, outs: &mpsc::Rece
         stream.write_all(format!("{}\n", json!({"id": id, "cmd": cmd})).as_bytes()).is_ok()
     };
     // A place's view carries its latest messages; the window asks for the pages before (fac-42).
-    let tail = factory_ui::app::PAGE;
-    let watch = |place: &str| json!({"watch": {"places": [factory_engine::runtime::SCREEN, place], "tail": tail, "full": true}});
+    let tail = mork_ui::app::PAGE;
+    let watch =
+        |place: &str| json!({"watch": {"places": [mork_engine::runtime::SCREEN, place], "tail": tail, "full": true}});
     let (mut next, mut watching, mut probed) = (2u64, false, None::<std::time::Instant>);
     while !reader.is_finished() {
         let mut ok = true;
         if !watching && ready.load(Ordering::SeqCst) {
             watching = true;
             ok = send(&mut stream, 1, watch(place));
-        } else if !watching && probed.is_none_or(|t| factory_engine::clock::elapsed(t) >= Duration::from_millis(500)) {
-            probed = Some(factory_engine::clock::instant());
+        } else if !watching && probed.is_none_or(|t| mork_engine::clock::elapsed(t) >= Duration::from_millis(500)) {
+            probed = Some(mork_engine::clock::instant());
             ok = send(&mut stream, 0, json!({"status": {}}));
         }
         ok &= match outs.recv_timeout(Duration::from_millis(100)) {

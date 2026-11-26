@@ -1,9 +1,9 @@
 //! An agent's picker (fac-96) shows its current and next settings and which changes start a fresh session.
 
-use factory_types::config::{Cli, Effort};
-use factory_types::view::{AgentRow, ModelChoice, Setting};
 use iced::widget::{Column, Row, row};
 use iced::{Element, Length};
+use mork_types::config::{Cli, Effort};
+use mork_types::view::{AgentRow, ModelChoice, Setting};
 
 use crate::app::{App, Effect, Message, Overlay};
 use crate::fonts;

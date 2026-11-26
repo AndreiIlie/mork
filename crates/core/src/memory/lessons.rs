@@ -1,6 +1,6 @@
-use factory_types::config::Config;
-use factory_types::memory::{FileRow, GENERAL, MemoryFile, MemoryView, Tally, key};
-use factory_types::state::Sender;
+use mork_types::config::Config;
+use mork_types::memory::{FileRow, GENERAL, MemoryFile, MemoryView, Tally, key};
+use mork_types::state::Sender;
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Decision};
@@ -42,7 +42,7 @@ fn tallied(state: &State, memory: &str, count: impl FnOnce(&mut Tally)) -> Chang
     Change::PutMemoryTally(t)
 }
 
-/// Andrei's send of a memory to review (fac-610): its tally takes the time.
+/// The operator's send of a memory to review (fac-610): its tally takes the time.
 pub(crate) fn reviewed(state: &State, memory: &str, now: i64) -> Change {
     tallied(state, memory, |t| t.reviewed_ms = Some(now))
 }
@@ -55,7 +55,7 @@ fn held(state: &State) -> Vec<&str> {
     memories
 }
 
-/// Only a seat's read is counted: an orchestrator's or Andrei's gets the text and changes nothing (fac-598).
+/// Only a seat's read is counted: an orchestrator's or the operator's gets the text and changes nothing (fac-598).
 pub(super) fn read(state: &State, from: &Sender, f: &MemoryFile, now: i64) -> Decision {
     let mut d = Decision::ok(json!({"memory.read": {
         "memory": f.memory, "name": f.name, "description": f.description,

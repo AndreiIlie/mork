@@ -1,8 +1,8 @@
 //! Claude's stream (`--output-format stream-json --verbose`), F-C1 to F-C5.
 
-use factory_types::config::{CLAUDE_BLOCKED, Seat};
-use factory_types::seen::DetailKind::{Text, Thinking};
-use factory_types::seen::{ListStep, StepStatus};
+use mork_types::config::{CLAUDE_BLOCKED, Seat};
+use mork_types::seen::DetailKind::{Text, Thinking};
+use mork_types::seen::{ListStep, StepStatus};
 use serde_json::Value;
 
 use super::{ContextReport, StreamState, limits, turn};
@@ -222,7 +222,7 @@ fn tool_step(st: &mut StreamState, thread: Option<&str>, b: &Value) {
     turn::step(st, thread, id, words.chars().take(100).collect());
 }
 
-// The words Andrei approved for each tool (fac-206); a tool they don't name, or one missing what
+// The words the operator approved for each tool (fac-206); a tool they don't name, or one missing what
 // they say of it, is its name.
 fn tool_words(name: &str, input: &Value, folder: &str, home: &str) -> String {
     let field = |k: &str| input.get(k).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
@@ -346,7 +346,7 @@ pub const SETTINGS: &str = r#"{"attribution":{"commit":"","pr":"","sessionUrl":f
 pub struct Dirs<'a> {
     /// The turn's images, when it has some.
     pub images: Option<&'a str>,
-    /// The running build's skills, loaded as the `factory` plugin (fac-88), versioned with the build.
+    /// The running build's skills, loaded as the `mork` plugin (fac-88), versioned with the build.
     pub skills: Option<&'a str>,
 }
 
@@ -395,27 +395,26 @@ pub fn argv(
     a
 }
 
-/// What an unwalled seat never reads (fac-25): the `Read` rules cover Read, Grep, Glob and Bash's own
-/// reads, the `Bash` ones refuse any command naming them; neither binds a command that hides the name.
-pub const DENY: [&str; 4] = ["Read(//**/ACCESS.md)", "Read(//**/.ssh/**)", "Bash(*ACCESS.md*)", "Bash(*.ssh*)"];
-
-/// The turn's settings: the Agent hook (fac-403), `advisorModel` when named (fac-5), and an
-/// unwalled seat's `permissions.deny` (fac-25), alongside `SETTINGS`.
+/// Claude's turn settings, including synchronous, fail-closed PreToolUse hooks.
 pub fn settings(seat: &Seat) -> String {
-    let unwalled = seat.wall == factory_types::config::Wall::None;
+    let unwalled = seat.wall == mork_types::config::Wall::None;
     let mut v: Value = serde_json::from_str(SETTINGS).unwrap_or_else(|_| serde_json::json!({}));
     let bin = std::env::current_exe().unwrap_or_default();
     let bin = bin.to_string_lossy().replace('\'', "'\\''");
     let flag = if seat.model.to_ascii_lowercase().contains("fable") { " --seat-fable" } else { "" };
     let command = format!("'{bin}' claude-agent-hook{flag}");
-    v["hooks"] = serde_json::json!({"PreToolUse": [{
-        "matcher": "Agent", "hooks": [{"type": "command", "command": command}]
-    }]});
+    let hook = |matcher: &str, command: String| {
+        serde_json::json!({
+            "matcher": matcher, "hooks": [{"type": "command", "command": command, "onFailure": "block"}]
+        })
+    };
+    let mut hooks = vec![hook("Agent", command)];
+    if unwalled {
+        hooks.push(hook("Read|Grep|Glob|Bash", format!("'{bin}' claude-path-hook")));
+    }
+    v["hooks"] = serde_json::json!({"PreToolUse": hooks});
     if let Some(model) = &seat.advisor {
         v["advisorModel"] = Value::String(model.clone());
-    }
-    if unwalled {
-        v["permissions"] = serde_json::json!({"deny": DENY});
     }
     v.to_string()
 }

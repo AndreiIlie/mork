@@ -3,10 +3,10 @@
 mod common;
 
 use common::{Sim, reply};
-use factory_types::ask::{Ask, AskKind};
-use factory_types::card::Stage;
-use factory_types::state::Sender;
-use factory_types::work::Purpose;
+use mork_types::ask::{Ask, AskKind};
+use mork_types::card::Stage;
+use mork_types::state::Sender;
+use mork_types::work::Purpose;
 use serde_json::json;
 
 const CARD: &str = "web-1";
@@ -21,7 +21,7 @@ fn start_brief(s: &mut Sim, card: &str, extra: serde_json::Value) {
             dst.insert(k.clone(), v.clone());
         }
     }
-    s.andrei(json!({"start": start})).unwrap();
+    s.operator(json!({"start": start})).unwrap();
     s.settle_actions();
     let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == card))[0].clone();
     s.end_job(&clone, json!({}));

@@ -1,4 +1,4 @@
-//! The agents' memories (fac-159), managed through `factory ctl`, and the
+//! The agents' memories (fac-159), managed through `mork ctl`, and the
 //! projects' notes (fac-287), each with the card and seat it came from, apart from the board's own notes.
 
 mod handoffs;
@@ -7,8 +7,8 @@ mod notes;
 mod search;
 mod similar;
 
-use factory_types::state::Sender;
-use factory_types::{Command, ProjectId};
+use mork_types::state::Sender;
+use mork_types::{Command, ProjectId};
 
 use crate::decide::{Ctx, Decision};
 use crate::state::State;
@@ -22,10 +22,13 @@ pub use notes::view as notes_view;
 pub(crate) use notes::{origin, put, under};
 pub(crate) use search::index;
 
-pub(crate) fn lesson_note_help(factory: &ProjectId) -> String {
-    format!(
-        "File a lesson about your card's project with `factory ctl notes.add lesson '<text>'`. File lessons about the factory or intended for `general` with `factory ctl notes.add lesson --project {factory} '<text>'`. The receiving orchestrator triages the note."
-    )
+pub(crate) fn lesson_note_help(mork: Option<&ProjectId>) -> String {
+    match mork {
+        Some(mork) => format!(
+            "File a lesson about your card's project with `mork ctl notes.add lesson '<text>'`. File lessons about Mork or intended for `general` with `mork ctl notes.add lesson --project {mork} '<text>'`. The receiving orchestrator triages the note."
+        ),
+        None => "File a lesson about your card's project with `mork ctl notes.add lesson '<text>'`. The receiving orchestrator triages the note.".into(),
+    }
 }
 
 /// One of the memory commands, or the projects' notes'.

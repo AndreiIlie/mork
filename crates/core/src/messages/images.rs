@@ -1,21 +1,21 @@
 //! A message's images (1.4.11.5, fac-278, fac-654): an agent's are the copies the engine published from its `io/`
-//! folder, `$FACTORY_IO`, for its `say` as it was sent or for its turn's reply.
+//! folder, `$MORK_IO`, for its `say` as it was sent or for its turn's reply.
 
-use factory_types::job::Mount;
-use factory_types::reply::Reply;
-use factory_types::state::{Job, Sender};
+use mork_types::job::Mount;
+use mork_types::reply::Reply;
+use mork_types::state::{Job, Sender};
 
 use crate::state::State;
 
 /// An agent's images must be the copies the engine published as it sent them, in a running job's `published/`: its
-/// `$FACTORY_IO` changes later (fac-654), and a path outside its wall would leak a file (1.4.11.5). Andrei's needn't.
+/// `$MORK_IO` changes later (fac-654), and a path outside its wall would leak a file (1.4.11.5). The operator's needn't.
 pub(super) fn allowed(state: &State, from: &Sender, images: &[String]) -> Result<(), String> {
     let Sender::Agent(key) = from else { return Ok(()) };
     let jobs = state.jobs.values().filter(|j| &j.owner == key && j.settled.is_none());
     let published: Vec<String> = jobs.filter_map(published_dir).collect();
     images.iter().try_for_each(|i| {
         if !published.iter().any(|dir| plain_in(dir, i)) {
-            return Err(format!("the image {i} isn't in your io/ folder, $FACTORY_IO: an agent's images go there"));
+            return Err(format!("the image {i} isn't in your io/ folder, $MORK_IO: an agent's images go there"));
         }
         Ok(())
     })
@@ -29,7 +29,7 @@ pub fn reply_allowed(job: &Job, reply: &Reply) -> Result<(), String> {
     hand.chain(reply.messages.iter().flat_map(|m| m.images.iter())).try_for_each(|i| {
         if !published.as_ref().is_some_and(|dir| plain_in(dir, i)) {
             return Err(format!(
-                "the image {i} isn't a regular file of your io/ folder, $FACTORY_IO: name it by its full path there, \
+                "the image {i} isn't a regular file of your io/ folder, $MORK_IO: name it by its full path there, \
                  reached through no link"
             ));
         }
@@ -48,9 +48,9 @@ fn plain_in(dir: &str, image: &str) -> bool {
     image.strip_prefix(dir).is_some_and(|n| !n.is_empty() && !n.contains('/') && n != "." && n != "..")
 }
 
-// The job's `$FACTORY_IO`, when its wall binds that very folder read-write.
+// The job's `$MORK_IO`, when its wall binds that very folder read-write.
 fn io_dir(j: &Job) -> Option<&str> {
-    let io = j.spec.env.get("FACTORY_IO")?.trim_end_matches('/');
+    let io = j.spec.env.get("MORK_IO")?.trim_end_matches('/');
     let bound = j.spec.mounts.iter().any(|m| matches!(m, Mount::Rw { path } if path.trim_end_matches('/') == io));
     (bound && !io.is_empty()).then_some(io)
 }

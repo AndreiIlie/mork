@@ -3,14 +3,14 @@
 
 use std::fmt::Write as _;
 
-use factory_types::CardId;
-use factory_types::state::{Message, Sender};
+use mork_types::CardId;
+use mork_types::state::{Message, Sender};
 
 use super::Engine;
 use crate::store::JournalRow;
 
 fn when(ms: i64) -> String {
-    let (y, mo, d, h, mi, s) = factory_core::state::names::civil_from_ms(ms);
+    let (y, mo, d, h, mi, s) = mork_core::state::names::civil_from_ms(ms);
     format!("{y:04}-{mo:02}-{d:02} {h:02}:{mi:02}:{s:02}")
 }
 
@@ -34,7 +34,7 @@ impl Engine {
             id.as_str().to_uppercase(),
             card.title,
             card.project,
-            factory_core::lifecycle::facts::mode_word(card.mode)
+            mork_core::lifecycle::facts::mode_word(card.mode)
         );
         for (i, (from, run)) in starts.iter().enumerate() {
             let to = starts.get(i + 1).map_or(i64::MAX, |(t, _)| *t);
@@ -110,8 +110,8 @@ fn whole_hand(m: &Message) -> String {
 /// paused, its lifetime, and its cost.
 pub(super) fn timeline_text(rows: &[&JournalRow]) -> String {
     let marks: Vec<(i64, &str, &serde_json::Value)> = rows.iter().map(|(t, _, k, d)| (*t, k.as_str(), d)).collect();
-    let (points, cost) = factory_core::views::timeline::points(&marks);
-    let t = factory_core::views::timeline::totals(&points, crate::clock::now_ms());
+    let (points, cost) = mork_core::views::timeline::points(&marks);
+    let t = mork_core::views::timeline::totals(&points, crate::clock::now_ms());
     let min = |ms: i64| format!("{}m", ms / 60_000);
     let stages: Vec<String> = t.stages.iter().map(|(s, ms)| format!("{s} {}", min(*ms))).collect();
     // why: millionths of a dollar shown as dollars; far below f64's exact range.

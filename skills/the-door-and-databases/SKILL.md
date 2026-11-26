@@ -5,7 +5,7 @@ description: "Use when your work needs something on a machine outside your wall,
 
 # The door and databases
 
-Use the door for the database and machine operations described here: it runs one operation on one target over Andrei's own access.
+Use the door for the database and machine operations described here: it runs one operation on one target over the operator's own access.
 No credential, host or alias is ever shown to you, and its database operations are read-only.
 
 Calls run one at a time per target, in ask order.
@@ -19,12 +19,12 @@ A non-read call nobody waits on, including an approved `misc.run` or a `sh.run` 
 Direct calls never post news when disconnected (only asked and held calls do); retrying in the same turn still gets a finished call's result.
 
 1. **Find the target.**
-   `factory ctl door.help` lists the targets, their services, reads, logs and limits; `factory ctl door.help <target>` describes one, and says which is a replica (`sql.read_only_server`; `read_only` is true on every SQL target).
-   `factory ctl door --help` lists the operations (`sql.select`, `mongo.find`, `file.tail` and the rest), `factory ctl door --target <t> --help` a target's.
+   `mork ctl door.help` lists the targets, their services, reads, logs and limits; `mork ctl door.help <target>` describes one, and says which is a replica (`sql.read_only_server`; `read_only` is true on every SQL target).
+   `mork ctl door --help` lists the operations (`sql.select`, `mongo.find`, `file.tail` and the rest), `mork ctl door --target <t> --help` a target's.
 2. **Ask for what the target allows.**
    A request is resolved against the target's allowlist.
    An allowed call runs directly.
-   A `misc.run` becomes Andrei's ask in the build room on a two-room card and in your place otherwise.
+   A `misc.run` becomes the operator's ask in the build room on a two-room card and in your place otherwise.
    The news in your place tells you how it went.
    Other calls outside the allowlist are `not allowed`.
    If the `failed` text says the query may still be running on its target, its server didn't take the kill: the same query is `not allowed` until it has ended there (each ask tries the kill again; the `why` says when it clears).
@@ -34,7 +34,7 @@ Direct calls never post news when disconnected (only asked and held calls do); r
 3. **Query a replica** with:
 
 ```sh
-factory ctl door --target <replica> --op sql.select --params "$(cat <<'JSON'
+mork ctl door --target <replica> --op sql.select --params "$(cat <<'JSON'
 {"query": "SELECT id FROM app.users WHERE name = 'O''Neil'"}
 JSON
 )"
@@ -45,7 +45,7 @@ JSON
    When a target sets `schema_hint`, `door.help <target>` and any schema refusal show where its schema is documented and what to inspect instead.
    The session is read-only on the server.
    Backslash escapes and multiline literals use a consistent connection mode; hints cannot change that mode or the row cap, or lift the time limit.
-   The server ends a read at the target's timeout, and kills it when its call ends early: if your `factory ctl door` is killed (a tool's own timeout) or your turn is cut, its query goes with it, so keep a long read's wait alive (run it in the background).
+   The server ends a read at the target's timeout, and kills it when its call ends early: if your `mork ctl door` is killed (a tool's own timeout) or your turn is cut, its query goes with it, so keep a long read's wait alive (run it in the background).
    A LIMIT larger than the target's row cap is lowered to it before the query runs.
    A replica differs in its bounds: no row cap but its own, a longer timeout.
    Write real values into the query, its only field (it takes no bound parameters), and a LIMIT when you don't need every row.
@@ -61,7 +61,7 @@ JSON
 Keys such as `$where`, `$function` and `$accumulator` inside literal documents and values are data.
 Projection, sort and document/byte/time bounds apply.
 
-`file.get` copies one file under a target's named root, bytes intact, into your seat's `io/` folder (`FACTORY_IO`), up to 20 MB, with `file.cat`'s guards and no ask: `factory ctl door --target production --op file.get --params '{"root": "uploads", "path": "reports/<year>/<id>.pdf"}'` answers `file`, its path, and `size`.
+`file.get` copies one file under a target's named root, bytes intact, into your seat's `io/` folder (`MORK_IO`), up to 20 MB, with `file.cat`'s guards and no ask: `mork ctl door --target production --op file.get --params '{"root": "uploads", "path": "reports/<year>/<id>.pdf"}'` answers `file`, its path, and `size`.
 Read it there with your own tools (`pdftotext`, `unzip`).
 `door.help` lists the file roots; build the path under a root from the database.
 
@@ -71,6 +71,6 @@ Credentials and tokens stay with the engine, requests stay at the configured ori
 Output masking and limits apply.
 File roots and named logs keep their location restrictions.
 
-**A project's data folder** needs no door: on a card whose project sets one (`data` in factory.toml), it is in your wall at `/data`, read-only, its datasets one subfolder each, read with your own tools (`grep`, `pdftotext`).
+**A project's data folder** needs no door: on a card whose project sets one (`data` in mork.toml), it is in your wall at `/data`, read-only, its datasets one subfolder each, read with your own tools (`grep`, `pdftotext`).
 
-`factory manual reference` has the door's whole reference (`door`, `door.help`).
+`mork manual reference` has the door's whole reference (`door`, `door.help`).

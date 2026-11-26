@@ -4,8 +4,8 @@
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
-use factory_types::door::FILE_GET_MAX;
-use factory_types::door_plan::Ran;
+use mork_types::door::FILE_GET_MAX;
+use mork_types::door_plan::Ran;
 
 fn failed(words: String) -> Ran {
     Ran { exit: Some(1), stderr: words, ..Ran::default() }
@@ -13,7 +13,7 @@ fn failed(words: String) -> Ran {
 
 // No symlink at any part of the path, the root's own included; no `..`; a regular file only.
 pub(super) fn read_beneath(root: &str, path: &str, max: usize) -> Ran {
-    let f = match factory_sys::open_beneath_no_symlinks(Path::new(root), Path::new(path)) {
+    let f = match mork_sys::open_beneath_no_symlinks(Path::new(root), Path::new(path)) {
         Ok(f) => f,
         Err(e) => return failed(format!("{path}: {e}")),
     };
@@ -29,7 +29,7 @@ pub(super) fn read_beneath(root: &str, path: &str, max: usize) -> Ran {
 
 // As `read_beneath`, the whole file copied to `into`; one over the cap is refused unread.
 pub(super) fn get_beneath(root: &str, path: &str, into: &Path) -> Ran {
-    let f = match factory_sys::open_beneath_no_symlinks(Path::new(root), Path::new(path)) {
+    let f = match mork_sys::open_beneath_no_symlinks(Path::new(root), Path::new(path)) {
         Ok(f) => f,
         Err(e) => return failed(format!("{path}: {e}")),
     };
@@ -74,7 +74,7 @@ pub(super) fn deliver(path: &str, bytes: &[u8], into: &Path) -> Ran {
 // Read from its end: at most `max` bytes, whatever the log's size. No symlink on its path is
 // followed, its folders' included.
 pub(super) fn tail(path: &str, lines: u64, max: usize) -> Ran {
-    let mut f = match factory_sys::open_no_symlinks(Path::new(path)) {
+    let mut f = match mork_sys::open_no_symlinks(Path::new(path)) {
         Ok(f) => f,
         Err(e) => return failed(format!("{path}: {e}")),
     };

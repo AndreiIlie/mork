@@ -1,13 +1,13 @@
 //! A candidate's verification (fac-375): its checks, then its review round and its whole suite at once on the same
 //! commit, both results returned together; made again at the merge queue's front, its checks and suite alone.
 
-use factory_types::ask::AskKind;
-use factory_types::card::{Candidate, Card, Landing};
-use factory_types::landing::HeldRound;
-use factory_types::lease::Pass;
-use factory_types::suites::SuiteNews;
-use factory_types::work::{FinalRun, Purpose};
-use factory_types::{CardId, Sha};
+use mork_types::ask::AskKind;
+use mork_types::card::{Candidate, Card, Landing};
+use mork_types::landing::HeldRound;
+use mork_types::lease::Pass;
+use mork_types::suites::SuiteNews;
+use mork_types::work::{FinalRun, Purpose};
+use mork_types::{CardId, Sha};
 
 use super::candidates::stale;
 use super::members::{hold, say};
@@ -25,11 +25,24 @@ pub fn pr_entry(c: &Card) -> bool {
 /// Its candidate made: its checks run, unless the candidate is its head and they passed on it.
 pub(crate) fn run(p: &mut Poster<'_>, c: Card, k: Candidate, on: Sha, ctx: Ctx<'_>) {
     let Some(commit) = k.commit.clone() else { return };
-    let stand = c.head.as_ref() == Some(&commit) && crate::lifecycle::gates::checks_stand(p, &c, ctx);
+    let report: Option<serde_json::Value> = c.checks_output.as_deref().and_then(|s| serde_json::from_str(s).ok());
+    let stand = report.as_ref().is_some_and(|r| r["base"].as_str() == Some(on.as_str()))
+        && c.head.as_ref() == Some(&commit)
+        && crate::lifecycle::gates::checks_stand(p, &c, ctx);
     if k.checked || stand || !crate::lifecycle::gates::has_checks(&c, ctx) {
-        return checked(p, c, k, &on, ctx);
+        let flags = test_changes(report.as_ref().filter(|_| stand));
+        return checked(p, c, k, &on, flags, ctx);
     }
     start(p, c, k, on, true, None, ctx);
+}
+
+fn test_changes(report: Option<&serde_json::Value>) -> Vec<String> {
+    report
+        .and_then(|r| r["test_changes"].as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|flag| flag.as_str().map(str::to_owned))
+        .collect()
 }
 
 // A run of its candidate: its checks against `on`, or its suite, walled.
@@ -46,9 +59,9 @@ fn job(p: &mut Poster<'_>, mut c: Card, k: Candidate, purpose: Purpose, ctx: Ctx
     super::leases::start_job(p, purpose, ctx);
 }
 
-/// Its checks passed: at the queue's front, its suite alone while its rounds approve all it has, else it is verified
-/// again; verified, its round, unless none is owed, and its suite start at once, neither waiting for the other.
-pub(crate) fn checked(p: &mut Poster<'_>, mut c: Card, mut k: Candidate, on: &Sha, ctx: Ctx<'_>) {
+// Its checks passed: at the queue's front, its suite alone while its rounds approve all it has, else it is verified
+// again; verified, its round, unless none is owed, and its suite start at once, neither waiting for the other.
+fn checked(p: &mut Poster<'_>, mut c: Card, mut k: Candidate, on: &Sha, flags: Vec<String>, ctx: Ctx<'_>) {
     k.checked = true;
     if k.queue {
         if !gate::reviewed(&c) || gate::settles(p, &c, &k.contents) || gate::declined(p, &c, on, &k.contents) {
@@ -72,21 +85,22 @@ pub(crate) fn checked(p: &mut Poster<'_>, mut c: Card, mut k: Candidate, on: &Sh
     p.put_card(c.clone());
     // The round is asked first, so a suite waiting for a slot never holds it back.
     if owed {
-        gate::ask(p, &c, &commit, on, &k.contents, ctx);
+        gate::ask(p, &c, &commit, on, &k.contents, flags, ctx);
     }
     if let Some(c) = p.card(&id) {
         suite(p, c, k, ctx);
     }
 }
 
-// Andrei's review of its branch holds its gate's id: it holds its place, and `/resume` once that
+// The operator's review of its branch holds its gate's id: it holds its place, and `/resume` once that
 // review is done runs its checks again, then its round and its suite.
 fn held(p: &mut Poster<'_>, mut c: Card, k: Candidate, on: &Sha, rid: &CardId) {
     let Some(commit) = k.commit.clone() else { return };
     let (card, clone) = (c.id.clone(), k.clone);
     let purpose = Purpose::TrainRun { card, commit, on: on.clone(), clone, checks: true, test: None, unwalled: false };
     c.landing = Some(Landing::Test(Candidate { checked: false, ..k }));
-    let why = format!("{rid}, Andrei's review of its branch, is under way: its review card waits for `done {rid}`");
+    let why =
+        format!("{rid}, the operator's review of its branch, is under way: its review card waits for `done {rid}`");
     hold(p, c, purpose, AskKind::Error, &why);
 }
 
@@ -138,7 +152,7 @@ pub(crate) fn suite(p: &mut Poster<'_>, c: Card, k: Candidate, ctx: Ctx<'_>) {
 }
 
 // A legacy success leaves wall-test records unproven, so it owes an explicit walled run.
-// The factory's cache entry must prove both phases on the same candidate (fac-65).
+// Mork's cache entry must prove both phases on the same candidate (fac-65).
 pub(crate) fn suite_passed(p: &mut Poster<'_>, c: Card, k: Candidate, purpose: &Purpose, run: &FinalRun, ctx: Ctx<'_>) {
     let Purpose::TrainRun { card, commit, on, clone, test: Some(test), unwalled, .. } = purpose else {
         return tested(p, c, k, None, ctx);
@@ -180,6 +194,7 @@ pub fn ran(p: &mut Poster<'_>, c: Card, purpose: &Purpose, run: FinalRun, ctx: C
     if let Err(why) = unchanged(&run, &commit, &tree) {
         return hold(p, c, purpose.clone(), AskKind::Error, &format!("its run's result is discarded: {why}"));
     }
+    let flags = test_changes(run.checks.as_ref().and_then(|r| r.report.as_ref()));
     let mut failures = Vec::new();
     if let (Some(Ok(n)), Some(k)) = (&checks, run.checks.as_ref())
         && *n > 0
@@ -208,12 +223,12 @@ pub fn ran(p: &mut Poster<'_>, c: Card, purpose: &Purpose, run: FinalRun, ctx: C
     match (failures.is_empty(), purpose) {
         // Its checks passed: its review round and its suite are next, side by side (fac-375).
         (true, Purpose::TrainRun { on, test: None, .. }) if !k.checked => {
-            checked(p, c, k, on, ctx);
+            checked(p, c, k, on, flags, ctx);
         }
-        // An entry's checks found something: its round weighs what they say, or Andrei's approval (fac-356).
+        // An entry's checks found something: its round weighs what they say, or the operator's approval (fac-356).
         (false, Purpose::TrainRun { on, test: None, .. }) if !k.checked && crate::reviews::gate::entry(&c) => {
             c.checks_output = Some(failures.join("\n\n"));
-            checked(p, c, k, on, ctx);
+            checked(p, c, k, on, flags, ctx);
         }
         (true, _) => suite_passed(p, c, k, purpose, &run, ctx),
         (false, _) => tested(p, c, k, failure, ctx),
@@ -327,11 +342,11 @@ fn unchanged(run: &FinalRun, head: &Sha, tree: &str) -> Result<(), String> {
     Ok(())
 }
 
-// What a pass of the factory's own suite is remembered under beside its command: its wall tests
+// What a pass of Mork's own suite is remembered under beside its command: its wall tests
 // passed outside the wall too. A pass remembered without it proves none of them (fac-65).
 const WALLS: &str = "its wall tests, outside every wall (fac-65)";
 
-// The project's suite command, as passes are remembered under (4.9.6); the factory's own, with
+// The project's suite command, as passes are remembered under (4.9.6); Mork's own, with
 // `WALLS`.
 fn suite_command(c: &Card, ctx: Ctx<'_>) -> Vec<String> {
     let Some(p) = ctx.config.projects.get(&c.project) else { return Vec::new() };
@@ -342,8 +357,8 @@ fn suite_command(c: &Card, ctx: Ctx<'_>) -> Vec<String> {
     command
 }
 
-// Whether the card's suite has wall tests that need a run outside every wall: the factory's own
+// Whether the card's suite has wall tests that need a run outside every wall: Mork's own
 // project's, whose walled jobs can start no wall inside them (fac-65).
 fn walls_owed(c: &Card, ctx: Ctx<'_>) -> bool {
-    c.project == ctx.config.factory.project
+    ctx.config.mork.project.as_ref() == Some(&c.project)
 }

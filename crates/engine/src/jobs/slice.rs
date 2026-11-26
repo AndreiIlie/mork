@@ -1,4 +1,4 @@
-//! `factory_work.slice` (fac-143): every job the supervisor starts runs in it, with a low CPU and
+//! `mork_work.slice` (fac-143): every job the supervisor starts runs in it, with a low CPU and
 //! IO weight and a memory cap of the slice's own, so the desktop wins whenever it wants the machine.
 
 use std::io::{self, Read};
@@ -7,14 +7,14 @@ use std::process::{Command, Stdio};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use factory_types::config::SliceConfig;
-use factory_types::job::Launch;
+use mork_types::config::SliceConfig;
+use mork_types::job::Launch;
 
 use crate::{clock, faults};
 
-/// The one slice every job's scope is made in. No dash: `factory-work` would nest in
-/// `factory.slice`, alone there, its weight weighing against nothing of the desktop's.
-pub const SLICE: &str = "factory_work.slice";
+/// The one slice every job's scope is made in. No dash: `mork-work` would nest in
+/// `mork.slice`, alone there, its weight weighing against nothing of the desktop's.
+pub const SLICE: &str = "mork_work.slice";
 const SYSTEMD_RUN: &str = "/usr/bin/systemd-run";
 const SYSTEMCTL: &str = "/usr/bin/systemctl";
 /// What `systemd-run --user` needs to reach the user's manager, kept out of a job's own environment.
@@ -43,14 +43,10 @@ pub fn wrap(launch: Launch, argv: Vec<String>, clear: &[&str]) -> Vec<String> {
 }
 
 /// How this engine starts its jobs: in the slice, given the config's weights and cap, when
-/// `systemd-run --user` works here; else niced, with why. The tests' `FACTORY_TEST_LAUNCH` picks.
+/// `systemd-run --user` works here; else niced, with why.
 pub fn choose(home_root: &Path, config: &SliceConfig) -> (Launch, Option<String>) {
     if faults::TEST_SETTINGS {
-        return match faults::test_env("FACTORY_TEST_LAUNCH").as_deref() {
-            Some("slice") => (Launch::Slice, None),
-            Some("nice") => (Launch::Nice, Some("FACTORY_TEST_LAUNCH=nice".into())),
-            _ => (Launch::Plain, None),
-        };
+        return (Launch::Plain, None);
     }
     match probe(home_root).and_then(|()| set_properties(home_root, config)) {
         Ok(()) => (Launch::Slice, None),
@@ -95,7 +91,7 @@ fn probe(home_root: &Path) -> Result<(), String> {
     super::launch::without_git_env(&mut cmd);
     cmd.args(&argv[1..]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
     use std::os::fd::AsRawFd;
-    factory_sys::prepare_wall_spawn(&mut cmd, Some(writer.as_raw_fd()), true);
+    mork_sys::prepare_wall_spawn(&mut cmd, Some(writer.as_raw_fd()), true);
     let mut child = cmd.spawn().map_err(|e| format!("{SYSTEMD_RUN} didn't start: {e}"))?;
     drop(writer);
     let start = clock::instant();

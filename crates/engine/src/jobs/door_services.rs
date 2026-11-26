@@ -1,12 +1,12 @@
-//! What a door call runs (fac-86), where its route says: here, or over Andrei's ssh alias. A credential is
+//! What a door call runs (fac-86), where its route says: here, or over the operator's ssh alias. A credential is
 //! written only to the call's own option files or a client's stdin; a remote run with no conclusive result is `lost`.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use factory_types::door::FILE_GET_MAX;
-use factory_types::door_plan::{Bounds, Pair, Plan, Ran, Route, Session};
+use mork_types::door::FILE_GET_MAX;
+use mork_types::door_plan::{Bounds, Pair, Plan, Ran, Route, Session};
 
 use super::bounded::{self, Hold, Watch};
 use super::door_files::{deliver, get_beneath, last_lines, read_beneath, tail};
@@ -260,7 +260,7 @@ fn sql(
     let first = |out: &[u8]| {
         let Some(session) = door_mysql::session(out) else { return Hold::Wait };
         let Some(path) = record else { return Hold::Release };
-        let until_ms = clock::real_now_ms().saturating_add(i64::try_from(bounds.1).unwrap_or(i64::MAX));
+        let until_ms = clock::now_ms().saturating_add(i64::try_from(bounds.1).unwrap_or(i64::MAX));
         let kept = Session { session, limit_ms: bounds.1, until_ms };
         match super::door_dispatch::durable(path, &serde_json::to_string(&kept).unwrap_or_default()) {
             Ok(()) => {

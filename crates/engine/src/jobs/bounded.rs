@@ -5,11 +5,12 @@ use std::collections::BTreeMap;
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::clock;
+use crate::lock::Lock;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Bounds {
@@ -67,7 +68,7 @@ pub enum Hold {
 // can be looked at while it runs.
 struct Capped {
     done: std::sync::mpsc::Receiver<()>,
-    buf: Arc<Mutex<Vec<u8>>>,
+    buf: Arc<Lock<Vec<u8>>>,
     over: Arc<AtomicBool>,
 }
 
@@ -75,13 +76,13 @@ impl Capped {
     fn start(r: Option<impl Read + Send + 'static>, cap: usize) -> Self {
         let (tx, done) = std::sync::mpsc::channel();
         let over = Arc::new(AtomicBool::new(false));
-        let buf = Arc::new(Mutex::new(Vec::new()));
+        let buf = Arc::new(Lock::new(Vec::new()));
         let (flag, kept) = (Arc::clone(&over), Arc::clone(&buf));
         std::thread::spawn(move || {
             if let Some(mut r) = r {
                 let mut chunk = [0u8; 16_384];
                 while let Ok(n @ 1..) = r.read(&mut chunk) {
-                    let mut b = kept.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                    let mut b = kept.lock();
                     let room = cap.saturating_sub(b.len());
                     b.extend_from_slice(&chunk[..n.min(room)]);
                     if n > room {
@@ -100,12 +101,12 @@ impl Capped {
     }
 
     fn seen(&self) -> Vec<u8> {
-        self.buf.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
+        self.buf.lock().clone()
     }
 
     fn finish(self, left: Duration) -> Vec<u8> {
         let _ = self.done.recv_timeout(left);
-        std::mem::take(&mut *self.buf.lock().unwrap_or_else(std::sync::PoisonError::into_inner))
+        std::mem::take(&mut *self.buf.lock())
     }
 }
 
@@ -131,7 +132,7 @@ pub fn run_watched(
     super::launch::without_git_env(&mut cmd);
     cmd.args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     // A group of its own, ended with it; killed when its caller dies, so a crash leaves none.
-    factory_sys::prepare_wall_spawn(&mut cmd, None, true);
+    mork_sys::prepare_wall_spawn(&mut cmd, None, true);
     if let Some(env) = run.env {
         cmd.env_clear().envs(env);
     }
@@ -155,14 +156,14 @@ pub fn run_watched(
             if let Some(cut) = watch.cut {
                 cut(&out.seen());
             }
-            let _ = factory_sys::kill(group, super::procs::libc_sig::KILL);
+            let _ = mork_sys::kill(group, super::procs::libc_sig::KILL);
             let _ = child.kill();
             break child.wait().ok();
         }
         clock::sleep(Duration::from_millis(5));
     };
     // What it left in its group ends with it.
-    let _ = factory_sys::kill(group, super::procs::libc_sig::KILL);
+    let _ = mork_sys::kill(group, super::procs::libc_sig::KILL);
     let left = bounds.timeout.saturating_sub(clock::elapsed(start)).max(Duration::from_millis(200));
     let (out_over, err_over) = (Arc::clone(&out.over), Arc::clone(&err.over));
     let (stdout, stderr) = (out.finish(left), err.finish(Duration::from_millis(200)));
@@ -211,11 +212,11 @@ fn stopped(watch: &Watch<'_>, out: &Capped, release: &mut Option<std::sync::mpsc
 pub fn walled(
     home_root: &Path,
     kind: &str,
-    spec: &factory_types::job::JobSpec,
+    spec: &mork_types::job::JobSpec,
     stdin: &[u8],
     bounds: Bounds,
 ) -> io::Result<Captured> {
-    use factory_types::job::WallMode;
+    use mork_types::job::WallMode;
     if spec.wall == WallMode::None {
         let cwd = Path::new(&spec.cwd);
         let r = Run { argv: &spec.argv, env: Some(&spec.env), cwd: Some(cwd), stdin };

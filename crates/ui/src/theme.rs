@@ -19,7 +19,7 @@ const fn alpha(c: Color, a: f32) -> Color {
 pub const BACKGROUND: Color = rgb(0x000a_0a0a);
 /// The 1 px edge that alone tells surfaces apart: the dividers between panels, a card's edge.
 pub const EDGE: Color = rgb(0x004e_4e4e);
-/// Names that matter, the selected room, Andrei's words, the cursor.
+/// Names that matter, the selected room, the operator's words, the cursor.
 pub const BRIGHT: Color = rgb(0x00ec_ecec);
 /// The foreman's name: a grey a step brighter than body.
 pub const STRONG: Color = rgb(0x00d6_d6d6);
@@ -43,9 +43,9 @@ pub const LIT: Color = rgb(0x00bd_bdbd);
 // The conversation's fills (fac-39), opaque on the black, so its words keep their contrast
 // whatever the blending.
 
-/// Cursor's selected row: Andrei's bubble, and the open room's band.
+/// Cursor's selected row: the operator's bubble, and the open room's band.
 pub const SELECTED: Color = rgb(0x001f_1f1f);
-/// Andrei's bubble.
+/// The operator's bubble.
 pub const BUBBLE: Color = SELECTED;
 /// A divider's line, inline code's fill.
 pub const SEAM: Color = rgb(0x002d_2d2d);
@@ -54,7 +54,7 @@ pub const TABLE_RULE: Color = rgb(0x0024_2424);
 /// A fenced block's fill, and its edge.
 pub const FENCE: Color = rgb(0x0011_1111);
 pub const FENCE_EDGE: Color = rgb(0x002d_2d2d);
-/// The fill of a message to Andrei.
+/// The fill of a message to the operator.
 pub const PANEL: Color = rgb(0x0016_1616);
 /// An open ask's fill.
 pub const ASK_FILL: Color = rgb(0x0015_110d);
@@ -65,7 +65,7 @@ pub const BORDER: f32 = 1.0;
 /// The Iced theme built on the palette.
 pub fn iced_theme() -> Theme {
     Theme::custom(
-        "factory".to_owned(),
+        "mork".to_owned(),
         iced::theme::Palette {
             background: BACKGROUND,
             text: TEXT,
@@ -142,7 +142,7 @@ pub fn room_picked(_: &Theme) -> container::Style {
 }
 
 /// A card edged in a tone: the surfaces' grey, or white while it is picked. A hand's colour is
-/// never its edge: Andrei found a status-coloured edge too heavy (fac-103).
+/// never its edge: the operator found a status-coloured edge too heavy (fac-103).
 pub fn card(tone: Tone) -> impl Fn(&Theme) -> container::Style {
     move |_| container::Style { border: edged(color(tone)), ..container::Style::default() }
 }
@@ -211,7 +211,7 @@ pub fn scrollbar(_: &Theme, _: scrollable::Status) -> scrollable::Style {
     }
 }
 
-/// Andrei's words: a bubble in the selected row's grey.
+/// The operator's words: a bubble in the selected row's grey.
 pub fn bubble(_: &Theme) -> container::Style {
     fill(BUBBLE)
 }
@@ -221,7 +221,7 @@ pub fn ask_open(_: &Theme) -> container::Style {
     container::Style { border: edged(EDGE), ..fill(ASK_FILL) }
 }
 
-/// A message to Andrei: a dark-grey panel, edged thinly.
+/// A message to the operator: a dark-grey panel, edged thinly.
 pub fn panel(_: &Theme) -> container::Style {
     container::Style { border: edged(EDGE), ..fill(PANEL) }
 }
@@ -278,7 +278,7 @@ pub fn field(_: &Theme) -> container::Style {
     container::Style { border: edged(EDGE), ..fill(BACKGROUND) }
 }
 
-/// The input inside its field: Andrei's words bright, a dim placeholder, a bright cursor.
+/// The input inside its field: the operator's words bright, a dim placeholder, a bright cursor.
 pub fn input(_: &Theme, _: text_editor::Status) -> text_editor::Style {
     text_editor::Style {
         background: Color::TRANSPARENT.into(),

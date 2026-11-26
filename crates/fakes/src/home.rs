@@ -48,9 +48,9 @@ fn homes_dir() -> PathBuf {
 
 impl TestHome {
     /// Makes `t-XXXXXX` in the workspace's short namespace beneath HOME, with `home/`, `tmp/`, `xdg/`,
-    /// `fhome/` (the factory home), `cfg/` and `bin/` inside.
+    /// `fhome/` (Mork home), `cfg/` and `bin/` inside.
     pub fn new() -> Self {
-        let keep = std::env::var("FACTORY_KEEP_TEST_HOMES").is_ok_and(|v| v == "1");
+        let keep = std::env::var("MORK_KEEP_TEST_HOMES").is_ok_and(|v| v == "1");
         Self::with_keep(keep)
     }
 
@@ -81,7 +81,7 @@ impl TestHome {
     pub fn xdg(&self) -> PathBuf {
         self.root.join("xdg")
     }
-    pub fn factory_home(&self) -> PathBuf {
+    pub fn mork_home(&self) -> PathBuf {
         self.root.join("fhome")
     }
     pub fn config_dir(&self) -> PathBuf {
@@ -98,16 +98,16 @@ impl TestHome {
             ("HOME".into(), s(self.home())),
             ("TMPDIR".into(), s(self.tmp())),
             ("XDG_RUNTIME_DIR".into(), s(self.xdg())),
-            ("FACTORY_HOME".into(), s(self.factory_home())),
-            ("FACTORY_CONFIG".into(), s(self.config_dir().join("factory.toml"))),
+            ("MORK_HOME".into(), s(self.mork_home())),
+            ("MORK_CONFIG".into(), s(self.config_dir().join("mork.toml"))),
         ]
     }
 
-    /// Links the fakes, built beside `factory_exe`, into `bin/` under their CLI names. The
+    /// Links the fakes, built beside `mork_exe`, into `bin/` under their CLI names. The
     /// fakes are built first (once per test binary), so a test never runs a stale one.
-    pub fn link_fakes(&self, factory_exe: &Path) {
+    pub fn link_fakes(&self, mork_exe: &Path) {
         build_fakes_once();
-        let dir = factory_exe.parent().unwrap_or(Path::new("."));
+        let dir = mork_exe.parent().unwrap_or(Path::new("."));
         for (link, bin) in FAKE_LINKS {
             let target = dir.join(bin);
             let _ = std::os::unix::fs::symlink(&target, self.bin().join(link));
@@ -147,7 +147,7 @@ impl Default for TestHome {
 
 static BUILT: std::sync::Once = std::sync::Once::new();
 
-// Once per test binary: `cargo test -p factory-app` alone doesn't build another package's binaries.
+// Once per test binary: `cargo test -p mork-app` alone doesn't build another package's binaries.
 fn build_fakes_once() {
     BUILT.call_once(|| {
         let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
@@ -205,7 +205,7 @@ impl Drop for TestHome {
         let leaked = leftovers > 0 && !self.allow_leftovers;
         let failed = std::thread::panicking() || leaked;
         if failed {
-            print_app_log(&self.factory_home().join("logs/app.log"));
+            print_app_log(&self.mork_home().join("logs/app.log"));
         }
         if self.keep || failed {
             eprintln!("kept test home: {}", self.root.display());

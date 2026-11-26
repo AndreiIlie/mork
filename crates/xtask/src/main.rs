@@ -93,7 +93,7 @@ fn check() -> bool {
     verdict("check", &[("rustfmt", a), ("comments", true), ("clippy", c), ("audits", d), ("web", w)])
 }
 
-const FAULTS: [&str; 2] = ["--features", "factory-app/faults,factory-engine/faults"];
+const FAULTS: [&str; 2] = ["--features", "mork-app/faults,mork-engine/faults"];
 
 // The merge train runs the suite walled, then its recorded wall tests unwalled (fac-65). With no phase,
 // as an older engine's train runs it, it runs once as before; fac-123 refuses that after fac-65's reload.
@@ -106,7 +106,7 @@ fn test() -> bool {
     }
 }
 
-// Each pass builds right before it runs: both leave their `factory` at the one path the tests run. Only
+// Each pass builds right before it runs: both leave their `mork` at the one path the tests run. Only
 // the run is timed. The production build proves `faults` compiles out, and runs the tests named `production`.
 fn suite(walled: bool) -> bool {
     let root = xtask::root();

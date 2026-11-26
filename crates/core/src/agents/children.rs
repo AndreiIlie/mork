@@ -1,12 +1,12 @@
 //! Child seats report to the parent that tasked them (fac-94, fac-95).
 
-use factory_types::ask::Color;
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::command::Command;
-use factory_types::reply::{Intent, Outcome, Reply, Role};
-use factory_types::review::Verdict;
-use factory_types::state::{Agent, Choice, Job, MessageKind, Owed, Sender};
-use factory_types::{AgentKey, CardId, PlaceId, SeatName};
+use mork_types::ask::Color;
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::command::Command;
+use mork_types::reply::{Intent, Outcome, Reply, Role};
+use mork_types::review::Verdict;
+use mork_types::state::{Agent, Choice, Job, MessageKind, Owed, Sender};
+use mork_types::{AgentKey, CardId, PlaceId, SeatName};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -175,7 +175,7 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
         return Decision::invalid("`task` is empty: a child starts on its task");
     }
     // One line, whatever its words hold: the room list shows it beside the reviewer's name.
-    let topic = topic.as_deref().map(factory_types::chat::line);
+    let topic = topic.as_deref().map(mork_types::chat::line);
     match (*role, topic.as_deref()) {
         (Role::Reviewer, None | Some("")) => {
             return Decision::refused("a reviewer needs its topic: `spawn --topic '<topic>'`, in your own words");
@@ -224,7 +224,7 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
 }
 
 /// Reports a child's finished, blocked, asking or red reply to its parent's live turn or wakes it in the parent's
-/// room. Nothing submits the card, decides a review or asks Andrei (fac-94, decision 1; fac-95; fac-99).
+/// room. Nothing submits the card, decides a review or asks the operator (fac-94, decision 1; fac-95; fac-99).
 pub fn replied(p: &mut Poster<'_>, card: &Card, who: &Who, r: &Reply, job: &Job) -> bool {
     let Some(a) = p.agent(&who.key).filter(is_child) else { return false };
     let Some(parent) = a.parent.clone() else { return false };
@@ -280,7 +280,7 @@ fn report_text(name: &str, done: &str, r: &Reply) -> String {
     if !r.hand.message.is_empty() {
         text.push_str(&format!("\n\n{}", r.hand.message));
     }
-    // Its question is its foreman's to answer or carry to Andrei, so it travels whole.
+    // Its question is its foreman's to answer or carry to the operator, so it travels whole.
     if !r.hand.ask.trim().is_empty() {
         text.push_str(&format!("\n\nIt asks: {}", r.hand.ask_words().trim()));
     }
@@ -296,7 +296,7 @@ fn report_text(name: &str, done: &str, r: &Reply) -> String {
 
 /// Ends the specification holder's brief researchers when its plan is approved: its planner's, or a no-planner card's
 /// foreman's (fac-616).
-pub(crate) fn release_researchers(p: &mut Poster<'_>, holder: &AgentKey, config: &factory_types::config::Config) {
+pub(crate) fn release_researchers(p: &mut Poster<'_>, holder: &AgentKey, config: &mork_types::config::Config) {
     for a in p.state.agents.values().filter(|a| a.role == Role::Researcher && a.parent.as_ref() == Some(holder)) {
         super::closing::retire(p, &a.key, true, config);
     }
@@ -304,7 +304,7 @@ pub(crate) fn release_researchers(p: &mut Poster<'_>, holder: &AgentKey, config:
 
 /// Ends a card's baseline seats when its baseline step ends (fac-636); with `stop`, visual mode turned off, their
 /// running turns are stopped too. A seat already retiring keeps its closing turn.
-pub(crate) fn release_baselines(p: &mut Poster<'_>, card: &CardId, stop: bool, config: &factory_types::config::Config) {
+pub(crate) fn release_baselines(p: &mut Poster<'_>, card: &CardId, stop: bool, config: &mork_types::config::Config) {
     let mine = |a: &&Agent| {
         a.role == Role::Baseline && a.retiring.is_none() && places::card_of(p.state, &a.place).as_ref() == Some(card)
     };
@@ -405,15 +405,22 @@ pub(super) fn line(a: &Agent) -> Option<String> {
     let (ends, folder) = match a.role {
         Role::Researcher => (
             "`reported` or `blocked`",
-            "You work in a folder of your own; the card's clone, at `$FACTORY_CLONE`, is yours to read, never to write.".to_owned(),
+            "You work in a folder of your own; the card's clone, at `$MORK_CLONE`, is yours to read, never to write."
+                .to_owned(),
         ),
         Role::Reviewer => (
             "`review-pass`, `review-fail` or `blocked`",
-            format!("You review in the card's clone, at the commit under review, beside its other reviewers: run what you need there, and change no tracked file. Save each executable proof there under `.git/factory/proofs/`, named by its finding, and keep that path out of the finding's proof text; your foreman puts the ones it keeps into the round's folder there, and you rerun an earlier round's from its own `round-<n>/` folder. {}", crate::reviews::verdict::PROOF_RULE),
+            format!(
+                "You review in the card's clone, at the commit under review, beside its other reviewers: run what you need there, and change no tracked file. Save each executable proof there under `.git/mork/proofs/`, named by its finding, and keep that path out of the finding's proof text; your foreman puts the ones it keeps into the round's folder there, and you rerun an earlier round's from its own `round-<n>/` folder. {}",
+                crate::reviews::verdict::PROOF_RULE
+            ),
         ),
         Role::Baseline => (
             "`built` or `blocked`",
-            format!("You write only the mock's folder, `{}/` in the card's clone; the rest of the clone is yours to read.", crate::lifecycle::mock::FOLDER),
+            format!(
+                "You write only the mock's folder, `{}/` in the card's clone; the rest of the clone is yours to read.",
+                crate::lifecycle::mock::FOLDER
+            ),
         ),
         Role::Planner | Role::Foreman | Role::Echo => return None,
     };

@@ -10,17 +10,17 @@ mod train;
 
 use std::collections::BTreeMap;
 
-use factory_core::decide::{Ctx, Decision, Event, Intent, decide};
-use factory_types::Command;
-use factory_types::action::{Action, ActionWhat};
-use factory_types::card::{BoardCard, Card, Stage};
-use factory_types::config::Config;
-use factory_types::protocol::ErrorBody;
-use factory_types::state::{Message, Sender};
-use factory_types::{CardId, Sha};
+use mork_core::decide::{Ctx, Decision, Event, Intent, decide};
+use mork_types::Command;
+use mork_types::action::{Action, ActionWhat};
+use mork_types::card::{BoardCard, Card, Stage};
+use mork_types::config::Config;
+use mork_types::protocol::ErrorBody;
+use mork_types::state::{Message, Sender};
+use mork_types::{CardId, Sha};
 use serde_json::{Value, json};
 
-/// The factory's home, as the jobs' paths name it.
+/// Mork's home, as the jobs' paths name it.
 pub const HOME: &str = "/f";
 
 /// A commit hash made from a short name, so tests read `sha("h1")`.
@@ -30,16 +30,16 @@ pub fn sha(name: &str) -> Sha {
 }
 
 /// The test config: a local project `web` and a Bitbucket project `ex`, with checks and a test command, neither the
-/// factory's own project, whose suite would owe its wall tests a second run.
+/// mork's own project, whose suite would owe its wall tests a second run.
 pub fn config() -> Config {
     let c = json!({
-        "factory": {"project": "factory"},
-        "git": {"author": "Factory Test <t@example.invalid>"},
+        "mork": {"project": "mork"},
+        "git": {"author": "Mork Test <t@example.invalid>"},
         "projects": {
-            "web": {"repo": "/r/web", "board": "/b/web", "test": "npm test",
+            "web": {"repo": "/r/web", "board": {"kind": "markdown", "path": "/b/web"}, "test": "npm test",
                     "checks": {"command": "checks", "folder": "/c/web"}},
-            "ex": {"repo": "/r/ex", "board": "/b/ex", "test": "npm test",
-                   "bitbucket": {"workspace": "ws", "slug": "ex"},
+            "ex": {"repo": "/r/ex", "board": {"kind": "markdown", "path": "/b/ex"}, "test": "npm test",
+                   "forge": {"kind": "bitbucket", "workspace": "ws", "slug": "ex"},
                    "checks": {"command": "checks", "folder": "/c/ex"}}
         }
     });
@@ -56,13 +56,13 @@ pub fn reply(outcome: &str, headline: &str) -> Value {
 }
 
 /// What head `head` makes of the files it changes: each file's content its own at every head (fac-95).
-pub fn contents(head: &str, files: &[&str]) -> factory_types::review::Contents {
+pub fn contents(head: &str, files: &[&str]) -> mork_types::review::Contents {
     files.iter().map(|f| ((*f).to_owned(), format!("100644 {}", sha(&format!("{head}:{f}"))))).collect()
 }
 
 /// The simulated engine.
 pub struct Sim {
-    pub state: factory_core::state::State,
+    pub state: mork_core::state::State,
     pub config: Config,
     pub now: i64,
     /// Intents not yet carried out.
@@ -77,7 +77,7 @@ pub struct Sim {
 impl Sim {
     pub fn new() -> Self {
         Self {
-            state: factory_core::state::State::default(),
+            state: mork_core::state::State::default(),
             config: config(),
             now: 1_792_000_000_000,
             intents: Vec::new(),
@@ -109,15 +109,15 @@ impl Sim {
         self.apply(Event::Command { from, cmd }).answer.unwrap_or(Ok(Value::Null))
     }
 
-    pub fn andrei(&mut self, cmd: Value) -> Result<Value, ErrorBody> {
-        self.cmd(Sender::Andrei, cmd)
+    pub fn operator(&mut self, cmd: Value) -> Result<Value, ErrorBody> {
+        self.cmd(Sender::Operator, cmd)
     }
 
     /// Puts a card on its project's board, `Backlog`, as the engine reads it.
     pub fn board(&mut self, id: &str, project: &str) {
         let title = format!("The title of {id}");
         let description = format!("The description of {id}.");
-        let text = factory_core::board::new_card(&id.to_uppercase(), &title, &description, "2026-11-21 10:00")
+        let text = mork_core::board::new_card(&id.to_uppercase(), &title, &description, "2026-11-21 10:00")
             .map(|(_, t)| t)
             .unwrap()
             .replace("status: To Do", "status: Backlog");
@@ -166,6 +166,6 @@ impl Sim {
 
     /// Whether an agent is owed a turn now.
     pub fn owed(&self, key: &str) -> bool {
-        factory_core::agents::turns::due(&self.state, &self.config, self.now).iter().any(|k| k.as_str() == key)
+        mork_core::agents::turns::due(&self.state, &self.config, self.now).iter().any(|k| k.as_str() == key)
     }
 }

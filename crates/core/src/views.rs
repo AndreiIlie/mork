@@ -21,7 +21,7 @@ pub mod search;
 pub mod status;
 pub mod timeline;
 
-use factory_types::Command;
+use mork_types::Command;
 
 use crate::decide::{Ctx, Decision};
 use crate::state::State;

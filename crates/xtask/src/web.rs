@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn parses_tsc_single_and_multiline_errors_and_ignores_npm_banner() {
         let output = "\
-> factory-web@ typecheck
+> mork-web@ typecheck
 > tsc --noEmit --pretty false
 
 src/App.tsx(12,5): error TS2322: Type 'number' is not assignable to type 'string'.

@@ -64,14 +64,14 @@ pub(crate) fn fail(code: i32, words: &str) -> i32 {
     code
 }
 
-/// `ssh`: Andrei's own alias, with no key, login or configuration of the Factory's; a command is the one remote
+/// `ssh`: the operator's own alias, with no key, login or configuration of Mork's; a command is the one remote
 /// string; a forward binds a socket here and holds the connection open until the scenario's `after` ends it.
 pub fn ssh_main() -> i32 {
     let argv: Vec<String> = std::env::args().collect();
     let stdin = stdin_all();
     log("ssh", &argv, &stdin);
     // The alias carries its own host, login and keys: a user, key or configuration file named here
-    // would be the Factory reaching past it, which it never does.
+    // would be Mork reaching past it, which it never does.
     for bad in ["-i", "-l", "-F"] {
         if argv.iter().any(|a| a == bad) {
             return fail(255, "fake ssh: a key, login or config file was named; the alias carries its own");

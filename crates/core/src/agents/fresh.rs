@@ -1,8 +1,8 @@
 //! `fresh` (fac-25): an agent's session ended and a new one started in its stead, at its next
 //! turn, with the startup's material and a line naming the session it replaces.
 
-use factory_types::state::{Agent, Fresh, Owed, Sender};
-use factory_types::{AgentKey, SessionId};
+use mork_types::state::{Agent, Fresh, Owed, Sender};
+use mork_types::{AgentKey, SessionId};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -28,7 +28,7 @@ pub(super) fn fresh(state: &State, from: &Sender, name: &str, ctx: Ctx<'_>) -> D
     let running = state.jobs.values().any(|j| j.owner == key && j.settled.is_none());
     let by = match from {
         Sender::Agent(k) => k.as_str().to_owned(),
-        Sender::Andrei | Sender::Engine => "andrei".to_owned(),
+        Sender::Operator | Sender::Engine => "operator".to_owned(),
         Sender::Orchestrator(_) | Sender::Pa => from.label(),
     };
     let f = Fresh { replaces: agent.session.clone(), by, at: ctx.now, pending: running, vendor: None };
@@ -65,6 +65,7 @@ fn replace_reading(state: &State, a: &mut Agent, f: Fresh, challenge: Option<u64
     a.missed.clear();
     a.session = None;
     a.session_started = false;
+    a.needs_specification = false;
     a.held.clear();
     a.last_prompt = None;
     a.context = None;

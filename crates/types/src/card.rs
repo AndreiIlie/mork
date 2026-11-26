@@ -137,7 +137,7 @@ pub struct Card {
     pub failed_job: Option<crate::work::Purpose>,
     /// Cut jobs in a row (1.4.6.5).
     pub job_cuts: u32,
-    /// A PR alarm raised (4.11.6): raised once, answered by `close`, or by Andrei's or an orchestrator's `ack` (fac-157).
+    /// A PR alarm raised (4.11.6): raised once, answered by `close`, or by the operator's or an orchestrator's `ack` (fac-157).
     pub alarm: bool,
     /// Where its landing stands (4.11.2).
     pub landing: Option<Landing>,
@@ -157,15 +157,15 @@ pub struct Card {
     /// Seat questions and non-visual plans are automatically given to the project's orchestrator (fac-474, fac-669).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub delegated: bool,
-    /// The project's orchestrator answers departures and reversals too, instead of leaving them to Andrei (fac-474, fac-669).
+    /// The project's orchestrator answers departures and reversals too, instead of leaving them to the operator (fac-474, fac-669).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub self_sustained: bool,
-    /// Andrei turned its preview on (fac-222): it runs, an app's start bringing it back, until he
+    /// The operator turned its preview on (fac-222): it runs, an app's start bringing it back, until he
     /// stops it or the card ends.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub preview: bool,
     /// In visual mode (fac-413, fac-636): a full card's mock made at brief and approved with its plan, on
-    /// Andrei's switch or an orchestrator's start; kept across restarts and later runs.
+    /// The operator's switch or an orchestrator's start; kept across restarts and later runs.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub visual: bool,
     /// This run has no planner (fac-616): its foreman holds the specification, at brief and after it.
@@ -174,7 +174,7 @@ pub struct Card {
     /// A visual card's mock (fac-413, fac-636): its baseline, made at brief, or reopened at build; this run's only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mock: Option<Mock>,
-    /// Its foreman or Andrei sent it back to brief after its plan's approval (fac-638): this run's only.
+    /// Its foreman or the operator sent it back to brief after its plan's approval (fac-638): this run's only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rebrief: Option<Rebrief>,
     /// The seq of the engine's request for the foreman's challenge of the current recap (fac-558): only a reply
@@ -217,17 +217,17 @@ pub struct Carried {
     pub file: String,
 }
 
-/// A visual card's mock step (fac-258): its mock made, served and shown to Andrei before its build.
+/// A visual card's mock step (fac-258): its mock made, served and shown to the operator before its build.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Mock {
     pub step: MockStep,
     /// The mock was offered for approval (fac-484); absent on older records until carry-over.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub offered: bool,
-    /// The mock host's port, from the factory's port range, apart from its preview port.
+    /// The mock host's port, from Mork's port range, apart from its preview port.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
-    /// Andrei reopened it during the run's build or later (fac-591): how many notes its card had then, so the
+    /// The operator reopened it during the run's build or later (fac-591): how many notes its card had then, so the
     /// decisions recorded since are those numbered above it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reopened: Option<usize>,
@@ -254,10 +254,10 @@ pub struct Rebrief {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MockStep {
-    /// The mock is made and changed as Andrei comments, until his `approve`.
+    /// The mock is made and changed as the operator comments, until his `approve`.
     #[default]
     Open,
-    /// Andrei's `approve` ended it.
+    /// The operator's `approve` ended it.
     Approved,
     /// Visual mode was turned off during it: ended without the mock.
     Skipped,
@@ -293,7 +293,7 @@ impl Sketch {
 /// nothing to clarify (fac-24).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Approval {
-    /// Andrei, a delegated card's foreman, or its project's orchestrator holding its open plan ask.
+    /// The operator, a delegated card's foreman, or its project's orchestrator holding its open plan ask.
     /// Older clear starts name the agent holding the specification; they approved nothing.
     pub by: crate::state::Sender,
     pub via: ApprovedVia,
@@ -327,7 +327,7 @@ pub struct Gates {
     pub review_asked: Option<crate::ids::Sha>,
     /// This head passed its gates, its checks or none configured: what verification and the merge queue admit.
     pub passed: Option<crate::ids::Sha>,
-    /// Andrei's approval stands on this head (Bitbucket, 4.11.1), approved at this time.
+    /// The operator's approval stands on this head (Bitbucket, 4.11.1), approved at this time.
     pub approved: Option<(crate::ids::Sha, i64)>,
     /// The foreman answered `built` and the head is being taken.
     pub built_pending: bool,

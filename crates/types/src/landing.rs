@@ -11,7 +11,7 @@ pub enum Landing {
     Queued { at: i64 },
     /// At the train's front with no candidate: the base fetched first.
     Fetch { at: i64 },
-    /// A PR merged outside the factory, its merge commit not yet in the mirror: fetched, then its
+    /// A PR merged outside Mork, its merge commit not yet in the mirror: fetched, then its
     /// PR read again, whatever the fetch says of the head (M5.3).
     HandMerged,
     /// Its candidate being made in its train clone (fac-68).
@@ -33,7 +33,7 @@ pub enum Landing {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         verified: bool,
     },
-    /// A PR published, waiting out of the train for Andrei's approval, never merged before it (fac-98, fac-111).
+    /// A PR published, waiting out of the train for the operator's approval, never merged before it (fac-98, fac-111).
     /// An older build's, not `verified`, merges on its PR entry's run instead (fac-375).
     Approval {
         tree: Option<String>,

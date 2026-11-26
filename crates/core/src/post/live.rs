@@ -1,8 +1,8 @@
 // Smooth delivery (fac-389): a message handed to its recipient's running turn, read between its tool calls;
 // the turn's end says whether it was, and one missed wakes its agent then.
 
-use factory_types::state::{Job, JobStatus, Sender};
-use factory_types::{AgentKey, JobId};
+use mork_types::state::{Job, JobStatus, Sender};
+use mork_types::{AgentKey, JobId};
 
 use super::Poster;
 use crate::decide::Intent;
@@ -10,12 +10,12 @@ use crate::messages::places::Who;
 use crate::state::Change;
 
 impl Poster<'_> {
-    /// Hands message `seq`, posted in this decision, to `who`'s running live turn: whether it did. Only Andrei's, an
+    /// Hands message `seq`, posted in this decision, to `who`'s running live turn: whether it did. Only the operator's, an
     /// orchestrator's or its own foreman's go, to an agent neither paused nor ending, whose turn isn't stopping.
     pub fn deliver(&mut self, who: &Who, from: &Sender, seq: u64) -> bool {
         let Some(a) = self.agent(&who.key) else { return false };
         let parent = matches!(from, Sender::Agent(k) if a.parent.as_ref() == Some(k));
-        if !(parent || *from == Sender::Andrei || from.is_orchestrator()) {
+        if !(parent || *from == Sender::Operator || from.is_orchestrator()) {
             return false;
         }
         self.deliver_to(who, from, seq)

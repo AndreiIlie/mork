@@ -1,11 +1,11 @@
 //! A stalled non-review card nudges the seat it waits on, once per stall: its seats last said `working`, its children
 //! `working`, finished or blocked, and nothing is running, owed or awaited (fac-379, fac-380, fac-415, fac-587).
 
-use factory_types::AgentKey;
-use factory_types::action::ActionStatus;
-use factory_types::card::{Card, Landing, Mode};
-use factory_types::reply::{Intent as Kind, Outcome, Role};
-use factory_types::state::{Agent, AgentStatus, Job, JobStatus, Message, MessageKind, ORCHESTRATOR, Sender};
+use mork_types::AgentKey;
+use mork_types::action::ActionStatus;
+use mork_types::card::{Card, Landing, Mode};
+use mork_types::reply::{Intent as Kind, Outcome, Role};
+use mork_types::state::{Agent, AgentStatus, Job, JobStatus, Message, MessageKind, ORCHESTRATOR, Sender};
 use serde_json::json;
 
 use crate::decide::Intent;

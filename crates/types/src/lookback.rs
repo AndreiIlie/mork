@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{CardId, ProjectId, Sha};
 
 /// The engine's fixed inputs in a look-back clone.
-pub const INPUT_FILE: &str = ".git/factory/lookback.json";
+pub const INPUT_FILE: &str = ".git/mork/lookback.json";
 
 /// The scope of one look-back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

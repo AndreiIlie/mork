@@ -1,5 +1,5 @@
 //! The door's targets (fac-1): `targets.toml` is re-read at each request and before each dispatch;
-//! the credentials it names live in Andrei's access file, which only the engine reads.
+//! the credentials it names live in the operator's access file, which only the engine reads.
 
 pub mod access;
 pub mod call;
@@ -8,10 +8,10 @@ pub mod redact;
 
 use std::path::Path;
 
-use factory_core::door::policy::Resolved;
-use factory_types::door::{Op, canonical};
-use factory_types::door_config::TargetsFile;
-use factory_types::door_plan::{Pair, Plan};
+use mork_core::door::policy::Resolved;
+use mork_types::door::{Op, canonical};
+use mork_types::door_config::TargetsFile;
+use mork_types::door_plan::{Pair, Plan};
 
 use crate::paths::Home;
 use redact::Redactor;
@@ -32,7 +32,7 @@ pub fn parse(text: &str) -> Result<TargetsFile, String> {
             None => e.message().trim().to_owned(),
         }
     })?;
-    factory_core::door::target::check_file(&f)?;
+    mork_core::door::target::check_file(&f)?;
     Ok(f)
 }
 
@@ -45,13 +45,13 @@ pub struct Resolution {
 
 /// Resolves `op` on `target` against the file as it is now.
 pub fn resolve(f: &TargetsFile, target: &str, op: &Op) -> Result<Resolution, String> {
-    let resolved = factory_core::door::policy::resolve(f, target, op)?;
+    let resolved = mork_core::door::policy::resolve(f, target, op)?;
     let plan = canonical(&serde_json::to_value(&resolved.envelope).map_err(|e| e.to_string())?);
     Ok(Resolution { resolved, plan })
 }
 
 /// A call resolved again from `targets.toml` as it is now: its plan and its allowlist verdict.
-pub fn current(home: &Home, c: &factory_types::door_call::DoorCall) -> Result<Resolution, String> {
+pub fn current(home: &Home, c: &mork_types::door_call::DoorCall) -> Result<Resolution, String> {
     let f = read(home)?;
     let params: serde_json::Value = serde_json::from_str(&c.params).map_err(|e| e.to_string())?;
     let op = Op::parse(&c.op, &params).map_err(|e| format!("{e:?}"))?;
@@ -60,8 +60,8 @@ pub fn current(home: &Home, c: &factory_types::door_call::DoorCall) -> Result<Re
 
 /// Whether a call still resolves to the plan and the allowlist verdict it was cleared or
 /// approved on: a changed configuration or a revoked allowlist stops it.
-pub fn unchanged(home: &Home, a: &factory_types::action::Action) -> Result<(), String> {
-    let (c, d) = factory_core::door::parts(a).ok_or("not a door call")?;
+pub fn unchanged(home: &Home, a: &mork_types::action::Action) -> Result<(), String> {
+    let (c, d) = mork_core::door::parts(a).ok_or("not a door call")?;
     let now = current(home, c).map_err(|e| format!("its target can't be resolved now: {e}"))?;
     if now.plan != c.plan || now.resolved.verdict != d.validator {
         return Err("the target's configuration or allowlist changed since it was checked: ask again".into());

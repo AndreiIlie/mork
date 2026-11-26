@@ -1,11 +1,11 @@
 //! A card's controls (fac-474): binary active and visual tracks, and one three-position delegation control.
 //! Each position takes a click only while the engine offers its command.
 
-use factory_types::Command;
-use factory_types::about::Switch;
-use factory_types::view::PlaceView;
 use iced::widget::{Column, container};
 use iced::{Element, Length};
+use mork_types::Command;
+use mork_types::about::Switch;
+use mork_types::view::PlaceView;
 
 use crate::app::{App, Effect, Message};
 use crate::spans::Tone;

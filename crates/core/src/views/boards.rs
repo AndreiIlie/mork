@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use factory_types::card::{BoardCard, Card, Landing, Stage};
-use factory_types::view::{AgentLight, BoardGroup, BoardRow, BoardView, LiveMarks, MergeQueue};
-use factory_types::{CardId, ProjectId};
+use mork_types::card::{BoardCard, Card, Landing, Stage};
+use mork_types::view::{AgentLight, BoardGroup, BoardRow, BoardView, LiveMarks, MergeQueue};
+use mork_types::{CardId, ProjectId};
 
 use super::findings::{folded_parent, folded_review};
 use super::order::{by_number, live_cards};
@@ -119,9 +119,9 @@ fn step_words(c: &Card, base: &str) -> String {
         Some(Landing::Test(_)) => "its candidate's checks".to_owned(),
         Some(Landing::Review(_)) => "its suite ended, its round under way".to_owned(),
         Some(Landing::Passed(_)) => "verified, waiting to land".to_owned(),
-        Some(Landing::HandMerged) => "merged outside the factory".to_owned(),
+        Some(Landing::HandMerged) => "merged outside Mork".to_owned(),
         Some(Landing::Published { .. }) => "published".to_owned(),
-        Some(Landing::Approval { .. }) => "its PR waiting for Andrei's approval".to_owned(),
+        Some(Landing::Approval { .. }) => "its PR waiting for the operator's approval".to_owned(),
         Some(Landing::Merge { .. }) => "merging its PR".to_owned(),
     }
 }

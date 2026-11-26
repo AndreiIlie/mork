@@ -18,7 +18,7 @@ pub enum ActionWhat {
     Push { card: CardId, branch: String, commit: Sha },
     /// Push the local base's current tip to its backup; `landed` identifies the triggering landing.
     BackupPush { project: crate::ProjectId, base: String, remote: String, landed: Sha },
-    /// Open the card's PR in Andrei's name (fac-98), or, the card having one (`pr`), give that exact
+    /// Open the card's PR in the operator's name (fac-98), or, the card having one (`pr`), give that exact
     /// PR this title and description, none for a card with no ticket (fac-111, fac-290).
     OpenPr {
         card: CardId,
@@ -62,7 +62,7 @@ pub enum ActionWhat {
         #[serde(default)]
         repo: String,
         /// A colleague's PR's destination, which it merges into: one moved since its review is
-        /// checked for the files the PR touches. None for a Factory card, merged into the base.
+        /// checked for the files the PR touches. None for a Mork card, merged into the base.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         dest: Option<String>,
     },
@@ -269,7 +269,7 @@ impl ActionWhat {
     }
 
     /// Whether it calls Bitbucket: held while its token is refused.
-    pub fn bitbucket(&self) -> bool {
+    pub fn forge(&self) -> bool {
         matches!(
             self,
             Self::Push { .. }

@@ -2,10 +2,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_core::state::State;
-use factory_core::views::burn::{self, Row, WEEK_MS};
-use factory_types::CardId;
-use factory_types::usage::RecentBurn;
+use mork_core::state::State;
+use mork_core::views::burn::{self, Row, WEEK_MS};
+use mork_types::CardId;
+use mork_types::usage::RecentBurn;
 
 use crate::claude_accounts::Accounts;
 use crate::store::{JournalRow, Store};
@@ -56,7 +56,7 @@ fn resolve_parents(state: &State, store: &Store, cards: &BTreeSet<String>) -> BT
     for id in cards {
         match state.cards.get(&CardId::new(id.as_str())) {
             Some(c) => {
-                if let Some(of) = factory_core::reviews::gate::subject_of(c) {
+                if let Some(of) = mork_core::reviews::gate::subject_of(c) {
                     parents.insert(id.clone(), of.as_str().to_owned());
                 }
             }

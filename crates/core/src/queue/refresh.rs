@@ -1,10 +1,10 @@
 //! A live card's clone keeps origin/<base> on its project's newest base tip (fac-333): a refresh,
 //! no join, so its base tip, joins, messages and stage stay as they are.
 
-use factory_types::card::{Card, Mode, Refresh};
-use factory_types::state::Settlement;
-use factory_types::work::Purpose;
-use factory_types::{CardId, Sha};
+use mork_types::card::{Card, Mode, Refresh};
+use mork_types::state::Settlement;
+use mork_types::work::Purpose;
+use mork_types::{CardId, Sha};
 use serde_json::json;
 
 use crate::decide::{Intent, JobEnd};
@@ -103,7 +103,7 @@ fn holds(c: &Card, tip: &Sha) -> bool {
 // A clone or install of the card asked for (this decision's too), owed or running, the job ending aside.
 fn cloning(p: &Poster<'_>, id: &CardId) -> bool {
     let of = |w: &Purpose| matches!(w, Purpose::Clone { card, .. } | Purpose::Install { card, .. } if card == id);
-    let running = |j: &factory_types::state::Job| {
+    let running = |j: &mork_types::state::Job| {
         p.ending.as_ref() != Some(&j.id) && j.settled.is_none() && j.purpose.as_ref().is_some_and(of)
     };
     p.intents.iter().any(|i| matches!(i, Intent::StartJob { purpose } if of(purpose)))

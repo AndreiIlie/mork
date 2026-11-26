@@ -9,9 +9,9 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 
 use serde::Deserialize;
 
-use factory_core::state::Change;
-use factory_types::card::{Card, Mode};
-use factory_types::{CardId, JobId, ProjectId};
+use mork_core::state::Change;
+use mork_types::card::{Card, Mode};
+use mork_types::{CardId, JobId, ProjectId};
 
 use super::{Engine, Phase, upkeep};
 use crate::jobs::{context, waker};
@@ -89,7 +89,7 @@ impl Engine {
             .iter()
             .filter_map(|c| match c {
                 Change::AddOrchestratorEvent(e) => {
-                    Some((e.project.clone(), factory_core::messages::wakes::line(&self.state, &e.what)?))
+                    Some((e.project.clone(), mork_core::messages::wakes::line(&self.state, &e.what)?))
                 }
                 _ => None,
             })
@@ -106,9 +106,11 @@ impl Engine {
         }
     }
 
-    // A finished reload's announcement, as main says it, wakes the factory's own orchestrator alone (fac-386).
+    // A finished reload's announcement, as main says it, wakes Mork's own orchestrator alone (fac-386).
     pub(super) fn wakes_reloaded(&mut self, text: String) {
-        self.wake_queue(self.ctx.config.factory.project.clone(), text);
+        if let Some(project) = self.ctx.config.mork.project.clone() {
+            self.wake_queue(project, text);
+        }
     }
 
     fn wake_queue(&mut self, project: ProjectId, line: String) {
@@ -129,17 +131,17 @@ impl Engine {
         // One kept across a reload may not have loaded (fac-336): read before it is judged.
         let unloaded = &self.state.unloaded.cards;
         let cards = self.wakes.ending.iter().filter(|c| unloaded.contains(*c)).cloned().collect();
-        self.load(&factory_core::state::unloaded::Wanted { cards, ..Default::default() });
+        self.load(&mork_core::state::unloaded::Wanted { cards, ..Default::default() });
         let ending = std::mem::take(&mut self.wakes.ending);
         let before = ending.clone();
         for id in ending {
             let Some(card) = self.state.cards.get(&id).filter(|c| !c.stage.is_live()) else { continue };
-            if !factory_core::messages::wakes::settled(&self.state, card) {
+            if !mork_core::messages::wakes::settled(&self.state, card) {
                 self.wakes.ending.push(id);
                 continue;
             }
-            let factory = &self.ctx.config.factory.project;
-            let line = factory_core::messages::wakes::ended(&self.state, card, factory);
+            let mork = self.ctx.config.mork.project.as_ref();
+            let line = mork_core::messages::wakes::ended(&self.state, card, mork);
             let project = card.project.clone();
             self.wake_queue(project, line);
         }
@@ -200,7 +202,7 @@ impl Engine {
         let Some(queue) = self.wakes.queues.get_mut(project) else { return };
         let lines: Vec<String> = queue.drain(..PER_RUN.min(queue.len())).collect();
         self.wakes_keep();
-        let id = factory_core::state::names::job_id(now, &factory_types::AgentKey::new(waker::OWNER), random::salt());
+        let id = mork_core::state::names::job_id(now, &mork_types::AgentKey::new(waker::OWNER), random::salt());
         let spec = match waker::spec(&self.ctx, &id, now) {
             Ok(spec) => spec,
             Err(e) => {

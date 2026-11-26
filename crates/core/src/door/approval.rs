@@ -1,11 +1,11 @@
-//! Andrei's once/no on an outside door call (fac-1, fac-124): approval binds to the exact plan and is
+//! The operator's once/no on an outside door call (fac-1, fac-124): approval binds to the exact plan and is
 //! consumed by the dispatch it starts; a call is never run again, and one that never ran is never done.
 
-use factory_types::AskId;
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::ask::{AskKind, Color};
-use factory_types::door_call::{Approval, DoorCall, Phase, Verdict};
-use factory_types::state::Sender;
+use mork_types::AskId;
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::ask::{AskKind, Color};
+use mork_types::door_call::{Approval, DoorCall, Phase, Verdict};
+use mork_types::state::Sender;
 use serde_json::{Value, json};
 
 use super::parts;
@@ -32,7 +32,7 @@ pub(super) fn raise(p: &mut Poster<'_>, a: &Action, call: &DoorCall, validator: 
     );
     r.agent = match &call.from {
         Sender::Agent(k) => Some(k.clone()),
-        Sender::Andrei | Sender::Engine | Sender::Orchestrator(_) | Sender::Pa => None,
+        Sender::Operator | Sender::Engine | Sender::Orchestrator(_) | Sender::Pa => None,
     };
     r.action = Some(a.id.clone());
     let id = asks::raise(p, r);
@@ -52,7 +52,7 @@ fn open_ask(state: &State, ask: &str) -> Result<Action, Decision> {
         .ok_or_else(|| Decision::refused(format!("`{ask}` waits for nothing")))
 }
 
-/// `door.once`: Andrei's approval of this call, bound to its plan, for one dispatch.
+/// `door.once`: the operator's approval of this call, bound to its plan, for one dispatch.
 pub fn once(state: &State, ask: &str, ctx: Ctx<'_>) -> Decision {
     let mut a = match open_ask(state, ask) {
         Ok(a) => a,
@@ -85,7 +85,7 @@ pub fn no(state: &State, ask: &str, ctx: Ctx<'_>) -> Decision {
     let mut p = Poster::for_ctx(state, ctx);
     asks::close_one(&mut p, ask);
     let id = a.id.clone();
-    refuse(&mut p, a, "Andrei said no");
+    refuse(&mut p, a, "The operator said no");
     p.journal("door.no", None, json!({"id": id, "ask": ask}));
     let mut dec = Decision::ok(json!({"door.no": {"ask": ask, "action": id}}));
     p.finish(&mut dec);
@@ -126,7 +126,7 @@ pub fn start_guard(a: &mut Action, prepared: Option<&Value>, now: i64) -> Result
                 ap.consumed_ms = Some(now);
                 Ok(())
             }
-            Some(_) => Err("Andrei's once was used already: it runs once".into()),
+            Some(_) => Err("The operator's once was used already: it runs once".into()),
             None => Err("it has no approval".into()),
         },
         Phase::Cleared | Phase::Checking | Phase::Asked | Phase::Refused => Err("it isn't cleared to run".into()),
@@ -134,7 +134,7 @@ pub fn start_guard(a: &mut Action, prepared: Option<&Value>, now: i64) -> Result
 }
 
 /// A started call found not dispatched after a crash, on the dispatcher's or the engine's
-/// durable word: Andrei's once wasn't used, and serves the one dispatch still to come.
+/// durable word: the operator's once wasn't used, and serves the one dispatch still to come.
 pub fn not_dispatched(a: &mut Action) {
     if let Some(ap) = a.door.as_mut().and_then(|d| d.approval.as_mut()) {
         ap.consumed_ms = None;
@@ -147,7 +147,7 @@ pub fn refusal(a: &Action, how: &str) -> Option<String> {
     let never_ran = d.phase == Phase::Asked;
     match how {
         "retry" => Some(format!(
-            "{} is a door call: it is never run again; its requester asks again, or Andrei answers its ask",
+            "{} is a door call: it is never run again; its requester asks again, or the operator answers its ask",
             a.id
         )),
         "done" if never_ran => Some(format!("{} never ran: answer its ask with door.once or door.no", a.id)),

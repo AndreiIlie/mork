@@ -120,13 +120,13 @@ fn put_description(lines: &mut Vec<String>, description: &str, written: &[Writte
     if n.unknown.is_some() && under.iter().any(|l| !l.trim().is_empty()) {
         return Err(BoardError::Field(
             "description",
-            "can't be replaced: no record of the factory's says where the note on top of it ends; add what changed as a note instead (`card.change --note`, or `--decision` for Andrei's)",
+            "can't be replaced: no record of Mork's says where the note on top of it ends; add what changed as a note instead (`card.change --note`, or `--decision` for the operator's)",
         ));
     }
     if under.iter().any(|l| notes::is_note(l)) {
         return Err(BoardError::Field(
             "description",
-            "can't be replaced: it holds a dated note a replacement would delete; add what changed as a note instead (`card.change --note`, or `--decision` for Andrei's)",
+            "can't be replaced: it holds a dated note a replacement would delete; add what changed as a note instead (`card.change --note`, or `--decision` for the operator's)",
         ));
     }
     let new = description.trim().lines().map(str::to_owned).collect::<Vec<_>>();

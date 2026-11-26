@@ -3,10 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::card::Plan;
-use factory_types::view::{Doing, PlaceView};
 use iced::widget::{Column, container, row};
 use iced::{Element, Length};
+use mork_types::card::Plan;
+use mork_types::view::{Doing, PlaceView};
 
 use crate::app::{App, Message};
 use crate::icons::{self, Icon};

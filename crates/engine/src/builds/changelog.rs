@@ -1,25 +1,26 @@
-//! What a reload brought (fac-75): the commits between the two builds, read from the factory's
+//! What a reload brought (fac-75): the commits between the two builds, read from Mork's
 //! repo, for the reload's line in main.
 
 use std::path::Path;
 use std::time::Duration;
 
-use factory_core::maintenance::changelog::Commit;
+use mork_core::maintenance::changelog::Commit;
 
 use super::BuildError;
 use crate::git;
 use crate::paths::Home;
 
 /// The commits `to` has and `from` hasn't, oldest first, and when the earliest of them was committed
-/// (epoch ms): from the factory's mirror when it holds both, else Andrei's checkout.
+/// (epoch ms): from Mork's mirror when it holds both, else the operator's checkout.
 pub fn range(
     home: &Home,
-    config: &factory_types::config::Config,
+    config: &mork_types::config::Config,
     from: &str,
     to: &str,
 ) -> Result<(Vec<Commit>, Option<i64>), BuildError> {
-    let (checkout, _) = super::factory_repo(config)?;
-    let mirror = home.mirrors().join(config.factory.project.as_str());
+    let id = config.mork.project.as_ref().ok_or(BuildError::NoSelfBuild)?;
+    let (checkout, _) = super::mork_repo(config)?;
+    let mirror = home.mirrors().join(id.as_str());
     let holds = |repo: &Path| [from, to].iter().all(|c| git::resolve(home, repo, c).is_ok());
     let repo = if mirror.join("HEAD").exists() && holds(&mirror) { mirror } else { checkout };
     let span = format!("{from}..{to}");

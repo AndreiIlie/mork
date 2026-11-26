@@ -1,5 +1,5 @@
-//! `factory wall-exec [--partial] <ports> -- <argv>` (1.4.11.3): sets no-new-privileges and a Landlock domain,
-//! then execs the job; `--any-port` for the ports leaves TCP unrestricted (fac-93).
+//! `mork wall-exec` (1.4.11.3) applies no-new-privileges, Landlock and seccomp before exec.
+//! `--any-port` leaves TCP unrestricted (fac-93).
 
 use std::os::unix::process::CommandExt;
 use std::process::Command;
@@ -9,12 +9,12 @@ use crate::faults;
 /// The lowest Landlock ABI a full wall needs: abstract-socket and signal scoping.
 pub const MIN_ABI: i64 = 6;
 
-/// The kernel's Landlock ABI, or the test override (`FACTORY_TEST_LANDLOCK_ABI`, 1.10.6).
+/// The kernel's Landlock ABI, or the test override (`MORK_TEST_LANDLOCK_ABI`, 1.10.6).
 pub fn landlock_abi() -> i64 {
-    if let Some(v) = faults::test_env("FACTORY_TEST_LANDLOCK_ABI").and_then(|v| v.parse().ok()) {
+    if let Some(v) = faults::test_env("MORK_TEST_LANDLOCK_ABI").and_then(|v| v.parse().ok()) {
         return v;
     }
-    factory_sys::landlock_abi().0
+    mork_sys::landlock_abi().0
 }
 
 /// Why `wall-exec` didn't exec the job.
@@ -34,6 +34,8 @@ pub enum WallExecError {
     AbiTooLow(i64),
     /// The Landlock domain couldn't be set.
     Landlock(std::io::Error),
+    /// The syscall filter could not be installed.
+    Seccomp(std::io::Error),
     /// The exec itself failed.
     Exec { program: String, err: std::io::Error },
 }
@@ -50,6 +52,7 @@ impl std::fmt::Display for WallExecError {
                 write!(f, "wall-exec: Landlock ABI {abi} is below {MIN_ABI}; refusing to run unwalled")
             }
             Self::Landlock(e) => write!(f, "wall-exec: Landlock failed: {e}"),
+            Self::Seccomp(e) => write!(f, "wall-exec: seccomp failed: {e}"),
             Self::Exec { program, err } => write!(f, "wall-exec: {program}: {err}"),
         }
     }
@@ -96,7 +99,7 @@ pub fn run(args: &[String]) -> WallExecError {
     if a.partial && !faults::TEST_SETTINGS {
         return WallExecError::PartialRefused;
     }
-    if let Err(e) = factory_sys::set_no_new_privs() {
+    if let Err(e) = mork_sys::set_no_new_privs() {
         return WallExecError::NoNewPrivs(e);
     }
     let abi = landlock_abi();
@@ -104,12 +107,15 @@ pub fn run(args: &[String]) -> WallExecError {
         return WallExecError::AbiTooLow(abi);
     }
     let restriction =
-        factory_sys::Restriction { tcp_connect: a.ports.clone().filter(|_| abi >= 4), scope: abi >= MIN_ABI };
-    if let Err(e) = factory_sys::restrict_self(&restriction) {
+        mork_sys::Restriction { tcp_connect: a.ports.clone().filter(|_| abi >= 4), scope: abi >= MIN_ABI };
+    if let Err(e) = mork_sys::restrict_self(&restriction) {
         return WallExecError::Landlock(e);
     }
+    if let Err(e) = mork_sys::install_wall_filter() {
+        return WallExecError::Seccomp(e);
+    }
     let Some((program, rest)) = a.argv.split_first() else { return WallExecError::NoCommand };
-    // bwrap's `--chdir` sets `PWD`; the wall's environment is only what the factory sets
+    // bwrap's `--chdir` sets `PWD`; the wall's environment is only what Mork sets
     // (1.4.11.4).
     let err = Command::new(program).args(rest).env_remove("PWD").exec();
     WallExecError::Exec { program: program.clone(), err }

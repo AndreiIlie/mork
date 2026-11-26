@@ -81,7 +81,7 @@ export function plural(n: number, one: string, many: string): string {
 }
 
 export function authorName(from: Author): string {
-  if (from.is === "andrei") return "Andrei";
+  if (from.is === "operator") return "Operator";
   if (from.is === "engine") return "engine";
   if (from.is === "orchestrator") return `orchestrator:${from.project}`;
   if (from.is === "pa") return "pa";

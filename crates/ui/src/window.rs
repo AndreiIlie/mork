@@ -9,7 +9,7 @@ use crate::spans::{self, Tone};
 use crate::widgets::{self, boxed_button, clickable, words_button};
 use crate::{fonts, place, rooms, side, theme, wrappers};
 
-/// The target size: a maximized window on Andrei's 1080p monitor (5).
+/// The target size: a maximized window on the operator's 1080p monitor (5).
 pub const TARGET: (f32, f32) = (1853.0, 1048.0);
 /// The rooms panel's width, and the side column's, the dividers beside them left out (5.4).
 pub const ROOMS_W: f32 = 284.0;
@@ -43,7 +43,7 @@ pub fn settings_at(position: Option<(i32, i32)>) -> iced::window::Settings {
         exit_on_close_request: false,
         // The desktop file's name, so the dock shows the launcher's icon on the window.
         platform_specific: iced::window::settings::PlatformSpecific {
-            application_id: "factory".to_owned(),
+            application_id: "mork".to_owned(),
             ..Default::default()
         },
         ..iced::window::Settings::default()

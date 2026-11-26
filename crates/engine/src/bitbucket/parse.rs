@@ -1,8 +1,6 @@
-//! Bitbucket's answers (F-B1–F-B12): one parser (1.12.3).
-
-use factory_types::Sha;
-use factory_types::review::{Thread, ThreadReply, ThreadResolution};
-use factory_types::work::OpenPr;
+use mork_types::Sha;
+use mork_types::review::{Thread, ThreadReply, ThreadResolution};
+use mork_types::work::OpenPr;
 use serde_json::Value;
 
 fn updates(activity: &Value) -> Vec<(&str, &str)> {
@@ -66,6 +64,7 @@ pub fn open_pr(p: &Value, me: Option<&str>) -> Option<OpenPr> {
     let text = |at: &str| p.pointer(at).and_then(Value::as_str).unwrap_or("").to_owned();
     let author = p.get("author")?;
     Some(OpenPr {
+        review_requested: false,
         pr: p.get("id")?.as_u64()?,
         author: author
             .get("nickname")

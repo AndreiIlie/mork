@@ -34,7 +34,7 @@ pub fn materialize_into(root: &Path, extra: Option<&Path>) -> io::Result<Option<
 // Reads regular files under a configured skills root without following any symlink; a missing root
 // adds nothing, while any other root error or built-in/.claude-plugin collision fails startup.
 fn read_extra(root: &Path) -> io::Result<Vec<(String, Vec<u8>)>> {
-    let dir = match factory_sys::open_no_symlinks(root) {
+    let dir = match mork_sys::open_no_symlinks(root) {
         Ok(f) => f,
         Err(e) if e.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
         Err(e) => return Err(e),
@@ -57,7 +57,7 @@ fn walk_dir(
     folders: &mut Vec<(std::fs::File, PathBuf)>,
     out: &mut Vec<(String, Vec<u8>)>,
 ) -> io::Result<()> {
-    for entry in factory_sys::read_dir_of(cur)? {
+    for entry in mork_sys::read_dir_of(cur)? {
         let entry = entry?;
         let name = entry.file_name();
         let next = rel.join(&name);
@@ -69,9 +69,9 @@ fn walk_dir(
             return Err(io::Error::other("configured skill path `.claude-plugin` is reserved"));
         }
         if kind.is_dir() {
-            match factory_sys::open_dir_beneath(cur, Path::new(&name)) {
+            match mork_sys::open_dir_beneath(cur, Path::new(&name)) {
                 Ok(sub) => folders.push((sub, next)),
-                Err(e) if factory_sys::not_followed(&e) || e.kind() == ErrorKind::NotFound => {}
+                Err(e) if mork_sys::not_followed(&e) || e.kind() == ErrorKind::NotFound => {}
                 Err(e) => return Err(e),
             }
         } else {
@@ -86,9 +86,9 @@ fn read_file(root: &Path, rel: &Path, out: &mut Vec<(String, Vec<u8>)>) -> io::R
     if FILES.iter().any(|(built_in, _)| *built_in == key) {
         return Err(io::Error::other(format!("configured skill path `{key}` collides with a built-in skill")));
     }
-    let mut file = match factory_sys::open_beneath_no_symlinks(root, rel) {
+    let mut file = match mork_sys::open_beneath_no_symlinks(root, rel) {
         Ok(f) => f,
-        Err(e) if factory_sys::not_followed(&e) || e.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(e) if mork_sys::not_followed(&e) || e.kind() == ErrorKind::NotFound => return Ok(()),
         Err(e) => return Err(e),
     };
     if !file.metadata()?.is_file() {
@@ -126,7 +126,7 @@ pub fn write_out(root: &Path, files: &[(&str, &[u8])]) -> io::Result<Option<Path
             std::fs::create_dir_all(parent)?;
         }
         std::fs::write(&path, bytes)?;
-        factory_sys::chmod(&path, 0o444)?;
+        mork_sys::chmod(&path, 0o444)?;
     }
     std::fs::rename(&tmp, &dir)?;
     Ok(Some(dir))

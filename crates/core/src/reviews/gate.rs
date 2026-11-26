@@ -3,13 +3,13 @@
 
 use std::collections::BTreeSet;
 
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::config::ReviewKind;
-use factory_types::reply::Role;
-use factory_types::review::{Contents, Review, Round, Verdict};
-use factory_types::work::{Cloned, Purpose};
-use factory_types::{CardId, Sha};
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::config::ReviewKind;
+use mork_types::reply::Role;
+use mork_types::review::{Contents, Review, Round, Verdict};
+use mork_types::work::{Cloned, Purpose};
+use mork_types::{CardId, Sha};
 use serde_json::json;
 
 use crate::decide::{Ctx, Intent};
@@ -39,7 +39,7 @@ pub fn reviewed(c: &Card) -> bool {
     entry(c) || gated(c)
 }
 
-/// The Factory card a branch card reviews; none for an entry.
+/// The Mork card a branch card reviews; none for an entry.
 pub fn subject_of(c: &Card) -> Option<&CardId> {
     c.review.as_ref().and_then(|r| r.of.as_ref()).filter(|_| c.mode == Mode::Review)
 }
@@ -111,7 +111,7 @@ pub fn paths(state: &State, subject: &Card) -> BTreeSet<String> {
     subject.contents.keys().cloned().chain(approved.unwrap_or_default()).collect()
 }
 
-/// The live review card at `id` that isn't `subject`'s: Andrei's review of its branch, which its
+/// The live review card at `id` that isn't `subject`'s: the operator's review of its branch, which its
 /// gate waits for and never replaces (fac-111).
 pub fn taken(p: &Poster<'_>, id: &CardId, subject: &CardId) -> Option<CardId> {
     p.card(id).filter(|c| c.stage.is_live() && subject_of(c) != Some(subject)).map(|c| c.id)
@@ -181,7 +181,14 @@ fn new_pr_head(subject: &Card, review: &Review) -> bool {
     entry(subject) && !same.is_some_and(|(a, b)| a == b)
 }
 
-fn wanted(subject: &Card, review: &Review, commit: &Sha, base: &Sha, contents: &Contents) -> Round {
+fn wanted(
+    subject: &Card,
+    review: &Review,
+    commit: &Sha,
+    base: &Sha,
+    contents: &Contents,
+    test_changes: Vec<String>,
+) -> Round {
     let (carried, files) = match changes(subject) {
         Some(changes) => {
             let carried = contents.iter().filter(|(f, _)| !changes.contains_key(*f));
@@ -195,6 +202,7 @@ fn wanted(subject: &Card, review: &Review, commit: &Sha, base: &Sha, contents: &
     let head = subject.head.clone().filter(|_| entry(subject));
     Round {
         n: 0,
+        test_changes,
         head,
         commit: commit.clone(),
         base: base.clone(),
@@ -211,14 +219,22 @@ fn wanted(subject: &Card, review: &Review, commit: &Sha, base: &Sha, contents: &
 
 /// Requests a round for unapproved content or open findings, immediately or after the current one.
 /// Fix rounds carry unchanged files and return findings to their raisers (fac-111).
-pub fn ask(p: &mut Poster<'_>, subject: &Card, commit: &Sha, base: &Sha, contents: &Contents, ctx: Ctx<'_>) {
+pub fn ask(
+    p: &mut Poster<'_>,
+    subject: &Card,
+    commit: &Sha,
+    base: &Sha,
+    contents: &Contents,
+    test_changes: Vec<String>,
+    ctx: Ctx<'_>,
+) {
     if !gated(subject) && !entry(subject) {
         return;
     }
     let found = card_for(p, subject).or_else(|| adopt(p, subject, base, ctx));
     let Some(mut rc) = found.or_else(|| new_card(p, subject, base, ctx)) else { return };
     let mut review = rc.review.take().map(|r| *r).unwrap_or_default();
-    let wanted = wanted(subject, &review, commit, base, contents);
+    let wanted = wanted(subject, &review, commit, base, contents, test_changes);
     let reviews =
         |r: &Round| r.head == wanted.head && wanted.contents().iter().all(|(f, c)| r.contents().get(f) == Some(c));
     let clone = match review.open().cloned() {
@@ -338,7 +354,7 @@ fn owner_of<'a>(state: &'a State, rc: &Card) -> Option<&'a Card> {
 }
 
 /// A card's agents, its foreman and its reviewers.
-pub fn agents_of(p: &Poster<'_>, id: &CardId) -> Vec<factory_types::AgentKey> {
+pub fn agents_of(p: &Poster<'_>, id: &CardId) -> Vec<mork_types::AgentKey> {
     p.state.agents.keys().filter(|k| k.as_str().split('/').next() == Some(id.as_str())).cloned().collect()
 }
 

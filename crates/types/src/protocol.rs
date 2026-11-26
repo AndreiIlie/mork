@@ -65,7 +65,7 @@ pub enum Answer {
 pub struct Request {
     pub id: u64,
     pub cmd: serde_json::Value,
-    /// Who the command is sent as: `orchestrator:<project>` on Andrei's socket alone (fac-244); none, the socket's.
+    /// Who the command is sent as: `orchestrator:<project>` on the operator's socket alone (fac-244); none, the socket's.
     #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
     pub sent_as: Option<String>,
 }

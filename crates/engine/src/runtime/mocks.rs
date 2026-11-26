@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use factory_core::lifecycle::mock::{FOLDER, HOST, LOG};
-use factory_types::{AgentKey, CardId};
+use mork_core::lifecycle::mock::{FOLDER, HOST, LOG};
+use mork_types::{AgentKey, CardId};
 
 use super::Engine;
 use crate::jobs::door_ssh::quoted;
@@ -25,7 +25,7 @@ impl Engine {
     /// Ends the hosts of cards whose step is over, marks down those that exited, makes the wanted
     /// cards' mock folders and, with a Vite host set, starts their hosts.
     pub(super) fn mocks_tick(&mut self) {
-        let wanted: BTreeMap<CardId, u16> = factory_core::lifecycle::mock::wanted(&self.state).into_iter().collect();
+        let wanted: BTreeMap<CardId, u16> = mork_core::lifecycle::mock::wanted(&self.state).into_iter().collect();
         self.mocks.running.retain(|id, _| wanted.contains_key(id));
         self.mocks.down.retain(|id| wanted.contains_key(id));
         self.mocks.made.retain(|id| wanted.contains_key(id));
@@ -58,7 +58,7 @@ impl Engine {
         self.mocks.running.clear();
     }
 
-    // Its mock folder made, once; then its host, where the factory has a Vite host set.
+    // Its mock folder made, once; then its host, where Mork has a Vite host set.
     fn mock_start(&mut self, id: &CardId, port: u16) -> Result<Option<Worker>, String> {
         let clone = self.clone_dir(id.as_str());
         // A link in its place could take what the engine makes elsewhere (R9).
@@ -66,10 +66,10 @@ impl Engine {
             return Err(format!("{id} has no clone: its `.git` isn't a folder"));
         }
         if !self.mocks.made.contains(id) {
-            factory_sys::mkdir_beneath(&clone, Path::new(FOLDER)).map_err(|e| format!("`{FOLDER}`: {e}"))?;
+            mork_sys::mkdir_beneath(&clone, Path::new(FOLDER)).map_err(|e| format!("`{FOLDER}`: {e}"))?;
             self.mocks.made.insert(id.clone());
         }
-        let Some(vite) = self.ctx.config.factory.vite.clone() else { return Ok(None) };
+        let Some(vite) = self.ctx.config.mork.vite.clone() else { return Ok(None) };
         self.mock_spawn(id, &clone, &vite, port).map(Some)
     }
 
@@ -79,16 +79,16 @@ impl Engine {
         let config = host_config(clone, vite)?;
         let owner = AgentKey::new(format!("{id}/mock"));
         let now = clock::now_ms();
-        let job = factory_core::state::names::job_id(now, &owner, random::salt());
+        let job = mork_core::state::names::job_id(now, &owner, random::salt());
         let toolchains = self.ctx.project_toolchains(Some(c.project.as_str()));
         let mut env = self.ctx.env(&job, &owner, None, &toolchains, &self.opts.home.job(job.as_str()).join("io"));
         // No turn's: the agents' socket knows no job of it.
-        for k in ["FACTORY_JOB", "FACTORY_AGENT", "FACTORY_AGENT_SOCK"] {
+        for k in ["MORK_JOB", "MORK_AGENT", "MORK_AGENT_SOCK"] {
             env.remove(k);
         }
-        env.insert("FACTORY_CARD".into(), id.as_str().to_owned());
-        env.insert("FACTORY_PROJECT".into(), c.project.to_string());
-        env.insert("FACTORY_PORT".into(), port.to_string());
+        env.insert("MORK_CARD".into(), id.as_str().to_owned());
+        env.insert("MORK_PROJECT".into(), c.project.to_string());
+        env.insert("MORK_PORT".into(), port.to_string());
         env.insert("NODE_PATH".into(), format!("{vite}/node_modules"));
         let places = self.ctx.places(
             &clone.join(HOST),
@@ -106,14 +106,14 @@ impl Engine {
             quoted(&config),
         );
         let argv = vec!["sh".into(), "-c".into(), command.clone()];
-        let spec = self.ctx.spec(&job, factory_types::job::JobKind::Check, &owner, argv, &cwd, &places, env, None, now);
+        let spec = self.ctx.spec(&job, mork_types::job::JobKind::Check, &owner, argv, &cwd, &places, env, None, now);
         worker::start(self.opts.home.root(), &spec, "mock", LOG, &command).map_err(|e| e.to_string())
     }
 }
 
 // Vite's own denials but its `.git` one, which would refuse the mock, then all of `.git` but the
-// mock's folder; picomatch's `!(factory-mock)` passes any name it begins, hence the last two.
-const DENY: &str = r#"[".env", ".env.*", "*.{crt,pem}", "**/.git/!(factory-mock)", "**/.git/!(factory-mock)/**", "**/.git/factory-mock?*", "**/.git/factory-mock?*/**"]"#;
+// mock's folder; picomatch's `!(mork-mock)` passes any name it begins, hence the last two.
+const DENY: &str = r#"[".env", ".env.*", "*.{crt,pem}", "**/.git/!(mork-mock)", "**/.git/!(mork-mock)/**", "**/.git/mork-mock?*", "**/.git/mork-mock?*/**"]"#;
 
 // Vite's watcher ignores `.git`: each mock folder is watched apart, afresh when made again, and relayed to Vite,
 // which reads a PostCSS config once and never recompiles CSS for a new file: the relay restarts or restyles.
@@ -127,7 +127,7 @@ const own = () => ["js", "cjs", "mjs", "ts", "cts", "mts"].some((x) => existsSyn
 const tailwind = () => {
   try { return { plugins: [createRequire(join(web, "package.json"))("@tailwindcss/postcss")({ base: web })] }; } catch {}
 };
-const relay = { name: "factory-mock-watch", configureServer(server) {
+const relay = { name: "mork-mock-watch", configureServer(server) {
   const watched = new Map();
   let timer, styled;
   const restart = (file) => {
@@ -203,7 +203,7 @@ export default () => {
 // The host's Vite configuration, written beside the mock, never through a link: its cache out of
 // the mock's folder, the clone and the Vite folder all it serves files from, `.git` but the mock denied.
 fn host_config(clone: &Path, vite: &str) -> Result<String, String> {
-    factory_sys::mkdir_beneath(clone, Path::new(HOST)).map_err(|e| format!("`{HOST}`: {e}"))?;
+    mork_sys::mkdir_beneath(clone, Path::new(HOST)).map_err(|e| format!("`{HOST}`: {e}"))?;
     let path = |p: &Path| serde_json::Value::from(p.display().to_string()).to_string();
     let text = CONFIG
         .replace("@MOCK@", &path(&clone.join(FOLDER)))
@@ -213,6 +213,6 @@ fn host_config(clone: &Path, vite: &str) -> Result<String, String> {
         .replace("@VITE@", &path(Path::new(vite)))
         .replace("@DENY@", DENY);
     let file = Path::new(HOST).join("vite.config.mjs");
-    factory_sys::write_beneath(clone, &file, text.as_bytes()).map_err(|e| format!("`{}`: {e}", file.display()))?;
+    mork_sys::write_beneath(clone, &file, text.as_bytes()).map_err(|e| format!("`{}`: {e}", file.display()))?;
     Ok(clone.join(file).display().to_string())
 }

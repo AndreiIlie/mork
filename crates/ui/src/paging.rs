@@ -1,8 +1,8 @@
 //! Pages of a conversation (fac-42): a message's place in its history never changes, so
 //! `earlier` counts tell whether two runs of messages meet.
 
-use factory_types::view::{HistoryPage, MessageView, PlaceView};
-use factory_types::{Command, PlaceId};
+use mork_types::view::{HistoryPage, MessageView, PlaceView};
+use mork_types::{Command, PlaceId};
 
 use crate::app::{App, Effect, PAGE};
 

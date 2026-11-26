@@ -3,12 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::door::{
-    FILE_GET_MAX, FileCat, FileGet, FileTail, LibraGet, MiscRun, MongoFind, Op, ShRun, SqlSelect,
-};
-use factory_types::door_call::Verdict;
-use factory_types::door_config::{ArgType, Limits, Target, TargetsFile, Transport};
-use factory_types::door_plan::{Bounds, Envelope, Plan, Route};
+use mork_types::door::{FILE_GET_MAX, FileCat, FileGet, FileTail, LibraGet, MiscRun, MongoFind, Op, ShRun, SqlSelect};
+use mork_types::door_call::Verdict;
+use mork_types::door_config::{ArgType, Limits, Target, TargetsFile, Transport};
+use mork_types::door_plan::{Bounds, Envelope, Plan, Route};
 use serde_json::Value;
 
 /// A request resolved: what would run, and the allowlist's verdict on it.
@@ -24,8 +22,7 @@ const OUTSIDE: &str = "outside";
 
 /// Resolves `op` on `target`, or says why no adapter may run it (`not allowed`).
 pub fn resolve(file: &TargetsFile, target: &str, op: &Op) -> Result<Resolved, String> {
-    let t =
-        file.targets.get(target).ok_or_else(|| format!("no target `{target}`: factory ctl door.help lists them"))?;
+    let t = file.targets.get(target).ok_or_else(|| format!("no target `{target}`: mork ctl door.help lists them"))?;
     let limits = file.defaults.lowered(t.limits);
     let (plan, verdict, items) = match op {
         Op::SqlSelect(p) => sql(t, target, p, file.defaults)?,
@@ -250,9 +247,10 @@ fn relative(path: &str) -> Result<(), String> {
 }
 
 fn sh(t: &Target, target: &str, p: &ShRun) -> Result<Step, String> {
-    let c =
-        t.sh.get(&p.command)
-            .ok_or_else(|| format!("no command `{}` on `{target}`: misc.run asks Andrei for any other", p.command))?;
+    let c = t
+        .sh
+        .get(&p.command)
+        .ok_or_else(|| format!("no command `{}` on `{target}`: misc.run asks the operator for any other", p.command))?;
     if let Some(k) = p.args.keys().find(|k| !c.args.contains_key(*k)) {
         return Err(format!("`{}` takes no argument `{k}`", p.command));
     }
@@ -272,7 +270,7 @@ fn misc(p: &MiscRun) -> Result<Step, String> {
     if p.argv.iter().any(|a| a.len() > 4096 || a.contains('\0')) {
         return Err("an argument is over 4096 bytes, or holds a NUL".into());
     }
-    let verdict = Verdict::new(OUTSIDE, "the misc door always asks Andrei");
+    let verdict = Verdict::new(OUTSIDE, "the misc door always asks the operator");
     Ok((Plan::Run { argv: p.argv.clone() }, verdict, 0))
 }
 

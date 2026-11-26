@@ -1,10 +1,10 @@
-// A card's mock outlives its clone (fac-591): kept in the factory's home between runs, the way a handoff is kept, and
+// A card's mock outlives its clone (fac-591): kept in Mork's home between runs, the way a handoff is kept, and
 // put into the next run's clone.
 
 use std::path::Path;
 
-use factory_core::lifecycle::mock::FOLDER;
-use factory_types::CardId;
+use mork_core::lifecycle::mock::FOLDER;
+use mork_types::CardId;
 
 use super::Engine;
 use super::handoff::{preserve_folder, put_back, recorded, unrecord};

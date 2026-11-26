@@ -1,13 +1,13 @@
 //! Heads and their gates (4.2.3, 4.6, 4.7, 4.10): a head taken after the foreman's turn, the checks on it, and
 //! the card ready, its verification starting once they pass (fac-652).
 
-use factory_types::Sha;
-use factory_types::action::ActionWhat;
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::reply::Role;
-use factory_types::work::{CheckRun, CloneStatus, Purpose, Taken};
-use factory_types::{CardId, JobId};
+use mork_types::Sha;
+use mork_types::action::ActionWhat;
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::reply::Role;
+use mork_types::work::{CheckRun, CloneStatus, Purpose, Taken};
+use mork_types::{CardId, JobId};
 use serde_json::Value;
 
 use crate::decide::Ctx;
@@ -115,7 +115,7 @@ fn late(p: &mut Poster<'_>, card: Card) {
     p.journal("built.late", Some(id.as_str()), serde_json::json!({"head": card.head, "stage": card.stage}));
     p.put_card(card);
     let rerun = if pr.is_some() {
-        format!(" `factory ctl rereview {id}` runs its PR's failed run again on that head.")
+        format!(" `mork ctl rereview {id}` runs its PR's failed run again on that head.")
     } else {
         String::new()
     };
@@ -139,7 +139,7 @@ pub fn take_returned(p: &mut Poster<'_>, card: Card, head: &Sha, job: &JobId, t:
 }
 
 /// Whether a take is of the card's last bundle, the one whose head it keeps (fac-97).
-pub(crate) fn last_bundle(b: &factory_types::card::Bundled, job: &JobId, head: &Sha) -> bool {
+pub(crate) fn last_bundle(b: &mork_types::card::Bundled, job: &JobId, head: &Sha) -> bool {
     b.job.as_ref() == Some(job) && b.head.as_ref() == Some(head)
 }
 
@@ -152,11 +152,11 @@ fn bundle_owed(p: &Poster<'_>, id: &CardId) -> bool {
 }
 
 /// A job recorded: a bundle of a card's is its run's latest, whose end alone takes a head (fac-97).
-pub fn bundle_recorded(state: &crate::state::State, job: &factory_types::state::Job, d: &mut crate::decide::Decision) {
+pub fn bundle_recorded(state: &crate::state::State, job: &mork_types::state::Job, d: &mut crate::decide::Decision) {
     // A refresh reads no head (fac-333).
     let Some(Purpose::Bundle { card, refresh: None, .. }) = &job.purpose else { return };
     let Some(mut c) = state.cards.get(card).cloned() else { return };
-    c.bundled = Some(factory_types::card::Bundled { job: Some(job.id.clone()), head: None });
+    c.bundled = Some(mork_types::card::Bundled { job: Some(job.id.clone()), head: None });
     d.changes.push(crate::state::Change::PutCard(Box::new(c)));
 }
 
@@ -201,7 +201,7 @@ fn taken(p: &mut Poster<'_>, mut card: Card, t: Taken, ctx: Ctx<'_>) {
         crate::reviews::end::moved(p, &card, &t.head);
         let built = card.gates.built_pending;
         let clean = card.gates.clean;
-        card.gates = factory_types::card::Gates { built_pending: built, clean, ..Default::default() };
+        card.gates = mork_types::card::Gates { built_pending: built, clean, ..Default::default() };
     }
     // A new head at `ready` goes through the gates again: what waited on the old one goes.
     if moved && card.stage == Stage::Ready {
@@ -262,7 +262,7 @@ pub(crate) fn verdict(run: &CheckRun) -> Result<usize, String> {
 }
 
 /// Why a checks run's exit and report can't be trusted (4.7.5), or its findings' count: the gate's,
-/// and `factory test --checks`'s (fac-165). `located` is each finding's place in the clone.
+/// and `mork test --checks`'s (fac-165). `located` is each finding's place in the clone.
 pub fn report_verdict(
     exit: Option<i32>,
     report: Option<&Value>,
@@ -285,19 +285,38 @@ pub fn report_verdict(
     }
 }
 
+/// A known secret stops this submission before project checks can print its line.
+pub(crate) fn secret_found(p: &mut Poster<'_>, mut card: Card, purpose: &Purpose, hit: &str, ctx: Ctx<'_>) {
+    let words = format!("Checks found {hit}. Remove the credential from the candidate's history.");
+    if let Purpose::Check { head, .. } = purpose {
+        if card.head.as_ref() == Some(head) && card.gates.checking.as_ref() == Some(head) {
+            card.gates.checking = None;
+            super::fixes::send_back(p, card, &words);
+        }
+    } else if !crate::queue::candidates::stale(p, &card, purpose) {
+        if crate::reviews::gate::entry(&card) {
+            crate::queue::members::hold(p, card, purpose.clone(), AskKind::Checks, &words);
+        } else {
+            crate::queue::members::leave(p, card, "checks found a secret", &words, ctx);
+        }
+    }
+}
+
 /// A checks run ended (4.7.3–4.7.6).
-pub fn check_ended(p: &mut Poster<'_>, mut card: Card, run: CheckRun, ctx: Ctx<'_>) {
+pub fn check_ended(p: &mut Poster<'_>, mut card: Card, run: CheckRun, fork: &Sha, ctx: Ctx<'_>) {
     // Stale: the new head is checked instead.
     if card.head.as_ref() != Some(&run.head) || card.gates.checking.as_ref() != Some(&run.head) {
         return;
     }
     card.gates.checking = None;
     let id = card.id.clone();
-    let output = run.report.as_ref().map(|r| r.to_string()).unwrap_or_default();
     match verdict(&run) {
         Ok(0) => {
             card.gates.checked = Some((run.head.clone(), run.folder_commit.clone()));
-            card.checks_output = Some(output);
+            card.checks_output = run.report.map(|mut report| {
+                report["base"] = serde_json::json!(fork);
+                report.to_string()
+            });
             passed(p, card, ctx);
         }
         Ok(n) => {

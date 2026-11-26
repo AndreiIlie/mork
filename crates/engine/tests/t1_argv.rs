@@ -5,48 +5,75 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use factory_engine::cli::{ContextReport, StreamState, agy, claude, codex};
-use factory_engine::jobs::context::Context;
-use factory_engine::paths::Home;
-use factory_types::config::Config;
-use factory_types::{AgentKey, JobId};
+use mork_engine::cli::{ContextReport, StreamState, agy, claude, codex};
+use mork_engine::jobs::context::Context;
+use mork_engine::paths::Home;
+use mork_types::config::Config;
+use mork_types::{AgentKey, JobId};
 use serde_json::json;
 
 fn config(extra: &str) -> Config {
-    factory_engine::config::parse(&format!("[factory]\nproject = \"f\"\n[git]\nauthor = \"A <a@b>\"\n{extra}")).unwrap()
+    mork_engine::config::parse(&format!("[mork]\nproject = \"f\"\n[git]\nauthor = \"A <a@b>\"\n{extra}")).unwrap()
 }
 
 // The seats run on Claude here, whichever CLI the roster gives them (fac-399).
 const CLAUDE: &str = "cli = \"claude\"\nmodel = \"claude-opus-5-5\"\n";
 
+fn assert_unwalled_hooks(settings: &serde_json::Value) {
+    assert!(settings.get("permissions").is_none());
+    let hooks = settings["hooks"]["PreToolUse"].as_array().unwrap();
+    assert_eq!(hooks.len(), 2);
+    for (group, matcher, command) in
+        [(&hooks[0], "Agent", "claude-agent-hook"), (&hooks[1], "Read|Grep|Glob|Bash", "claude-path-hook")]
+    {
+        assert_eq!(group["matcher"], matcher);
+        let handler = &group["hooks"][0];
+        assert_eq!(handler["type"], "command");
+        assert!(handler["command"].as_str().unwrap().ends_with(command));
+        assert_eq!(handler["onFailure"], "block");
+    }
+}
+
 // fac-25: an unwalled seat's settings carry its deny list, every turn of it; a walled seat's don't.
 #[test]
 fn fac_25_an_unwalled_seats_settings_deny_access_md_and_ssh() {
     let schema = json!({"type": "object"});
-    let deny = json!(["Read(//**/ACCESS.md)", "Read(//**/.ssh/**)", "Bash(*ACCESS.md*)", "Bash(*.ssh*)"]);
     let researcher = config(&format!("[seats.researcher]\n{CLAUDE}wall = \"none\"\n")).seat("researcher").unwrap();
-    assert_eq!(researcher.wall, factory_types::config::Wall::None);
+    assert_eq!(researcher.wall, mork_types::config::Wall::None);
     for resume in [false, true] {
         let argv = claude::argv(&researcher, "uuid-1", resume, &schema, claude::Dirs::default(), None, Some(200_000));
         assert_eq!(argv[argv.iter().position(|a| a == "--permission-mode").unwrap() + 1], "bypassPermissions");
         let i = argv.iter().position(|a| a == "--settings").unwrap();
         let settings: serde_json::Value = serde_json::from_str(&argv[i + 1]).unwrap();
-        assert_eq!(settings["permissions"]["deny"], deny);
+        assert_unwalled_hooks(&settings);
         assert_eq!(settings["attribution"]["sessionUrl"], false);
     }
     let walled = config(&format!("[seats.researcher]\n{CLAUDE}")).seat("researcher").unwrap();
     let argv = claude::argv(&walled, "uuid-1", false, &schema, claude::Dirs::default(), None, Some(200_000));
     let mut settings: serde_json::Value = serde_json::from_str(argv.last().unwrap()).unwrap();
+    assert_eq!(settings["hooks"]["PreToolUse"].as_array().unwrap().len(), 1);
+    assert_eq!(settings["hooks"]["PreToolUse"][0]["matcher"], "Agent");
+    assert_eq!(settings["hooks"]["PreToolUse"][0]["hooks"][0]["onFailure"], "block");
     assert!(settings.as_object_mut().unwrap().remove("hooks").is_some());
     assert_eq!(settings, serde_json::from_str::<serde_json::Value>(claude::SETTINGS).unwrap());
     let foreman = format!("[seats.foreman]\n{CLAUDE}wall = \"none\"\nadvisor = \"claude-fable-5-1\"\n");
     let unwalled = config(&foreman).seat("foreman").unwrap();
     let argv = claude::argv(&unwalled, "uuid-1", false, &schema, claude::Dirs::default(), None, Some(200_000));
     let settings: serde_json::Value = serde_json::from_str(argv.last().unwrap()).unwrap();
-    assert_eq!(
-        (settings["permissions"]["deny"].clone(), settings["advisorModel"].clone()),
-        (deny, "claude-fable-5-1".into())
-    );
+    assert_eq!(settings["advisorModel"], "claude-fable-5-1");
+}
+
+#[test]
+fn claude_seat_env_disables_deferred_tool_resume_after_overrides() {
+    let key = "CLAUDE_CODE_DISABLE_DEFERRED_TOOL_RESUME";
+    let mut cfg = config(&format!("[seats.foreman]\n{CLAUDE}"));
+    cfg.mork.env.insert(key.into(), "0".into());
+    let mut seat = cfg.seat("foreman").unwrap();
+    seat.env.insert(key.into(), "0".into());
+    let ctx = Context::new(Home::new("/tmp/f"), cfg, "/bin/f".into(), BTreeMap::new());
+    let env = |seat| ctx.env(&JobId::new("j"), &AgentKey::new("foreman"), seat, &[], Path::new("/tmp/f/io"));
+    assert_eq!(env(Some(&seat))[key], "1");
+    assert_eq!(env(None)[key], "0");
 }
 
 #[test]
@@ -68,8 +95,8 @@ fn fac_681_context_cap_passes_autocompact_to_claude_and_env_to_agy() {
     let env = ctx.env(&job, &owner, Some(&agy_seat), &[], Path::new("/tmp/f/io"));
     assert_eq!(env.get("AGY_CLI_AUTO_COMPACT_OVERRIDE").map(String::as_str), Some("200000"));
 
-    let disabled_cfg = factory_engine::config::parse(
-        "[factory]\nproject = \"f\"\ncontext_cap = 0\n[git]\nauthor = \"A <a@b>\"\n[seats.foreman]\ncli = \"agy\"\nmodel = \"gemini-4-neon\"\n",
+    let disabled_cfg = mork_engine::config::parse(
+        "[mork]\nproject = \"f\"\ncontext_cap = 0\n[git]\nauthor = \"A <a@b>\"\n[seats.foreman]\ncli = \"agy\"\nmodel = \"gemini-4-neon\"\n",
     )
     .unwrap();
     let ctx = Context::new(Home::new(PathBuf::from("/tmp/f")), disabled_cfg, PathBuf::from("/bin/f"), BTreeMap::new());

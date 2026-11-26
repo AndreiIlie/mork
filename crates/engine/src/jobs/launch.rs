@@ -5,29 +5,28 @@ use std::io;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, Command, Output, Stdio};
+use std::sync::Arc;
 use std::time::Duration;
 
-use factory_types::job::JobSpec;
+use mork_types::job::JobSpec;
 
 use super::{proclog, wall};
 use crate::clock;
+use crate::lock::Lock;
 
-/// Starts `factory supervise <dir>`: the supervisor detaches at once (fork, new session,
-/// fork), so the wait is short. `pass_fault` passes the app's `FACTORY_FAULT` on, or not.
-pub fn start_supervisor(bin: &Path, dir: &Path, home_root: &Path, pass_fault: bool) -> io::Result<()> {
+/// Starts `mork supervise <dir>`: the supervisor detaches at once (fork, new session,
+/// fork), so the wait is short.
+pub fn start_supervisor(bin: &Path, dir: &Path, home_root: &Path) -> io::Result<()> {
     let mut cmd = Command::new(bin);
     without_git_env(&mut cmd);
     cmd.arg("supervise").arg(dir).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
-    if !pass_fault {
-        cmd.env_remove("FACTORY_FAULT");
-    }
     let argv = vec![bin.display().to_string(), "supervise".into(), dir.display().to_string()];
     proclog::record(home_root, "supervisor", &argv, &dir.display().to_string(), false);
     let status = cmd.status()?;
     if status.success() { Ok(()) } else { Err(io::Error::other(format!("the supervisor didn't start: {status}"))) }
 }
 
-/// A long-lived child its caller owns and ends: `factory live-check`'s scratch factory (1.11).
+/// A long-lived child its caller owns and ends: `mork live-check`'s scratch mork (1.11).
 /// Its output goes to `log`.
 pub fn child(home_root: &Path, argv: &[String], env: &[(String, String)], log: &Path) -> io::Result<Child> {
     let (program, args) = argv.split_first().ok_or_else(|| io::Error::other("empty argv"))?;
@@ -70,12 +69,12 @@ pub fn short_env(
         }
         if clock::elapsed(start) > timeout {
             // The guard ends what escaped its group first (M4.6), then the group goes.
-            let _ = factory_sys::kill(-group, super::procs::libc_sig::TERM);
+            let _ = mork_sys::kill(-group, super::procs::libc_sig::TERM);
             let ends = clock::instant();
             while child.try_wait()?.is_none() && clock::elapsed(ends) < Duration::from_secs(1) {
                 clock::sleep(Duration::from_millis(5));
             }
-            let _ = factory_sys::kill(group, super::procs::libc_sig::KILL);
+            let _ = mork_sys::kill(group, super::procs::libc_sig::KILL);
             let _ = child.kill();
             let _ = child.wait();
             return Err(io::Error::new(io::ErrorKind::TimedOut, format!("{program} timed out")));
@@ -83,7 +82,7 @@ pub fn short_env(
         clock::sleep(Duration::from_millis(5));
     };
     // What it left running in its group ends with it.
-    let _ = factory_sys::kill(group, super::procs::libc_sig::KILL);
+    let _ = mork_sys::kill(group, super::procs::libc_sig::KILL);
     // A descendant in a session of its own may hold a pipe: the read ends at the timeout (M3.34).
     let left = timeout.saturating_sub(clock::elapsed(start));
     Ok(Output { status, stdout: out.finish(left), stderr: err.finish(left) })
@@ -103,7 +102,7 @@ fn guarded(argv: &[&str], cwd: &Path, env: &[(String, String)]) -> Command {
 }
 
 // A caller's git variables (`git rev-parse --local-env-vars`, every `GIT_CONFIG*`; a git hook's shell, say) never
-// point the factory's git, or a factory it starts, at another repository (M5.12). What a call adds itself comes after.
+// point Mork's git, or a Mork process it starts, at another repository (M5.12). What a call adds itself comes after.
 const GIT_LOCAL: &[&str] = &[
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_OBJECT_DIRECTORY",
@@ -136,8 +135,8 @@ pub fn without_git_env(cmd: &mut Command) {
 /// (M3.34, M3.25); the command reads the guard's stdin, and the guard exits as it does, 128 plus a signal's number.
 pub fn guard(argv: &[impl AsRef<std::ffi::OsStr>]) -> Command {
     let mut cmd = Command::new("/bin/sh");
-    cmd.args(["-c", GUARD, "factory-guard"]).args(argv);
-    factory_sys::prepare_guard_spawn(&mut cmd);
+    cmd.args(["-c", GUARD, "mork-guard"]).args(argv);
+    mork_sys::prepare_guard_spawn(&mut cmd);
     cmd
 }
 
@@ -150,23 +149,21 @@ const GUARD: &str = "k() { n=0; while [ $n -lt 200 ]; do c=; { read -r c < /proc
     trap 'k; kill -KILL 0' TERM; exec 3<&0; \"$@\" <&3 3<&- & wait $!; s=$?; k; exit $s";
 
 struct Drain {
-    buf: std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
+    buf: Arc<Lock<Vec<u8>>>,
     done: std::sync::mpsc::Receiver<()>,
 }
 
 impl Drain {
     fn start(r: Option<Box<dyn io::Read + Send>>) -> Self {
         use std::io::Read;
-        let buf = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let buf = Arc::new(Lock::new(Vec::new()));
         let (tx, done) = std::sync::mpsc::channel();
-        let shared = std::sync::Arc::clone(&buf);
+        let shared = Arc::clone(&buf);
         std::thread::spawn(move || {
             if let Some(mut r) = r {
                 let mut chunk = [0u8; 65_536];
                 while let Ok(n @ 1..) = r.read(&mut chunk) {
-                    if let Ok(mut b) = shared.lock() {
-                        b.extend_from_slice(&chunk[..n]);
-                    }
+                    shared.lock().extend_from_slice(&chunk[..n]);
                 }
             }
             let _ = tx.send(());
@@ -176,12 +173,12 @@ impl Drain {
 
     fn finish(self, left: Duration) -> Vec<u8> {
         let _ = self.done.recv_timeout(left);
-        self.buf.lock().map(|mut b| std::mem::take(&mut *b)).unwrap_or_default()
+        std::mem::take(&mut *self.buf.lock())
     }
 }
 
 /// The config's editor on a finding (5.7.5): started and left to run, its end reaped on a
-/// thread of its own. It is Andrei's program, outside any wall.
+/// thread of its own. It is the operator's program, outside any wall.
 pub fn editor(home_root: &Path, argv: &[String]) -> io::Result<()> {
     let (program, args) = argv.split_first().ok_or_else(|| io::Error::other("no editor command"))?;
     proclog::record(home_root, "editor", argv, "", false);
@@ -242,13 +239,13 @@ pub fn walled_read(
     group: &std::sync::atomic::AtomicI32,
 ) -> io::Result<String> {
     use std::io::{BufRead, BufReader, Write};
-    let argv = if spec.wall == factory_types::job::WallMode::None { spec.argv.clone() } else { wall::argv_short(spec) };
-    proclog::record(home_root, "limits", &argv, &spec.cwd, spec.wall != factory_types::job::WallMode::None);
+    let argv = if spec.wall == mork_types::job::WallMode::None { spec.argv.clone() } else { wall::argv_short(spec) };
+    proclog::record(home_root, "limits", &argv, &spec.cwd, spec.wall != mork_types::job::WallMode::None);
     let (program, args) = argv.split_first().ok_or_else(|| io::Error::other("empty argv"))?;
     let mut cmd = Command::new(program);
     let input = if matches!(answer, Answer::Rpc(_)) { Stdio::piped() } else { Stdio::null() };
     cmd.args(args).stdin(input).stdout(Stdio::piped()).stderr(Stdio::null()).process_group(0);
-    if spec.wall == factory_types::job::WallMode::None {
+    if spec.wall == mork_types::job::WallMode::None {
         cmd.env_clear().envs(&spec.env).current_dir(&spec.cwd);
     }
     let mut child = cmd.spawn()?;
@@ -273,7 +270,7 @@ pub fn walled_read(
     }
     let result = read_answer(&rx, &mut child, answer, cut);
     if pgid > 0 {
-        let _ = factory_sys::kill(-pgid, super::procs::libc_sig::KILL);
+        let _ = mork_sys::kill(-pgid, super::procs::libc_sig::KILL);
     }
     let _ = child.kill();
     let _ = child.wait();
@@ -335,6 +332,6 @@ fn exited(child: &mut Child, start: std::time::Instant, cut: Duration) -> Option
 pub fn end_group(group: &std::sync::atomic::AtomicI32) {
     let pgid = group.swap(0, std::sync::atomic::Ordering::SeqCst);
     if pgid > 0 {
-        let _ = factory_sys::kill(-pgid, super::procs::libc_sig::KILL);
+        let _ = mork_sys::kill(-pgid, super::procs::libc_sig::KILL);
     }
 }

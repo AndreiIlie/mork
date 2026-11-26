@@ -5,14 +5,14 @@
 mod common;
 
 use common::Sim;
-use factory_core::decide::{Event, Intent};
-use factory_core::door::{owed_news, status_of};
-use factory_types::action::{Action, ActionStatus};
-use factory_types::door::status;
-use factory_types::door_call::{DoorCall, Verdict};
-use factory_types::state::Sender;
-use factory_types::work::Found;
-use factory_types::{ActionId, AgentKey, CardId, JobId, PlaceId};
+use mork_core::decide::{Event, Intent};
+use mork_core::door::{owed_news, status_of};
+use mork_types::action::{Action, ActionStatus};
+use mork_types::door::status;
+use mork_types::door_call::{DoorCall, Verdict};
+use mork_types::state::Sender;
+use mork_types::work::Found;
+use mork_types::{ActionId, AgentKey, CardId, JobId, PlaceId};
 use serde_json::{Value, json};
 
 fn call(op: &str, params: &str, plan: &str, turn: &str) -> DoorCall {
@@ -120,7 +120,7 @@ fn unstarted_pending_read_dropped_owes_no_news_and_reasks_fresh() {
 
     let plan3 = r#"{"sql":"SELECT 10"}"#;
     let (id3, _) = ask_door(&mut sim, call("sql.select", r#"{"query":"SELECT 10"}"#, plan3, "turn-1"), verdict);
-    sim.andrei(json!({"stop": {"card": "web-1"}})).unwrap();
+    sim.operator(json!({"stop": {"card": "web-1"}})).unwrap();
     assert!(action(&sim, &id3).cancelled);
     sim.apply(Event::DoorUnstarted { id: id3.clone(), busy: None });
     let dropped_cancelled = action(&sim, &id3);
@@ -128,12 +128,12 @@ fn unstarted_pending_read_dropped_owes_no_news_and_reasks_fresh() {
     assert!(!dropped_cancelled.cancelled);
     assert!(!owed_news(&dropped_cancelled));
     sim.intents.clear();
-    sim.andrei(json!({"resume": {"card": "web-1"}})).unwrap();
+    sim.operator(json!({"resume": {"card": "web-1"}})).unwrap();
     assert!(!sim.intents.iter().any(|i| matches!(i, Intent::RunAction { id } if *id == id3)));
 }
 
 #[test]
-fn direct_sh_run_owes_news_only_when_held_or_settled_by_andrei() {
+fn direct_sh_run_owes_news_only_when_held_or_settled_by_operator() {
     let mut sim = Sim::new();
     sim.through_brief("web-1", "web");
     let verdict = Verdict::new("allowed", "a named command of the target");
@@ -163,7 +163,7 @@ fn direct_sh_run_owes_news_only_when_held_or_settled_by_andrei() {
     assert!(!owed_news(&action(&sim, &id3)));
     assert_eq!(door_news(&sim, "web-1"), vec!["door: sh.run on replica: held"]);
 
-    sim.andrei(json!({"action.done": {"action": id3, "note": "checked"}})).unwrap();
+    sim.operator(json!({"action.done": {"action": id3, "note": "checked"}})).unwrap();
     assert!(owed_news(&action(&sim, &id3)));
     sim.apply(Event::DoorDelivered { id: id3.clone(), answered: false });
     assert!(!owed_news(&action(&sim, &id3)));
@@ -173,7 +173,7 @@ fn direct_sh_run_owes_news_only_when_held_or_settled_by_andrei() {
     let (id4, _) = ask_door(&mut sim, call("sh.run", r#"{"command":"restart"}"#, plan4, "turn-1"), verdict.clone());
     start_door(&mut sim, &id4, plan4, &verdict);
     sim.apply(Event::ActionFound { id: id4.clone(), found: Found::Unclear { words: "no receipt".into() } });
-    sim.andrei(json!({"action.drop": {"action": id4}})).unwrap();
+    sim.operator(json!({"action.drop": {"action": id4}})).unwrap();
     assert_eq!(status_of(&action(&sim, &id4)), status::NOT_ALLOWED);
     assert!(owed_news(&action(&sim, &id4)));
     sim.apply(Event::DoorDelivered { id: id4.clone(), answered: false });
@@ -184,14 +184,14 @@ fn direct_sh_run_owes_news_only_when_held_or_settled_by_andrei() {
 fn asked_misc_run_owes_news_for_done_refused_guard_and_held() {
     let mut sim = Sim::new();
     sim.through_brief("web-1", "web");
-    let outside = Verdict::new("outside", "the misc door always asks Andrei");
+    let outside = Verdict::new("outside", "the misc door always asks the operator");
 
     let plan1 = r#"{"misc":["echo","hi"]}"#;
     let (id1, ans1) =
         ask_door(&mut sim, call("misc.run", r#"{"argv":["echo","hi"]}"#, plan1, "turn-1"), outside.clone());
     assert!(!owed_news(&action(&sim, &id1)));
     let ask1 = ans1["door"]["ask"].as_str().unwrap().to_owned();
-    sim.andrei(json!({"door.once": {"ask": ask1}})).unwrap();
+    sim.operator(json!({"door.once": {"ask": ask1}})).unwrap();
     start_door(&mut sim, &id1, plan1, &outside);
     sim.apply(Event::ActionReturned {
         id: id1.clone(),
@@ -206,7 +206,7 @@ fn asked_misc_run_owes_news_for_done_refused_guard_and_held() {
     let (id2, ans2) =
         ask_door(&mut sim, call("misc.run", r#"{"argv":["echo","no"]}"#, plan2, "turn-1"), outside.clone());
     let ask2 = ans2["door"]["ask"].as_str().unwrap().to_owned();
-    sim.andrei(json!({"door.no": {"ask": ask2}})).unwrap();
+    sim.operator(json!({"door.no": {"ask": ask2}})).unwrap();
     assert!(owed_news(&action(&sim, &id2)));
     sim.apply(Event::DoorDelivered { id: id2.clone(), answered: false });
     assert!(!owed_news(&action(&sim, &id2)));
@@ -215,7 +215,7 @@ fn asked_misc_run_owes_news_for_done_refused_guard_and_held() {
     let (id3, ans3) =
         ask_door(&mut sim, call("misc.run", r#"{"argv":["echo","guard"]}"#, plan3, "turn-1"), outside.clone());
     let ask3 = ans3["door"]["ask"].as_str().unwrap().to_owned();
-    sim.andrei(json!({"door.once": {"ask": ask3}})).unwrap();
+    sim.operator(json!({"door.once": {"ask": ask3}})).unwrap();
     start_door(&mut sim, &id3, r#"{"misc":["changed"]}"#, &outside);
     assert_eq!(action(&sim, &id3).status, ActionStatus::Dropped);
     assert!(owed_news(&action(&sim, &id3)));
@@ -226,14 +226,14 @@ fn asked_misc_run_owes_news_for_done_refused_guard_and_held() {
     let (id4, ans4) =
         ask_door(&mut sim, call("misc.run", r#"{"argv":["echo","held"]}"#, plan4, "turn-1"), outside.clone());
     let ask4 = ans4["door"]["ask"].as_str().unwrap().to_owned();
-    sim.andrei(json!({"door.once": {"ask": ask4}})).unwrap();
+    sim.operator(json!({"door.once": {"ask": ask4}})).unwrap();
     start_door(&mut sim, &id4, plan4, &outside);
     sim.apply(Event::ActionFound { id: id4.clone(), found: Found::Unclear { words: "no receipt".into() } });
     assert_eq!(action(&sim, &id4).status, ActionStatus::Held);
     assert!(owed_news(&action(&sim, &id4)));
     sim.apply(Event::DoorDelivered { id: id4.clone(), answered: false });
     assert!(!owed_news(&action(&sim, &id4)));
-    sim.andrei(json!({"action.drop": {"action": id4}})).unwrap();
+    sim.operator(json!({"action.drop": {"action": id4}})).unwrap();
     assert!(owed_news(&action(&sim, &id4)));
     sim.apply(Event::DoorDelivered { id: id4.clone(), answered: false });
     assert!(!owed_news(&action(&sim, &id4)));

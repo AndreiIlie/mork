@@ -1,17 +1,17 @@
-// The engine runs on a thread of its own; the window is a client of `factory.sock` like any other (1.6).
+// The engine runs on a thread of its own; the window is a client of `mork.sock` like any other (1.6).
 
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-use factory_app::wiring::{self, Msg, Out};
-use factory_engine::paths::Home;
-use factory_types::view::Screen;
-use factory_ui::app::{App, Effect, Message, Settings, WindowOp};
 use iced::futures::channel::mpsc as fmpsc;
 use iced::widget::text_editor::{Action, Edit};
 use iced::{Element, Subscription, Task};
+use mork_app::wiring::{self, Msg, Out};
+use mork_engine::paths::Home;
+use mork_types::view::Screen;
+use mork_ui::app::{App, Effect, Message, Settings, WindowOp};
 
 static INBOX: OnceLock<Mutex<Option<fmpsc::UnboundedReceiver<Msg>>>> = OnceLock::new();
 
@@ -19,7 +19,7 @@ struct Shell {
     app: App,
     out: mpsc::Sender<Out>,
     home: Home,
-    tunnels: mpsc::Sender<factory_engine::jobs::web_tunnels::Request>,
+    tunnels: mpsc::Sender<mork_engine::jobs::web_tunnels::Request>,
 }
 
 /// Runs the engine and the window; returns only if the window couldn't run.
@@ -30,33 +30,30 @@ pub fn run(home: &Home, settings: Settings, engine: impl FnOnce() -> i32 + Send 
     let (out, outs) = mpsc::channel();
     let session = wiring::read_session(home);
     let place = session.place.clone();
-    let window = factory_ui::window::settings_at(session.position);
+    let window = mork_ui::window::settings_at(session.position);
     wiring::link(home.clone(), tx.clone(), outs, place);
     let tunnels = wiring::tunnels(home.clone(), settings.tunnels.clone(), tx.clone());
     clock(tx);
     let home = home.clone();
     let boot = move || {
         let app = App::new(Screen::default(), session.clone(), settings.clone());
-        (
-            Shell { app, out: out.clone(), home: home.clone(), tunnels: tunnels.clone() },
-            factory_ui::window::focus_input(),
-        )
+        (Shell { app, out: out.clone(), home: home.clone(), tunnels: tunnels.clone() }, mork_ui::window::focus_input())
     };
     let result = iced::application(boot, update, view)
         // Avoid the reported NVIDIA/Wayland frame stall (fac-120, iced-rs/iced#3496).
         .settings(iced::Settings { vsync: false, ..Default::default() })
         .subscription(subscription)
         .window(window)
-        .font(factory_ui::fonts::REGULAR_BYTES)
-        .font(factory_ui::fonts::BOLD_BYTES)
-        .font(factory_ui::fonts::ITALIC_BYTES)
-        .font(factory_ui::fonts::ICONS_BYTES)
-        .default_font(factory_ui::fonts::MONO)
-        .theme(|_: &Shell| factory_ui::theme::iced_theme())
-        .title(|_: &Shell| "factory".to_owned())
+        .font(mork_ui::fonts::REGULAR_BYTES)
+        .font(mork_ui::fonts::BOLD_BYTES)
+        .font(mork_ui::fonts::ITALIC_BYTES)
+        .font(mork_ui::fonts::ICONS_BYTES)
+        .default_font(mork_ui::fonts::MONO)
+        .theme(|_: &Shell| mork_ui::theme::iced_theme())
+        .title(|_: &Shell| "mork".to_owned())
         .run();
     if let Err(e) = result {
-        eprintln!("factory: the window couldn't run: {e}");
+        eprintln!("mork: the window couldn't run: {e}");
     }
     // However the window ended, the engine ends cleanly and exits the process (2.7).
     end_app();
@@ -78,7 +75,7 @@ fn subscription(_: &Shell) -> Subscription<Msg> {
             // why: a desktop's coordinates are whole pixels, far inside i32.
             #[allow(clippy::cast_possible_truncation)]
             iced::window::Event::Moved(p) => {
-                Some(Msg::Ui(factory_ui::app::Message::Moved(p.x.round() as i32, p.y.round() as i32)))
+                Some(Msg::Ui(mork_ui::app::Message::Moved(p.x.round() as i32, p.y.round() as i32)))
             }
             _ => None,
         }),
@@ -87,7 +84,7 @@ fn subscription(_: &Shell) -> Subscription<Msg> {
 
 // As SIGTERM does: the engine shuts down cleanly first (2.7).
 fn end_app() {
-    let _ = factory_sys::kill(factory_sys::getpid(), 15);
+    let _ = mork_sys::kill(mork_sys::getpid(), 15);
 }
 
 fn inbox() -> impl iced::futures::Stream<Item = Msg> {
@@ -100,7 +97,7 @@ fn update(s: &mut Shell, msg: Msg) -> Task<Msg> {
     // The clock stands still while nothing moves: anything else that happens reads it fresh (a
     // double click's timing, when a hand was first seen).
     if !matches!(msg, Msg::Tick(_)) {
-        s.app.tick(factory_engine::clock::now_ms());
+        s.app.tick(mork_engine::clock::now_ms());
     }
     let effects = wiring::step(&mut s.app, msg);
     FRAME_EVERY.store(s.app.frame_every().unwrap_or(0), Ordering::Relaxed);
@@ -131,7 +128,7 @@ fn effect(s: &Shell, e: Effect) -> Task<Msg> {
             if s.tunnels.send((name.clone(), open)).is_err() {
                 return Task::done(Msg::Ui(Message::TunnelStatus(
                     name,
-                    factory_types::web_tunnel::Status::Failed("The tunnel tracker stopped".into()),
+                    mork_types::web_tunnel::Status::Failed("The tunnel tracker stopped".into()),
                 )));
             }
             Task::none()
@@ -148,7 +145,7 @@ fn effect(s: &Shell, e: Effect) -> Task<Msg> {
             end_app();
             Task::none()
         }
-        Effect::Window(op) => factory_ui::window::window_task(op),
+        Effect::Window(op) => mork_ui::window::window_task(op),
     }
 }
 
@@ -161,7 +158,7 @@ fn paste(home: Home, place: String) -> Task<Msg> {
             let (tx, rx) = iced::futures::channel::oneshot::channel();
             let home = home.clone();
             std::thread::spawn(move || {
-                let _ = tx.send(factory_engine::clipboard::image(&home));
+                let _ = tx.send(mork_engine::clipboard::image(&home));
             });
             let place = place.clone();
             Task::future(rx).then(move |read| {
@@ -202,9 +199,9 @@ fn clock(tx: fmpsc::UnboundedSender<Msg>) {
     std::thread::spawn(move || {
         let mut last = 0;
         loop {
-            factory_engine::clock::sleep(Duration::from_millis(25));
+            mork_engine::clock::sleep(Duration::from_millis(25));
             let every = FRAME_EVERY.load(Ordering::Relaxed);
-            let now = factory_engine::clock::now_ms();
+            let now = mork_engine::clock::now_ms();
             if every > 0 && now.saturating_sub(last) >= every {
                 last = now;
                 if tx.unbounded_send(Msg::Tick(now)).is_err() {

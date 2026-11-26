@@ -1,6 +1,6 @@
 {
-  "name": "factory",
+  "name": "mork",
   "version": "1.0.0",
-  "description": "The Factory's procedures, versioned with the running build.",
+  "description": "Mork's procedures, versioned with the running build.",
   "skills": "./"
 }

@@ -4,16 +4,16 @@
 mod common;
 
 use common::{Sim, reply, sha};
-use factory_core::decide::{Decision, Event, Intent};
-use factory_core::queue::order::in_queue;
-use factory_core::state::Change;
-use factory_types::action::ActionWhat;
-use factory_types::card::{Landing, Stage};
-use factory_types::lookback::Read;
-use factory_types::protocol::ErrorCode;
-use factory_types::state::{MessageKind, Sender};
-use factory_types::work::Purpose;
-use factory_types::{AgentKey, Command, catalog, words};
+use mork_core::decide::{Decision, Event, Intent};
+use mork_core::queue::order::in_queue;
+use mork_core::state::Change;
+use mork_types::action::ActionWhat;
+use mork_types::card::{Landing, Stage};
+use mork_types::lookback::Read;
+use mork_types::protocol::ErrorCode;
+use mork_types::state::{MessageKind, Sender};
+use mork_types::work::Purpose;
+use mork_types::{AgentKey, Command, catalog, words};
 use serde_json::{Value, json};
 
 const LOCAL: &str = "web-1";
@@ -22,7 +22,7 @@ const PR: &str = "ex-1";
 #[test]
 fn only_an_orchestrator_can_wait_for_wakes() {
     let mut sim = Sim::new();
-    for sender in [Sender::Andrei, Sender::Agent("web-1/foreman".into())] {
+    for sender in [Sender::Operator, Sender::Agent("web-1/foreman".into())] {
         let result = sim.cmd(sender, json!({"wakes": {}}));
         assert!(matches!(result, Err(e) if e.code == ErrorCode::Buzz && e.message.contains("`wakes`")));
     }
@@ -165,7 +165,7 @@ fn a_failed_round_goes_back_to_the_foreman() {
     assert_eq!(s.stage(LOCAL), Stage::Build);
     assert!(!s.owed(&format!("{LOCAL}/foreman")), "failed round with findings must wait for triage");
     assert!(s.card(LOCAL).triage.is_some());
-    s.andrei(json!({"triage": {"card": LOCAL, "fix": ["1", "2"]}})).unwrap();
+    s.operator(json!({"triage": {"card": LOCAL, "fix": ["1", "2"]}})).unwrap();
     assert!(!s.owed(&format!("{LOCAL}/foreman")), "the fix request didn't wait for the base's import");
     s.imported(LOCAL);
     foreman_asked(&s, LOCAL, "src/a.rs is wrong");
@@ -212,7 +212,7 @@ fn a_moved_base_is_joined_before_the_checks() {
 
 #[test]
 fn builder_spawn_and_launch_are_gone() {
-    use factory_types::Command;
+    use mork_types::Command;
 
     let spawn = json!({"spawn": {"card": LOCAL, "role": "builder", "task": "Implement"}});
     let launch =
@@ -227,13 +227,13 @@ fn a_reopened_mock_holds_the_foreman() {
     s.through_brief(LOCAL, "web");
     let foreman = format!("{LOCAL}/foreman");
     assert!(s.owed(&foreman));
-    use factory_types::card::{Mock, MockStep};
+    use mork_types::card::{Mock, MockStep};
 
     let card = s.state.cards.get_mut(LOCAL).unwrap();
     card.visual = true;
     card.mock = Some(Mock { step: MockStep::Approved, ..Mock::default() });
-    s.andrei(json!({"mock": {"card": LOCAL}})).unwrap();
-    s.andrei(json!({"say": {"place": LOCAL, "text": "Please carry on."}})).unwrap();
+    s.operator(json!({"mock": {"card": LOCAL}})).unwrap();
+    s.operator(json!({"say": {"place": LOCAL, "text": "Please carry on."}})).unwrap();
     assert!(!s.owed(&foreman));
     assert!(s.owed(&format!("{LOCAL}/planner")));
 }
@@ -241,14 +241,14 @@ fn a_reopened_mock_holds_the_foreman() {
 #[test]
 fn rebrief_drops_old_build_retries_and_wakes_the_foreman_for_its_specification() {
     use common::reply;
-    use factory_core::decide::{Event, JobEnd, SessionSeen};
-    use factory_types::state::Owed;
+    use mork_core::decide::{Event, JobEnd, SessionSeen};
+    use mork_types::state::Owed;
 
     let foreman = format!("{LOCAL}/foreman");
     for cut_before_brief in [true, false] {
         let mut s = Sim::new();
         s.board(LOCAL, "web");
-        s.andrei(json!({"start": {"card": LOCAL, "no-planner": true}})).unwrap();
+        s.operator(json!({"start": {"card": LOCAL, "no-planner": true}})).unwrap();
         s.settle_actions();
         let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { .. }))[0].clone();
         s.end_job(&clone, json!({}));
@@ -256,7 +256,7 @@ fn rebrief_drops_old_build_retries_and_wakes_the_foreman_for_its_specification()
         let mut recap = reply("brief-ready", "The plan");
         recap["hand"]["message"] = json!("- where: src\n---\nThe plan.");
         s.turn(&foreman, recap);
-        s.andrei(json!({"approve": {"card": LOCAL}})).unwrap();
+        s.operator(json!({"approve": {"card": LOCAL}})).unwrap();
 
         let id = s.turn_started(&foreman);
         let cut = Event::JobEnded { id, end: JobEnd::Cut { session: SessionSeen::default() } };
@@ -264,7 +264,7 @@ fn rebrief_drops_old_build_retries_and_wakes_the_foreman_for_its_specification()
             s.apply(cut.clone());
             assert!(matches!(s.state.agents[foreman.as_str()].owed, Some(Owed::Retry { .. })));
         }
-        s.andrei(json!({"brief": {"card": LOCAL}})).unwrap();
+        s.operator(json!({"brief": {"card": LOCAL}})).unwrap();
         if !cut_before_brief {
             s.apply(cut);
         }
@@ -281,7 +281,7 @@ fn begin_lookback(s: &mut Sim, project: &str, read: Option<&str>) -> String {
     if let Some(read) = read {
         cmd["lookback"]["read"] = json!(read);
     }
-    s.andrei(cmd).unwrap()["lookback"]["card"].as_str().unwrap().to_owned()
+    s.operator(cmd).unwrap()["lookback"]["card"].as_str().unwrap().to_owned()
 }
 
 fn clone_lookback(s: &mut Sim, card: &str) {
@@ -307,7 +307,7 @@ fn lookback_records_each_read_on_done_after_report_ready() {
         clone_lookback(&mut s, &card);
         s.turn(&format!("{card}/foreman"), reply("report-ready", "Ready"));
         assert!(s.state.lookbacks.get("web").is_none_or(|reads| !reads.contains_key(&read)));
-        s.andrei(json!({"done": {"card": card}})).unwrap();
+        s.operator(json!({"done": {"card": card}})).unwrap();
         let cursor = &s.state.lookbacks["web"][&read];
         assert_eq!(cursor.commit, Some(sha(s.tip)));
         assert_eq!(cursor.started_ms, Some(started));
@@ -322,10 +322,10 @@ fn lookback_records_each_read_on_done_after_report_ready() {
 #[test]
 fn lookback_refuses_a_retired_read_and_a_second_live_read() {
     let mut s = Sim::new();
-    let error = s.andrei(json!({"lookback": {"project": "web", "read": "merged"}})).unwrap_err();
+    let error = s.operator(json!({"lookback": {"project": "web", "read": "merged"}})).unwrap_err();
     assert!(error.message.contains("unknown look-back read"));
     let card = begin_lookback(&mut s, "web", Some("pulse"));
-    let error = s.andrei(json!({"lookback": {"project": "web", "read": "deep-sweep"}})).unwrap_err();
+    let error = s.operator(json!({"lookback": {"project": "web", "read": "deep-sweep"}})).unwrap_err();
     assert!(error.message.contains(&card));
 }
 
@@ -335,7 +335,7 @@ fn lookback_done_before_report_ready_leaves_the_cursor_unchanged() {
     let first = begin_lookback(&mut s, "web", None);
     clone_lookback(&mut s, &first);
     s.turn(&format!("{first}/foreman"), reply("report-ready", "Ready"));
-    s.andrei(json!({"done": {"card": first}})).unwrap();
+    s.operator(json!({"done": {"card": first}})).unwrap();
     let previous = s.state.lookbacks["web"][&Read::Pulse].clone();
     s.tip = "base2";
     for cloned in [false, true] {
@@ -344,7 +344,7 @@ fn lookback_done_before_report_ready_leaves_the_cursor_unchanged() {
             clone_lookback(&mut s, &card);
             assert_eq!(s.card(&card).lookback.unwrap().through, Some(sha(s.tip)));
         }
-        s.andrei(json!({"done": {"card": card}})).unwrap();
+        s.operator(json!({"done": {"card": card}})).unwrap();
         assert_eq!(s.stage(&card), Stage::Done);
         assert_eq!(s.state.lookbacks["web"][&Read::Pulse], previous);
     }
@@ -357,7 +357,7 @@ fn lookback_fetches_a_bitbucket_project_with_a_cursor_while_idle() {
         let card = begin_lookback(&mut s, project, Some("deep-sweep"));
         clone_lookback(&mut s, &card);
         s.turn(&format!("{card}/foreman"), reply("report-ready", "Ready"));
-        s.andrei(json!({"done": {"card": card}})).unwrap();
+        s.operator(json!({"done": {"card": card}})).unwrap();
     }
     s.settle_actions();
     s.now += 5 * 60 * 1000;
@@ -391,13 +391,13 @@ fn proposal_notes_keep_ordered_literal_paths_under_the_seats_project() {
     assert_eq!(note["notes.add"]["title"], "Use one parser");
     assert_eq!(note["notes.add"]["text"], "Share the parser.");
     assert_eq!(note["notes.add"]["files"], json!(["src/a,b.rs", "[src]"]));
-    s.config.factory.project = "ex".into();
+    s.config.mork.project = Some("ex".into());
     let mut wrong_project = cmd;
     wrong_project["notes.add"]["project"] = json!("ex");
     let refusal = s.cmd(sender, wrong_project).unwrap_err();
     assert!(refusal.message.contains("this seat files notes under its own project"));
     let without_files = s
-        .andrei(json!({"notes.add": {
+        .operator(json!({"notes.add": {
             "kind": "proposal", "project": "web", "title": "Group look-back notes", "text": "Group related work."
         }}))
         .unwrap();
@@ -421,14 +421,14 @@ fn proposal_notes_refuse_wrong_fields_and_keep_the_smell_syntax() {
     ];
     for mut fields in invalid {
         fields["project"] = json!("web");
-        assert!(s.andrei(json!({"notes.add": fields})).is_err(), "{fields}");
+        assert!(s.operator(json!({"notes.add": fields})).is_err(), "{fields}");
     }
     let spec = catalog::find("notes.add", false).unwrap();
     let smell = ["smell", "Work", "--project", "web", "--file", "src/a,b.rs", "--line", "1", "--why", "Reason"];
     let cmd = words::command(spec, &smell.map(str::to_owned)).unwrap();
     assert_eq!(cmd["notes.add"]["file"], "src/a,b.rs");
     assert!(Command::parse(&cmd, false).is_ok());
-    let note = s.andrei(cmd).unwrap();
+    let note = s.operator(cmd).unwrap();
     assert_eq!(note["notes.add"]["file"], "src/a,b.rs");
     for kind in ["smell", "feedback", "lesson"] {
         let args = [kind, "Work", "--file", "src/a.rs", "--file", "src/b.rs"];
@@ -460,10 +460,39 @@ fn smell_notes_keep_positional_file_line_and_why() {
     for form in forms {
         let args: Vec<_> = form.iter().map(|word| (*word).to_owned()).collect();
         let cmd = words::command(spec, &args).unwrap();
-        let answer = s.andrei(cmd).unwrap();
+        let answer = s.operator(cmd).unwrap();
         let note = &answer["notes.add"];
         assert_eq!(note["file"], "src/parser.rs");
         assert_eq!(note["line"], 42);
         assert_eq!(note["why"], "Can drift");
     }
+}
+
+#[test]
+fn a_passing_checks_report_sends_test_changes_to_the_round() {
+    let mut s = Sim::new();
+    s.through_brief(LOCAL, "web");
+    s.built(LOCAL, "h1", "base1");
+    let flag = "tests/example.rs:3 (base): deleted test in example";
+    let head = sha("h1");
+    let run = json!({"head": head, "exit": 0, "folder_dirty": false, "folder_commit": "c1", "located": [],
+        "report": {"status": 0, "findings": [], "test_changes": [flag], "head": head, "base": sha("base1")}});
+    s.answer_job("check", |p| matches!(p, Purpose::Check { .. }), run);
+    s.settle_actions();
+    s.candidate(LOCAL);
+    s.round_asked(LOCAL);
+    foreman_asked(&s, &s.review_card(LOCAL), flag);
+}
+
+#[test]
+fn a_secret_in_the_submitted_history_stops_verification() {
+    let mut s = Sim::new();
+    s.through_brief(LOCAL, "web");
+    s.built(LOCAL, "h1", "base1");
+    let hit = "a credential, in fixture:2 (commit h1)";
+    s.answer_job("check", |p| matches!(p, Purpose::Check { .. }), json!({"secret_hit": hit}));
+    assert_eq!(s.stage(LOCAL), Stage::Build);
+    assert!(s.card(LOCAL).gates.checking.is_none());
+    assert!(s.open_jobs(|p| matches!(p, Purpose::Candidate { .. })).is_empty());
+    foreman_asked(&s, LOCAL, hit);
 }

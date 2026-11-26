@@ -1,10 +1,10 @@
 //! Main's Projects tab reads only the screen; its buttons send the same look-back command as the CLI.
 
-use factory_types::lookback::{LastView, ProjectView, Read, ReadView};
-use factory_types::{Command, ProjectId};
 use iced::alignment::Vertical;
 use iced::widget::{Column, Row, column, container, responsive};
 use iced::{Element, Length};
+use mork_types::lookback::{LastView, ProjectView, Read, ReadView};
+use mork_types::{Command, ProjectId};
 
 use crate::app::{App, Effect, Message, ScrollOp};
 use crate::spans::Tone;

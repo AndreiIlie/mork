@@ -1,10 +1,10 @@
 //! A refused reply posts no effects: malformed JSON, wrong-role outcomes, incomplete findings, untyped messages,
 //! invalid images, or ineffective foreman outcomes leaving a card waiting (fac-423). Echo replies hold one message.
 
-use factory_types::card::{Mode, Stage};
-use factory_types::config::Cli;
-use factory_types::reply::{Outcome, Reply, Role};
-use factory_types::state::{Agent, Job};
+use mork_types::card::{Mode, Stage};
+use mork_types::config::Cli;
+use mork_types::reply::{Outcome, Reply, Role};
+use mork_types::state::{Agent, Job};
 use serde_json::Value;
 
 use crate::state::State;
@@ -20,19 +20,19 @@ pub(super) fn check(role: Role, value: &Value, job: &Job) -> Result<Reply, Strin
     Ok(r)
 }
 
-/// A seat's reply schema for its next turn: a closing turn's, its two feedbacks (fac-287, fac-592), or one offering the outcomes it may end with now.
-pub fn schema_of(state: &State, a: &Agent, cli: Cli) -> Value {
+/// A seat's reply schema for its next turn: a closing turn's feedback answers (fac-287, fac-592, fac-725), or one offering the outcomes it may end with now.
+pub fn schema_of(state: &State, a: &Agent, cli: Cli, with_mork: bool) -> Value {
     if super::closing::ending_turn(a) {
-        return factory_types::reply::closing_schema();
+        return mork_types::reply::closing_schema(with_mork);
     }
-    factory_types::reply::schema_offering(a.role, super::children::is_child(a), cli, &outcomes(state, a))
+    mork_types::reply::schema_offering(a.role, super::children::is_child(a), cli, &outcomes(state, a))
 }
 
 /// The outcomes an agent's turn may end with now: its role's, and `brief-ready` for a no-planner card's room foreman
 /// at brief (past any baseline step) or while a reopened mock is open (fac-616, fac-688).
 pub fn outcomes(state: &State, a: &Agent) -> Vec<Outcome> {
     let mut all = a.role.outcomes().to_vec();
-    let recaps = |c: &factory_types::card::Card| {
+    let recaps = |c: &mork_types::card::Card| {
         c.no_planner
             && c.mode == Mode::Full
             && ((c.stage == Stage::Brief && !crate::lifecycle::mock::baseline(c)) || crate::lifecycle::mock::open(c))
@@ -47,7 +47,7 @@ pub fn outcomes(state: &State, a: &Agent) -> Vec<Outcome> {
 fn allowed(role: Role, job: &Job) -> Vec<Outcome> {
     let mut all = role.outcomes().to_vec();
     let saved = job.io_files.get("schema.json").and_then(|s| serde_json::from_str::<Value>(s).ok());
-    if role == Role::Foreman && saved.is_some_and(|s| factory_types::reply::offers(&s, Outcome::BriefReady)) {
+    if role == Role::Foreman && saved.is_some_and(|s| mork_types::reply::offers(&s, Outcome::BriefReady)) {
         all.insert(1, Outcome::BriefReady);
     }
     all

@@ -1,7 +1,7 @@
 //! Target policies are validated whole and described without connection details or credentials.
 //! Descriptions expose the operations and bounds an agent may request (fac-1, fac-124).
 
-use factory_types::door_config::{Libra, Limits, Login, Sql, Target, TargetsFile, Transport};
+use mork_types::door_config::{Libra, Limits, Login, Sql, Target, TargetsFile, Transport};
 use serde_json::{Value, json};
 
 // The longest a read-only server's SQL may be given: an hour.
@@ -15,7 +15,7 @@ pub fn check_file(f: &TargetsFile) -> Result<(), String> {
                     and access sections (version 2)"
             .into());
     }
-    if f.version != factory_types::door_config::TARGETS_VERSION {
+    if f.version != mork_types::door_config::TARGETS_VERSION {
         return Err(format!("version {} isn't one this build reads (2)", f.version));
     }
     if f.access.as_ref().is_some_and(|a| !real(a)) {
@@ -43,7 +43,7 @@ fn check_target(t: &Target, access: bool) -> Result<(), String> {
     match (t.transport, &t.ssh) {
         (Transport::Ssh, None) => return Err("transport = \"ssh\" needs [ssh]".into()),
         (Transport::Local, Some(_)) => return Err("transport = \"local\" takes no [ssh]".into()),
-        (Transport::Ssh, Some(s)) if !name(&s.alias) => return Err("[ssh] needs an alias of Andrei's".into()),
+        (Transport::Ssh, Some(s)) if !name(&s.alias) => return Err("[ssh] needs an alias of the operator's".into()),
         (Transport::Ssh | Transport::Local, _) => {}
     }
     if t.misc && t.transport != Transport::Ssh {
@@ -112,7 +112,7 @@ fn check_libra(l: &Libra) -> Result<(), String> {
 }
 
 // The program is fixed; each `{arg}` is a whole, declared element, and each declared one used.
-fn check_command(name: &str, c: &factory_types::door_config::ShCommand) -> Result<(), String> {
+fn check_command(name: &str, c: &mork_types::door_config::ShCommand) -> Result<(), String> {
     let Some(first) = c.argv.first() else { return Err(format!("[sh.{name}] has an empty argv")) };
     if first.contains('{') {
         return Err(format!("[sh.{name}]'s program is fixed: no `{{arg}}` in it"));

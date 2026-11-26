@@ -1,7 +1,7 @@
 // M5.36: the window redraws on its own clock only while an icon spins or a hand blinks.
 
-use factory_types::seen::StepStatus;
-use factory_types::view::{CacheState, Doing};
+use mork_types::seen::StepStatus;
+use mork_types::view::{CacheState, Doing};
 
 use crate::app::App;
 use crate::session::Tab;
@@ -38,7 +38,7 @@ impl App {
     // fac-206: counts to the second, animations or not.
     fn timer_frame(&self) -> Option<i64> {
         let chat = self.overlay.is_none() && (self.session.place != "main" || self.session.tab == Tab::Engine);
-        let counting = |t: &factory_types::chat::ChatTurn| {
+        let counting = |t: &mork_types::chat::ChatTurn| {
             t.running
                 && (t.turn.thinking_since.is_some()
                     || t.turn.steps.iter().any(|s| s.start_ms.is_some() && s.end_ms.is_none()))

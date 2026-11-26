@@ -1,4 +1,4 @@
-//! The open card's notes (fac-94, fac-105): Andrei's decisions are among them, the card being its
+//! The open card's notes (fac-94, fac-105): the operator's decisions are among them, the card being its
 //! agents' memory. When they overflow, the section scrolls inside itself.
 
 use iced::widget::text::{LineHeight, Span, Wrapping};
@@ -39,7 +39,7 @@ pub fn body(app: &App) -> Element<'_, Message> {
     if notes.is_empty() {
         return side::empty("no notes yet");
     }
-    let struck = factory_types::decisions::withdrawn(notes);
+    let struck = mork_types::decisions::withdrawn(notes);
     let list = Column::with_children(notes.iter().enumerate().map(|(i, n)| note(i, notes.len(), n, struck[i])))
         .spacing(NOTE_GAP);
     container(list).id("notes").width(Length::Fill).into()
@@ -52,7 +52,7 @@ fn note(i: usize, total: usize, n: &str, struck: bool) -> Element<'_, Message> {
     let (who, words) = signed(&clean);
     let (bright, text) = if struck { (Tone::Dim, Tone::Dim) } else { (Tone::Bright, Tone::Text) };
     let mut spans: Vec<Span<'_>> = Vec::new();
-    let head = match factory_types::decisions::number(total, i) {
+    let head = match mork_types::decisions::number(total, i) {
         n if who.is_empty() => format!("#{n} "),
         n => format!("#{n} {who}: "),
     };

@@ -41,11 +41,6 @@ function kpis(burn: RecentBurn | null, shares: Share[], nowMs: number): Kpi[] {
       sub: burn === null ? "" : `over ${burn.ended_cards} ended ${plural(burn.ended_cards, "card", "cards")}`,
     },
     {
-      label: "Prompt Cache Hit",
-      value: burn?.cache_hit_percent !== undefined ? `${burn.cache_hit_percent}%` : "?",
-      sub: "of prompt tokens read from cache",
-    },
-    {
       label: "Cards Left",
       value: left !== undefined ? `~${left.cards}` : "?",
       sub: left !== undefined ? `on ${left.pool} week${resets}` : "no weekly pool read yet",
@@ -93,6 +88,27 @@ function SpendChart({ days, tzOffsetMin }: { days: DayBurn[]; tzOffsetMin: numbe
           })}
         </div>
       </ChartLayout>
+    </section>
+  );
+}
+
+function PromptCacheHit({ burn }: { burn: RecentBurn | null }) {
+  return (
+    <section className="mt-gutter">
+      <SectionHead title="Prompt Cache Hit" right={<span className="text-label-12 text-gray-700">Last 7 days</span>} />
+      {burn === null || burn.cache_by_model.length === 0 ? (
+        <p className="text-label-13 text-gray-700">{burn === null ? "Loading…" : "?"}</p>
+      ) : (
+        <List>
+          {burn.cache_by_model.map(({ cli, model, cache_hit_percent }) => (
+            <Row key={`${cli}\0${model}`}>
+              <span className="shrink-0 text-gray-700">{cli}</span>
+              <span className="min-w-0 flex-1 break-all">{model}</span>
+              <span className={MONO}>{cache_hit_percent === undefined ? "?" : `${cache_hit_percent}%`}</span>
+            </Row>
+          ))}
+        </List>
+      )}
     </section>
   );
 }
@@ -230,7 +246,7 @@ function BurnByRole({ burn }: { burn: RecentBurn | null }) {
   );
 }
 
-/** The Usage page at `/usage`: 7-day KPI strip, 14-day spend chart, account quotas, and burn by role. */
+/** The Usage page at `/usage`: weekly figures, per-model cache rates, daily spend, quotas, and burn by role. */
 export function Usage({
   screen,
   burn,
@@ -251,6 +267,7 @@ export function Usage({
       <PageScroll>
         <RefusalLine refusal={burnError} className="mb-3" />
         <KpiStrip items={kpis(burn, screen.top.usage, nowMs)} />
+        <PromptCacheHit burn={burn} />
         {days.length > 0 && <SpendChart days={days} tzOffsetMin={screen.tz_offset_min} />}
         <div className="mt-gutter grid grid-cols-1 gap-gutter xl:grid-cols-2">
           <AccountQuotas shares={screen.top.usage} nowMs={nowMs} live={live} />

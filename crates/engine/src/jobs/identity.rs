@@ -4,8 +4,8 @@
 use std::path::Path;
 use std::time::Duration;
 
-use factory_types::job::WallMode;
-use factory_types::{AgentKey, JobId};
+use mork_types::job::WallMode;
+use mork_types::{AgentKey, JobId};
 
 use super::folder::JobDir;
 use super::procs;
@@ -25,8 +25,8 @@ pub fn of_peer(jobs_dir: &Path, pid: i32) -> Option<(AgentKey, JobId)> {
     }
 }
 
-/// The unwalled job a peer of `factory.sock` runs in, if any (fac-25): that agent's, never
-/// Andrei's, whichever socket it reaches.
+/// The unwalled job a peer of `mork.sock` runs in, if any (fac-25): that agent's, never
+/// The operator's, whichever socket it reaches.
 pub fn of_unwalled_peer(jobs_dir: &Path, pid: i32) -> Option<(AgentKey, JobId)> {
     scan(jobs_dir, pid, procs::pidns(pid).as_deref(), false).0
 }
@@ -34,7 +34,7 @@ pub fn of_unwalled_peer(jobs_dir: &Path, pid: i32) -> Option<(AgentKey, JobId)> 
 fn scan(jobs_dir: &Path, pid: i32, ns: Option<&str>, walled: bool) -> (Option<(AgentKey, JobId)>, bool) {
     let Ok(rd) = std::fs::read_dir(jobs_dir) else { return (None, false) };
     // An unwalled job's processes share the engine's namespace: a walled peer is never one of them,
-    // whatever `FACTORY_JOB` it sets.
+    // whatever `MORK_JOB` it sets.
     let host = ns.is_some() && procs::pidns(std::process::id().cast_signed()).as_deref() == ns;
     let boot = procs::boot_id();
     let mut pending = false;

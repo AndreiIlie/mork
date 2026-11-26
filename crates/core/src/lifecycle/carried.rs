@@ -1,9 +1,9 @@
 //! The cards a run carries (fac-563): which run holds a card, who may join one, and the status writes each carried
 //! card's board gets with its run's.
 
-use factory_types::action::{Action, ActionStatus, ActionWhat, BoardEdit};
-use factory_types::card::{BoardCard, Card, Carried, Mode, Stage};
-use factory_types::{ActionId, CardId, ProjectId};
+use mork_types::action::{Action, ActionStatus, ActionWhat, BoardEdit};
+use mork_types::card::{BoardCard, Card, Carried, Mode, Stage};
+use mork_types::{ActionId, CardId, ProjectId};
 
 use crate::decide::{Ctx, Intent};
 use crate::post::Poster;

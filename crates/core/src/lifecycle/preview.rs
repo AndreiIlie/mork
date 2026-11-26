@@ -1,11 +1,11 @@
-//! A full card's preview worker (fac-196): it runs only once Andrei turned it on, with `preview` or `demo` (fac-222),
+//! A full card's preview worker (fac-196): it runs only once the operator turned it on, with `preview` or `demo` (fac-222),
 //! and its foreman may restart it while on (fac-348); the engine runs the worker, this records the call.
 
-use factory_types::CardId;
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::config::Config;
-use factory_types::reply::Role;
-use factory_types::state::{Agent, Sender};
+use mork_types::CardId;
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::config::Config;
+use mork_types::reply::Role;
+use mork_types::state::{Agent, Sender};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -13,7 +13,7 @@ use crate::post::Poster;
 use crate::state::State;
 
 /// The worker's output, in the clone where git doesn't see it and its seats can read it.
-pub const LOG: &str = ".git/factory-preview.log";
+pub const LOG: &str = ".git/mork-preview.log";
 
 /// What `preview` asks of a card's worker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,7 +45,7 @@ pub fn serves<'a>(card: &Card, config: &'a Config) -> Option<(&'a str, u16)> {
     Some((command, card.port?))
 }
 
-/// Every card whose preview should run, Andrei having turned it on, with its command and port.
+/// Every card whose preview should run, the operator having turned it on, with its command and port.
 pub fn wanted<'a>(state: &State, config: &'a Config) -> Vec<(CardId, &'a str, u16)> {
     let on = state.cards.values().filter(|c| c.preview);
     on.filter_map(|c| serves(c, config).map(|(cmd, port)| (c.id.clone(), cmd, port))).collect()
@@ -72,7 +72,7 @@ fn servable<'a>(state: &'a State, card: &str, config: &Config, demo: bool) -> Re
     Ok(c)
 }
 
-/// `preview <card> [action]`, or `demo <card>` (`demo`), past the buzz: Andrei's call, or its foreman's restart of a
+/// `preview <card> [action]`, or `demo <card>` (`demo`), past the buzz: the operator's call, or its foreman's restart of a
 /// preview that is on, recorded on the card and said in its places, and a demo's reply asked of its foreman.
 pub(super) fn command(
     state: &State,
@@ -93,10 +93,12 @@ pub(super) fn command(
     };
     let Some((_, port)) = serves(&c, ctx.config) else { return Decision::refused(format!("{id} has no port")) };
     let link = url(&c.id, port);
-    // Past the buzz, anyone but Andrei is the card's foreman restarting it.
-    let foreman = *from != Sender::Andrei;
+    // Past the buzz, anyone but the operator is the card's foreman restarting it.
+    let foreman = *from != Sender::Operator;
     if foreman && !c.preview {
-        return Decision::refused(format!("{id}'s preview is off: turning it on is Andrei's, his /preview or /demo."));
+        return Decision::refused(format!(
+            "{id}'s preview is off: turning it on is the operator's, his /preview or /demo."
+        ));
     }
     c.preview = action != Action::Stop;
     let mut p = Poster::for_ctx(state, ctx);
@@ -107,12 +109,12 @@ pub(super) fn command(
         crate::messages::announce::to_card(&mut p, &c.id, &format!("{id}/foreman restarted the preview"), &text);
     } else if c.preview {
         let text = format!(
-            "Andrei turned {id}'s preview on: it serves the clone at {link}, its output in `{LOG}`. He may be looking at it."
+            "The operator turned {id}'s preview on: it serves the clone at {link}, its output in `{LOG}`. He may be looking at it."
         );
         crate::messages::announce::to_card(&mut p, &c.id, &format!("{id}'s preview is on"), &text);
     }
     if demo {
-        let text = format!("Andrei asked for a demo of {id} at {link}. {}", reply_request(&link));
+        let text = format!("The operator asked for a demo of {id} at {link}. {}", reply_request(&link));
         crate::messages::requests::ask_agent(&mut p, &c.id, Role::Foreman, "Prepare a demo", &text);
     }
     p.journal("preview", Some(&id), json!({"on": c.preview, "demo": demo, "from": from}));
@@ -138,7 +140,7 @@ pub fn line(state: &State, a: &Agent, config: &Config) -> Option<String> {
     let command = project.preview.as_deref()?;
     let port = c.port.filter(|_| c.mode == Mode::Full)?;
     Some(format!(
-        "{id}'s preview runs only on Andrei's call, his /preview or /demo in its room: the engine then runs `{command}` in its clone and serves it at {} (`FACTORY_PORT`), its output in `{LOG}`. No seat starts or stops it; you may suggest one to him. While it is on, its foreman may restart it (`preview {id} restart`) to serve the clone's current code.",
+        "{id}'s preview runs only on the operator's call, his /preview or /demo in its room: the engine then runs `{command}` in its clone and serves it at {} (`MORK_PORT`), its output in `{LOG}`. No seat starts or stops it; you may suggest one to him. While it is on, its foreman may restart it (`preview {id} restart`) to serve the clone's current code.",
         url(&id, port)
     ))
 }

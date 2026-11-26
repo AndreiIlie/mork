@@ -1,20 +1,20 @@
-//! The actions a place or an ask offers (1.5.2, 1.12.6): each a command `decide` would accept now from Andrei, found by
+//! The actions a place or an ask offers (1.5.2, 1.12.6): each a command `decide` would accept now from the operator, found by
 //! deciding it and keeping the decision unused, so a view offers exactly what the engine would take.
 
-use factory_types::about::{Switch, SwitchPosition};
-use factory_types::ask::{Ask, AskKind};
-use factory_types::card::{Card, Mode};
-use factory_types::state::{Agent, Sender};
-use factory_types::view::Offer;
-use factory_types::{AgentKey, CardId, Command};
+use mork_types::about::{Switch, SwitchPosition};
+use mork_types::ask::{Ask, AskKind};
+use mork_types::card::{Card, Mode};
+use mork_types::state::{Agent, Sender};
+use mork_types::view::Offer;
+use mork_types::{AgentKey, CardId, Command};
 
 use crate::decide::{Ctx, Event, decide};
 use crate::messages::places::{self, MAIN};
 use crate::state::State;
 
-/// Whether `decide` would accept a command from Andrei now.
+/// Whether `decide` would accept a command from the operator now.
 pub(crate) fn accepted(state: &State, cmd: &Command, ctx: Ctx<'_>) -> bool {
-    let e = Event::Command { from: Sender::Andrei, cmd: cmd.clone() };
+    let e = Event::Command { from: Sender::Operator, cmd: cmd.clone() };
     matches!(decide(state, &e, ctx).answer, Some(Ok(_)))
 }
 
@@ -69,7 +69,7 @@ fn by_room(state: &State, place: &str, card: &CardId) -> impl Fn(&str) -> bool {
 fn card_actions(state: &State, card: &CardId, ctx: Ctx<'_>) -> Vec<Offer> {
     let c = || card.clone();
     // A later run carries what the last one did unless it landed them (fac-563): unlanded work goes on with no other set.
-    let last = state.cards.get(card).filter(|x| x.stage != factory_types::card::Stage::Done);
+    let last = state.cards.get(card).filter(|x| x.stage != mork_types::card::Stage::Done);
     let carries = last.map(|x| x.carries.iter().map(|k| k.id.clone()).collect()).unwrap_or_default();
     let candidates = [
         ("approve", Command::Approve { card: c() }),
@@ -211,6 +211,6 @@ pub fn answers_with<'s>(a: &Ask, agent: impl Fn(&AgentKey) -> Option<&'s Agent>)
 fn session_missing<'s, 'a>(agent: impl Fn(&AgentKey) -> Option<&'s Agent>, ask: &'a Ask) -> Option<&'a AgentKey> {
     let k = ask.agent.as_ref().filter(|_| ask.kind == AskKind::Error)?;
     let status = &agent(k)?.status;
-    let missing = matches!(status, factory_types::state::AgentStatus::Error { words } if crate::agents::fresh::session_missing(words));
+    let missing = matches!(status, mork_types::state::AgentStatus::Error { words } if crate::agents::fresh::session_missing(words));
     missing.then_some(k)
 }

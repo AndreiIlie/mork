@@ -1,12 +1,12 @@
 //! A door request arriving resolved (fac-1, fac-124): the same one asked again is answered by the first,
-//! an allowed one is put to run, and an outside one raises Andrei's ask.
+//! an allowed one is put to run, and an outside one raises the operator's ask.
 
-use factory_types::ActionId;
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::door::{CALLER_WENT, WAITING, status};
-use factory_types::door_call::{DoorCall, DoorState, Phase, Verdict};
-use factory_types::door_plan::Session;
-use factory_types::state::Sender;
+use mork_types::ActionId;
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::door::{CALLER_WENT, WAITING, status};
+use mork_types::door_call::{DoorCall, DoorState, Phase, Verdict};
+use mork_types::door_plan::Session;
+use mork_types::state::Sender;
 use serde_json::json;
 
 use super::approval::raise;

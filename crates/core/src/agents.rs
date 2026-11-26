@@ -20,9 +20,9 @@ pub mod subagents;
 pub mod turns;
 pub mod usage;
 
-use factory_types::Command;
-use factory_types::reply::Role;
-use factory_types::state::Sender;
+use mork_types::Command;
+use mork_types::reply::Role;
+use mork_types::state::Sender;
 
 use crate::decide::{Ctx, Decision};
 use crate::state::State;
@@ -45,12 +45,12 @@ pub fn command(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Dec
     }
 }
 
-// The planner is the foreman's child in name only: its model stays Andrei's choice (fac-633).
+// The planner is the foreman's child in name only: its model stays the operator's choice (fac-633).
 fn planner_of(state: &State, from: &Sender, agent: &str) -> Option<String> {
     let Sender::Agent(key) = from else { return None };
     let me = state.agents.get(key).filter(|a| a.role == Role::Foreman)?;
-    let target = state.agents.get(&factory_types::AgentKey::new(agent.trim()))?;
+    let target = state.agents.get(&mork_types::AgentKey::new(agent.trim()))?;
     let card = crate::messages::places::card_of(state, &me.place)?;
     (target.role == Role::Planner && crate::messages::places::card_of(state, &target.place) == Some(card))
-        .then(|| format!("{} is its card's planner, whose model only Andrei picks", target.key))
+        .then(|| format!("{} is its card's planner, whose model only the operator picks", target.key))
 }

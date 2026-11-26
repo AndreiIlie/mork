@@ -1,5 +1,5 @@
-//! `factory test`, inside a wall (4.9): a held lease reconnects within 30 s of a reload, or ends the command (exit 3);
-//! a lease ask says when it waits for a slot, and is asked again over a new connection if the factory goes away.
+//! `mork test`, inside a wall (4.9): a held lease reconnects within 30 s of a reload, or ends the command (exit 3);
+//! a lease ask says when it waits for a slot, and is asked again over a new connection if Mork goes away.
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
@@ -25,7 +25,7 @@ pub(super) struct Link {
     told: bool,
 }
 
-/// Why `factory test` couldn't talk to the factory.
+/// Why `mork test` couldn't talk to Mork.
 #[derive(Debug)]
 pub enum SlotError {
     NoSocket,
@@ -37,10 +37,10 @@ pub enum SlotError {
 impl std::fmt::Display for SlotError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoSocket => write!(f, "factory test runs inside a wall: no FACTORY_AGENT_SOCK"),
-            Self::Connect(e) => write!(f, "no factory to ask for a test slot: {e}"),
+            Self::NoSocket => write!(f, "mork test runs inside a wall: no MORK_AGENT_SOCK"),
+            Self::Connect(e) => write!(f, "no Mork to ask for a test slot: {e}"),
             Self::Io(e) => write!(f, "{e}"),
-            Self::Closed => write!(f, "the factory closed the connection"),
+            Self::Closed => write!(f, "Mork closed the connection"),
         }
     }
 }
@@ -48,7 +48,7 @@ impl std::fmt::Display for SlotError {
 impl std::error::Error for SlotError {}
 
 fn sock() -> Result<String, SlotError> {
-    std::env::var("FACTORY_AGENT_SOCK").ok().filter(|s| !s.is_empty()).ok_or(SlotError::NoSocket)
+    std::env::var("MORK_AGENT_SOCK").ok().filter(|s| !s.is_empty()).ok_or(SlotError::NoSocket)
 }
 
 fn connect() -> Result<Link, SlotError> {
@@ -86,10 +86,7 @@ impl Link {
             let Ok(v) = serde_json::from_str::<Value>(&text) else { continue };
             if v["waiting"]["id"].as_u64() == Some(id) && !self.told {
                 self.told = true;
-                eprintln!(
-                    "factory test: waiting for a slot ({})",
-                    v["waiting"]["why"].as_str().unwrap_or("none is free")
-                );
+                eprintln!("mork test: waiting for a slot ({})", v["waiting"]["why"].as_str().unwrap_or("none is free"));
             }
             if v.get("id").and_then(Value::as_u64) == Some(id) {
                 return Ok(v);
@@ -133,7 +130,7 @@ fn flatten(v: &Value) -> Result<Value, String> {
     }
 }
 
-/// Asks for a lease of `kind`, which may wait for a slot as long as it takes: a factory that goes away meanwhile (a
+/// Asks for a lease of `kind`, which may wait for a slot as long as it takes: Mork going away meanwhile (a
 /// reload, a restart, a new build) is waited for, and the ask made again to it. The `Err` is the exit code.
 pub(super) fn lease(link: &mut Link, args: &[String], own: &str, kind: &str, command: &[String]) -> Result<Value, i32> {
     let cmd = json!({"test.lease": {"kind": kind, "command": command}});
@@ -153,7 +150,7 @@ pub(super) fn lease(link: &mut Link, args: &[String], own: &str, kind: &str, com
     }
 }
 
-// A new connection, however long the factory takes; another build is handed the whole command.
+// A new connection, however long Mork takes; another build is handed the whole command.
 fn back(told: bool, args: &[String], own: &str) -> Result<Link, i32> {
     loop {
         clock::sleep(Duration::from_millis(300));
@@ -167,15 +164,15 @@ fn back(told: bool, args: &[String], own: &str) -> Result<Link, i32> {
     }
 }
 
-// The turn's `FACTORY_IO`, its seat's folder (fac-654); a job given none, its own `io/`.
+// The turn's `MORK_IO`, its seat's folder (fac-654); a job given none, its own `io/`.
 pub(super) fn io_dir() -> String {
-    if let Some(io) = std::env::var("FACTORY_IO").ok().filter(|io| !io.is_empty()) {
+    if let Some(io) = std::env::var("MORK_IO").ok().filter(|io| !io.is_empty()) {
         return io;
     }
     let home = sock()
         .ok()
         .and_then(|s| std::path::Path::new(&s).parent().and_then(|r| r.parent()).map(std::path::Path::to_path_buf));
-    let job = std::env::var("FACTORY_JOB").unwrap_or_default();
+    let job = std::env::var("MORK_JOB").unwrap_or_default();
     home.map(|h| h.join("jobs").join(job).join("io").display().to_string()).unwrap_or_default()
 }
 
@@ -189,13 +186,13 @@ fn parse(args: &[String]) -> (&'static str, Vec<String>) {
     }
 }
 
-/// `factory test …`; its exit code. `own` is this binary's commit.
+/// `mork test …`; its exit code. `own` is this binary's commit.
 pub fn run(args: &[String], own: &str) -> i32 {
     if args.first().map(String::as_str) == Some("--resume") {
         return resume_cmd(args, own);
     }
     if matches!(args.first().map(String::as_str), Some("--help" | "-h")) {
-        print!("{}", factory_core::maintenance::manuals::test_help());
+        print!("{}", mork_core::maintenance::manuals::test_help());
         return 0;
     }
     let (kind, command) = parse(args);
@@ -203,7 +200,7 @@ pub fn run(args: &[String], own: &str) -> i32 {
         Ok(l) => l,
         Err(e) => return fail(&e, 2),
     };
-    // A factory of another build: its binary runs instead, with the same arguments (1.6.4).
+    // Mork of another build: its binary runs instead, with the same arguments (1.6.4).
     if !link.build.is_empty() && link.build != own {
         return other_build(&link, args);
     }
@@ -234,10 +231,10 @@ pub fn run(args: &[String], own: &str) -> i32 {
         .unwrap_or_default();
     let code = run_leased(link, &lease, &argv, None, own);
     if code == 127 && kind == "run" && one_string(&command) {
-        eprintln!("factory test: {NOT_ONE_STRING}");
+        eprintln!("mork test: {NOT_ONE_STRING}");
     }
     if code == 126 && kind == "run" {
-        eprintln!("factory test: {NOT_A_PROGRAM}");
+        eprintln!("mork test: {NOT_A_PROGRAM}");
     }
     code
 }
@@ -267,10 +264,10 @@ pub(super) fn run_leased(
 }
 
 // A `--run` given its whole command as one quoted string, which the shell looks up as a program's name.
-const NOT_ONE_STRING: &str = "give the program and its arguments as separate words, e.g. `factory test --run npx jest a.test.js`, not as one quoted string";
+const NOT_ONE_STRING: &str = "give the program and its arguments as separate words, e.g. `mork test --run npx jest a.test.js`, not as one quoted string";
 
 // A `--run` whose first word is a file that isn't a program (the shell's 126, "Permission denied"), a test file's path say.
-const NOT_A_PROGRAM: &str = "the first word is run as a program: put the program first and the file after it as separate words, e.g. `factory test --run npx jest <file>`";
+const NOT_A_PROGRAM: &str = "the first word is run as a program: put the program first and the file after it as separate words, e.g. `mork test --run npx jest <file>`";
 
 fn one_string(command: &[String]) -> bool {
     matches!(command, [only] if only.contains(char::is_whitespace))
@@ -287,7 +284,7 @@ impl Running {
             Self::Child(c) => c.try_wait().ok().flatten().map(|s| s.code().unwrap_or(1)),
             // Our child still, across the exec (1.8.6.5): its real status (M3.24). One that
             // isn't can't be reaped, and its end is no pass.
-            Self::Pid(p) => match factory_sys::try_reap(*p) {
+            Self::Pid(p) => match mork_sys::try_reap(*p) {
                 Ok(code) => code,
                 Err(_) => (!std::path::Path::new(&format!("/proc/{p}")).exists() || zombie(*p)).then_some(1),
             },
@@ -304,7 +301,7 @@ impl Running {
     fn kill(&mut self) {
         let pid = self.pid();
         if pid > 0 {
-            let _ = factory_sys::kill(pid, super::procs::libc_sig::TERM);
+            let _ = mork_sys::kill(pid, super::procs::libc_sig::TERM);
             let start = clock::instant();
             let mut ended = false;
             while !ended && clock::elapsed(start) < Duration::from_secs(1) {
@@ -314,8 +311,8 @@ impl Running {
             // The guard leads its group (M3.25); a pid that leads none is ended alone. One that
             // ended and was reaped is signalled no more: its pid may be another's now.
             if !ended {
-                let _ = factory_sys::kill(-pid, super::procs::libc_sig::KILL);
-                let _ = factory_sys::kill(pid, super::procs::libc_sig::KILL);
+                let _ = mork_sys::kill(-pid, super::procs::libc_sig::KILL);
+                let _ = mork_sys::kill(pid, super::procs::libc_sig::KILL);
             }
         }
         match self {
@@ -323,7 +320,7 @@ impl Running {
                 let _ = c.wait();
             }
             Self::Pid(p) => {
-                let _ = factory_sys::try_reap(*p);
+                let _ = mork_sys::try_reap(*p);
             }
         }
     }
@@ -334,7 +331,7 @@ fn zombie(pid: i32) -> bool {
         .is_ok_and(|s| s.rsplit(')').next().is_some_and(|r| r.trim_start().starts_with('Z')))
 }
 
-// While `child` runs, a factory of another build is handed over to: its `factory test --resume <lease> --child <pid>`,
+// While `child` runs, Mork of another build is handed over to: its `mork test --resume <lease> --child <pid>`,
 // exec'd, keeps it our child (1.8.6.5).
 fn reclaim(lease: &str, own: &str, child: Option<i32>) -> Option<Link> {
     let start = clock::instant();
@@ -359,13 +356,13 @@ fn hand_over(link: &Link, lease: &str, own: &str, pid: i32) {
     }
     let args = ["test".to_owned(), "--resume".into(), lease.into(), "--child".into(), pid.to_string()];
     let err = super::launch::exec(&bin, &args, &[]);
-    eprintln!("factory test: couldn't run build {}: {err}", link.build);
+    eprintln!("mork test: couldn't run build {}: {err}", link.build);
 }
 
 fn other_build(link: &Link, args: &[String]) -> i32 {
     let home = link.home.clone().map(crate::paths::Home::new);
     let Some(bin) = home.map(|h| crate::builds::binary(&h, &link.build)).filter(|b| b.exists()) else {
-        return fail(&format!("the factory runs build {}, whose binary is missing", link.build), 2);
+        return fail(&format!("Mork runs build {}, whose binary is missing", link.build), 2);
     };
     let mut all = vec!["test".to_owned()];
     all.extend(args.iter().cloned());
@@ -402,14 +399,14 @@ fn hold(mut link: Link, lease: &str, mut running: Running, own: &str) -> i32 {
 fn resume_cmd(args: &[String], own: &str) -> i32 {
     let after = |flag: &str| args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1)).cloned();
     let (Some(lease), Some(pid)) = (after("--resume"), after("--child").and_then(|p| p.parse::<i32>().ok())) else {
-        return fail("factory test --resume <lease> --child <pid>", 2);
+        return fail("mork test --resume <lease> --child <pid>", 2);
     };
     let mut running = Running::Pid(pid);
     let since = clock::instant();
     let link = connect().ok().and_then(|mut l| l.resume(&lease, since).then_some(l));
     match link {
         Some(l) => {
-            eprintln!("factory test: resumed under build {own}");
+            eprintln!("mork test: resumed under build {own}");
             hold(l, &lease, running, own)
         }
         None => {
@@ -420,6 +417,6 @@ fn resume_cmd(args: &[String], own: &str) -> i32 {
 }
 
 pub(super) fn fail(words: &(impl std::fmt::Display + ?Sized), code: i32) -> i32 {
-    eprintln!("factory test: {words}");
+    eprintln!("mork test: {words}");
     code
 }

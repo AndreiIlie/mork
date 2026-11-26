@@ -3,10 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::config::Config;
-use factory_types::reply::Role;
-use factory_types::state::{Agent, AgentStatus, Job, JobStatus, Owed};
-use factory_types::{AgentKey, JobId, SessionId, card::Mode, card::Stage};
+use mork_types::config::Config;
+use mork_types::reply::Role;
+use mork_types::state::{Agent, AgentStatus, Job, JobStatus, Owed};
+use mork_types::{AgentKey, JobId, SessionId, card::Mode, card::Stage};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -26,9 +26,9 @@ pub struct SessionSeen {
     /// The session's cost total the stream last gave, in millionths of a dollar (Claude 7).
     pub cost_micros: Option<u64>,
     /// The CLI, model and effort the job launched with (fac-526).
-    pub selection: Option<factory_types::cost::Selection>,
+    pub selection: Option<mork_types::cost::Selection>,
     /// Running usage by session or Codex thread, including child threads (fac-526).
-    pub token_totals: std::collections::BTreeMap<String, factory_types::cost::Tokens>,
+    pub token_totals: std::collections::BTreeMap<String, mork_types::cost::Tokens>,
     /// The context window it reported, with its model (Claude 9).
     pub window: Option<(String, u64)>,
     /// The tokens its context held at the latest call it reported (fac-25).
@@ -96,6 +96,8 @@ fn awaiting_clone(state: &State, a: &Agent) -> bool {
 pub struct TurnPlan {
     pub agent: AgentKey,
     pub prompt: String,
+    /// The prefix shared by the full and short prompts, kept apart from the request on replay.
+    pub specification_bytes: usize,
     pub resume: bool,
     pub corrects: Option<JobId>,
     /// The images of the news it reads (1.4.8, Claude 4).
@@ -125,7 +127,7 @@ pub fn plan(state: &State, key: &AgentKey, ctx: Ctx<'_>, codex_exec: bool) -> Op
     let a = &a;
     // An opening request's retry is read against its own reply contract, whatever ran since (fac-626).
     let request = opening_retry(state, a);
-    let ((prompt, staged), resume, corrects) = asked(state, a, ctx, codex_exec, request)?;
+    let ((mut prompt, staged), resume, corrects) = asked(state, a, ctx, codex_exec, request)?;
     let (images, carry) = match a.owed.as_ref()? {
         Owed::Wake => (super::prompt::news_images(state, a), None),
         Owed::Retry { prompt, .. } => (Vec::new(), carried(state, key, prompt, request)),
@@ -133,9 +135,15 @@ pub fn plan(state: &State, key: &AgentKey, ctx: Ctx<'_>, codex_exec: bool) -> Op
     };
     // A session resumes only once it has started (1.4.6.4).
     let resume = resume && a.session_started;
-    let short = request.filter(|_| resume).map(|r| short(state, a, ctx, (r, codex_exec)));
+    let mut short = request.filter(|_| resume).map(|r| short(state, a, ctx, (r, codex_exec)));
+    let specification = super::prompt::after_compaction(state, a);
+    prompt.insert_str(0, &specification);
+    if let Some((text, _)) = &mut short {
+        text.insert_str(0, &specification);
+    }
     Some(TurnPlan {
         agent: key.clone(),
+        specification_bytes: specification.len(),
         prompt,
         resume,
         corrects,
@@ -163,9 +171,12 @@ fn asked(state: &State, a: &Agent, ctx: Ctx<'_>, codex_exec: bool, request: Opti
             (rerun(state, a, ctx.config, (asked, *resume, codex_exec), prompt), *resume, corrects.clone())
         }
         Owed::Correction { of, reason } if a.retiring.is_some() => {
-            ((super::lesson::refused(reason), BTreeMap::new()), true, Some(of.clone()))
+            let with_mork = ctx.config.mork.project.is_some();
+            ((super::lesson::refused(reason, with_mork), BTreeMap::new()), true, Some(of.clone()))
         }
-        Owed::Survey | Owed::Lesson => ((super::lesson::prompt(), BTreeMap::new()), true, None),
+        Owed::Survey | Owed::Lesson => {
+            ((super::lesson::prompt(ctx.config.mork.project.is_some()), BTreeMap::new()), true, None)
+        }
         Owed::Correction { of, reason } => {
             let refused = format!("Your reply was refused: {reason}. Reply again, fixed.");
             (rerun(state, a, ctx.config, (Correction(of), true, codex_exec), &refused), true, Some(of.clone()))
@@ -202,7 +213,12 @@ fn retried(state: &State, key: &AgentKey, prompt: &str) -> Option<JobId> {
     state
         .jobs
         .values()
-        .filter(|j| &j.owner == key && !j.io_copies.is_empty() && !j.stdin.is_empty() && prompt.ends_with(&j.stdin))
+        .filter(|j| {
+            &j.owner == key
+                && !j.io_copies.is_empty()
+                && !j.request_text().is_empty()
+                && prompt.ends_with(j.request_text())
+        })
         .map(|j| j.id.clone())
         .max()
 }
@@ -233,8 +249,8 @@ pub fn prepared(state: &State, job: &Job, session: Option<&str>, ctx: Ctx<'_>) -
     // A retry of an opening request keeps that request's prompt to run again, a cut's note with it (fac-626).
     if job.corrects.is_none() && !super::closing::ending_turn(agent) {
         let request = request_of(state, job);
-        let noted = request.id != job.id && job.stdin.starts_with(CUT_NOTE);
-        a.last_prompt = Some(if noted { cut_noted(&request.stdin) } else { request.stdin.clone() });
+        let noted = request.id != job.id && job.request_text().starts_with(CUT_NOTE);
+        a.last_prompt = Some(if noted { cut_noted(request.request_text()) } else { request.request_text().to_owned() });
     }
     a.owed = None;
     a.report_round = a.report_round.filter(|_| a.wake_after);
@@ -265,7 +281,7 @@ pub fn prepared(state: &State, job: &Job, session: Option<&str>, ctx: Ctx<'_>) -
 }
 
 // A correction or a retry is asked about its turn's head, never a newer one (M4.2).
-fn asked_head(state: &State, owed: &Agent, a: &Agent) -> Option<factory_types::Sha> {
+fn asked_head(state: &State, owed: &Agent, a: &Agent) -> Option<mork_types::Sha> {
     match owed.owed.as_ref()? {
         Owed::Wake => review_head(state, a),
         Owed::Retry { head, .. } => head.clone(),
@@ -285,7 +301,7 @@ fn news_reached(state: &State, owed: &Agent, a: &Agent) -> Option<u64> {
     }
 }
 
-fn review_head(state: &State, a: &Agent) -> Option<factory_types::Sha> {
+fn review_head(state: &State, a: &Agent) -> Option<mork_types::Sha> {
     let card = crate::messages::places::card_of(state, &a.place).and_then(|c| state.cards.get(&c))?;
     match a.role {
         Role::Foreman | Role::Reviewer if card.mode == Mode::Review => card.gates.review_asked.clone(),
@@ -314,6 +330,7 @@ pub fn session_seen(state: &State, id: &JobId, session: &SessionSeen, now: i64) 
     let cost = if job.detached {
         // A detached turn's session can still compact its live seat before exiting (fac-629).
         if session.compacted {
+            a.needs_specification = true;
             super::prompt::held::cut(&mut a);
         }
         None
@@ -343,7 +360,7 @@ pub fn recorded(state: &State, job: &Job) -> Decision {
     d.changes.push(Change::PutJob(Box::new(job.clone())));
     // Recorded: no longer owed (M3.9).
     if let Some(key) =
-        job.purpose.as_ref().map(factory_types::work::Purpose::key).filter(|k| state.owed_work.contains_key(k))
+        job.purpose.as_ref().map(mork_types::work::Purpose::key).filter(|k| state.owed_work.contains_key(k))
     {
         d.changes.push(Change::RemoveOwedWork { key });
     }

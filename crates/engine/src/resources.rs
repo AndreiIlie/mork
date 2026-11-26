@@ -1,9 +1,9 @@
-//! The machine's own load, read from `/proc` (1.12.2): every process on it counts, the factory's or not.
+//! The machine's own load, read from `/proc` (1.12.2): every process on it counts, Mork's or not.
 
 use std::fs;
 use std::time::Duration;
 
-use factory_types::view::{Ram, Resources};
+use mork_types::view::{Ram, Resources};
 
 use crate::clock;
 

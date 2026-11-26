@@ -1,10 +1,10 @@
 //! Places and who is in them (3.3, 3.4): main, a card's build room, its spec room and challenge place, a DM; the agent a
 //! name reaches from a place. The route a reply's message takes is `routes`'.
 
-use factory_types::card::{Card, Mode};
-use factory_types::reply::Role;
-use factory_types::state::Sender;
-use factory_types::{AgentKey, CardId, PlaceId, SeatName};
+use mork_types::card::{Card, Mode};
+use mork_types::reply::Role;
+use mork_types::state::Sender;
+use mork_types::{AgentKey, CardId, PlaceId, SeatName};
 
 use crate::decide::Ctx;
 use crate::state::State;
@@ -17,9 +17,9 @@ pub const MAIN: &str = "main";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlaceKind {
     Main,
-    /// `<card>`: its build room, Andrei's and its foreman's.
+    /// `<card>`: its build room, the operator's and its foreman's.
     Room(CardId),
-    /// `<card>/spec`: a full card's spec room, Andrei's and its planner's (fac-633).
+    /// `<card>/spec`: a full card's spec room, the operator's and its planner's (fac-633).
     Spec(CardId),
     /// `<card>/challenge`: its foreman's and planner's exchange, which no window shows (fac-633).
     Challenge(CardId),
@@ -154,7 +154,7 @@ pub fn dm_agent(state: &State, card: &CardId, role: Role) -> Result<Who, String>
 /// The seat a new agent of a role takes on a card: a review card's foreman has its own (fac-246).
 pub fn seat_of(card: Option<&Card>, role: Role) -> &'static str {
     if role == Role::Foreman {
-        factory_types::config::foreman_seat(card.is_some_and(|c| c.mode == Mode::Review))
+        mork_types::config::foreman_seat(card.is_some_and(|c| c.mode == Mode::Review))
     } else {
         role.as_str()
     }
@@ -169,20 +169,20 @@ pub(super) fn main_agent(name: &str, ctx: Ctx<'_>) -> Result<Who, String> {
     }
 }
 
-/// The leading `@name` of Andrei's words, if any (3.4.5, 5.10.1).
+/// The leading `@name` of the operator's words, if any (3.4.5, 5.10.1).
 pub(super) fn addressee(text: &str) -> Option<&str> {
     let first = text.split_whitespace().next()?;
     first.strip_prefix('@').filter(|n| !n.is_empty())
 }
 
-/// The agent Andrei's words (or a `say`) in a place reach: `to` when given, else a leading
+/// The agent the operator's words (or a `say`) in a place reach: `to` when given, else a leading
 /// `@name`, else the place's own (3.4.5).
 pub(super) fn addressed(state: &State, place: &str, to: Option<&str>, text: &str, ctx: Ctx<'_>) -> Result<Who, String> {
     let named = to.or_else(|| addressee(text));
     match kind(state, place) {
         PlaceKind::Main => match named {
             Some(n) => main_agent(n, ctx),
-            None => Err("Andrei's words in main reach nobody: name an agent".into()),
+            None => Err("The operator's words in main reach nobody: name an agent".into()),
         },
         PlaceKind::Room(card) => in_room(state, &card, named, false),
         PlaceKind::Spec(card) => in_room(state, &card, named, true),
@@ -245,7 +245,7 @@ pub(super) fn planner_sender(state: &State, from: &Sender, to: &Who) -> bool {
         return true;
     }
     let Some(card) = card_of(state, &to.place).and_then(|c| state.cards.get(&c)) else { return false };
-    if crate::lifecycle::facts::agreeing(card) || *from == Sender::Andrei || from.is_orchestrator() {
+    if crate::lifecycle::facts::agreeing(card) || *from == Sender::Operator || from.is_orchestrator() {
         return true;
     }
     let Sender::Agent(key) = from else { return false };
@@ -256,22 +256,22 @@ pub(super) fn planner_sender(state: &State, from: &Sender, to: &Who) -> bool {
     })
 }
 
-// The names that once posted for Andrei or a room, and its aliases: he is reached only by a raised hand (fac-390).
-const TO_ANDREI: [&str; 4] = ["andrei", "room", "runner", "factory"];
+// The names that once posted for the operator or a room, and its aliases: he is reached only by a raised hand (fac-390).
+const TO_OPERATOR: [&str; 4] = ["operator", "room", "runner", "mork"];
 
-/// Why an agent's words for Andrei go nowhere: where its hand's `ask` takes them instead (fac-390).
+/// Why an agent's words for the operator go nowhere: where its hand's `ask` takes them instead (fac-390).
 pub fn hand_only(child: bool) -> String {
     if child {
-        "you never reach Andrei: your hand's `ask` reaches your foreman as a request, and it carries what needs him"
+        "you never reach the operator: your hand's `ask` reaches your foreman as a request, and it carries what needs him"
             .into()
     } else {
-        "an agent reaches Andrei only by raising its hand: put it in your hand's `ask`, end your turn and wait for his answer".into()
+        "an agent reaches the operator only by raising its hand: put it in your hand's `ask`, end your turn and wait for his answer".into()
     }
 }
 
-/// Whether a name is one of those the router refuses for Andrei's sake.
-pub fn for_andrei(name: &str) -> bool {
-    TO_ANDREI.contains(&name.trim().to_lowercase().as_str())
+/// Whether a name is one of those the router refuses for the operator's sake.
+pub fn for_operator(name: &str) -> bool {
+    TO_OPERATOR.contains(&name.trim().to_lowercase().as_str())
 }
 
 /// Who an existing agent is, from its key.

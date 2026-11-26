@@ -8,22 +8,23 @@ mod common;
 use std::collections::BTreeMap;
 
 use common::{Sim, sha};
-use factory_core::decide::Event;
-use factory_core::door::{policy, target};
-use factory_core::queue::pr;
-use factory_core::views::{outside::Outside, screen};
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::config::TicketsConfig;
-use factory_types::door::{Op, SqlSelect};
-use factory_types::door_config::{Limits, LimitsLowered, Login, Sql, TARGETS_VERSION, Target, TargetsFile, Transport};
-use factory_types::work::OpenPr;
-use factory_types::{CardId, Sha};
+use mork_core::decide::Event;
+use mork_core::door::{policy, target};
+use mork_core::queue::pr;
+use mork_core::views::{outside::Outside, screen};
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::config::TicketsConfig;
+use mork_types::door::{Op, SqlSelect};
+use mork_types::door_config::{Limits, LimitsLowered, Login, Sql, TARGETS_VERSION, Target, TargetsFile, Transport};
+use mork_types::work::OpenPr;
+use mork_types::{CardId, Sha};
 use serde_json::json;
 
 const NEUTRAL_SCHEMA_REFUSED: &str = "refused: reading information_schema or the sys schema is not allowed because it scans metadata across every database on the server.";
 
-fn open_pr(pr_num: u64, title: &str, dest: &str, head: &Sha) -> OpenPr {
+fn open_pr(pr_num: u64, title: &str, dest: &str, head: &Sha, review_requested: bool) -> OpenPr {
     OpenPr {
+        review_requested,
         pr: pr_num,
         author: "colleague".into(),
         title: title.into(),
@@ -46,27 +47,47 @@ fn review_tag_gates_non_base_auto_review_and_head_following() {
     let h3 = sha("h3");
 
     // Without review_tag configured, a tagged PR targeting a non-base branch is ignored.
-    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(10, "Fix @review-bot", "develop", &h1)] });
+    sim.apply(Event::OpenPrsRead {
+        project: "ex".into(),
+        prs: vec![open_pr(10, "Fix @review-bot", "develop", &h1, false)],
+    });
     assert!(!sim.state.cards.contains_key(&CardId::new("pr-ex-10")));
 
     // With review_tag configured, an untagged non-base PR is still ignored.
-    sim.config.projects.get_mut("ex").unwrap().review_tag = Some("@review-bot".into());
-    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(11, "Fix without tag", "develop", &h1)] });
+    let mork_types::config::ForgeConfig::Bitbucket { review_tag, .. } =
+        &mut sim.config.projects.get_mut("ex").unwrap().forge
+    else {
+        panic!("expected hosted forge")
+    };
+    *review_tag = Some("@review-bot".into());
+    sim.apply(Event::OpenPrsRead {
+        project: "ex".into(),
+        prs: vec![open_pr(11, "Fix without tag", "develop", &h1, false)],
+    });
     assert!(!sim.state.cards.contains_key(&CardId::new("pr-ex-11")));
 
     // A non-base PR matching review_tag starts an auto review card on that dest.
-    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(12, "Fix @review-bot", "develop", &h1)] });
+    sim.apply(Event::OpenPrsRead {
+        project: "ex".into(),
+        prs: vec![open_pr(12, "Fix @review-bot", "develop", &h1, true)],
+    });
     let card_id = CardId::new("pr-ex-12");
     let c = sim.state.cards.get(&card_id).unwrap();
     assert_eq!(c.review.as_ref().and_then(|r| r.dest.as_deref()), Some("develop"));
 
     // Moving the head after dropping the tag does not follow an auto-started card on a tagged project.
-    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(12, "Fix untagged", "develop", &h2)] });
+    sim.apply(Event::OpenPrsRead {
+        project: "ex".into(),
+        prs: vec![open_pr(12, "Fix untagged", "develop", &h2, false)],
+    });
     let c = sim.state.cards.get(&card_id).unwrap();
     assert_eq!(c.head.as_ref(), Some(&h1));
 
     // Moving the head with the tag back follows and updates r.dest.
-    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(12, "Fix @review-bot", "release", &h3)] });
+    sim.apply(Event::OpenPrsRead {
+        project: "ex".into(),
+        prs: vec![open_pr(12, "Fix @review-bot", "release", &h3, true)],
+    });
     let c = sim.state.cards.get(&card_id).unwrap();
     assert_eq!(c.review.as_ref().and_then(|r| r.dest.as_deref()), Some("release"));
 }
@@ -77,7 +98,7 @@ fn tickets_config_gates_ticket_parsing_pr_text_branch_and_screen_detail() {
     sim.through_brief("ex-1", "ex");
 
     // Put an Azure DevOps ticket note at the top of the card's description.
-    let ticket_desc = "andrei 21.11: Azure DevOps 4123\n\nThe description.\n";
+    let ticket_desc = "operator 21.11: Azure DevOps 4123\n\nThe description.\n";
     sim.state.board.get_mut(&CardId::new("ex-1")).unwrap().description = ticket_desc.into();
     let mut card = sim.card("ex-1");
     card.description = ticket_desc.into();
@@ -92,12 +113,13 @@ fn tickets_config_gates_ticket_parsing_pr_text_branch_and_screen_detail() {
 
     sim.board("ex-2", "ex");
     sim.state.board.get_mut(&CardId::new("ex-2")).unwrap().description = ticket_desc.into();
-    sim.andrei(json!({"start": {"card": "ex-2", "mode": "full", "no-planner": true}})).unwrap();
+    sim.operator(json!({"start": {"card": "ex-2", "mode": "full", "no-planner": true}})).unwrap();
     sim.settle_actions();
     assert_eq!(sim.card("ex-2").branch.as_deref(), Some("ex-2"));
 
     // Enable [projects.ex.tickets]: screen detail, PR title, branch naming, and PR wording hold activate.
-    sim.config.projects.get_mut("ex").unwrap().tickets = Some(TicketsConfig {
+    sim.config.projects.get_mut("ex").unwrap().tickets = Some(TicketsConfig::AzureDevops {
+        token: "/cred".into(),
         api: "https://example.invalid/api/workitems".into(),
         page: "https://example.invalid/workitems/edit/".into(),
     });
@@ -108,7 +130,7 @@ fn tickets_config_gates_ticket_parsing_pr_text_branch_and_screen_detail() {
 
     sim.board("ex-3", "ex");
     sim.state.board.get_mut(&CardId::new("ex-3")).unwrap().description = ticket_desc.into();
-    sim.andrei(json!({"start": {"card": "ex-3", "mode": "full", "no-planner": true}})).unwrap();
+    sim.operator(json!({"start": {"card": "ex-3", "mode": "full", "no-planner": true}})).unwrap();
     sim.settle_actions();
     assert!(sim.card("ex-3").branch.as_deref().is_some_and(|b| b.starts_with("4123-")));
 }
@@ -116,13 +138,14 @@ fn tickets_config_gates_ticket_parsing_pr_text_branch_and_screen_detail() {
 #[test]
 fn tickets_config_holds_unworded_open_pr_and_formats_configured_page_url() {
     let mut sim = Sim::new();
-    sim.config.projects.get_mut("ex").unwrap().tickets = Some(TicketsConfig {
+    sim.config.projects.get_mut("ex").unwrap().tickets = Some(TicketsConfig::AzureDevops {
+        token: "/cred".into(),
         api: "https://example.invalid/api/workitems".into(),
         page: "https://example.invalid/workitems/edit/".into(),
     });
     sim.through_brief("ex-1", "ex");
     sim.state.board.get_mut(&CardId::new("ex-1")).unwrap().description =
-        "andrei 21.11: Azure DevOps 4123\n\nThe description.\n".into();
+        "operator 21.11: Azure DevOps 4123\n\nThe description.\n".into();
     sim.built("ex-1", "h1", "base1");
     sim.checks("ex-1", 0, &[]);
     sim.candidate("ex-1");
@@ -137,9 +160,9 @@ fn tickets_config_holds_unworded_open_pr_and_formats_configured_page_url() {
     // Adding PR wording and retrying OpenPr formats the title and configured page URL.
     sim.state.board.get_mut(&CardId::new("ex-1")).unwrap().description =
         "foreman 21.11: PR wording\n  Title: Fix billing totals\n  4123: Recalculate invoice totals on save.\n\
-         andrei 21.11: Azure DevOps 4123\n\nThe description.\n"
+         operator 21.11: Azure DevOps 4123\n\nThe description.\n"
             .into();
-    sim.andrei(json!({"action.retry": {"action": held.id}})).unwrap();
+    sim.operator(json!({"action.retry": {"action": held.id}})).unwrap();
     let retried = sim.pending().into_iter().find(|a| matches!(a.what, ActionWhat::OpenPr { .. })).unwrap();
     match retried.what {
         ActionWhat::OpenPr { title, description, .. } => {
@@ -211,4 +234,13 @@ fn schema_refusal_is_neutral_and_uses_target_schema_hint_and_door_help() {
     // Hinted target whose configured database is information_schema: policy database refusal site appends schema_hint.
     let err = policy::resolve(&file, "hinted_sys", &Op::SqlSelect(SqlSelect { query: "SELECT 1".into() })).unwrap_err();
     assert_eq!(err, format!("{NEUTRAL_SCHEMA_REFUSED} {hint}"));
+}
+
+#[test]
+fn projects_identifies_each_forge() {
+    let mut sim = Sim::new();
+    let result = sim.operator(json!({"projects": {}})).unwrap();
+    let projects = result["projects"]["projects"].as_array().unwrap();
+    assert_eq!(projects[0]["forge"], json!({"kind":"bitbucket","workspace":"ws","slug":"ex"}));
+    assert_eq!(projects[1]["forge"], json!({"kind":"local"}));
 }

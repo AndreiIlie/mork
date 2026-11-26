@@ -1,10 +1,10 @@
 // Four-step human pipeline (`Spec`, `Build`, `Verify`, `Land`) and compact pipelines for
 // `report` and `review` cards, shared by card headers, board rows, and room rows (fac-680).
 
-use factory_types::ask::AskKind;
-use factory_types::card::{Card, Landing, MockStep, Mode, Stage};
-use factory_types::reply::Role;
-use factory_types::view::{AgentLight, StageAt, StageKind, StageMark};
+use mork_types::ask::AskKind;
+use mork_types::card::{Card, Landing, MockStep, Mode, Stage};
+use mork_types::reply::Role;
+use mork_types::view::{AgentLight, StageAt, StageKind, StageMark};
 
 use super::findings::{current_round, folded_review};
 use super::outside::Outside;
@@ -225,7 +225,7 @@ pub(super) fn verify_sub(state: &State, card: &Card, outside: &Outside) -> Optio
         let k = t.items.len();
         let word = if k == 1 { "finding waits" } else { "findings wait" };
         let lead = if t.stalemate { "stalemate" } else { "failed" };
-        // A triage given to the orchestrator waits for it, not for Andrei (fac-691).
+        // A triage given to the orchestrator waits for it, not for the operator (fac-691).
         let given = state.asks.get(&t.ask).is_some_and(|a| a.open && a.given);
         let whom = if given { "orchestrator" } else { "you" };
         return Some(format!("{lead} · {k} {word} for {whom}"));
@@ -268,7 +268,7 @@ pub(super) fn is_held(state: &State, card: &Card) -> bool {
         })
 }
 
-fn is_held_landing_ask(state: &State, a: &factory_types::ask::Ask) -> bool {
+fn is_held_landing_ask(state: &State, a: &mork_types::ask::Ask) -> bool {
     a.kind == AskKind::Held
         && a.action
             .as_ref()
@@ -303,7 +303,7 @@ pub(super) fn land_sub(state: &State, card: &Card) -> Option<String> {
         Some(Landing::Merge { .. }) => {
             Some(card.pr.map_or_else(|| "merging".to_owned(), |n| format!("PR #{n} merging")))
         }
-        Some(Landing::HandMerged) => Some("merged outside the factory".to_owned()),
+        Some(Landing::HandMerged) => Some("merged outside Mork".to_owned()),
         _ => queue_position(state, card)
             .map(|pos| if pos == 0 { "in slot".to_owned() } else { format!("#{pos} in line") })
             .or_else(|| {

@@ -4,19 +4,19 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use factory_core::decide::{Event, JobEnd, SessionSeen};
-use factory_types::card::Card;
-use factory_types::config::ProjectConfig as Project;
-use factory_types::job::{JobKind, WallMode};
-use factory_types::state::Job;
-use factory_types::work::Purpose;
-use factory_types::{AgentKey, CardId, JobId};
+use mork_core::decide::{Event, JobEnd, SessionSeen};
+use mork_types::card::Card;
+use mork_types::config::ProjectConfig as Project;
+use mork_types::job::{JobKind, WallMode};
+use mork_types::state::Job;
+use mork_types::work::Purpose;
+use mork_types::{AgentKey, CardId, JobId};
 use serde_json::{Value, json};
 
 use super::Engine;
 use crate::jobs::context::Context;
 use crate::jobs::work::Order;
-use crate::{clock, faults, random};
+use crate::{clock, random};
 
 /// What a work job is made of, before its spec.
 pub(super) struct Plan {
@@ -29,7 +29,7 @@ pub(super) struct Plan {
     pub files: BTreeMap<String, String>,
     pub copies: BTreeMap<String, String>,
     pub project: Option<String>,
-    /// Run outside every wall: the factory's own wall tests, which no wall can start inside (fac-65).
+    /// Run outside every wall: Mork's own wall tests, which no wall can start inside (fac-65).
     pub unwalled: bool,
 }
 
@@ -67,7 +67,7 @@ impl Engine {
         if !dirty {
             return None;
         }
-        let checks = factory_types::work::CheckRun {
+        let checks = mork_types::work::CheckRun {
             head: head.clone(),
             exit: None,
             report: None,
@@ -80,7 +80,7 @@ impl Engine {
     }
 
     /// `StartJob`: the job recorded with its purpose, then launched (1.4.3).
-    pub(super) fn start_work(&mut self, purpose: &factory_types::work::Purpose) {
+    pub(super) fn start_work(&mut self, purpose: &mork_types::work::Purpose) {
         // Work is owed until its job is recorded (M3.9): a second intent for work already
         // recorded (owed at recovery, then issued again by `Started`) starts nothing (T6.3).
         if !self.state.owed_work.contains_key(&purpose.key()) {
@@ -111,7 +111,7 @@ impl Engine {
     }
 
     pub(super) fn launch_work(&mut self, purpose: &Purpose, plan: Plan, now: i64) -> bool {
-        let id = factory_core::state::names::job_id(now, &plan.owner, random::salt());
+        let id = mork_core::state::names::job_id(now, &plan.owner, random::salt());
         let io = self.opts.home.job(id.as_str()).join("io");
         let mut job = match job_of_plan(&self.ctx, plan, &id, &io, now) {
             Ok(job) => job,
@@ -126,7 +126,6 @@ impl Engine {
             job.checks_at = Some(self.checks_folder(card).0);
         }
         self.apply(&Event::JobRecorded { job: Box::new(job) });
-        faults::hit("work.after-intent");
         if self.state.jobs.contains_key(&id) {
             self.launch(&id);
             return true;
@@ -138,9 +137,9 @@ impl Engine {
         self.work_ends_at_once(purpose, JobEnd::Failed { words: why.to_owned() }, now);
     }
 
-    fn work_ends_at_once(&mut self, purpose: &Purpose, end: JobEnd, now: i64) {
+    pub(super) fn work_ends_at_once(&mut self, purpose: &Purpose, end: JobEnd, now: i64) {
         let owner = owner_of(purpose);
-        let id = factory_core::state::names::job_id(now, &owner, random::salt());
+        let id = mork_core::state::names::job_id(now, &owner, random::salt());
         let io = self.opts.home.job(id.as_str()).join("io");
         let places = self.ctx.unwalled_places(&io, Vec::new(), Vec::new(), None, &[]);
         let spec = self.ctx.spec(
@@ -160,7 +159,7 @@ impl Engine {
         self.apply(&Event::JobEnded { id, end });
     }
 
-    fn plan_work(&self, purpose: &Purpose) -> Result<Plan, String> {
+    pub(super) fn plan_work(&self, purpose: &Purpose) -> Result<Plan, String> {
         match purpose {
             Purpose::WallTests { .. } => self.plan_wall_run(purpose),
             Purpose::Clone { .. } | Purpose::Candidate { .. } | Purpose::Bundle { .. } => {
@@ -202,8 +201,8 @@ impl Engine {
         ];
         let purpose = Purpose::Check {
             card: card.clone(),
-            head: c.head.clone().unwrap_or_else(|| factory_types::Sha::new(fork)),
-            fork: factory_types::Sha::new(fork),
+            head: c.head.clone().unwrap_or_else(|| mork_types::Sha::new(fork)),
+            fork: mork_types::Sha::new(fork),
         };
         // The clone read-write (checks write caches and build output in it), the checks' checkout
         // read-only (1.4.11.1, M3.28, fac-165).
@@ -225,7 +224,7 @@ pub(super) fn owner_of(purpose: &Purpose) -> AgentKey {
         Purpose::Candidate { card, .. } => (card.as_str().to_owned(), "candidate"),
         Purpose::TrainRun { card, .. } => (card.as_str().to_owned(), "train"),
         Purpose::Suite { card, .. } => (card.as_str().to_owned(), "suite"),
-        Purpose::Build { .. } => ("factory".to_owned(), "build"),
+        Purpose::Build { .. } => ("mork".to_owned(), "build"),
         Purpose::WallTests { card, .. } => (card.as_str().to_owned(), "walls"),
     };
     AgentKey::new(format!("{who}/{what}"))

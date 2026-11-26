@@ -1,5 +1,5 @@
-use factory_core::state::{Change, State};
-use factory_types::note::Note;
+use mork_core::state::{Change, State};
+use mork_types::note::Note;
 use rusqlite::Transaction;
 
 use super::{Result, put_entity};

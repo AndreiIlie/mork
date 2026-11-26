@@ -1,4 +1,4 @@
-//! The engine's git (1.12.2): on Andrei's checkouts and the engine's own repositories, never
+//! The engine's git (1.12.2): on the operator's checkouts and the engine's own repositories, never
 //! on an agent's clone (1.2.4), each command a short one through `jobs`.
 
 pub mod checkout;
@@ -47,7 +47,7 @@ impl From<GitError> for String {
     }
 }
 
-/// Runs git in a folder (a mirror or Andrei's checkout); its trimmed output, or git's words.
+/// Runs git in a folder (a mirror or the operator's checkout); its trimmed output, or git's words.
 pub fn git(home: &Home, dir: &Path, args: &[&str], timeout: Duration) -> Result<String, GitError> {
     git_env(home, dir, args, timeout, &[])
 }
@@ -115,7 +115,7 @@ pub fn resolve(home: &Home, repo: &Path, commit: &str) -> Result<String, GitErro
     if out.status.success() && full.len() == 40 {
         Ok(full)
     } else {
-        Err(GitError::Refused(format!("{commit} isn't a commit of the factory repo")))
+        Err(GitError::Refused(format!("{commit} isn't a commit of Mork repo")))
     }
 }
 

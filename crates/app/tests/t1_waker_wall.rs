@@ -1,4 +1,4 @@
-// fac-265: the haiku's wall holds Andrei's Claude Code sessions folder and sockets, and nothing else of his;
+// fac-265: the haiku's wall holds the operator's Claude Code sessions folder and sockets, and nothing else of his;
 // no other seat's wall holds either.
 #![cfg(feature = "faults")]
 // why: test code: a failed unwrap is the test failing, which 1.12.4 leaves to tests.
@@ -11,18 +11,17 @@ use std::os::unix::net::UnixListener;
 use std::time::Duration;
 
 use common::Rig;
-use factory_engine::jobs::bounded::{self, Bounds};
-use factory_engine::jobs::context::Context;
-use factory_engine::jobs::waker;
-use factory_types::job::{JobKind, JobSpec};
-use factory_types::{AgentKey, JobId};
+use mork_engine::jobs::bounded::{self, Bounds};
+use mork_engine::jobs::context::Context;
+use mork_engine::jobs::waker;
+use mork_types::job::{JobKind, JobSpec};
+use mork_types::{AgentKey, JobId};
 use serde_json::{Value, json};
 
-// A context whose app home and runtime folder are the rig's, where Andrei's would be.
+// A context whose app home and runtime folder are the rig's, where the operator's would be.
 fn context(rig: &Rig) -> Context {
-    let config = factory_engine::config::read(&rig.t.config_dir().join("factory.toml")).unwrap();
-    let mut ctx =
-        Context::new(factory_engine::paths::Home::new(rig.fhome()), config, common::exe(), Default::default());
+    let config = mork_engine::config::read(&rig.t.config_dir().join("mork.toml")).unwrap();
+    let mut ctx = Context::new(mork_engine::paths::Home::new(rig.fhome()), config, common::exe(), Default::default());
     ctx.app_home = rig.t.home().display().to_string();
     ctx.app_runtime = rig.t.xdg().display().to_string();
     // Every source path a wall binds read-only or read-write must be there, as the app makes them.
@@ -56,10 +55,11 @@ fn listen(path: &std::path::Path) -> UnixListener {
     l
 }
 
-// Andrei's files and sockets, the seats' shared home and the waker's own, with dummy contents.
+// The operator's files and sockets, a seat's home and the waker's own, with dummy contents.
 fn plant(rig: &Rig) {
     let (home, runtime) = (rig.t.home(), rig.t.xdg());
-    let (shared, waker) = (rig.agent_home(), rig.fhome().join("waker-home"));
+    let (shared, waker) =
+        (mork_engine::paths::Home::new(rig.fhome()).seat_home("fixture"), rig.fhome().join("waker-home"));
     for d in [home.join(".claude/sessions"), runtime.join("cc-socks"), shared.join(".claude"), waker.join(".claude")] {
         std::fs::create_dir_all(d).unwrap();
     }
@@ -67,8 +67,9 @@ fn plant(rig: &Rig) {
     std::fs::write(home.join(".claude/.credentials.json"), "a dummy secret").unwrap();
     std::fs::write(home.join("dummy-secret"), "a dummy secret").unwrap();
     std::fs::write(runtime.join("other-file"), "a dummy secret").unwrap();
-    // The seats' shared home: their login and a settings file any seat can write; the waker has a login of its own.
-    std::fs::write(shared.join(".claude/.credentials.json"), "a dummy login").unwrap();
+    // The waker must read only its own credentials and settings.
+    std::fs::create_dir_all(rig.fhome().join("logins/claude")).unwrap();
+    std::fs::write(rig.fhome().join("logins/claude/.credentials.json"), "a dummy login").unwrap();
     std::fs::write(shared.join(".claude/settings.json"), "a dummy hook").unwrap();
     std::fs::write(waker.join(".claude/settings.json"), "the waker's own").unwrap();
     std::fs::write(waker.join(".claude/.credentials.json"), "the waker's login").unwrap();
@@ -82,7 +83,8 @@ fn fac_265_only_the_waker_sees_the_sessions_and_sockets() {
     let rig = Rig::new();
     let ctx = context(&rig);
     let (home, runtime) = (rig.t.home(), rig.t.xdg());
-    let (shared, waker) = (rig.agent_home(), rig.fhome().join("waker-home"));
+    let (shared, waker) =
+        (mork_engine::paths::Home::new(rig.fhome()).seat_home("fixture"), rig.fhome().join("waker-home"));
     plant(&rig);
     let _peer = listen(&runtime.join("cc-socks/peer.sock"));
     let _bus = listen(&runtime.join("bus"));
@@ -92,7 +94,7 @@ fn fac_265_only_the_waker_sees_the_sessions_and_sockets() {
     let what = json!({
         "read": [s(sessions.join("4242.json")), s(waker.join(".claude/.credentials.json")),
                  s(waker.join(".claude/settings.json")), s(shared.join(".claude/settings.json")),
-                 s(shared.join(".claude/.credentials.json")), s(home.join(".claude/sessions/4242.json")),
+                 s(rig.fhome().join("logins/claude/.credentials.json")), s(home.join(".claude/sessions/4242.json")),
                  s(home.join(".claude/.credentials.json")), s(home.join("dummy-secret")), s(runtime.join("other-file"))],
         "exists": [s(waker.clone())],
         "unix": [peer, s(runtime.join("bus"))],
@@ -107,10 +109,10 @@ fn fac_265_only_the_waker_sees_the_sessions_and_sockets() {
     {
         assert!(read(&haiku, &seen).starts_with("READ"), "the haiku couldn't read {}: {haiku}", seen.display());
     }
-    // Its home is its own: the shared home's config, a seat's to write, is not in its wall.
+    // Its home is its own: a seat's writable config, is not in its wall.
     for hidden in [
         shared.join(".claude/settings.json"),
-        shared.join(".claude/.credentials.json"),
+        rig.fhome().join("logins/claude/.credentials.json"),
         home.join(".claude/sessions/4242.json"),
         home.join(".claude/.credentials.json"),
         home.join("dummy-secret"),
@@ -130,11 +132,13 @@ fn fac_265_only_the_waker_sees_the_sessions_and_sockets() {
 
 // A seat's wall, made as every turn's is: neither the folder nor the sockets, and not the waker's home.
 fn seat_sees_none(ctx: &Context, rig: &Rig, what: &Value, peer: &str) {
-    let (home, shared, waker) = (rig.t.home(), rig.agent_home(), rig.fhome().join("waker-home"));
+    let (home, shared, waker) = (rig.t.home(), ctx.home.seat_home("fixture"), rig.fhome().join("waker-home"));
     let id = JobId::new("20261028-120000-wake-haiku-0001");
     let owner = AgentKey::new("main/echo");
-    let places = ctx.places(&shared, Vec::new(), Vec::new(), None, &[]).unwrap();
-    let env = ctx.env(&id, &owner, None, &[], &rig.fhome().join("jobs").join(id.as_str()).join("io"));
+    let mut places = ctx.places(&shared, Vec::new(), Vec::new(), None, &[]).unwrap();
+    mork_engine::seat_homes::login_places(&ctx.home, &shared, mork_types::config::Cli::Claude, &mut places).unwrap();
+    let mut env = ctx.env(&id, &owner, None, &[], &rig.fhome().join("jobs").join(id.as_str()).join("io"));
+    mork_engine::seat_homes::env(&ctx.home, &shared, &mut env);
     let cwd = shared.display().to_string();
     let seat = ctx.spec(&id, JobKind::Turn, &owner, Vec::new(), &cwd, &places, env, Some(ctx.ports(None)), 0);
     let seat = probed(ctx, seat, what);

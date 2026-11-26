@@ -4,8 +4,8 @@ use std::io::Write;
 
 use sha2::{Digest, Sha256};
 
-/// Appends this run's line to `$FAKE_LOG`: name, argv, folder, `FACTORY_JOB`,
-/// `FACTORY_AGENT`, a hash of stdin, the time.
+/// Appends this run's line to `$FAKE_LOG`: name, argv, folder, `MORK_JOB`,
+/// `MORK_AGENT`, a hash of stdin, the time.
 pub fn append(name: &str, argv: &[String], stdin: &[u8]) {
     let Some(path) = std::env::var_os("FAKE_LOG") else { return };
     let cwd = std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default();
@@ -17,8 +17,8 @@ pub fn append(name: &str, argv: &[String], stdin: &[u8]) {
         "overlap": overlap,
         "argv": argv,
         "cwd": cwd,
-        "job": std::env::var("FACTORY_JOB").unwrap_or_default(),
-        "agent": std::env::var("FACTORY_AGENT").unwrap_or_default(),
+        "job": std::env::var("MORK_JOB").unwrap_or_default(),
+        "agent": std::env::var("MORK_AGENT").unwrap_or_default(),
         "stdin_sha256": hash,
         "time": u64::try_from(time).unwrap_or(0),
     });

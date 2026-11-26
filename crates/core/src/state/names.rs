@@ -1,6 +1,6 @@
 //! Names the engine makes from state: a job's id (1.4.2).
 
-use factory_types::{AgentKey, JobId};
+use mork_types::{AgentKey, JobId};
 
 /// `<yyyymmdd-hhmmss>-<owner>-<4 hex>`, the owner's `/` made `-`.
 pub fn job_id(now_ms: i64, owner: &AgentKey, salt: u16) -> JobId {

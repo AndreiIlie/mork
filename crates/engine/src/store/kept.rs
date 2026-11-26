@@ -3,9 +3,9 @@
 
 use std::collections::BTreeSet;
 
-use factory_core::decide::Journal;
-use factory_core::state::Change;
-use factory_types::action::{Action, ActionWhat};
+use mork_core::decide::Journal;
+use mork_core::state::Change;
+use mork_types::action::{Action, ActionWhat};
 use rusqlite::{Transaction, params};
 
 use super::{Result, Store};
@@ -26,7 +26,7 @@ pub(super) fn change(tx: &Transaction<'_>, c: &Change) -> Result<()> {
 
 fn owed(tx: &Transaction<'_>, a: &Action) -> Result<()> {
     let key = format!("{OWED}{}", a.id);
-    if factory_core::door::owed_news(a) {
+    if mork_core::door::owed_news(a) {
         tx.execute("INSERT OR IGNORE INTO meta (key, value) VALUES (?1, '1')", params![key])?;
     } else {
         tx.execute("DELETE FROM meta WHERE key = ?1", params![key])?;

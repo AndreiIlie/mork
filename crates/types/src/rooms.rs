@@ -60,7 +60,7 @@ pub enum PlaceKind {
     Card {
         card: CardId,
     },
-    /// A full card's spec room, Andrei's and its planner's (fac-633).
+    /// A full card's spec room, the operator's and its planner's (fac-633).
     Spec {
         card: CardId,
     },

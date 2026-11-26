@@ -21,9 +21,9 @@ pub mod start;
 pub mod stops;
 pub mod visual;
 
-use factory_types::card::Card;
-use factory_types::state::Sender;
-use factory_types::{CardId, Command};
+use mork_types::card::Card;
+use mork_types::state::Sender;
+use mork_types::{CardId, Command};
 
 use crate::decide::{Ctx, Decision};
 use crate::state::State;

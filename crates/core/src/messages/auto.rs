@@ -1,9 +1,9 @@
-//! A project on auto (fac-381): Andrei's switch saves a default, each card that starts in the project starts delegated.
+//! A project on auto (fac-381): the operator's switch saves a default, each card that starts in the project starts delegated.
 //! It changes no card that exists, and asks follow each card's own toggle (fac-172).
 
-use factory_types::orchestrator::Auto;
-use factory_types::view::Offer;
-use factory_types::{Command, ProjectId};
+use mork_types::orchestrator::Auto;
+use mork_types::view::Offer;
+use mork_types::{Command, ProjectId};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};

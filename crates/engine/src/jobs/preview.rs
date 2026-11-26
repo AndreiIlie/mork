@@ -6,7 +6,7 @@ use std::path::Path;
 use std::process::{Child, Stdio};
 use std::time::Duration;
 
-use factory_types::job::{JobSpec, WallMode};
+use mork_types::job::{JobSpec, WallMode};
 
 use super::procs::libc_sig;
 use super::{launch, proclog, wall};
@@ -22,7 +22,7 @@ pub struct Worker {
 /// to the clone's `log`: opened by the walled shell, or beneath the clone with no link followed when unwalled.
 pub fn start(home_root: &Path, spec: &JobSpec, kind: &str, log: &str, command: &str) -> io::Result<Worker> {
     let walled = spec.wall != WallMode::None;
-    let started = format!("echo 'factory: {kind} started at {}'", clock::now_ms());
+    let started = format!("echo 'mork: {kind} started at {}'", clock::now_ms());
     let script =
         if walled { format!("exec >>{log} 2>&1; {started}; {command}") } else { format!("{started}; {command}") };
     let mut spec = spec.clone();
@@ -32,7 +32,7 @@ pub fn start(home_root: &Path, spec: &JobSpec, kind: &str, log: &str, command: &
     let (out, err) = if walled {
         (Stdio::null(), Stdio::null())
     } else {
-        let f = factory_sys::append_beneath(Path::new(&spec.cwd), Path::new(log))?;
+        let f = mork_sys::append_beneath(Path::new(&spec.cwd), Path::new(log))?;
         (Stdio::from(f.try_clone()?), Stdio::from(f))
     };
     let mut cmd = launch::guard(&argv);
@@ -61,12 +61,12 @@ impl Drop for Worker {
     // Its guard kills what it started on SIGTERM; what is left of its group goes after a grace.
     fn drop(&mut self) {
         if matches!(self.child.try_wait(), Ok(None)) {
-            let _ = factory_sys::kill(-self.group, libc_sig::TERM);
+            let _ = mork_sys::kill(-self.group, libc_sig::TERM);
             let ends = clock::instant();
             while matches!(self.child.try_wait(), Ok(None)) && clock::elapsed(ends) < Duration::from_secs(3) {
                 clock::sleep(Duration::from_millis(10));
             }
-            let _ = factory_sys::kill(-self.group, libc_sig::KILL);
+            let _ = mork_sys::kill(-self.group, libc_sig::KILL);
         }
         let _ = self.child.wait();
     }

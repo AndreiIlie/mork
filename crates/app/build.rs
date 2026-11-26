@@ -1,17 +1,17 @@
-// Reads .git without running git; FACTORY_BUILD_COMMIT, set by a `factory build` (1.8.3), wins.
+// Reads .git without running git; MORK_BUILD_COMMIT, set by a `mork build` (1.8.3), wins.
 #![forbid(unsafe_code)]
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 fn main() {
-    println!("cargo:rerun-if-env-changed=FACTORY_BUILD_COMMIT");
-    let (commit, dirty) = match std::env::var("FACTORY_BUILD_COMMIT") {
+    println!("cargo:rerun-if-env-changed=MORK_BUILD_COMMIT");
+    let (commit, dirty) = match std::env::var("MORK_BUILD_COMMIT") {
         Ok(c) if c.len() == 40 => (c, false),
         _ => (head_commit().unwrap_or_else(|| "0".repeat(40)), true),
     };
-    println!("cargo:rustc-env=FACTORY_COMMIT={commit}");
-    println!("cargo:rustc-env=FACTORY_DIRTY={dirty}");
+    println!("cargo:rustc-env=MORK_COMMIT={commit}");
+    println!("cargo:rustc-env=MORK_DIRTY={dirty}");
 }
 
 fn head_commit() -> Option<String> {

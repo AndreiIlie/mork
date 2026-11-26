@@ -1,9 +1,9 @@
 //! An agent's latest turn over its place (fac-96): only the row's own job's, a child's never
 //! shows in its parent's.
 
-use factory_types::seen::{Detail, DetailKind, TurnView};
 use iced::widget::{Column, container, responsive};
 use iced::{Element, Length, Padding};
+use mork_types::seen::{Detail, DetailKind, TurnView};
 
 use crate::app::{App, Message};
 use crate::fonts;

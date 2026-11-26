@@ -3,9 +3,9 @@
 
 use std::sync::Arc;
 
-use factory_types::chat::MessagesView;
-use factory_types::seen::TurnView;
-use factory_types::view::{BoardView, Doing, HistoryPage, MessageView, PlaceView, Screen};
+use mork_types::chat::MessagesView;
+use mork_types::seen::TurnView;
+use mork_types::view::{BoardView, Doing, HistoryPage, MessageView, PlaceView, Screen};
 use serde_json::{Value, json};
 
 use super::Engine;
@@ -124,7 +124,7 @@ fn bounded(mut v: PlaceView) -> PlaceView {
 }
 
 // Cut round proofs to WORDS_MAX and shed oldest rounds' proofs first if the overview still exceeds its budget (fac-698).
-fn bound_round_proofs(o: &mut factory_types::view::OverviewView, budget: usize) {
+fn bound_round_proofs(o: &mut mork_types::view::OverviewView, budget: usize) {
     for f in o.stages.iter_mut().filter_map(|s| s.round.as_mut()).flat_map(|r| r.findings.iter_mut()) {
         f.proof = cut_to(&f.proof, WORDS_MAX).0;
     }
@@ -176,7 +176,7 @@ pub(super) fn bounded_turn(t: &mut TurnView, steps: usize, budget: usize) {
     }
     let mut size = size_of(t);
     let split = t.steps.len().saturating_sub(RECENT_STEPS);
-    let thinking = Some(factory_types::seen::DetailKind::Thinking);
+    let thinking = Some(mork_types::seen::DetailKind::Thinking);
     cut |= evict_slice(&mut t.steps[..split], None, &mut size, budget, thinking);
     cut |= evict_slice(&mut t.steps[..split], None, &mut size, budget, None);
     cut |= evict_slice(&mut t.steps[split..], Some(&mut t.after), &mut size, budget, thinking);
@@ -185,11 +185,11 @@ pub(super) fn bounded_turn(t: &mut TurnView, steps: usize, budget: usize) {
 }
 
 fn evict_slice(
-    steps: &mut [factory_types::seen::StepView],
-    after: Option<&mut Vec<factory_types::seen::Detail>>,
+    steps: &mut [mork_types::seen::StepView],
+    after: Option<&mut Vec<mork_types::seen::Detail>>,
     size: &mut usize,
     budget: usize,
-    only: Option<factory_types::seen::DetailKind>,
+    only: Option<mork_types::seen::DetailKind>,
 ) -> bool {
     let mut cut = false;
     for details in steps.iter_mut().map(|s| &mut s.details).chain(after) {
@@ -257,7 +257,7 @@ fn shorten(b: &mut BoardView, r: Rows) {
 fn bounded_screen(mut s: Screen) -> Screen {
     for h in &mut s.hands {
         // Large triage asks list every finding for the native window; keep them whole until LINE_BUDGET trims (fac-680).
-        if h.kind != factory_types::ask::AskKind::Triage {
+        if h.kind != mork_types::ask::AskKind::Triage {
             h.words = cut_to(&h.words, WORDS_MAX).0;
         }
     }
@@ -288,20 +288,20 @@ fn bounded_screen(mut s: Screen) -> Screen {
 }
 
 impl Engine {
-    pub(super) fn ctx_now(&self) -> factory_core::decide::Ctx<'_> {
-        factory_core::decide::Ctx { now: crate::clock::now_ms(), config: &self.ctx.config, faults: self.faults() }
+    pub(super) fn ctx_now(&self) -> mork_core::decide::Ctx<'_> {
+        mork_core::decide::Ctx { now: crate::clock::now_ms(), config: &self.ctx.config, faults: self.faults() }
     }
 
     /// A place's view, its latest `tail` messages when one is given, as `core` works it out,
     /// within its line; without `full`, only the conversation (fac-280).
     pub(super) fn view(&self, place: &str, tail: Option<u64>, full: bool) -> Value {
         if !full {
-            let v = factory_core::views::conversation::messages(&self.state, place, tail);
+            let v = mork_core::views::conversation::messages(&self.state, place, tail);
             return serde_json::to_value(bounded_messages(v)).unwrap_or_default();
         }
-        let card = factory_core::messages::places::card_of(&self.state, place);
+        let card = mork_core::messages::places::card_of(&self.state, place);
         let outside = self.outside(card.as_ref());
-        let v = factory_core::views::place::place(&self.state, place, tail, &outside, self.ctx_now());
+        let v = mork_core::views::place::place(&self.state, place, tail, &outside, self.ctx_now());
         let mut v = bounded(v);
         v.turns = self.chat_turns(place, &v.messages, None);
         super::chat::bound(&mut v.turns);
@@ -310,14 +310,8 @@ impl Engine {
 
     /// `history`: a page of a place's messages before one, within its line (fac-42); the turns
     /// between them only with `turns` (fac-280).
-    pub(super) fn history(
-        &self,
-        place: &factory_types::PlaceId,
-        before: u64,
-        count: u64,
-        turns: Option<bool>,
-    ) -> Value {
-        let page = factory_core::views::conversation::history(&self.state, place.as_str(), before, count);
+    pub(super) fn history(&self, place: &mork_types::PlaceId, before: u64, count: u64, turns: Option<bool>) -> Value {
+        let page = mork_core::views::conversation::history(&self.state, place.as_str(), before, count);
         let mut page = bounded_page(page);
         if turns.unwrap_or(false) {
             page.turns = self.chat_turns(place.as_str(), &page.messages, Some(before));
@@ -329,7 +323,7 @@ impl Engine {
     /// The screen but the place shown (5).
     pub(super) fn screen_view(&self) -> Value {
         let outside = self.outside(None);
-        let s = factory_core::views::screen::screen(&self.state, &outside, self.ctx_now());
+        let s = mork_core::views::screen::screen(&self.state, &outside, self.ctx_now());
         serde_json::to_value(bounded_screen(s)).unwrap_or_default()
     }
 
@@ -351,12 +345,12 @@ impl Engine {
             .values()
             .filter_map(|a| {
                 if let Some(c) = self.seen.get(&a.key).and_then(|s| s.context.as_ref()) {
-                    let window = self.ctx.config.factory.effective_window(c.window);
+                    let window = self.ctx.config.mork.effective_window(c.window);
                     return Some(json!({"agent": a.key.as_str(), "used": c.used, "window": window, "model": c.model}));
                 }
-                let stored = factory_core::agents::costs::stored_context(&self.ctx.config, a)?;
+                let stored = mork_core::agents::costs::stored_context(&self.ctx.config, a)?;
                 let model = stored.model.map(str::to_owned).or_else(|| {
-                    factory_core::agents::models::setting(&self.state, &self.ctx.config, a).map(|s| s.model.model)
+                    mork_core::agents::models::setting(&self.state, &self.ctx.config, a).map(|s| s.model.model)
                 });
                 Some(json!({"agent": a.key.as_str(), "used": stored.used, "window": stored.window, "model": model}))
             })

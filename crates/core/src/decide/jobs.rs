@@ -1,9 +1,9 @@
 //! The end of every job of no agent's turn (section 4): settled once, then routed to what follows from its purpose.
 
-use factory_types::ask::{Ask, AskKind, Color};
-use factory_types::card::{Card, Mode};
-use factory_types::state::{Job, Settlement};
-use factory_types::work::{CheckRun, CloneStatus, Cloned, FinalRun, Made, Purpose};
+use mork_types::ask::{Ask, AskKind, Color};
+use mork_types::card::{Card, Mode};
+use mork_types::state::{Job, Settlement};
+use mork_types::work::{CheckRun, CloneStatus, Cloned, FinalRun, Made, Purpose};
 use serde_json::{Value, json};
 
 use super::{Ctx, Decision, Intent, JobEnd};
@@ -103,7 +103,7 @@ fn settlement(end: &JobEnd) -> Settlement {
     }
 }
 
-fn routed(p: &mut Poster<'_>, job: &factory_types::JobId, purpose: &Purpose, end: &JobEnd, ctx: Ctx<'_>) -> Settlement {
+fn routed(p: &mut Poster<'_>, job: &mork_types::JobId, purpose: &Purpose, end: &JobEnd, ctx: Ctx<'_>) -> Settlement {
     let card = purpose.card().and_then(|c| p.card(c));
     // Non-bundle work settling after a card ended must never revive it, retry, or raise asks (fac-664).
     if let Some(c) = card.as_ref().filter(|c| !c.stage.is_live() && !matches!(purpose, Purpose::Bundle { .. })) {
@@ -149,19 +149,17 @@ fn routed(p: &mut Poster<'_>, job: &factory_types::JobId, purpose: &Purpose, end
     }
 }
 
-fn finished(
-    p: &mut Poster<'_>,
-    mut card: Card,
-    purpose: &Purpose,
-    job: &factory_types::JobId,
-    v: &Value,
-    ctx: Ctx<'_>,
-) {
+fn finished(p: &mut Poster<'_>, mut card: Card, purpose: &Purpose, job: &mork_types::JobId, v: &Value, ctx: Ctx<'_>) {
     card.job_cuts = 0;
     if !keeps_held_run(&card, purpose) {
         card.failed_job = None;
     }
     p.put_card(card.clone());
+    if let Some(hit) = v["secret_hit"].as_str()
+        && matches!(purpose, Purpose::Check { .. } | Purpose::TrainRun { checks: true, .. })
+    {
+        return crate::lifecycle::gates::secret_found(p, card, purpose, hit, ctx);
+    }
     match purpose {
         Purpose::Clone { at, .. } if card.mode == Mode::Review => {
             let resolved = serde_json::from_value(v["resolved"].clone()).unwrap_or_default();
@@ -184,8 +182,8 @@ fn finished(
             }
             Err(e) => failed(p, Some(card), purpose, &format!("its status.json isn't valid: {e}")),
         },
-        Purpose::Check { .. } => match serde_json::from_value::<CheckRun>(v.clone()) {
-            Ok(run) => crate::lifecycle::gates::check_ended(p, card, run, ctx),
+        Purpose::Check { fork, .. } => match serde_json::from_value::<CheckRun>(v.clone()) {
+            Ok(run) => crate::lifecycle::gates::check_ended(p, card, run, fork, ctx),
             Err(e) => failed(p, Some(card), purpose, &format!("its result isn't valid: {e}")),
         },
         // An older build's suite, join or run of the queue in the card's clone: the train runs them now.
@@ -268,7 +266,7 @@ fn failed(p: &mut Poster<'_>, card: Option<Card>, purpose: &Purpose, words: &str
     }
     // A closed or landed card's last bundle that couldn't run (no clone yet): the clone goes anyway.
     if crate::lifecycle::gates::ended(&c) && matches!(purpose, Purpose::Bundle { .. }) {
-        p.act(factory_types::action::ActionWhat::RemoveClone { card: id, run: c.run, keep_proofs: false });
+        p.act(mork_types::action::ActionWhat::RemoveClone { card: id, run: c.run, keep_proofs: false });
         return;
     }
     if crate::queue::order::is_train(Some(purpose)) {
@@ -321,7 +319,7 @@ fn recovery(c: &Card, purpose: &Purpose, words: &str) -> Option<Purpose> {
 
 // A bundle ran: the tip it brought in is the clone's base now (4.12.1), and the red ask of the
 // card's bundle that failed before is answered (fac-12).
-fn bundled(p: &mut Poster<'_>, mut card: Card, base_in: Option<&factory_types::Sha>) -> Card {
+fn bundled(p: &mut Poster<'_>, mut card: Card, base_in: Option<&mork_types::Sha>) -> Card {
     if let Some(tip) = base_in {
         card.base_tip = Some(tip.clone());
         p.put_card(card.clone());

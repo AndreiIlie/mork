@@ -1,11 +1,11 @@
 //! A submission its reopened mock (fac-591) or its return to brief (fac-638) withdrew: its bundles, takes, checks,
 //! push and PR opening retired by identity: none moves the head, passes or fails a later submission, asks or reruns.
 
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::card::Card;
-use factory_types::state::Settlement;
-use factory_types::work::Purpose;
-use factory_types::{CardId, JobId, Sha};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::card::Card;
+use mork_types::state::Settlement;
+use mork_types::work::Purpose;
+use mork_types::{CardId, JobId, Sha};
 use serde_json::json;
 
 use crate::decide::{Ctx, Intent, JobEnd};

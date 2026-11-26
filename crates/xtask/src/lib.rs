@@ -29,11 +29,11 @@ pub fn root() -> PathBuf {
 
 /// The crates of 1.1.1, by folder name, and their package names.
 pub const CRATES: &[(&str, &str)] = &[
-    ("types", "factory-types"),
-    ("core", "factory-core"),
-    ("engine", "factory-engine"),
-    ("ui", "factory-ui"),
-    ("sys", "factory-sys"),
-    ("app", "factory-app"),
-    ("fakes", "factory-fakes"),
+    ("types", "mork-types"),
+    ("core", "mork-core"),
+    ("engine", "mork-engine"),
+    ("ui", "mork-ui"),
+    ("sys", "mork-sys"),
+    ("app", "mork-app"),
+    ("fakes", "mork-fakes"),
 ];

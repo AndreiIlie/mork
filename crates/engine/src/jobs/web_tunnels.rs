@@ -10,8 +10,8 @@ use std::process::{Child, Stdio};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
-use factory_types::config::TunnelConfig;
-use factory_types::web_tunnel::Status;
+use mork_types::config::TunnelConfig;
+use mork_types::web_tunnel::Status;
 
 use super::{
     door_ssh::{self, Scratch},
@@ -102,7 +102,7 @@ fn poll_tunnels(tunnels: &mut BTreeMap<String, Tunnel>, changed: &impl Fn(String
     true
 }
 
-// The forwards Andrei left open, opened again when the app starts: a restart or a reload ends them.
+// The forwards the operator left open, opened again when the app starts: a restart or a reload ends them.
 fn wanted(home: &Home, configured: &BTreeMap<String, TunnelConfig>) -> Vec<String> {
     let text = std::fs::read_to_string(open_list(home)).unwrap_or_default();
     configured.keys().filter(|name| text.lines().any(|l| l == name.as_str())).cloned().collect()
@@ -196,7 +196,7 @@ impl Drop for Tunnel {
         if matches!(self.child.try_wait(), Ok(None))
             && let Ok(pid) = i32::try_from(self.child.id())
         {
-            let _ = factory_sys::kill(pid, super::procs::libc_sig::TERM);
+            let _ = mork_sys::kill(pid, super::procs::libc_sig::TERM);
         }
         let _ = self.child.wait();
     }

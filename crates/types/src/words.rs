@@ -1,4 +1,4 @@
-//! A command typed as words (`start ex-550 report`): `factory ctl`'s subcommands and the window's
+//! A command typed as words (`start ex-550 report`): `mork ctl`'s subcommands and the window's
 //! `/` lines read them here, one parser for both (1.7, 5.10.2, 1.12.6).
 
 use serde_json::{Map, Value, json};

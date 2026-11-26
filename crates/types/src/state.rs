@@ -11,15 +11,15 @@ use crate::job::{JobKind, JobSpec};
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Sender {
-    /// Andrei: the window, or `factory ctl` outside a wall (`factory.sock`).
-    Andrei,
+    /// The operator: the window, or `mork ctl` outside a wall (`mork.sock`).
+    Operator,
     /// An agent, known by the wall its connection came from (`agent.sock`).
     Agent(AgentKey),
     Engine,
-    /// A project's outside orchestrator: `factory ctl --as orchestrator:<project>` on `factory.sock`,
-    /// never counted as Andrei (fac-244).
+    /// A project's outside orchestrator: `mork ctl --as orchestrator:<project>` on `mork.sock`,
+    /// never counted as the operator (fac-244).
     Orchestrator(crate::ProjectId),
-    /// Andrei's outside PA, which the orchestrators replaced (fac-244): only on what it sent before, as
+    /// The operator's outside PA, which the orchestrators replaced (fac-244): only on what it sent before, as
     /// nothing says which of them it was; nobody sends as it now.
     Pa,
 }
@@ -30,7 +30,7 @@ pub const ORCHESTRATOR: &str = "orchestrator:";
 impl Sender {
     pub fn label(&self) -> String {
         match self {
-            Self::Andrei => "andrei".into(),
+            Self::Operator => "operator".into(),
             Self::Agent(a) => a.as_str().to_owned(),
             Self::Engine => "engine".into(),
             Self::Orchestrator(p) => format!("{ORCHESTRATOR}{p}"),
@@ -38,7 +38,7 @@ impl Sender {
         }
     }
 
-    /// An orchestrator, or the PA they replaced: an outside session on Andrei's socket, never him.
+    /// An orchestrator, or the PA they replaced: an outside session on the operator's socket, never him.
     pub fn is_orchestrator(&self) -> bool {
         matches!(self, Self::Orchestrator(_) | Self::Pa)
     }
@@ -72,7 +72,7 @@ pub struct Message {
     pub kind: MessageKind,
     pub headline: String,
     pub text: String,
-    /// Andrei's messages in main are numbered (3.3.5).
+    /// The operator's messages in main are numbered (3.3.5).
     pub number: Option<u64>,
     /// A hand, when the message is one (3.5.4): its text, color and ask.
     pub hand: Option<Box<crate::reply::Hand>>,
@@ -89,7 +89,7 @@ pub struct Message {
     /// anyone. None on what an agent's reply didn't send, and on messages from before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intent: Option<crate::reply::Intent>,
-    /// The ask Andrei gave an orchestrator that this message of its closed: his delegation, so its
+    /// The ask the operator gave an orchestrator that this message of its closed: his delegation, so its
     /// answer carries his authority (fac-160). Only the engine sets it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delegated: Option<crate::AskId>,
@@ -196,6 +196,9 @@ pub struct Agent {
     pub session: Option<crate::SessionId>,
     /// Whether the session has started (Claude's `system/init`, Codex's `thread.started`).
     pub session_started: bool,
+    /// Compaction requires the next prompt to restore the card specification (fac-737).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub needs_specification: bool,
     pub status: AgentStatus,
     pub owed: Option<Owed>,
     /// The last message seq the agent has seen, for its news.
@@ -279,7 +282,7 @@ pub struct Agent {
     /// turn sends a section again only when it changed. Empty for a new or compacted session.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub held: BTreeMap<String, String>,
-    /// Its `$FACTORY_IO` folder's id under the home's `io/` (fac-654): its first turn's job id, kept for the seat's
+    /// Its `$MORK_IO` folder's id under the home's `io/` (fac-654): its first turn's job id, kept for the seat's
     /// lifetime; none before its first turn.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub io: Option<String>,
@@ -311,7 +314,7 @@ pub struct Choice {
     pub cli: crate::config::Cli,
     pub model: String,
     pub effort: crate::config::Effort,
-    /// `andrei`, the picking agent's key, or `factory.toml` for the roster's.
+    /// `operator`, the picking agent's key, or `mork.toml` for the roster's.
     pub by: String,
     /// The roster phase it was made in (fac-399): it holds within that phase alone, until its seat leaves it; none is
     /// an older build's, or one its seat's phase change expired.
@@ -324,7 +327,7 @@ pub struct Choice {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fresh {
     pub replaces: Option<crate::SessionId>,
-    /// `andrei`, or the asking agent's key.
+    /// `operator`, or the asking agent's key.
     pub by: String,
     pub at: i64,
     /// A turn of the old session runs: the session is replaced once it ends.
@@ -360,6 +363,9 @@ pub struct Job {
     pub owner: AgentKey,
     pub spec: JobSpec,
     pub stdin: String,
+    /// The current specification prefixed to this request. A retry gets its own current prefix.
+    #[serde(default)]
+    pub specification_bytes: usize,
     pub io_files: BTreeMap<String, String>,
     pub status: JobStatus,
     pub settled: Option<Settlement>,
@@ -406,6 +412,13 @@ pub struct Job {
     /// The prompt sections this turn sent, by name (fac-620): its agent holds them once its model answered.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub staged: BTreeMap<String, String>,
+}
+
+impl Job {
+    /// The request to replay, apart from any specification restored for this particular turn.
+    pub fn request_text(&self) -> &str {
+        self.stdin.get(self.specification_bytes..).unwrap_or(&self.stdin)
+    }
 }
 
 /// A place: main, a card's room, a DM, or a test place.

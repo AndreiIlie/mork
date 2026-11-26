@@ -3,13 +3,12 @@
 
 use std::io::Read;
 
-use factory_types::catalog::{CommandSpec, FieldType};
-use factory_types::protocol::MAX_LINE;
+use mork_types::catalog::{CommandSpec, FieldType};
+use mork_types::protocol::MAX_LINE;
 use serde_json::{Value, json};
 
 const BOTH: &str = "spawn takes its task in words or from --task-file, not both";
-const USAGE: &str =
-    "usage: factory ctl spawn <card> <role> --task-file <path, or - for stdin> [--model …] [--effort …]";
+const USAGE: &str = "usage: mork ctl spawn <card> <role> --task-file <path, or - for stdin> [--model …] [--effort …]";
 
 fn refused(why: impl std::fmt::Display) -> String {
     format!("{why}\n{USAGE}")
@@ -30,12 +29,12 @@ pub fn prepare(spec: &CommandSpec, args: &[String]) -> Result<Option<Pending>, S
 fn checked(spec: &CommandSpec, args: &[String]) -> Result<Option<Pending>, String> {
     let Some((path, rest)) = split(spec, args)? else { return Ok(None) };
     // Words that already make a whole spawn carry a task of their own.
-    if factory_types::words::command(spec, &rest).is_ok() {
+    if mork_types::words::command(spec, &rest).is_ok() {
         return Err(BOTH.into());
     }
     // In front, so the placeholder never fills a dangling option at the end.
     let named: Vec<String> = ["--task".to_owned(), String::new()].into_iter().chain(rest).collect();
-    let cmd = factory_types::words::command(spec, &named)?;
+    let cmd = mork_types::words::command(spec, &named)?;
     Ok(Some(Pending { path, cmd }))
 }
 
@@ -88,7 +87,7 @@ impl Pending {
         // Refuse before sending: the engine rejects lines over MAX_LINE.
         if line.len() + 1 > MAX_LINE {
             let size = line.len() + 1;
-            return Err(refused(format!("the spawn request is {size} bytes, over the factory's {MAX_LINE}-byte line")));
+            return Err(refused(format!("the spawn request is {size} bytes, over Mork's {MAX_LINE}-byte line")));
         }
         Ok(line)
     }
@@ -96,8 +95,8 @@ impl Pending {
 
 #[cfg(test)]
 mod tests {
-    use factory_types::catalog::CATALOG;
-    use factory_types::protocol::MAX_LINE;
+    use mork_types::catalog::CATALOG;
+    use mork_types::protocol::MAX_LINE;
     use serde_json::{Value, json};
 
     use super::{BOTH, Pending, prepare};

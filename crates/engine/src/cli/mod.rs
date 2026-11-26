@@ -4,6 +4,7 @@
 pub mod agy;
 pub mod appserver;
 pub mod claude;
+pub mod claude_hooks;
 pub mod codex;
 pub mod history;
 pub mod limits;
@@ -18,7 +19,7 @@ use serde_json::Value;
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct StreamState {
     /// The Claude account captured before this job started, retained across engine restarts.
-    pub account: Option<factory_types::usage::Account>,
+    pub account: Option<mork_types::usage::Account>,
     /// Claude's `system/init`, Codex's `thread.started` or agy's `init` was seen.
     pub session_started: bool,
     /// Codex's thread id, or agy's conversation id.
@@ -29,7 +30,7 @@ pub struct StreamState {
     /// Claude's session cost so far (`total_cost_usd`), when reported.
     pub cost_usd: Option<f64>,
     /// Running usage by session or Codex thread, including child threads (fac-526).
-    pub token_totals: std::collections::BTreeMap<String, factory_types::cost::Tokens>,
+    pub token_totals: std::collections::BTreeMap<String, mork_types::cost::Tokens>,
     /// A `rate_limit_event` with status `rejected` was seen: its reset, in epoch seconds, when
     /// known.
     pub limit_rejected: Option<Option<i64>>,
@@ -43,7 +44,7 @@ pub struct StreamState {
     pub model: Option<String>,
     /// The usage-limit windows the stream reported, latest first per window.
     pub limits: Vec<limits::Window>,
-    /// The seat's folder and the agent home, for shortening paths.
+    /// The working folder and HOME of the job, for shortening paths.
     pub folder: String,
     pub home: String,
     /// The job's agent: a foreman's or planner's word to the other shows as a step without its text (fac-633).
@@ -54,13 +55,13 @@ pub struct StreamState {
     pub windows: std::collections::BTreeMap<String, u64>,
     /// Text and thinking waiting for the next step of their thread: the turn's own (none), or a
     /// subagent's, by the tool call that ran it (fac-96).
-    pub pending: std::collections::BTreeMap<Option<String>, Vec<factory_types::seen::Detail>>,
+    pub pending: std::collections::BTreeMap<Option<String>, Vec<mork_types::seen::Detail>>,
     /// Each detail's identity in the stream, so a line read twice adds none.
     pub detail_keys: std::collections::BTreeSet<String>,
     /// Details were left out, to keep within `turn::DETAILS_MAX`.
     pub details_cut: bool,
     /// The agent's own step list, its steps in the order they were made (fac-128).
-    pub list: Vec<factory_types::seen::ListStep>,
+    pub list: Vec<mork_types::seen::ListStep>,
     /// The planner's calls waiting for their results, by tool call: its name and its input.
     pub planner_calls: std::collections::BTreeMap<String, (String, Value)>,
     /// When the engine read the line in hand, in epoch ms; none when no read of it was stamped
@@ -91,7 +92,7 @@ pub struct Step {
     pub id: String,
     pub words: String,
     /// The text and thinking its thread gave since its step before (fac-96).
-    pub details: Vec<factory_types::seen::Detail>,
+    pub details: Vec<mork_types::seen::Detail>,
     /// The subagent's tool call it ran under; none for the turn's own.
     pub thread: Option<String>,
     /// When it started and ended, as read (fac-206).
@@ -107,24 +108,24 @@ pub struct ContextReport {
 }
 
 impl StreamState {
-    /// A stream of a seat working in `folder`, with the agent home `home`.
+    /// A stream of a seat working in `folder` with HOME set to `home`.
     pub fn for_folder(folder: &str, home: &str) -> Self {
         Self { folder: folder.to_owned(), home: home.to_owned(), ..Self::default() }
     }
 }
 
 /// Whether a job's stream is Codex's app-server's: a live Codex turn's (fac-389).
-pub fn app_server(spec: &factory_types::job::JobSpec) -> bool {
-    matches!(spec.live, Some(factory_types::job::Live::Codex { .. }))
+pub fn app_server(spec: &mork_types::job::JobSpec) -> bool {
+    matches!(spec.live, Some(mork_types::job::Live::Codex { .. }))
 }
 
 /// Reads one complete line of a turn's stream, in the format its command speaks.
-pub fn read_line(cli: factory_types::config::Cli, app_server: bool, st: &mut StreamState, line: &str) {
+pub fn read_line(cli: mork_types::config::Cli, app_server: bool, st: &mut StreamState, line: &str) {
     match cli {
-        factory_types::config::Cli::Claude => claude::read_line(st, line),
-        factory_types::config::Cli::Codex if app_server => appserver::read_line(st, line),
-        factory_types::config::Cli::Codex => codex::read_line(st, line),
-        factory_types::config::Cli::Agy => agy::read_line(st, line),
+        mork_types::config::Cli::Claude => claude::read_line(st, line),
+        mork_types::config::Cli::Codex if app_server => appserver::read_line(st, line),
+        mork_types::config::Cli::Codex => codex::read_line(st, line),
+        mork_types::config::Cli::Agy => agy::read_line(st, line),
     }
 }
 

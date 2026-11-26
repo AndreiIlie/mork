@@ -231,7 +231,7 @@ function MessageRow({ m, tzOffsetMin, run }: { m: MessageView; tzOffsetMin: numb
       />
     );
   }
-  if (m.kind === "agent" && m.hand === null && m.to !== null && m.to !== "andrei") {
+  if (m.kind === "agent" && m.hand === null && m.to !== null && m.to !== "operator") {
     return (
       <FoldedRow
         label={`${authorName(m.from)} → ${m.to}`}
@@ -243,7 +243,7 @@ function MessageRow({ m, tzOffsetMin, run }: { m: MessageView; tzOffsetMin: numb
       />
     );
   }
-  const andrei = m.kind === "andrei";
+  const operator = m.kind === "operator";
   const engine = m.kind === "engine";
   const body =
     m.hand !== null
@@ -264,7 +264,7 @@ function MessageRow({ m, tzOffsetMin, run }: { m: MessageView; tzOffsetMin: numb
       <span className="font-mono text-label-12 tabular-nums text-gray-700">{clockTime(m.time_ms, tzOffsetMin)}</span>
     </div>
   );
-  if (andrei) {
+  if (operator) {
     return (
       <article className="py-3">
         <div className="w-fit max-w-full border border-gray-400 bg-gray-100 px-3 py-2">

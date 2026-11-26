@@ -1,4 +1,4 @@
-//! Andrei's check of the walls and the real CLIs (1.11); any failure exits 1.
+//! The operator's check of the walls and the real CLIs (1.11); any failure exits 1.
 //! The CLIs are whatever `claude` and `codex` the toolchains and PATH give, so a test runs it with the fakes.
 
 mod deny;
@@ -10,7 +10,7 @@ mod wall;
 
 pub use probe::run as probe;
 
-use factory_engine::paths::Home;
+use mork_engine::paths::Home;
 
 /// The checks, as they end.
 #[derive(Debug, Default)]
@@ -39,7 +39,7 @@ impl Report {
 pub fn run(real: &Home, bin: &std::path::Path) -> i32 {
     let mut report = Report::default();
     // SIGINT or SIGTERM: the check stops where it is, and its clean-up still runs (M5.28).
-    if let Err(e) = factory_sys::install_term_flag() {
+    if let Err(e) = mork_sys::install_term_flag() {
         report.check("the check's signals taken", Err(e.to_string()));
         return report.code();
     }
@@ -53,7 +53,7 @@ pub fn run(real: &Home, bin: &std::path::Path) -> i32 {
     report.check("the scratch home, repository and config", Ok(()));
     let started = s.start();
     let up = started.is_ok();
-    report.check("the factory starts in the scratch home", started);
+    report.check("Mork starts in the scratch home", started);
     if up {
         turns::run(&mut s, &mut report);
         // A failed step may leave a turn hung: the steps after it would wait it out (fac-170).

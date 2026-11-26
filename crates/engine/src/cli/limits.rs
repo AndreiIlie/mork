@@ -6,7 +6,7 @@ use serde_json::Value;
 /// One window of a usage limit, as a CLI reported it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Window {
-    pub account: Option<factory_types::usage::Account>,
+    pub account: Option<mork_types::usage::Account>,
     pub seen_ms: Option<i64>,
     /// The account's own (`account`), or a model's or a limit's own.
     pub bucket: String,
@@ -20,8 +20,8 @@ pub struct Window {
 
 pub const ACCOUNT: &str = "account";
 
-/// The account's organization and plan from the agent home's `.claude.json`; none if unknown.
-pub fn claude_account(config: &Value) -> Option<factory_types::usage::Account> {
+/// The account's organization and plan from a Claude configuration, when both are known.
+pub fn claude_account(config: &Value) -> Option<mork_types::usage::Account> {
     let a = config.get("oauthAccount")?;
     let id = a.get("accountUuid")?.as_str().filter(|s| !s.is_empty())?;
     let org = a.get("organizationUuid")?.as_str().filter(|s| !s.is_empty())?;
@@ -31,7 +31,7 @@ pub fn claude_account(config: &Value) -> Option<factory_types::usage::Account> {
         _ if a.get("userRateLimitTier").and_then(Value::as_str).is_some_and(|t| t.contains("claude_max")) => "max",
         _ => return None,
     };
-    Some(factory_types::usage::Account { id: format!("{org}/{id}"), plan: plan.into() })
+    Some(mork_types::usage::Account { id: format!("{org}/{id}"), plan: plan.into() })
 }
 
 /// A window's display name: the 5h, week and Fable pools, or the vendor's other window name.
@@ -206,7 +206,7 @@ pub fn agy_read(text: &str) -> Result<Vec<Window>, String> {
     };
     let gemini = find("Gemini Models").ok_or("agy's limits answer has no Gemini Models group")?;
     let mut windows = agy_group(ACCOUNT, Some(gemini));
-    windows.extend(agy_group(factory_types::config::AGY_3P_BUCKET, find("Claude and GPT models")));
+    windows.extend(agy_group(mork_types::config::AGY_3P_BUCKET, find("Claude and GPT models")));
     Ok(windows)
 }
 

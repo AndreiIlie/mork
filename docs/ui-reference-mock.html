@@ -1,0 +1,1622 @@
+<!--
+Temporary visual reference mock for the Web UI moonshot (fac-695 through fac-701).
+Delete this file once fac-701 lands.
+
+Known mock quirks already flagged by the operator (do NOT copy these two bugs into web/):
+1. .nav-group had `padding: 6px 0` above its divider, leaving a 6px black gap under an active last row; production bordered containers holding full-bleed rows must have zero vertical padding.
+2. The 14-day chart used `<text>` inside a `preserveAspectRatio="none"` SVG, stretching day labels horizontally; production charts must render axis/tick labels as HTML elements around the plot.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mork UI Moonshot - v3 Mock</title>
+<style>
+  @font-face {
+    font-family: "Geist";
+    src: url("./fonts/geist.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Geist Mono";
+    src: url("./fonts/geist-mono.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  :root {
+    --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+
+    /* Strict spacing scale: ONE outer gutter (--pad-page), ONE inner edge (--pad) */
+    --pad-page: 24px;
+    --pad: 16px;
+    --pad-row-y: 12px;
+    --gap: 12px;
+
+    /* Locked Cold Vercel Geist Dark Palette */
+    --bg: hsl(0 0% 4%);
+    --bg-sub: hsl(0 0% 6%);
+    --surface: hsl(0 0% 9%);
+    --surface-2: hsl(0 0% 12%);
+    --border: hsl(0 0% 18%);
+    --border-strong: hsl(0 0% 27%);
+    --text-1: hsl(0 0% 93%);
+    --text-2: hsl(0 0% 63%);
+    --text-3: hsl(0 0% 46%);
+
+    --green: hsl(131 41% 46%);
+    --amber: hsl(39 100% 57%);
+    --red: hsl(358 75% 59%);
+
+    --btn-primary-bg: hsl(0 0% 93%);
+    --btn-primary-fg: hsl(0 0% 4%);
+    --btn-primary-hover: hsl(0 0% 78%);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  button:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--text-1); outline-offset: -2px; }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  code { font-family: var(--font-mono); font-size: 12px; background: var(--surface-2); padding: 1px 4px; color: var(--text-1); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+  /* ==================== PRIMITIVES (Strict symmetric padding, zero ad-hoc overrides) ==================== */
+  .dot { width: 7px; height: 7px; border-radius: 9999px; flex-shrink: 0; display: inline-block; }
+  .dot.green { background: var(--green); }
+  .dot.amber { background: var(--amber); }
+  .dot.red { background: var(--red); }
+  .dot.grey { background: var(--border-strong); }
+  .dot.pulse { animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .btn {
+    height: 30px; padding: 0 12px;
+    font-size: 13px; font-weight: 500;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); border: 1px solid var(--btn-primary-bg); }
+  .btn-primary:hover { background: var(--btn-primary-hover); border-color: var(--btn-primary-hover); }
+  .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text-1); }
+  .btn-secondary:hover { background: var(--surface); border-color: var(--border-strong); }
+  .btn-ghost { color: var(--text-2); border: 1px solid transparent; }
+  .btn-ghost:hover { background: var(--surface); color: var(--text-1); }
+  .btn-sm { height: 26px; padding: 0 10px; font-size: 12px; }
+
+  /* Text link primitive: zero box, zero padding asymmetry, underline hover */
+  .text-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12.5px; color: var(--text-2);
+    text-decoration: none;
+  }
+  .text-link:hover { color: var(--text-1); text-decoration: underline; text-underline-offset: 3px; }
+
+  .seg { display: inline-flex; border: 1px solid var(--border); }
+  .seg button {
+    height: 28px; padding: 0 12px;
+    font-size: 12.5px; color: var(--text-2);
+    border-right: 1px solid var(--border);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button:hover { color: var(--text-1); }
+  .seg button.active { background: var(--surface-2); color: var(--text-1); font-weight: 500; }
+
+  /* ==================== APP SHELL ==================== */
+  .app { display: flex; height: 100vh; width: 100vw; }
+
+  .sidebar {
+    width: 260px; flex-shrink: 0;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .brand {
+    height: 48px; padding: 0 var(--pad);
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand-mark {
+    width: 18px; height: 18px;
+    background: var(--text-1); color: var(--bg);
+    display: grid; place-items: center; font-weight: 700; font-size: 11px;
+  }
+  .brand-name { font-weight: 600; font-size: 14px; letter-spacing: -0.02em; }
+  .brand-sha { margin-left: auto; font-size: 12px; color: var(--text-3); }
+
+  .update-bar {
+    padding: 8px var(--pad);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px; font-size: 12px;
+  }
+  .update-bar .sha { color: var(--text-2); }
+
+  .nav-scroll { flex: 1; overflow-y: auto; }
+  .nav-top { padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .nav-item {
+    width: 100%; height: 36px; padding: 0 var(--pad);
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13.5px; color: var(--text-2); text-align: left;
+  }
+  .nav-item:hover { background: var(--surface); color: var(--text-1); }
+  .nav-item.active { background: var(--surface-2); color: var(--text-1); font-weight: 500; }
+  .nav-badge { margin-left: auto; font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 8px; }
+  .nav-hand-inline { display: inline-flex; align-items: center; gap: 5px; color: var(--amber); }
+
+  .nav-group { border-bottom: 1px solid var(--border); padding: 6px 0; }
+  .nav-group-head {
+    display: flex; align-items: center;
+    height: 28px; padding: 0 var(--pad);
+    font-size: 12px; color: var(--text-3);
+  }
+  .nav-group-head .cnt { margin-left: auto; }
+
+  .nav-orch {
+    width: 100%; height: 32px; padding: 0 var(--pad);
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; color: var(--text-2); text-align: left;
+  }
+  .nav-orch:hover { background: var(--surface); color: var(--text-1); }
+  .nav-orch.active { background: var(--surface-2); color: var(--text-1); font-weight: 500; }
+  .nav-orch .orch-tag { margin-left: auto; font-size: 11.5px; color: var(--text-3); }
+
+  .nav-card { width: 100%; padding: 8px var(--pad); text-align: left; }
+  .nav-card:hover { background: var(--surface); }
+  .nav-card.active { background: var(--surface-2); }
+  .nav-card-top { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .nav-card-id { color: var(--text-1); font-weight: 500; }
+  .nav-card-stage { margin-left: auto; font-size: 11.5px; color: var(--text-3); }
+  .nav-card-title {
+    margin-top: 2px; padding-left: 15px;
+    font-size: 12px; color: var(--text-2);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .nav-card-bar { margin-top: 6px; margin-left: 15px; height: 2px; background: var(--border); }
+  .nav-card-bar > span { display: block; height: 100%; background: var(--green); transition: width 400ms ease; }
+
+  .rail-usage {
+    border-top: 1px solid var(--border);
+    padding: 12px var(--pad);
+    text-align: left;
+  }
+  .rail-usage:hover { background: var(--surface); }
+  .rail-usage-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+  .rail-usage-head .spend { color: var(--text-1); font-size: 11.5px; }
+  .rail-q-row {
+    display: grid; grid-template-columns: 64px 1fr 34px;
+    align-items: center; gap: 8px; margin-top: 6px; font-size: 11px; color: var(--text-3);
+  }
+  .rail-q-track { height: 4px; background: var(--surface-2); position: relative; }
+  .rail-q-fill { height: 100%; background: var(--text-2); }
+  .rail-q-fill.ok { background: var(--green); }
+  .rail-q-fill.hot { background: var(--amber); }
+  .rail-q-pace { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--text-1); }
+
+  .sidebar-footer {
+    border-top: 1px solid var(--border);
+    height: 36px; padding: 0 var(--pad);
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-2);
+  }
+  .sidebar-footer .sub { margin-left: auto; font-size: 11.5px; color: var(--text-3); }
+
+  /* ==================== MAIN SHELL (Consistent --pad-page everywhere) ==================== */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .view.active { display: flex; }
+
+  .page-header {
+    padding: 16px var(--pad-page);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .header-top { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+  .header-top .sep { color: var(--text-3); }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+  .title-row { margin-top: 6px; display: flex; align-items: center; gap: 14px; }
+  .page-title {
+    font-size: 22px; line-height: 28px; font-weight: 600;
+    letter-spacing: -0.03em; color: var(--text-1);
+    min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .mock-select {
+    height: 26px; background: var(--bg); border: 1px solid var(--border); color: var(--text-2);
+    padding: 0 8px; font-family: var(--font-mono); font-size: 11.5px;
+  }
+
+  /* ==================== CARD ROOM (50/50 SPLIT, UNIFORM EDGE PADDING) ==================== */
+  .stepper { margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+  .step-btn { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 8px; color: var(--text-3); }
+  .step-btn:first-child { margin-left: -8px; }
+  .step-btn:hover { background: var(--surface); color: var(--text-1); }
+  .step-btn.passed { color: var(--text-2); }
+  .step-btn.current { color: var(--text-1); font-weight: 500; background: var(--surface); border: 1px solid var(--border); margin-left: 0; }
+  .step-btn .step-sub { font-size: 12px; color: var(--text-2); font-weight: 400; }
+  .step-conn { width: 20px; height: 1px; background: var(--border); }
+
+  .seat-strip { margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .seat-strip-label { font-size: 12px; color: var(--text-3); }
+  .seat-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 26px; padding: 0 10px;
+    background: var(--bg); border: 1px solid var(--border);
+    font-size: 12px; color: var(--text-2);
+  }
+  .seat-chip:hover { background: var(--surface); border-color: var(--border-strong); color: var(--text-1); }
+  .seat-chip.open { background: var(--surface-2); border-color: var(--text-1); color: var(--text-1); }
+  .seat-chip .sname { color: var(--text-1); font-weight: 500; }
+  .seat-chip .smeta { font-size: 11.5px; color: var(--text-3); }
+  .mini-ctx { width: 24px; height: 3px; background: var(--border); display: inline-block; }
+  .mini-ctx > span { display: block; height: 100%; background: var(--text-2); }
+
+  .split-workspace { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+  .overview-col { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .overview-scroll { flex: 1; overflow-y: auto; }
+
+  /* STAGE LIST: Flush edge-to-edge inside left pane, EVERY row uses exact --pad-page (24px) left & right! */
+  .timeline { border-bottom: 1px solid var(--border); }
+  .stage-card { border-bottom: 1px solid var(--border); background: var(--bg); }
+  .stage-card:last-child { border-bottom: none; }
+  .stage-card.current { background: var(--bg-sub); }
+
+  .stage-head {
+    width: 100%;
+    padding: var(--pad-row-y) var(--pad-page);
+    display: flex; align-items: center; gap: var(--gap);
+    text-align: left;
+  }
+  .stage-head:hover { background: var(--surface); }
+  .stage-mark {
+    width: 12px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; color: var(--text-2); flex-shrink: 0;
+  }
+  .stage-name { font-weight: 500; font-size: 13.5px; color: var(--text-1); }
+  .stage-summary { font-size: 12.5px; color: var(--text-2); }
+  .stage-prog { width: 64px; height: 4px; background: var(--border); }
+  .stage-prog > span { display: block; height: 100%; background: var(--text-1); }
+  .stage-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-3); }
+  .stage-chev { color: var(--text-3); font-size: 11px; transition: transform 120ms; }
+  .stage-card.open .stage-chev { transform: rotate(90deg); }
+
+  /* Stage body: ZERO extra nested border box, ZERO uneven padding! Every child row owns its own exact padding. */
+  .stage-body { border-top: 1px solid var(--border); display: none; }
+  .stage-card.open .stage-body { display: block; }
+
+  /* Live rows inside Verify Round 3: EXACT same 24px right edge as stage-head, uniform +24px child indent on left! */
+  .sub-row {
+    padding: var(--pad-row-y) var(--pad-page) var(--pad-row-y) calc(var(--pad-page) + 24px);
+    border-bottom: 1px solid var(--border);
+  }
+  .sub-row:last-child { border-bottom: none; }
+  .sub-row-btn {
+    width: 100%; text-align: left;
+    padding: var(--pad-row-y) var(--pad-page) var(--pad-row-y) calc(var(--pad-page) + 24px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: var(--gap);
+  }
+  .sub-row-btn:last-child { border-bottom: none; }
+  .sub-row-btn:hover { background: var(--surface); }
+  .sub-row-btn.focused { background: var(--surface-2); }
+
+  /* Grandchild rows (reviewers under review foreman): uniform +48px left, SAME 24px right edge! */
+  .child-row-btn {
+    width: 100%; text-align: left;
+    padding: 10px var(--pad-page) 10px calc(var(--pad-page) + 48px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: var(--gap);
+    font-size: 12.5px;
+  }
+  .child-row-btn:last-child { border-bottom: none; }
+  .child-row-btn:hover { background: var(--surface); }
+  .child-row-btn.focused { background: var(--surface-2); }
+
+  .live-head { display: flex; align-items: center; gap: var(--gap); font-size: 13px; }
+  .live-title { font-weight: 500; color: var(--text-1); width: 108px; flex-shrink: 0; }
+  .live-state { font-size: 12px; color: var(--text-2); }
+  .live-state.pass { color: var(--green); }
+  .live-state.run { color: var(--text-1); }
+
+  /* Suite Progress Bar: aligned cleanly with title inside sub-row, reaches exact right edge */
+  .suite-bar-wrap { margin-top: 10px; }
+  .suite-bar-track { height: 5px; background: var(--surface-2); overflow: hidden; }
+  .suite-bar-fill {
+    height: 100%; background: var(--green);
+    transition: width 450ms linear;
+    position: relative; overflow: hidden;
+  }
+  .suite-bar-fill::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.32) 50%, transparent 100%);
+    animation: shimmer 1.6s linear infinite;
+  }
+  @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+  .suite-stats { margin-top: 6px; display: flex; align-items: center; gap: var(--gap); font-size: 12px; color: var(--text-3); }
+
+  .rev-name { font-weight: 500; color: var(--text-1); width: 92px; flex-shrink: 0; }
+  .rev-topic { color: var(--text-2); width: 150px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rev-step { color: var(--text-3); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rev-time { color: var(--text-3); font-size: 12px; flex-shrink: 0; }
+
+  /* Inline Plan Grid inside Build */
+  .plan-wrap { padding: var(--pad) var(--pad-page); }
+  .plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--pad); }
+  .deliv-card { border: 1px solid var(--border); padding: var(--pad); background: var(--bg); }
+  .deliv-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+  .deliv-cnt { margin-left: auto; font-size: 12px; color: var(--text-3); }
+  .deliv-bar { margin-top: 8px; height: 2px; background: var(--border); }
+  .deliv-bar > span { display: block; height: 100%; background: var(--text-1); }
+  .deliv-tasks { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-2); }
+  .deliv-task { display: flex; gap: 8px; }
+  .deliv-task.done { color: var(--text-3); }
+  .deliv-task.active { color: var(--text-1); }
+
+  /* Inline Findings */
+  .finding-item { border-bottom: 1px solid var(--border); }
+  .finding-item:last-child { border-bottom: none; }
+  .finding-row {
+    width: 100%;
+    padding: var(--pad-row-y) var(--pad-page) var(--pad-row-y) calc(var(--pad-page) + 24px);
+    display: flex; align-items: flex-start; gap: var(--gap); text-align: left;
+  }
+  .finding-row:hover { background: var(--surface); }
+  .f-num { font-size: 12px; color: var(--text-3); width: 24px; flex-shrink: 0; }
+  .f-state { font-size: 12px; width: 44px; flex-shrink: 0; }
+  .f-state.fixed { color: var(--text-3); }
+  .f-state.open { color: var(--amber); }
+  .f-sum { font-size: 13px; color: var(--text-1); }
+  .f-loc { margin-top: 2px; font-size: 11.5px; color: var(--text-3); }
+  .f-proof {
+    display: none;
+    padding: 10px var(--pad-page) 12px calc(var(--pad-page) + 48px);
+    border-top: 1px solid var(--border);
+    font-size: 12.5px; color: var(--text-2);
+  }
+  .finding-item.open .f-proof { display: block; }
+
+  /* Spec Decisions */
+  .decision-item {
+    padding: var(--pad-row-y) var(--pad-page) var(--pad-row-y) calc(var(--pad-page) + 24px);
+    border-bottom: 1px solid var(--border);
+  }
+  .decision-item:last-child { border-bottom: none; }
+  .decision-q { font-size: 13px; font-weight: 500; }
+  .decision-a { margin-top: 4px; font-size: 12.5px; color: var(--text-2); display: flex; gap: 8px; }
+
+  /* Anchored Raised Hand Card (Uniform --pad-page inset on all sides) */
+  .hand-dock { padding: var(--pad) var(--pad-page); border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg); }
+  .hand-card { width: 100%; background: var(--surface); border: 1px solid var(--border-strong); }
+  .hand-head {
+    padding: 10px var(--pad); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .hand-pill { font-size: 11.5px; font-weight: 600; height: 20px; padding: 0 8px; display: inline-flex; align-items: center; background: var(--amber); color: #0a0a0a; }
+  .hand-card.red .hand-pill { background: var(--red); color: #0a0a0a; }
+  .hand-title { font-size: 13px; color: var(--text-1); }
+  .hand-meta { font-size: 12px; color: var(--text-3); }
+  .hand-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .hand-body { padding: var(--pad); max-height: 290px; overflow-y: auto; }
+  .hand-prose { font-size: 13.5px; line-height: 20px; max-width: 72ch; }
+  .hand-options { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .opt-btn {
+    width: 100%; padding: 10px var(--pad);
+    border: 1px solid var(--border); background: var(--bg);
+    display: flex; align-items: flex-start; gap: 10px; text-align: left;
+  }
+  .opt-btn:hover { border-color: var(--text-2); background: var(--surface-2); }
+  .opt-btn.pick { border-color: var(--border-strong); background: var(--surface-2); }
+  .opt-num { font-size: 12px; color: var(--text-2); width: 16px; flex-shrink: 0; }
+  .opt-btn.pick .opt-num { color: var(--text-1); font-weight: 600; }
+  .opt-why { margin-top: 2px; font-size: 12px; color: var(--text-2); }
+  .triage-row { padding: 10px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .triage-row:last-child { border-bottom: none; }
+  .routing-preview {
+    margin-top: 12px; padding: 10px var(--pad);
+    background: var(--bg); border: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--text-2);
+  }
+
+  /* ==================== RIGHT SEAT CHAT PANE (50% SPLIT + FUSED FULL-BLEED COMPOSER) ==================== */
+  .seat-pane {
+    flex: 1 1 50%; min-width: 0;
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .seat-pane.collapsed { display: none; }
+  .pane-head {
+    padding: 12px var(--pad-page);
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .pane-top { display: flex; align-items: center; gap: 8px; }
+  .pane-title { font-weight: 600; font-size: 13.5px; }
+  .pane-auto-tag { font-size: 11.5px; color: var(--text-3); }
+  .pane-close { margin-left: auto; width: 24px; height: 24px; display: grid; place-items: center; color: var(--text-3); }
+  .pane-close:hover { background: var(--surface); color: var(--text-1); }
+  .pane-stats { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--text-2); }
+  .pane-ctx-bar { flex: 1; height: 3px; background: var(--border); }
+  .pane-ctx-bar > span { display: block; height: 100%; background: var(--text-1); }
+
+  .pane-stream { flex: 1; overflow-y: auto; padding: var(--pad) var(--pad-page); display: flex; flex-direction: column; gap: var(--pad); }
+  .msg-row { font-size: 13.5px; line-height: 20px; max-width: 72ch; }
+  .msg-row.operator { background: var(--surface); border: 1px solid var(--border); padding: 10px var(--pad); width: fit-content; max-width: 72ch; }
+  .msg-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); margin-bottom: 4px; }
+  .msg-meta strong { color: var(--text-1); font-weight: 500; }
+  .turn-block {
+    border-left: 1px solid var(--border-strong);
+    padding-left: 12px; font-size: 12px; color: var(--text-2);
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .turn-step { display: flex; align-items: center; gap: 8px; }
+  .turn-step .t { margin-left: auto; color: var(--text-3); }
+
+  /* FUSED FULL-BLEED COMPOSER: the bottom strip itself IS the input, Send + model picker fused cleanly inside */
+  .fused-composer {
+    border-top: 1px solid var(--border);
+    background: var(--bg-sub);
+    display: flex; flex-direction: column;
+    transition: background 100ms;
+  }
+  .fused-composer:focus-within { background: var(--surface); }
+  .fused-input {
+    width: 100%;
+    min-height: 52px;
+    padding: 12px var(--pad-page) 8px;
+    background: transparent;
+    border: none;
+    color: var(--text-1);
+    font: inherit; font-size: 13.5px; line-height: 20px;
+    resize: none;
+  }
+  .fused-input:focus-visible { outline: none; }
+  .fused-input::placeholder { color: var(--text-3); }
+  .fused-bar {
+    padding: 0 var(--pad-page) 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ==================== ORCHESTRATOR ROOM ==================== */
+  .wake-list { border-bottom: 1px solid var(--border); }
+  .wake-item {
+    padding: var(--pad-row-y) var(--pad-page);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: var(--gap); font-size: 13px;
+  }
+  .wake-item:last-child { border-bottom: none; }
+  .wake-kind { width: 68px; flex-shrink: 0; font-size: 12px; color: var(--text-2); }
+  .wake-kind.ok { color: var(--green); }
+  .wake-kind.auto { color: var(--text-1); }
+
+  /* ==================== FULL-WIDTH PAGES: BOARD & USAGE & ROUTING ==================== */
+  .page-scroll { flex: 1; overflow-y: auto; padding: var(--pad-page); }
+  .page-wrap { width: 100%; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); }
+  .kpi-card { padding: var(--pad); border-right: 1px solid var(--border); background: var(--bg); }
+  .kpi-card:last-child { border-right: none; }
+  .kpi-label { font-size: 12px; color: var(--text-2); }
+  .kpi-val { margin-top: 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.025em; }
+  .kpi-sub { margin-top: 4px; font-size: 12px; color: var(--text-3); }
+
+  .sec { margin-top: var(--pad-page); }
+  .sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .sec-title { font-size: 14px; font-weight: 600; }
+  .sec-note { font-size: 12px; color: var(--text-3); }
+
+  .slist { border: 1px solid var(--border); }
+  .srow { padding: var(--pad-row-y) var(--pad); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: var(--gap); }
+  .srow:last-child { border-bottom: none; }
+  .srow.clickable { width: 100%; text-align: left; }
+  .srow.clickable:hover { background: var(--surface); }
+
+  .two-col { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--pad-page); margin-top: var(--pad-page); }
+  .chart-card { border: 1px solid var(--border); padding: var(--pad); }
+  .chart-svg { width: 100%; height: 156px; margin-top: 12px; display: block; }
+
+  .quota-group { padding: var(--pad); border-bottom: 1px solid var(--border); }
+  .quota-group:last-child { border-bottom: none; }
+  .quota-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .quota-name { font-size: 13.5px; font-weight: 500; }
+  .quota-row { display: grid; grid-template-columns: 56px 1fr 44px 66px; align-items: center; gap: 10px; margin-top: 8px; font-size: 12px; }
+  .q-track { height: 6px; background: var(--surface-2); position: relative; }
+  .q-fill { height: 100%; background: var(--text-2); }
+  .q-fill.ok { background: var(--green); }
+  .q-fill.hot { background: var(--amber); }
+  .q-pace { position: absolute; top: -3px; bottom: -3px; width: 1.5px; background: var(--text-1); }
+
+  .role-bar-row { padding: var(--pad-row-y) var(--pad); border-bottom: 1px solid var(--border); }
+  .role-bar-row:last-child { border-bottom: none; }
+  .role-top { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .role-track { margin-top: 6px; height: 4px; background: var(--surface-2); }
+  .role-fill { height: 100%; background: var(--text-1); }
+
+  .rtbl { width: 100%; border-collapse: collapse; font-size: 12.5px; border: 1px solid var(--border); }
+  .rtbl th {
+    text-align: left; padding: var(--pad-row-y) var(--pad); font-size: 12px; font-weight: 500;
+    color: var(--text-3); border-bottom: 1px solid var(--border); background: var(--bg-sub);
+  }
+  .rtbl td { padding: var(--pad-row-y) var(--pad); border-bottom: 1px solid var(--border); }
+  .rtbl tr:last-child td { border-bottom: none; }
+  .rtbl select {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text-1);
+    padding: 4px 8px; font-family: var(--font-mono); font-size: 11.5px;
+  }
+
+  .rule-row {
+    padding: var(--pad-row-y) var(--pad); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: var(--gap); font-size: 13px;
+  }
+  .rule-row:last-child { border-bottom: none; }
+  .rule-tag { width: 54px; flex-shrink: 0; font-size: 12px; color: var(--green); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ==================== LEFT SIDEBAR ==================== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">F</div>
+      <span class="brand-name">Mork</span>
+      <span class="brand-sha mono">787c862</span>
+    </div>
+
+    <div class="update-bar">
+      <span class="dot amber"></span>
+      <span>Update <span class="sha mono">6b07a33</span></span>
+      <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="alert('Reload triggered in live app')">Reload</button>
+    </div>
+
+    <div class="nav-scroll">
+      <div class="nav-top">
+        <button class="nav-item" id="nav-board" onclick="showPage('board')">
+          <span>Board</span>
+          <span class="nav-badge mono">
+            <span class="nav-hand-inline"><span class="dot amber"></span>2</span>
+            <span>3</span>
+          </span>
+        </button>
+        <button class="nav-item" id="nav-usage" onclick="showPage('usage')">
+          <span>Usage &amp; Routing</span>
+          <span class="nav-badge mono">auto</span>
+        </button>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-head"><span>example.com</span><span class="cnt mono">1</span></div>
+        <button class="nav-orch" id="nav-orch-ex" onclick="showOrchestrator('example.com')">
+          <span class="dot grey"></span><span>Orchestrator</span><span class="orch-tag mono">idle</span>
+        </button>
+        <button class="nav-card active" id="nav-ex-545" onclick="showPage('card')">
+          <div class="nav-card-top">
+            <span class="dot green pulse"></span>
+            <span class="nav-card-id mono">ex-545</span>
+            <span class="nav-card-stage mono">Round 3</span>
+          </div>
+          <div class="nav-card-title">Archive daily logs as Parquet files in Spaces for multi-year querying</div>
+          <div class="nav-card-bar"><span id="nav-prog-545" style="width: 76%"></span></div>
+        </button>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-head"><span>mork</span><span class="cnt mono">2</span></div>
+        <button class="nav-orch" id="nav-orch-fac" onclick="showOrchestrator('mork')">
+          <span class="dot green"></span><span>Orchestrator</span><span class="orch-tag mono">16 landed</span>
+        </button>
+        <button class="nav-card" onclick="showPage('card'); setScenario('ask')">
+          <div class="nav-card-top">
+            <span class="dot amber"></span>
+            <span class="nav-card-id mono">fac-685</span>
+            <span class="nav-card-stage mono">Spec</span>
+          </div>
+          <div class="nav-card-title">Web Board Usage panel, Reload and Look-back triggers</div>
+        </button>
+        <button class="nav-card" onclick="showPage('card'); setScenario('triage')">
+          <div class="nav-card-top">
+            <span class="dot red"></span>
+            <span class="nav-card-id mono">fac-601</span>
+            <span class="nav-card-stage mono">Round 2</span>
+          </div>
+          <div class="nav-card-title">A review foreman's working files last across rounds</div>
+        </button>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-head"><span>conglomerate</span><span class="cnt mono">0</span></div>
+        <button class="nav-orch" id="nav-orch-cong" onclick="showOrchestrator('conglomerate')">
+          <span class="dot grey"></span><span>Orchestrator</span><span class="orch-tag mono">idle</span>
+        </button>
+      </div>
+    </div>
+
+    <button class="rail-usage" onclick="showPage('usage')" title="Open Usage & Routing">
+      <div class="rail-usage-head"><span>Quotas</span><span class="spend mono">$48.20 / 7d</span></div>
+      <div class="rail-q-row mono">
+        <span>Claude wk</span>
+        <div class="rail-q-track"><div class="rail-q-fill ok" style="width:27%"></div><div class="rail-q-pace" style="left:34%"></div></div>
+        <span style="text-align:right; color:var(--text-2)">27%</span>
+      </div>
+      <div class="rail-q-row mono">
+        <span>Gemini 5h</span>
+        <div class="rail-q-track"><div class="rail-q-fill ok" style="width:34%"></div><div class="rail-q-pace" style="left:83%"></div></div>
+        <span style="text-align:right; color:var(--text-2)">34%</span>
+      </div>
+      <div class="rail-q-row mono">
+        <span>Gemini wk</span>
+        <div class="rail-q-track"><div class="rail-q-fill hot" style="width:33%"></div><div class="rail-q-pace" style="left:15%"></div></div>
+        <span style="text-align:right; color:var(--amber)">33%</span>
+      </div>
+      <div class="rail-q-row mono">
+        <span>Codex</span>
+        <div class="rail-q-track"><div class="rail-q-fill" style="width:99%"></div></div>
+        <span style="text-align:right">cred</span>
+      </div>
+    </button>
+
+    <div class="sidebar-footer">
+      <span class="dot green"></span><span>Connected</span><span class="sub mono">2 working</span>
+    </div>
+  </aside>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <div class="main">
+
+    <!-- ==================== VIEW 1: CARD ROOM ==================== -->
+    <div class="view active" id="view-card">
+      <header class="page-header">
+        <div class="header-top">
+          <button class="text-link" onclick="showPage('board')">Board</button>
+          <span class="sep">/</span>
+          <span>example.com</span>
+          <span class="sep">/</span>
+          <span class="mono" style="color:var(--text-1)">ex-545</span>
+          <div class="header-right">
+            <select class="mock-select" id="sel-scenario" onchange="setScenario(this.value)" title="Preview Card Room state">
+              <option value="live">State: Verify · Round 3</option>
+              <option value="ask">State: Spec Question</option>
+              <option value="triage">State: Round 2 Triage</option>
+              <option value="approve">State: Approve Plan</option>
+            </select>
+            <span class="mono" style="font-size:12px; color:var(--text-3)">38m elapsed · $2.14</span>
+            <button class="btn btn-secondary btn-sm" id="btn-toggle-pane" onclick="toggleSeatPane()">Hide chat</button>
+            <button class="btn btn-secondary btn-sm">Pause</button>
+          </div>
+        </div>
+        <div class="title-row">
+          <h1 class="page-title">Archive daily logs as Parquet files in Spaces for multi-year querying</h1>
+        </div>
+
+        <div class="stepper">
+          <button class="step-btn passed" onclick="focusStage('st-spec')">
+            <span class="mono">✓</span><span>Spec</span><span class="step-sub mono">3 decisions</span>
+          </button>
+          <span class="step-conn"></span>
+          <button class="step-btn passed" onclick="focusStage('st-build')">
+            <span class="mono">✓</span><span>Build</span><span class="step-sub mono">9/10</span>
+          </button>
+          <span class="step-conn"></span>
+          <button class="step-btn current" onclick="focusStage('st-r3')">
+            <span class="dot green pulse"></span><span>Verify · Round 3</span><span class="step-sub mono" id="stepper-suite-sub">suite 76%</span>
+          </button>
+          <span class="step-conn"></span>
+          <button class="step-btn" disabled style="cursor:default"><span>Land</span></button>
+        </div>
+
+        <div class="seat-strip">
+          <span class="seat-strip-label">Seats</span>
+          <button class="seat-chip" id="chip-planner" onclick="selectSeat('planner', false)">
+            <span class="dot grey"></span><span class="sname mono">planner</span><span class="smeta">Opus 5.5</span>
+          </button>
+          <button class="seat-chip" id="chip-foreman" onclick="selectSeat('foreman', false)">
+            <span class="dot grey"></span><span class="sname mono">foreman</span><span class="smeta">Neon · 24k</span><span class="mini-ctx"><span style="width:6%"></span></span>
+          </button>
+          <button class="seat-chip open" id="chip-rforeman" onclick="selectSeat('rforeman', false)">
+            <span class="dot grey"></span><span class="sname mono">review foreman</span><span class="smeta">Opus 5.5 · 147k</span><span class="mini-ctx"><span style="width:37%"></span></span>
+          </button>
+          <button class="seat-chip" id="chip-r1" onclick="selectSeat('r1', false)">
+            <span class="dot green pulse"></span><span class="sname mono">reviewer-1</span><span class="smeta">Sol</span>
+          </button>
+          <button class="seat-chip" id="chip-r2" onclick="selectSeat('r2', false)">
+            <span class="dot green pulse"></span><span class="sname mono">reviewer-2</span><span class="smeta">Sol</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="split-workspace">
+        <!-- LEFT 50%: EDGE-TO-EDGE UNIFORM PADDING STAGE LIST -->
+        <div class="overview-col">
+          <div class="overview-scroll">
+            <div class="timeline">
+
+              <!-- SPEC -->
+              <section class="stage-card" id="st-spec">
+                <button class="stage-head" onclick="toggleStage('st-spec')">
+                  <span class="stage-mark mono">✓</span>
+                  <span class="stage-name">Spec</span>
+                  <span class="stage-summary">3 decisions agreed · approved by the operator</span>
+                  <span class="stage-meta mono"><span>18:27 · 19m</span><span class="stage-chev">▸</span></span>
+                </button>
+                <div class="stage-body">
+                  <div class="decision-item">
+                    <div class="decision-q">Partition layout in Spaces bucket?</div>
+                    <div class="decision-a"><span class="mono" style="color:var(--text-1)">1</span><span>Hive-style <code>logs/year=YYYY/month=MM/day=DD.parquet</code> for direct DuckDB globbing.</span></div>
+                  </div>
+                  <div class="decision-item">
+                    <div class="decision-q">Retention window for raw JSONL on local disk?</div>
+                    <div class="decision-a"><span class="mono" style="color:var(--text-1)">2</span><span>Keep 14 days locally after verified Spaces upload, then prune.</span></div>
+                  </div>
+                  <div class="decision-item">
+                    <div class="decision-q">Retry behavior if Spaces upload fails mid-night?</div>
+                    <div class="decision-a"><span class="mono" style="color:var(--text-1)">1</span><span>Idempotent overwrite per day key; next run sweeps any unarchived days.</span></div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- BUILD -->
+              <section class="stage-card" id="st-build">
+                <button class="stage-head" onclick="toggleStage('st-build')">
+                  <span class="stage-mark mono">✓</span>
+                  <span class="stage-name">Build</span>
+                  <span class="stage-summary">9 / 10 tasks</span>
+                  <span class="stage-prog"><span style="width:90%"></span></span>
+                  <span class="stage-meta mono"><span>18:46 · 12m</span><span class="stage-chev">▸</span></span>
+                </button>
+                <div class="stage-body">
+                  <div class="plan-wrap">
+                    <div class="plan-grid">
+                      <div class="deliv-card">
+                        <div class="deliv-head"><span>schema-and-data</span><span class="deliv-cnt mono">2/2</span></div>
+                        <div class="deliv-bar"><span style="width:100%"></span></div>
+                        <div class="deliv-tasks">
+                          <div class="deliv-task done"><span class="mono">✓</span><span>Define Parquet schema for log records</span></div>
+                          <div class="deliv-task done"><span class="mono">✓</span><span>Add typed reader/writer round-trip test</span></div>
+                        </div>
+                      </div>
+                      <div class="deliv-card">
+                        <div class="deliv-head"><span>parquet-and-spaces</span><span class="deliv-cnt mono">4/4</span></div>
+                        <div class="deliv-bar"><span style="width:100%"></span></div>
+                        <div class="deliv-tasks">
+                          <div class="deliv-task done"><span class="mono">✓</span><span>Stream daily JSONL into Zstd Parquet chunks</span></div>
+                          <div class="deliv-task done"><span class="mono">✓</span><span>Upload to Spaces with checksum verification</span></div>
+                        </div>
+                      </div>
+                      <div class="deliv-card">
+                        <div class="deliv-head"><span>archive-service-and-task</span><span class="deliv-cnt mono">2/2</span></div>
+                        <div class="deliv-bar"><span style="width:100%"></span></div>
+                        <div class="deliv-tasks">
+                          <div class="deliv-task done"><span class="mono">✓</span><span>Wire nightly cron job and backfill CLI</span></div>
+                          <div class="deliv-task done"><span class="mono">✓</span><span>Prune local files only after verified upload</span></div>
+                        </div>
+                      </div>
+                      <div class="deliv-card">
+                        <div class="deliv-head"><span>box-provisioning-and-guide</span><span class="deliv-cnt mono">1/2</span></div>
+                        <div class="deliv-bar"><span style="width:50%"></span></div>
+                        <div class="deliv-tasks">
+                          <div class="deliv-task done"><span class="mono">✓</span><span>Add idempotent DuckDB CLI install to production-box.sh</span></div>
+                          <div class="deliv-task active"><span class="mono">›</span><span>Add docs/archived-logs.md query guide</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- VERIFY ROUND 1 -->
+              <section class="stage-card" id="st-r1">
+                <button class="stage-head" onclick="toggleStage('st-r1')">
+                  <span class="stage-mark mono">✕</span>
+                  <span class="stage-name">Verify · Round 1</span>
+                  <span class="stage-summary">8 fixed, 2 open · <span class="mono">a19c4b2</span></span>
+                  <span class="stage-meta mono"><span>18:57 · 22m</span><span class="stage-chev">▸</span></span>
+                </button>
+                <div class="stage-body">
+                  <div class="finding-item" onclick="this.classList.toggle('open')">
+                    <button class="finding-row">
+                      <span class="f-num mono">#1</span>
+                      <span class="f-state fixed mono">fixed</span>
+                      <div>
+                        <div class="f-sum">Temp Parquet file leaked in /tmp when Spaces upload times out</div>
+                        <div class="f-loc mono">src/archive/writer.rs:118 · reviewer-1</div>
+                      </div>
+                    </button>
+                    <div class="f-proof">Use <code>NamedTempFile</code> inside the archive staging folder so drop cleans up on error.</div>
+                  </div>
+                  <div class="finding-item" onclick="this.classList.toggle('open')">
+                    <button class="finding-row">
+                      <span class="f-num mono">#2</span>
+                      <span class="f-state open mono">open</span>
+                      <div>
+                        <div class="f-sum">DuckDB install script skips SHA256 verification on downloaded binary</div>
+                        <div class="f-loc mono">scripts/boxes/production-box.sh:74 · reviewer-2</div>
+                      </div>
+                    </button>
+                    <div class="f-proof">Verify checksum against pinned release digest before moving binary into <code>/usr/local/bin/duckdb</code>.</div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- VERIFY ROUND 2 -->
+              <section class="stage-card" id="st-r2">
+                <button class="stage-head" onclick="toggleStage('st-r2')">
+                  <span class="stage-mark mono">✕</span>
+                  <span class="stage-name">Verify · Round 2</span>
+                  <span class="stage-summary">3 open · <span class="mono">d42e09f</span></span>
+                  <span class="stage-meta mono"><span>19:19 · 8m</span><span class="stage-chev">▸</span></span>
+                </button>
+                <div class="stage-body">
+                  <div class="finding-item" onclick="this.classList.toggle('open')">
+                    <button class="finding-row">
+                      <span class="f-num mono">#1</span>
+                      <span class="f-state fixed mono">fixed</span>
+                      <div>
+                        <div class="f-sum">Timezone boundary at midnight UTC splits one Bucharest day across two partitions</div>
+                        <div class="f-loc mono">src/archive/task.rs:52 · reviewer-1</div>
+                      </div>
+                    </button>
+                    <div class="f-proof">Group records by UTC date consistently and document UTC partitioning in query guide.</div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- VERIFY ROUND 3: Single flat edge-to-edge rows, EXACT vertical alignment on left & right! -->
+              <section class="stage-card current open" id="st-r3">
+                <button class="stage-head" onclick="toggleStage('st-r3')">
+                  <span class="stage-mark"><span class="dot green pulse"></span></span>
+                  <span class="stage-name">Verify · Round 3</span>
+                  <span class="stage-summary">suite running · 2 reviewers working</span>
+                  <span class="stage-meta mono"><span>19:27 · <span id="r3-elapsed">1m 23s</span></span><span class="stage-chev">▸</span></span>
+                </button>
+                <div class="stage-body">
+                  <!-- Checks -->
+                  <div class="sub-row">
+                    <div class="live-head">
+                      <span class="dot green"></span>
+                      <span class="live-title">Checks</span>
+                      <span class="live-state pass mono">passed</span>
+                      <span style="color:var(--text-3); font-size:12px">clippy, fmt, typecheck</span>
+                      <span class="mono" style="margin-left:auto; font-size:12px; color:var(--text-3)">1.4s</span>
+                    </div>
+                  </div>
+
+                  <!-- Test Suite -->
+                  <div class="sub-row">
+                    <div class="live-head">
+                      <span class="dot green pulse"></span>
+                      <span class="live-title">Test Suite</span>
+                      <span class="live-state run mono" id="suite-pct">76%</span>
+                      <span class="mono" style="font-size:12px; color:var(--text-2)" id="suite-counts">142 / 186 passed · 0 failed</span>
+                      <span class="mono" style="margin-left:auto; font-size:12px; color:var(--text-3)" id="suite-timer">23s</span>
+                    </div>
+                    <div class="suite-bar-wrap">
+                      <div class="suite-bar-track"><div class="suite-bar-fill" id="suite-bar" style="width: 76%"></div></div>
+                      <div class="suite-stats">
+                        <span class="mono" style="color:var(--text-2)" id="suite-test">parquet_export::compacts_daily_chunks</span>
+                        <span class="mono" style="margin-left:auto">worker 4/4</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Review Foreman (Parent row) -->
+                  <button class="sub-row-btn focused" id="rev-parent-btn" onclick="selectSeat('rforeman', false)">
+                    <span class="dot grey" title="Review foreman is idle, waiting on reviewers"></span>
+                    <span class="live-title mono">review foreman</span>
+                    <span class="live-state">waiting on 2 reviewers</span>
+                    <span class="mono" style="margin-left:auto; font-size:12px; color:var(--text-3)">Opus 5.5 · xhigh</span>
+                  </button>
+
+                  <!-- Reviewers (Indented child rows, EXACT same right edge!) -->
+                  <button class="child-row-btn" id="rev-row-r1" onclick="selectSeat('r1', false)">
+                    <span class="dot green pulse"></span>
+                    <span class="rev-name mono">reviewer-1</span>
+                    <span class="rev-topic">Parquet &amp; storage</span>
+                    <span class="rev-step mono">Reading src/archive/writer.rs (lines 90-160)</span>
+                    <span class="rev-time mono">18s</span>
+                  </button>
+                  <button class="child-row-btn" id="rev-row-r2" onclick="selectSeat('r2', false)">
+                    <span class="dot green pulse"></span>
+                    <span class="rev-name mono">reviewer-2</span>
+                    <span class="rev-topic">Ops &amp; Spaces policy</span>
+                    <span class="rev-step mono">Checking checksum pin in scripts/boxes/production-box.sh</span>
+                    <span class="rev-time mono">15s</span>
+                  </button>
+                </div>
+              </section>
+
+            </div>
+          </div>
+
+          <div class="hand-dock" id="hand-dock" style="display:none"></div>
+        </div>
+
+        <!-- RIGHT 50%: AUTO-OPENED SEAT CHAT + FUSED FULL-BLEED COMPOSER -->
+        <aside class="seat-pane" id="seat-pane">
+          <div class="pane-head">
+            <div class="pane-top">
+              <span class="dot grey" id="sp-dot"></span>
+              <span class="pane-title mono" id="sp-name">review foreman</span>
+              <span class="pane-auto-tag" id="sp-auto">active stage owner</span>
+              <button class="pane-close" onclick="toggleSeatPane()" title="Collapse chat pane">✕</button>
+            </div>
+            <div class="pane-stats mono">
+              <span id="sp-model">Opus 5.5 · xhigh</span>
+              <span style="color:var(--text-3)">·</span>
+              <span id="sp-ctx">147k / 400k</span>
+              <div class="pane-ctx-bar"><span id="sp-ctx-fill" style="width:37%"></span></div>
+              <span id="sp-warm">warm 16m</span>
+            </div>
+          </div>
+          <div class="pane-stream" id="sp-stream"></div>
+          <div class="fused-composer">
+            <textarea class="fused-input" rows="2" id="sp-input" placeholder="Message review foreman…"></textarea>
+            <div class="fused-bar">
+              <button class="btn btn-secondary btn-sm" id="sp-model-btn">Opus 5.5 · xhigh</button>
+              <button class="btn btn-primary btn-sm" style="margin-left:auto">Send</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- ==================== VIEW 2: ORCHESTRATOR ==================== -->
+    <div class="view" id="view-orch">
+      <header class="page-header">
+        <div class="header-top">
+          <button class="text-link" onclick="showPage('board')">Board</button>
+          <span class="sep">/</span>
+          <span id="orch-proj-crumb">mork</span>
+          <span class="sep">/</span>
+          <span style="color:var(--text-1)">Orchestrator</span>
+          <div class="header-right">
+            <span class="mono" style="font-size:12px; color:var(--text-3)">wakes armed · concurrency 1</span>
+            <button class="btn btn-secondary btn-sm" onclick="showPage('usage'); setUsageTab('routing')">Routing policy</button>
+          </div>
+        </div>
+        <div class="title-row"><h1 class="page-title" id="orch-title">mork Orchestrator</h1></div>
+      </header>
+
+      <div class="split-workspace">
+        <div class="overview-col">
+          <div class="overview-scroll">
+            <div class="wake-list">
+              <div class="wake-item">
+                <span class="wake-kind ok mono">landed</span>
+                <div style="flex:1">
+                  <div><strong>fac-601</strong> landed (<code>6b07a33</code>). Queue stopped per your return; reload waiting for your go-ahead.</div>
+                  <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">23:42 · delegated</div>
+                </div>
+              </div>
+              <div class="wake-item">
+                <span class="wake-kind auto mono">answered</span>
+                <div style="flex:1">
+                  <div>Answered <code>fac-601/answer/1</code> with Option 1: preserve all of <code>.git/mork/</code> across round remakes and reopens.</div>
+                  <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">23:25 · delegated</div>
+                </div>
+              </div>
+              <div class="wake-item">
+                <span class="wake-kind ok mono">reloaded</span>
+                <div style="flex:1">
+                  <div>Reloaded engine to <code>787c862</code> (673ms), bringing <code>fac-509</code>, <code>fac-627</code>, <code>fac-606</code> live.</div>
+                  <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">23:23 · idle gap</div>
+                </div>
+              </div>
+              <div class="wake-item">
+                <span class="wake-kind auto mono">routed</span>
+                <div style="flex:1">
+                  <div>Shifted <code>fac-506</code>..<code>fac-601</code> foremen from <code>Gemini 4 Neon</code> to <code>Opus 5.5 · high</code> after Gemini week pace crossed 2x.</div>
+                  <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">22:56 · quota policy</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pane-stream">
+              <div class="msg-row operator">
+                <div class="msg-meta"><strong>Operator</strong><span class="mono">23:27</span></div>
+                i've returned. can stop the delegated queue. how did it go?
+              </div>
+              <div class="msg-row">
+                <div class="msg-meta"><strong>orchestrator:mork</strong><span class="mono">23:27</span></div>
+                Queue stopped and auto-reload turned off: 15 cards landed cleanly with zero escalations, all live on build <code>787c862</code>, and <code>fac-601</code> finished right after at <code>6b07a33</code>.
+              </div>
+            </div>
+          </div>
+
+          <!-- FUSED FULL-BLEED COMPOSER -->
+          <div class="fused-composer">
+            <textarea class="fused-input" rows="2" placeholder="Message mork orchestrator…"></textarea>
+            <div class="fused-bar">
+              <span class="mono" style="font-size:11.5px; color:var(--text-3)">Enter to send</span>
+              <button class="btn btn-primary btn-sm" style="margin-left:auto">Send</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="seat-pane" style="flex:0 0 360px">
+          <div class="pane-head"><div class="pane-top"><span class="pane-title">Project Controls</span></div></div>
+          <div class="pane-stream">
+            <div class="deliv-card">
+              <div class="deliv-head"><span>Delegated Queue</span><span class="mono" style="margin-left:auto; font-size:12px; color:var(--text-3)">stopped</span></div>
+              <div style="margin-top:8px; font-size:12px; color:var(--text-2)">23 backlog cards queued · concurrency 1 · auto-reload off</div>
+              <div style="margin-top:12px; display:flex; gap:8px">
+                <button class="btn btn-primary btn-sm">Resume queue</button>
+                <button class="btn btn-secondary btn-sm">Edit queue</button>
+              </div>
+            </div>
+
+            <div class="deliv-card">
+              <div class="deliv-head"><span>Effective Routing (Now)</span><span class="mono" style="margin-left:auto; font-size:11.5px; color:var(--text-3)">quota-aware</span></div>
+              <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--text-2)">
+                <div style="display:flex; justify-content:space-between"><span>Foreman (core)</span><span class="mono" style="color:var(--text-1)">Opus 5.5 · high</span></div>
+                <div style="display:flex; justify-content:space-between"><span>Planner</span><span class="mono" style="color:var(--text-1)">Opus 5.5 · high</span></div>
+                <div style="display:flex; justify-content:space-between"><span>Reviewers</span><span class="mono" style="color:var(--text-1)">Sol · xhigh</span></div>
+              </div>
+              <div style="margin-top:12px">
+                <button class="text-link" onclick="showPage('usage'); setUsageTab('routing')">Configure routing policy →</button>
+              </div>
+            </div>
+
+            <div class="deliv-card">
+              <div class="deliv-head"><span>Feedback Notes</span><span class="mono" style="margin-left:auto; color:var(--text-2)">179</span></div>
+              <div style="margin-top:8px; font-size:12px; color:var(--text-2)">Seat notes waiting for triage into cards or memory.</div>
+              <div style="margin-top:12px"><button class="btn btn-secondary btn-sm">Triage notes</button></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- ==================== VIEW 3: BOARD (FULL-WIDTH) ==================== -->
+    <div class="view" id="view-board">
+      <header class="page-header">
+        <div class="header-top">
+          <span>Workspace</span>
+          <div class="header-right">
+            <div class="seg">
+              <button class="active">All projects</button>
+              <button>mork</button>
+              <button>example.com</button>
+              <button>conglomerate</button>
+            </div>
+          </div>
+        </div>
+        <div class="title-row"><h1 class="page-title">Board</h1></div>
+      </header>
+      <div class="page-scroll">
+        <div class="page-wrap">
+          <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-label">Active Cards</div><div class="kpi-val mono">3</div><div class="kpi-sub">2 seats working right now</div></div>
+            <div class="kpi-card"><div class="kpi-label">Raised Hands</div><div class="kpi-val mono" style="color:var(--amber)">2</div><div class="kpi-sub">1 expiring in 4m</div></div>
+            <div class="kpi-card"><div class="kpi-label">Landed Today</div><div class="kpi-val mono">16</div><div class="kpi-sub">0 escalations · 84% cache hit</div></div>
+            <div class="kpi-card"><div class="kpi-label">Active Routing</div><div class="kpi-val" style="font-size:16px; margin-top:8px">Opus 5.5 + Sol</div><div class="kpi-sub">shifting off Gemini wk pace</div></div>
+          </div>
+
+          <section class="sec">
+            <div class="sec-head"><span class="sec-title">Raised Hands</span><span class="sec-note mono">2 waiting</span></div>
+            <div class="slist">
+              <div class="srow">
+                <span class="dot amber"></span>
+                <button class="mono" style="font-weight:500; width:80px; text-align:left" onclick="showPage('card'); setScenario('ask')">fac-685</button>
+                <div style="flex:1; min-width:0">
+                  <div style="font-size:13.5px">Should the Usage panel show rolling 7 days or calendar week?</div>
+                  <div style="font-size:12px; color:var(--text-3); margin-top:2px">planner · Spec · <span style="color:var(--amber)">cold in 4m</span></div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="showPage('card'); setScenario('ask')">Answer</button>
+                <button class="btn btn-ghost btn-sm">Give to orchestrator</button>
+              </div>
+              <div class="srow">
+                <span class="dot red"></span>
+                <button class="mono" style="font-weight:500; width:80px; text-align:left" onclick="showPage('card'); setScenario('triage')">fac-601</button>
+                <div style="flex:1; min-width:0">
+                  <div style="font-size:13.5px">Verify · Round 2 failed · 2 findings to triage</div>
+                  <div style="font-size:12px; color:var(--text-3); margin-top:2px">Verify · Round 2 · 9m ago</div>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="showPage('card'); setScenario('triage')">Triage</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="sec">
+            <div class="sec-head"><span class="sec-title">Active Cards</span><span class="sec-note mono">3 running</span></div>
+            <div class="slist">
+              <button class="srow clickable" onclick="showPage('card'); setScenario('live')">
+                <span class="dot green pulse"></span>
+                <span class="mono" style="width:80px; font-weight:500">ex-545</span>
+                <span style="flex:1">Archive daily logs as Parquet files in Spaces for multi-year querying</span>
+                <span class="mono" style="font-size:12px; color:var(--text-2)">Verify · Round 3 · suite 76%</span>
+                <span class="stage-prog"><span style="width:76%; background:var(--green)"></span></span>
+              </button>
+              <button class="srow clickable" onclick="showPage('card'); setScenario('ask')">
+                <span class="dot amber"></span>
+                <span class="mono" style="width:80px; font-weight:500">fac-685</span>
+                <span style="flex:1">Web Board Usage panel, Reload and Look-back triggers</span>
+                <span class="mono" style="font-size:12px; color:var(--amber)">Spec · waiting</span>
+                <span class="stage-prog"><span style="width:25%; background:var(--amber)"></span></span>
+              </button>
+              <button class="srow clickable" onclick="showPage('card'); setScenario('triage')">
+                <span class="dot red"></span>
+                <span class="mono" style="width:80px; font-weight:500">fac-601</span>
+                <span style="flex:1">A review foreman's working files last across rounds</span>
+                <span class="mono" style="font-size:12px; color:var(--red)">Verify · Round 2 · triage</span>
+                <span class="stage-prog"><span style="width:80%; background:var(--red)"></span></span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== VIEW 4: USAGE & ROUTING (FULL-WIDTH) ==================== -->
+    <div class="view" id="view-usage">
+      <header class="page-header">
+        <div class="header-top">
+          <span>Telemetry &amp; Allocation</span>
+          <div class="header-right">
+            <div class="seg">
+              <button class="active" id="utab-quotas" onclick="setUsageTab('quotas')">Spend &amp; Quotas</button>
+              <button id="utab-routing" onclick="setUsageTab('routing')">Routing Policy</button>
+            </div>
+          </div>
+        </div>
+        <div class="title-row"><h1 class="page-title">Usage &amp; Routing</h1></div>
+      </header>
+
+      <div class="page-scroll">
+        <div class="page-wrap">
+
+          <div id="usage-pane-quotas">
+            <div class="kpi-grid">
+              <div class="kpi-card"><div class="kpi-label">7-Day Spend</div><div class="kpi-val mono">$48.20</div><div class="kpi-sub">across 20 landed cards</div></div>
+              <div class="kpi-card"><div class="kpi-label">Average / Card</div><div class="kpi-val mono">$2.41</div><div class="kpi-sub" style="color:var(--green)">-18% vs prior 7 days</div></div>
+              <div class="kpi-card"><div class="kpi-label">Prompt Cache Hit</div><div class="kpi-val mono">84%</div><div class="kpi-sub">saved ~$61.40 this week</div></div>
+              <div class="kpi-card"><div class="kpi-label">Claude Week Runway</div><div class="kpi-val mono">~18 cards</div><div class="kpi-sub">resets in 4d 14h</div></div>
+            </div>
+
+            <div class="chart-card" style="margin-top:var(--pad-page)">
+              <div style="display:flex; align-items:center; gap:10px">
+                <span class="sec-title">Daily Spend &amp; Landed Cards</span>
+                <span class="sec-note">Last 14 days · hover bars for breakdown</span>
+                <span id="chart-hover" class="mono" style="margin-left:auto; font-size:12px; color:var(--text-1)">Nov 24: $11.40 · 16 cards</span>
+              </div>
+              <svg class="chart-svg" id="spend-chart" viewBox="0 0 840 146" preserveAspectRatio="none"></svg>
+            </div>
+
+            <div class="two-col">
+              <div>
+                <div class="sec-head"><span class="sec-title">Account Quotas</span><span class="sec-note">tick = window elapsed</span></div>
+                <div class="slist">
+                  <div class="quota-group">
+                    <div class="quota-head"><span class="quota-name">Claude Max</span><span class="sec-note">read 2m ago</span></div>
+                    <div class="quota-row mono">
+                      <span style="color:var(--text-2)">week</span>
+                      <div class="q-track"><div class="q-fill ok" style="width:27%"></div><div class="q-pace" style="left:34%"></div></div>
+                      <span>27%</span><span style="color:var(--text-3); text-align:right">→79%</span>
+                    </div>
+                    <div class="quota-row mono">
+                      <span style="color:var(--text-2)">fable</span>
+                      <div class="q-track"><div class="q-fill hot" style="width:35%"></div><div class="q-pace" style="left:32%"></div></div>
+                      <span>35%</span><span style="color:var(--amber); text-align:right">→111%</span>
+                    </div>
+                  </div>
+                  <div class="quota-group">
+                    <div class="quota-head"><span class="quota-name">AGY Gemini</span><span class="sec-note">read 1m ago</span></div>
+                    <div class="quota-row mono">
+                      <span style="color:var(--text-2)">5h</span>
+                      <div class="q-track"><div class="q-fill ok" style="width:34%"></div><div class="q-pace" style="left:83%"></div></div>
+                      <span>34%</span><span style="color:var(--text-3); text-align:right">→41%</span>
+                    </div>
+                    <div class="quota-row mono">
+                      <span style="color:var(--text-2)">week</span>
+                      <div class="q-track"><div class="q-fill hot" style="width:33%"></div><div class="q-pace" style="left:15%"></div></div>
+                      <span>33%</span><span style="color:var(--amber); text-align:right">→218%</span>
+                    </div>
+                  </div>
+                  <div class="quota-group">
+                    <div class="quota-head"><span class="quota-name">Codex</span><span class="sec-note">prepaid credits active</span></div>
+                    <div class="quota-row mono">
+                      <span style="color:var(--text-2)">week</span>
+                      <div class="q-track"><div class="q-fill" style="width:99%"></div><div class="q-pace" style="left:94%"></div></div>
+                      <span>99%</span><span style="color:var(--text-3); text-align:right">credits</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div class="sec-head"><span class="sec-title">Burn by Role</span><span class="sec-note">Last 7 days</span></div>
+                <div class="slist">
+                  <div class="role-bar-row">
+                    <div class="role-top"><span>Foreman</span><span class="mono" style="margin-left:auto">$22.18</span><span class="mono" style="width:36px; text-align:right; color:var(--text-3)">46%</span></div>
+                    <div class="role-track"><div class="role-fill" style="width:46%"></div></div>
+                  </div>
+                  <div class="role-bar-row">
+                    <div class="role-top"><span>Reviewers</span><span class="mono" style="margin-left:auto">$14.94</span><span class="mono" style="width:36px; text-align:right; color:var(--text-3)">31%</span></div>
+                    <div class="role-track"><div class="role-fill" style="width:31%; background:var(--text-2)"></div></div>
+                  </div>
+                  <div class="role-bar-row">
+                    <div class="role-top"><span>Planner</span><span class="mono" style="margin-left:auto">$7.23</span><span class="mono" style="width:36px; text-align:right; color:var(--text-3)">15%</span></div>
+                    <div class="role-track"><div class="role-fill" style="width:15%; background:var(--text-2)"></div></div>
+                  </div>
+                  <div class="role-bar-row">
+                    <div class="role-top"><span>Researchers</span><span class="mono" style="margin-left:auto">$3.85</span><span class="mono" style="width:36px; text-align:right; color:var(--text-3)">8%</span></div>
+                    <div class="role-track"><div class="role-fill" style="width:8%; background:var(--text-3)"></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="usage-pane-routing" style="display:none">
+            <div style="border:1px solid var(--border); padding:var(--pad); display:flex; align-items:center; gap:16px; flex-wrap:wrap">
+              <div>
+                <div style="font-weight:600; font-size:14px">Quota-Aware Seat Assignment</div>
+                <div style="font-size:12.5px; color:var(--text-2); margin-top:2px">Guides how new cards and orchestrators choose models and effort from live pool pace. Always editable per card before Build.</div>
+              </div>
+              <div class="seg" style="margin-left:auto">
+                <button class="active">Balanced (Quota-aware)</button>
+                <button>Max Quality</button>
+                <button>Fixed Defaults</button>
+              </div>
+            </div>
+
+            <section class="sec">
+              <div class="sec-head"><span class="sec-title">Default Model &amp; Effort by Role</span><span class="sec-note">Applied at card start and visible on Approve Plan</span></div>
+              <table class="rtbl">
+                <thead>
+                  <tr>
+                    <th>Role / Work Type</th><th>Narrow (1-3 files)</th><th>Standard</th><th>Complex / Visual</th><th>Quota Spillover</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Planner</strong></td>
+                    <td><select><option>Opus 5.5 · high</option><option>Neon · high</option></select></td>
+                    <td><select><option>Opus 5.5 · high</option><option>Opus 5.5 · xhigh</option></select></td>
+                    <td><select><option>Opus 5.5 · xhigh</option></select></td>
+                    <td class="mono" style="color:var(--text-2)">→ Neon · high</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Foreman (Core / Backend)</strong></td>
+                    <td><select><option>Neon · medium</option><option>Opus 5.5 · high</option></select></td>
+                    <td><select><option>Neon · high</option><option>Opus 5.5 · high</option></select></td>
+                    <td><select><option>Neon · xhigh</option><option>Opus 5.5 · xhigh</option></select></td>
+                    <td class="mono" style="color:var(--amber)">active → Opus 5.5 · high</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Foreman (UI / Docs)</strong></td>
+                    <td><select><option>Opus 5.5 · high</option></select></td>
+                    <td><select><option>Opus 5.5 · high</option></select></td>
+                    <td><select><option>Opus 5.5 · xhigh</option></select></td>
+                    <td class="mono" style="color:var(--text-2)">→ Neon · high</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Reviewers</strong></td>
+                    <td><select><option>Sol · high</option><option>Sol · xhigh</option></select></td>
+                    <td><select><option>Sol · xhigh</option></select></td>
+                    <td><select><option>Sol · xhigh</option></select></td>
+                    <td class="mono" style="color:var(--green)">prepaid credits (no cap)</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Researchers</strong></td>
+                    <td><select><option>Neon · medium</option></select></td>
+                    <td><select><option>Neon · medium</option></select></td>
+                    <td><select><option>Neon · high</option></select></td>
+                    <td class="mono" style="color:var(--text-2)">→ Sonnet · medium</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <section class="sec">
+              <div class="sec-head"><span class="sec-title">Live Quota Rules</span><span class="sec-note">Evaluated before starting each card or turn</span></div>
+              <div class="slist">
+                <div class="rule-row">
+                  <span class="rule-tag mono">active</span>
+                  <div style="flex:1"><strong>Pace spillover:</strong> when <code>AGY Gemini week</code> projects &gt;150% while <code>Claude Max week</code> projects &lt;90%, route Standard Backend foremen to <code>Opus 5.5 · high</code>.</div>
+                </div>
+                <div class="rule-row">
+                  <span class="rule-tag mono" style="color:var(--text-2)">always</span>
+                  <div style="flex:1"><strong>Prepaid credits:</strong> never throttle or shift off <code>Codex / Sol</code> past 100% weekly pool.</div>
+                </div>
+                <div class="rule-row">
+                  <span class="rule-tag mono" style="color:var(--text-2)">guard</span>
+                  <div style="flex:1"><strong>No silent downgrade:</strong> never drop a Complex card below <code>high</code> effort automatically; raise a hand if all high-tier pools are exhausted.</div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function showPage(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    document.querySelectorAll('.nav-item, .nav-card, .nav-orch').forEach(el => el.classList.remove('active'));
+    if (name === 'board') document.getElementById('nav-board').classList.add('active');
+    if (name === 'usage') document.getElementById('nav-usage').classList.add('active');
+    if (name === 'card') document.getElementById('nav-ex-545').classList.add('active');
+  }
+
+  function showOrchestrator(project) {
+    showPage('orch');
+    document.getElementById('orch-proj-crumb').textContent = project;
+    document.getElementById('orch-title').textContent = project + ' Orchestrator';
+    const map = { 'example.com': 'nav-orch-ex', 'mork': 'nav-orch-fac', 'conglomerate': 'nav-orch-cong' };
+    if (map[project]) document.getElementById(map[project]).classList.add('active');
+  }
+
+  function setUsageTab(tab) {
+    document.getElementById('utab-quotas').classList.toggle('active', tab === 'quotas');
+    document.getElementById('utab-routing').classList.toggle('active', tab === 'routing');
+    document.getElementById('usage-pane-quotas').style.display = tab === 'quotas' ? 'block' : 'none';
+    document.getElementById('usage-pane-routing').style.display = tab === 'routing' ? 'block' : 'none';
+  }
+
+  function toggleStage(id) { document.getElementById(id).classList.toggle('open'); }
+  function focusStage(id) {
+    const el = document.getElementById(id);
+    el.classList.add('open');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  const SEATS = {
+    planner: {
+      name: 'planner', model: 'Opus 5.5 · high', dot: 'grey', ctx: '52k / 400k', pct: 13, warm: 'warm 11m',
+      html: `
+        <div class="msg-row"><div class="msg-meta"><strong>planner</strong><span class="mono">18:27</span></div>Scouted the log shipper and DuckDB provisioning script. Three spec decisions agreed and plan approved.</div>
+        <div class="msg-row operator"><div class="msg-meta"><strong>Operator</strong><span class="mono">18:45</span></div>Approved. Keep DuckDB install idempotent.</div>
+      `
+    },
+    foreman: {
+      name: 'foreman', model: 'Gemini 4 Neon · high', dot: 'grey', ctx: '24k / 400k', pct: 6, warm: 'warm 20m',
+      html: `
+        <div class="msg-row operator"><div class="msg-meta"><strong>Operator</strong><span class="mono">18:45</span></div>Build it. Keep DuckDB provisioning idempotent.</div>
+        <div class="turn-block">
+          <div class="turn-step"><span>Thought for 6s</span></div>
+          <div class="turn-step"><span>Edited src/archive/writer.rs</span><span class="t mono">2.1s</span></div>
+          <div class="turn-step"><span>Ran cargo test archive::</span><span class="t mono">8.4s</span></div>
+        </div>
+        <div class="msg-row"><div class="msg-meta"><strong>foreman</strong><span class="mono">19:26</span></div>Pushed Round 3 fixes for temp file cleanup and UTC day partitioning. Handed off to Verify.</div>
+      `
+    },
+    rforeman: {
+      name: 'review foreman', model: 'Opus 5.5 · xhigh', dot: 'grey', ctx: '147k / 400k', pct: 37, warm: 'warm 16m',
+      html: `
+        <div class="msg-row"><div class="msg-meta"><strong>review foreman</strong><span class="mono">19:27</span></div>Round 3 opened on commit <code>e92b10a</code> (diffed cleanly against <code>refs/rounds/2-on-base</code>). Dispatched <code>reviewer-1</code> on Parquet writer cleanup and <code>reviewer-2</code> on production-box.sh SHA256 verification.</div>
+        <div class="turn-block">
+          <div class="turn-step"><span>Waiting on 2 reviewers to return verdicts…</span></div>
+        </div>
+      `
+    },
+    r1: {
+      name: 'reviewer-1', model: 'Sol · xhigh', dot: 'green pulse', ctx: '84k / 400k', pct: 21, warm: 'warm 55m',
+      html: `
+        <div class="msg-row"><div class="msg-meta"><strong>review foreman</strong><span class="mono">19:27</span></div>Verify Round 2 finding #1 (UTC partitioning) and temp Parquet cleanup on timeout.</div>
+        <div class="turn-block">
+          <div class="turn-step"><span>Thought for 4s</span></div>
+          <div class="turn-step"><span>git diff refs/rounds/2-on-base HEAD</span><span class="t mono">0.3s</span></div>
+          <div class="turn-step"><span>Read src/archive/writer.rs:90-160</span><span class="t mono">0.2s</span></div>
+          <div class="turn-step" style="color:var(--text-1)"><span>Thinking… 7s</span></div>
+        </div>
+      `
+    },
+    r2: {
+      name: 'reviewer-2', model: 'Sol · xhigh', dot: 'green pulse', ctx: '62k / 400k', pct: 15, warm: 'warm 54m',
+      html: `
+        <div class="msg-row"><div class="msg-meta"><strong>review foreman</strong><span class="mono">19:27</span></div>Verify DuckDB SHA256 check and Spaces IAM least-privilege scope.</div>
+        <div class="turn-block">
+          <div class="turn-step"><span>Thought for 3s</span></div>
+          <div class="turn-step"><span>Read scripts/boxes/production-box.sh</span><span class="t mono">0.2s</span></div>
+          <div class="turn-step" style="color:var(--text-1)"><span>Checking sha256sum fallback path…</span></div>
+        </div>
+      `
+    }
+  };
+
+  let paneOpen = true;
+  function selectSeat(key, isAuto) {
+    const pane = document.getElementById('seat-pane');
+    pane.classList.remove('collapsed');
+    paneOpen = true;
+    document.getElementById('btn-toggle-pane').textContent = 'Hide chat';
+
+    const s = SEATS[key];
+    document.querySelectorAll('.seat-chip').forEach(c => c.classList.remove('open'));
+    const chip = document.getElementById('chip-' + key);
+    if (chip) chip.classList.add('open');
+
+    document.getElementById('rev-parent-btn').classList.toggle('focused', key === 'rforeman');
+    document.getElementById('rev-row-r1').classList.toggle('focused', key === 'r1');
+    document.getElementById('rev-row-r2').classList.toggle('focused', key === 'r2');
+
+    document.getElementById('sp-dot').className = 'dot ' + s.dot;
+    document.getElementById('sp-name').textContent = s.name;
+    document.getElementById('sp-auto').style.display = isAuto ? 'inline' : 'none';
+    document.getElementById('sp-model').textContent = s.model;
+    document.getElementById('sp-model-btn').textContent = s.model;
+    document.getElementById('sp-ctx').textContent = s.ctx;
+    document.getElementById('sp-ctx-fill').style.width = s.pct + '%';
+    document.getElementById('sp-warm').textContent = s.warm;
+    document.getElementById('sp-stream').innerHTML = s.html;
+    document.getElementById('sp-input').placeholder = 'Message ' + s.name + '…';
+  }
+
+  function toggleSeatPane() {
+    paneOpen = !paneOpen;
+    document.getElementById('seat-pane').classList.toggle('collapsed', !paneOpen);
+    document.getElementById('btn-toggle-pane').textContent = paneOpen ? 'Hide chat' : 'Show chat';
+  }
+
+  const HANDS = {
+    live: '',
+    ask: `
+      <div class="hand-card">
+        <div class="hand-head">
+          <span class="hand-pill">Raised Hand</span>
+          <span class="hand-title">planner asks in Spec</span>
+          <span class="hand-meta mono"><span style="color:var(--amber)">cold in 4m</span> · 6m ago</span>
+          <div class="hand-actions"><button class="btn btn-ghost btn-sm">Give to orchestrator</button></div>
+        </div>
+        <div class="hand-body">
+          <div class="hand-prose">Usage figures can summarize either the last 7 rolling days across all CLIs, or align with each provider's own weekly reset boundary. Which window should the Usage headline use?</div>
+          <div class="hand-options">
+            <button class="opt-btn pick" onclick="setScenario('live')">
+              <span class="opt-num mono">1</span>
+              <div>
+                <div class="opt-text">Rolling 7-day window across all CLIs</div>
+                <div class="opt-why">planner's pick: keeps spend, cache hit, and card average on one shared window.</div>
+              </div>
+            </button>
+            <button class="opt-btn" onclick="setScenario('live')">
+              <span class="opt-num mono">2</span>
+              <div class="opt-text">Align to Claude Max's weekly reset boundary</div>
+            </button>
+          </div>
+        </div>
+      </div>`,
+    triage: `
+      <div class="hand-card red">
+        <div class="hand-head">
+          <span class="hand-pill">Raised Hand</span>
+          <span class="hand-title">Verify · Round 2 failed · 2 findings to triage</span>
+          <span class="hand-meta mono">9m ago</span>
+          <div class="hand-actions">
+            <span class="mono" style="font-size:12px; color:var(--text-2)">2 to choose</span>
+            <button class="btn btn-primary btn-sm" onclick="setScenario('live')">Send</button>
+          </div>
+        </div>
+        <div class="hand-body">
+          <div class="triage-row">
+            <div style="flex:1; min-width:0">
+              <div style="font-size:13px"><span class="mono" style="color:var(--text-3)">#1</span> DuckDB install script skips SHA256 verification</div>
+              <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">scripts/boxes/production-box.sh:74 · reviewer-2</div>
+            </div>
+            <div class="seg"><button class="active">Fix</button><button>Decline</button><button>Foreman</button></div>
+          </div>
+          <div class="triage-row">
+            <div style="flex:1; min-width:0">
+              <div style="font-size:13px"><span class="mono" style="color:var(--text-3)">#2</span> Backfill CLI should log skipped days at debug level</div>
+              <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">src/archive/cli.rs:41 · reviewer-1</div>
+            </div>
+            <div class="seg"><button>Fix</button><button class="active">Decline</button><button>Foreman</button></div>
+          </div>
+        </div>
+      </div>`,
+    approve: `
+      <div class="hand-card">
+        <div class="hand-head">
+          <span class="hand-pill">Raised Hand</span>
+          <span class="hand-title">Approve plan in Spec</span>
+          <span class="hand-meta mono">2m ago</span>
+          <div class="hand-actions">
+            <button class="btn btn-ghost btn-sm">Request changes</button>
+            <button class="btn btn-primary btn-sm" onclick="setScenario('live')">Approve &amp; Build</button>
+          </div>
+        </div>
+        <div class="hand-body">
+          <div style="font-size:12px; color:var(--text-2); font-weight:500; margin-bottom:4px">What changes</div>
+          <div class="hand-prose">Export nightly JSONL logs as Zstd-compressed Parquet partitioned by UTC date into Spaces, verify checksum before pruning 14-day local files, and install DuckDB CLI idempotently.</div>
+          <div class="routing-preview">
+            <span style="color:var(--text-1); font-weight:500">Quota-aware seats</span>
+            <span class="mono">foreman: Opus 5.5 · high</span>
+            <span style="color:var(--text-3)">·</span>
+            <span class="mono">reviewers: Sol · xhigh</span>
+            <button class="text-link" style="margin-left:auto" onclick="showPage('usage'); setUsageTab('routing')">Edit routing →</button>
+          </div>
+        </div>
+      </div>`
+  };
+
+  function setScenario(s) {
+    document.getElementById('sel-scenario').value = s;
+    const dock = document.getElementById('hand-dock');
+    if (s === 'live') {
+      dock.style.display = 'none';
+      dock.innerHTML = '';
+      selectSeat('rforeman', true);
+    } else {
+      dock.style.display = 'block';
+      dock.innerHTML = HANDS[s];
+      selectSeat(s === 'triage' ? 'rforeman' : 'planner', true);
+    }
+  }
+
+  selectSeat('rforeman', true);
+
+  const TESTS = [
+    'parquet_export::compacts_daily_chunks',
+    'parquet_export::preserves_utf8_and_null_fields',
+    'spaces_upload::retries_transient_503',
+    'spaces_upload::verifies_etag_before_local_prune',
+    'backfill::skips_already_archived_days',
+    'duckdb_query::reads_hive_partition_glob',
+    'retention::keeps_14_days_on_disk'
+  ];
+  let passed = 142, secs = 23;
+  const total = 186;
+  setInterval(() => {
+    passed = passed >= total ? 128 : passed + 2;
+    secs = passed === 128 ? 14 : secs + 1;
+    const pct = Math.round((passed / total) * 100);
+    document.getElementById('suite-pct').textContent = pct + '%';
+    document.getElementById('suite-counts').textContent = `${passed} / ${total} passed · 0 failed`;
+    document.getElementById('suite-timer').textContent = secs + 's';
+    document.getElementById('suite-bar').style.width = pct + '%';
+    document.getElementById('suite-test').textContent = TESTS[passed % TESTS.length];
+    document.getElementById('stepper-suite-sub').textContent = `suite ${pct}%`;
+    document.getElementById('nav-prog-545').style.width = pct + '%';
+    document.getElementById('r3-elapsed').textContent = `1m ${String(secs).padStart(2, '0')}s`;
+  }, 900);
+
+  const DAILY = [
+    { d: 'Nov 11', v: 3.1, c: 2 }, { d: 'Nov 12', v: 5.4, c: 4 }, { d: 'Nov 13', v: 2.2, c: 1 },
+    { d: 'Nov 14', v: 7.8, c: 5 }, { d: 'Nov 15', v: 4.5, c: 3 }, { d: 'Nov 16', v: 6.1, c: 4 },
+    { d: 'Nov 17', v: 1.9, c: 1 }, { d: 'Nov 18', v: 8.6, c: 6 }, { d: 'Nov 19', v: 5.2, c: 3 },
+    { d: 'Nov 20', v: 6.9, c: 5 }, { d: 'Nov 21', v: 3.4, c: 2 }, { d: 'Nov 22', v: 7.1, c: 5 },
+    { d: 'Nov 23', v: 6.8, c: 4 }, { d: 'Nov 24', v: 11.4, c: 16 }
+  ];
+  const svg = document.getElementById('spend-chart');
+  const maxV = Math.max(...DAILY.map(x => x.v));
+  const bw = 44, gap = 16;
+  let out = `<line x1="0" y1="116" x2="840" y2="116" stroke="var(--border)" stroke-width="1"/>`;
+  out += `<line x1="0" y1="58" x2="840" y2="58" stroke="var(--border)" stroke-dasharray="2 4" stroke-width="1"/>`;
+  DAILY.forEach((item, i) => {
+    const h = Math.max(6, Math.round((item.v / maxV) * 98));
+    const x = i * (bw + gap) + 6;
+    const y = 116 - h;
+    const isLast = i === DAILY.length - 1;
+    out += `<g style="cursor:pointer" onmouseenter="document.getElementById('chart-hover').textContent='${item.d}: $${item.v.toFixed(2)} · ${item.c} cards'">
+      <rect x="${x}" y="${y}" width="${bw}" height="${h}" fill="${isLast ? 'var(--text-1)' : 'var(--border-strong)'}" />
+      <text x="${x + bw/2}" y="136" text-anchor="middle" fill="var(--text-3)" font-family="Geist Mono" font-size="10">${item.d.slice(4)}</text>
+    </g>`;
+  });
+  svg.innerHTML = out;
+</script>
+</body>
+</html>

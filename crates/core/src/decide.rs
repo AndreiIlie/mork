@@ -1,11 +1,11 @@
 //! `decide(&State, Event, ctx) -> Decision` (1.12.1): what happens next, as changes to store in one transaction,
 //! intents for the engine to carry out after it commits, and the answer to a command.
 
-use factory_types::Command;
-use factory_types::config::Config;
-use factory_types::protocol::{ErrorBody, ErrorCode};
-use factory_types::state::{Job, Sender};
-use factory_types::{AgentKey, CardId, JobId};
+use mork_types::Command;
+use mork_types::config::Config;
+use mork_types::protocol::{ErrorBody, ErrorCode};
+use mork_types::state::{Job, Sender};
+use mork_types::{AgentKey, CardId, JobId};
 use serde_json::Value;
 
 use crate::agents::{turns, usage};
@@ -89,7 +89,7 @@ pub enum Event {
     },
     /// The engine says something in a place (`Reloaded to …`, 1.8.6.6).
     EngineSays {
-        place: factory_types::PlaceId,
+        place: mork_types::PlaceId,
         text: String,
         /// What makes it once only (`reload:<id>`), journaled with it so a repeat is seen.
         key: Option<String>,
@@ -100,48 +100,48 @@ pub enum Event {
     },
     /// A CLI reported usage-limit windows: from a turn's stream, or Codex's limits read.
     LimitsSeen {
-        limits: Vec<factory_types::usage::Limit>,
+        limits: Vec<mork_types::usage::Limit>,
         /// From a turn's stream: the job, and how far into its `out.jsonl` these limits were
         /// read (1.4.7.2), stored with them.
         at: Option<(JobId, u64)>,
         /// A whole read of this CLI's limits (Codex's): a window it doesn't list is no longer
         /// reached (1.4.8, Codex 7).
-        whole: Option<factory_types::config::Cli>,
+        whole: Option<mork_types::config::Cli>,
     },
     /// The boards' cards, read again (an index, never stored).
     BoardsRead {
-        cards: Vec<factory_types::card::BoardCard>,
+        cards: Vec<mork_types::card::BoardCard>,
         /// Each board's id prefix, from its `config.yml` (M5.27).
-        prefixes: std::collections::BTreeMap<factory_types::ProjectId, String>,
+        prefixes: std::collections::BTreeMap<mork_types::ProjectId, String>,
     },
     /// The engine is about to carry out a pending action: `started` commits first (2.5.1).
     ActionStarted {
-        id: factory_types::ActionId,
+        id: mork_types::ActionId,
         /// What the engine read before the call, to check after a crash (a board file's
         /// content before and after, 2.5.2); kept from the first start.
         prepared: Option<Value>,
     },
     /// An outward action returned (2.5.1).
     ActionReturned {
-        id: factory_types::ActionId,
-        result: Result<Value, factory_types::work::ActionFailure>,
+        id: mork_types::ActionId,
+        result: Result<Value, mork_types::work::ActionFailure>,
     },
     /// What a `started` action did, as found after a crash (2.5.2).
     ActionFound {
-        id: factory_types::ActionId,
-        found: factory_types::work::Found,
+        id: mork_types::ActionId,
+        found: mork_types::work::Found,
     },
     /// The poller, or the re-read before a merge, read a card's PR (4.11).
     PrRead {
         card: CardId,
-        seen: factory_types::work::PrSeen,
+        seen: mork_types::work::PrSeen,
         /// Read right before the merge call (4.11.2.4), not by the poller.
         before_merge: bool,
     },
     /// The poller read a project's open PRs (4.16.1).
     OpenPrsRead {
-        project: factory_types::ProjectId,
-        prs: Vec<factory_types::work::OpenPr>,
+        project: mork_types::ProjectId,
+        prs: Vec<mork_types::work::OpenPr>,
     },
     /// Who the Bitbucket token is (3.7.2): `None` when it may act, else why not.
     TokenRead {
@@ -150,23 +150,23 @@ pub enum Event {
     /// Bitbucket accepted the token without saying who it is (`GET /user` answered, not 401): a
     /// refusal for a 401 is over (3.7.2).
     TokenAccepted,
-    /// Master's tip, read in Andrei's checkout, isn't `current`: the pin, else the build running (fac-19).
+    /// Master's tip, read in the operator's checkout, isn't `current`: the pin, else the build running (fac-19).
     MasterSeen {
-        tip: factory_types::Sha,
+        tip: mork_types::Sha,
         current: String,
         /// Its build, already in place, tried for the pin: pinned, or refused by the pin's checks.
         pinned: Option<Result<(), String>>,
     },
     /// A project's checks folder was read at this commit (4.7.7).
     ChecksFolderSeen {
-        project: factory_types::ProjectId,
+        project: mork_types::ProjectId,
         commit: String,
     },
     /// Time passed: leases to free, queues to start, fetches and polls due.
     Tick,
     /// A test-slot client's connection ended (4.9.3).
     LeaseClosed {
-        lease: factory_types::LeaseId,
+        lease: mork_types::LeaseId,
     },
     /// The engine started, or a reload took over: leases wait for their holders (4.9.4).
     Started,
@@ -178,10 +178,10 @@ pub enum Event {
     },
     /// A door request, resolved by the engine against its targets (fac-1): its call, and the allowlist's verdict.
     DoorAsked {
-        call: Box<factory_types::door_call::DoorCall>,
-        validator: factory_types::door_call::Verdict,
+        call: Box<mork_types::door_call::DoorCall>,
+        validator: mork_types::door_call::Verdict,
         /// The calls under way that are being stopped, their caller gone: none is matched.
-        stopped: Vec<factory_types::ActionId>,
+        stopped: Vec<mork_types::ActionId>,
     },
     /// A door request no adapter may run, or no operation: journaled and answered.
     DoorRefused {
@@ -193,18 +193,18 @@ pub enum Event {
     },
     /// A door call's requester was told how it stands: by its answer, or (`answered` false) now by news.
     DoorDelivered {
-        id: factory_types::ActionId,
+        id: mork_types::ActionId,
         answered: bool,
     },
     /// A pending door call lost its last waiter: busy, or an unstarted read whose caller went.
     DoorUnstarted {
-        id: factory_types::ActionId,
+        id: mork_types::ActionId,
         busy: Option<String>,
     },
     /// The kill of a read's query its server didn't take, tried again as the same query was asked
     /// again (fac-184): `ended` when killed, or none was left to kill.
     DoorKilled {
-        id: factory_types::ActionId,
+        id: mork_types::ActionId,
         ended: bool,
     },
     /// A failed round's proofs were copied into its fixer's clone: the files copied, or why not (fac-377).
@@ -215,7 +215,7 @@ pub enum Event {
     },
     /// A project's orchestrator's hook opened, or closed (fac-119, fac-244): main says so.
     Hooked {
-        project: factory_types::ProjectId,
+        project: mork_types::ProjectId,
         hooked: bool,
     },
 }
@@ -227,11 +227,11 @@ pub enum Intent {
     StopJob { id: JobId },
     /// Make and launch a job of no agent's turn (section 4); it is recorded through
     /// [`Event::JobRecorded`] with its purpose.
-    StartJob { purpose: factory_types::work::Purpose },
+    StartJob { purpose: mork_types::work::Purpose },
     /// Carry out an action, recorded `pending` (2.5.1).
-    RunAction { id: factory_types::ActionId },
+    RunAction { id: mork_types::ActionId },
     /// Send an ask's desktop notice, claimed in this transaction (2.6).
-    Notify { ask: factory_types::AskId },
+    Notify { ask: mork_types::AskId },
     /// Write a card's record again (2.9.1).
     WriteRecord { card: CardId },
     /// Read a card's PR again right before its merge call (4.11.2.4).
@@ -241,11 +241,11 @@ pub enum Intent {
     /// Copy review card `review`'s proofs into `card`'s clone, for round `round`'s fix (fac-263).
     CopyProofs { review: CardId, card: CardId, round: u32 },
     /// Remove a handoff's copy, `dir` under `project`'s records, its note deleted (fac-287).
-    RemoveHandoff { project: factory_types::ProjectId, dir: String },
+    RemoveHandoff { project: mork_types::ProjectId, dir: String },
     /// Remove a card's mock kept from an earlier clone, put into its new clone (fac-591).
     DropMock { card: CardId },
     /// Hand message `seq` to running turn `job`, its words and images, for its CLI to read while it works (fac-389):
-    /// each image copied from its source to its name in the turn's `$FACTORY_IO`, as the job's `io_copies` record it.
+    /// each image copied from its source to its name in the turn's `$MORK_IO`, as the job's `io_copies` record it.
     Deliver { job: JobId, seq: u64, text: String, images: Vec<(String, String)> },
 }
 
@@ -284,7 +284,7 @@ impl Decision {
 /// Records each project's stream, auto-gives delegated cards' seat and plan asks, and requests help for engine asks.
 pub fn decide(state: &State, event: &Event, ctx: Ctx<'_>) -> Decision {
     let mut d = route(state, event, ctx);
-    crate::messages::streams::record(state, &mut d, &ctx.config.factory.project, ctx.now);
+    crate::messages::streams::record(state, &mut d, ctx.config.mork.project.as_ref(), ctx.now);
     crate::messages::delegate::give_opened(state, &mut d, ctx.now);
     crate::messages::delegate::request_opened(state, &mut d, ctx.now);
     d

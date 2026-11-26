@@ -9,7 +9,7 @@ use serde_json::Value;
 // The only crates `core` may reach, directly or not: `types` and pure serialization crates
 // (T1.46: no async runtime, database, HTTP, file watching, system call or randomness crate).
 const CORE_ALLOWED: &[&str] = &[
-    "factory-types",
+    "mork-types",
     "serde",
     "serde_core",
     "serde_derive",
@@ -29,19 +29,19 @@ const CORE_ALLOWED: &[&str] = &[
 pub fn allowed_edges() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     let set = |xs: &[&'static str]| xs.iter().copied().collect::<BTreeSet<_>>();
     BTreeMap::from([
-        ("factory-types", set(&[])),
-        ("factory-sys", set(&[])),
-        ("factory-core", set(&["factory-types"])),
-        ("factory-engine", set(&["factory-core", "factory-types", "factory-sys"])),
-        ("factory-ui", set(&["factory-types"])),
-        ("factory-app", set(&["factory-types", "factory-core", "factory-engine", "factory-ui", "factory-sys"])),
-        ("factory-fakes", set(&[])),
+        ("mork-types", set(&[])),
+        ("mork-sys", set(&[])),
+        ("mork-core", set(&["mork-types"])),
+        ("mork-engine", set(&["mork-core", "mork-types", "mork-sys"])),
+        ("mork-ui", set(&["mork-types"])),
+        ("mork-app", set(&["mork-types", "mork-core", "mork-engine", "mork-ui", "mork-sys"])),
+        ("mork-fakes", set(&[])),
         ("xtask", set(&[])),
     ])
 }
 
 /// The workspace's own packages, by name: `workspace_members`, or failing that every package
-/// named `factory-…` and `xtask`.
+/// named `mork-…` and `xtask`.
 pub fn members(meta: &Value) -> BTreeSet<String> {
     match meta["workspace_members"].as_array() {
         Some(ids) => ids.iter().filter_map(Value::as_str).map(|id| name_of(meta, id)).collect(),
@@ -50,7 +50,7 @@ pub fn members(meta: &Value) -> BTreeSet<String> {
             .into_iter()
             .flatten()
             .filter_map(|p| p["name"].as_str())
-            .filter(|n| n.starts_with("factory-") || *n == "xtask")
+            .filter(|n| n.starts_with("mork-") || *n == "xtask")
             .map(str::to_owned)
             .collect(),
     }
@@ -124,7 +124,7 @@ pub fn check_graph(meta: &Value) -> Vec<String> {
     }
     for (pkg, want) in &allowed {
         if !ours.contains(*pkg) {
-            if meta["workspace_members"].is_array() || pkg.starts_with("factory-") && deps.contains_key(*pkg) {
+            if meta["workspace_members"].is_array() || pkg.starts_with("mork-") && deps.contains_key(*pkg) {
                 out.push(format!("{pkg}: missing from the workspace"));
             }
             continue;
@@ -135,14 +135,14 @@ pub fn check_graph(meta: &Value) -> Vec<String> {
             }
         }
     }
-    for d in transitive(&deps, "factory-core") {
+    for d in transitive(&deps, "mork-core") {
         if !CORE_ALLOWED.contains(&d.as_str()) {
-            out.push(format!("factory-core reaches {d}"));
+            out.push(format!("mork-core reaches {d}"));
         }
     }
-    for d in transitive(&deps, "factory-ui").into_iter().filter(|d| d.starts_with("factory-")) {
-        if d != "factory-types" {
-            out.push(format!("factory-ui reaches {d}"));
+    for d in transitive(&deps, "mork-ui").into_iter().filter(|d| d.starts_with("mork-")) {
+        if d != "mork-types" {
+            out.push(format!("mork-ui reaches {d}"));
         }
     }
     out
@@ -167,9 +167,9 @@ pub fn check_forbid(meta: &Value, root: &Path) -> Vec<String> {
             let text = std::fs::read_to_string(&src).unwrap_or_default();
             let has = text.lines().any(|l| l.trim() == "#![forbid(unsafe_code)]");
             let rel = crate::walk::rel(root, &src);
-            if name == "factory-sys" && kinds.contains(&"lib") && has {
+            if name == "mork-sys" && kinds.contains(&"lib") && has {
                 out.push("crates/sys: forbids unsafe, but it is where unsafe lives".into());
-            } else if name != "factory-sys" && !has {
+            } else if name != "mork-sys" && !has {
                 out.push(format!("{rel}: lacks #![forbid(unsafe_code)]"));
             }
         }

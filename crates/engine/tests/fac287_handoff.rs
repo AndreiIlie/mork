@@ -4,17 +4,17 @@
 
 use std::os::unix::fs::symlink;
 
-use factory_engine::runtime::handoff::preserve;
+use mork_engine::runtime::handoff::preserve;
 
-fn names(files: &[factory_types::note::HandoffFile]) -> Vec<&str> {
+fn names(files: &[mork_types::note::HandoffFile]) -> Vec<&str> {
     files.iter().map(|f| f.path.as_str()).collect()
 }
 
 #[test]
 fn fac287_a_handoff_is_copied_through_no_link() {
-    let root = std::env::temp_dir().join(format!("factory-test-handoff-{}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("mork-test-handoff-{}", std::process::id()));
     let (clone, to, secret) = (root.join("clone"), root.join("records/handoffs/ex-1-1"), root.join("secret"));
-    let handoff = clone.join(".git/factory/handoff");
+    let handoff = clone.join(".git/mork/handoff");
     std::fs::create_dir_all(handoff.join("notes")).unwrap();
     std::fs::create_dir_all(secret.join("deep")).unwrap();
     std::fs::write(secret.join("key"), "SECRET").unwrap();
@@ -41,8 +41,8 @@ fn fac287_a_handoff_is_copied_through_no_link() {
     assert!(preserve(&clone, &to).unwrap().is_none(), "a link for the handoff was followed");
     std::fs::remove_file(&handoff).unwrap();
     std::fs::remove_dir_all(clone.join(".git")).unwrap();
-    std::fs::create_dir_all(secret.join("factory/handoff")).unwrap();
-    std::fs::write(secret.join("factory/handoff/key"), "SECRET").unwrap();
+    std::fs::create_dir_all(secret.join("mork/handoff")).unwrap();
+    std::fs::write(secret.join("mork/handoff/key"), "SECRET").unwrap();
     symlink(&secret, clone.join(".git")).unwrap();
     assert!(preserve(&clone, &to).unwrap().is_none(), "a link for .git was followed");
     assert!(!to.exists());

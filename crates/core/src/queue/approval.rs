@@ -1,16 +1,16 @@
-//! Our PRs wait outside the merge queue for Andrei's current-head approval, asked once verified; PRs merge only on it,
+//! Our PRs wait outside the merge queue for the operator's current-head approval, asked once verified; PRs merge only on it,
 //! with his credential (fac-98, fac-111, fac-375). Conflicts never retry: ours joins, others stay held for him.
 
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Candidate, Card, Landing, Mode, Stage};
-use factory_types::work::{ActionFailure, OpenPr, PrSeen, PrState};
-use factory_types::{CardId, ProjectId, Sha};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Candidate, Card, Landing, Mode, Stage};
+use mork_types::work::{ActionFailure, OpenPr, PrSeen, PrState};
+use mork_types::{CardId, ProjectId, Sha};
 use serde_json::json;
 
 use super::pr::repo_of;
 use crate::decide::Ctx;
-use crate::decide::actions::DROPPED_BY_ANDREI;
+use crate::decide::actions::DROPPED_BY_OPERATOR;
 use crate::messages::asks::{self, Raise};
 use crate::post::Poster;
 use crate::state::State;
@@ -38,7 +38,7 @@ pub fn holds(c: &Card, project: &str, pr: u64) -> bool {
     c.project == project && c.mode != Mode::Review && c.stage.is_live() && c.pr == Some(pr)
 }
 
-/// Merges our published PR on Andrei's current-head approval once that head was verified on the base it merges into:
+/// Merges our published PR on the operator's current-head approval once that head was verified on the base it merges into:
 /// before publishing (fac-375), or by an older build's PR entry; waits for its card's turns to end (fac-111).
 pub fn own(p: &mut Poster<'_>, c: &Card, seen: &PrSeen, ctx: Ctx<'_>) {
     let Some(Landing::Approval { tree, base, commit, verified }) = c.landing.clone() else { return };
@@ -61,7 +61,7 @@ pub fn own(p: &mut Poster<'_>, c: &Card, seen: &PrSeen, ctx: Ctx<'_>) {
 }
 
 /// Merges an unpaused PR entry on current-head approval after its run passed on that base; live
-/// cards own their PRs. Findings remain Andrei's to weigh (fac-98, fac-111).
+/// cards own their PRs. Findings remain the operator's to weigh (fac-98, fac-111).
 pub fn colleague(p: &mut Poster<'_>, c: &Card, seen: &PrSeen, ctx: Ctx<'_>) {
     let Some(cfg) = ctx.config.projects.get(&c.project) else { return };
     let asked = c.review.as_ref().is_some_and(|r| r.merge);
@@ -77,7 +77,7 @@ pub fn colleague(p: &mut Poster<'_>, c: &Card, seen: &PrSeen, ctx: Ctx<'_>) {
     let what = ActionWhat::Merge { card: c.id.clone(), pr: seen.pr, head, tree: None, base, repo, dest: Some(into) };
     if merge(p, what) {
         let words = format!("You approved PR {} on its head {}: it merges.", seen.pr, seen.head.short());
-        crate::reviews::cards::to_andrei(p, &c.id, &words);
+        crate::reviews::cards::to_operator(p, &c.id, &words);
     }
 }
 
@@ -101,7 +101,7 @@ fn ran(p: &mut Poster<'_>, id: &CardId, head: &Sha) -> Option<Sha> {
             "You approved PR {pr} on its head {}, but its run there conflicted or failed: it doesn't merge. A new head goes through the merge train again.",
             head.short()
         );
-        crate::reviews::cards::to_andrei(p, id, &text);
+        crate::reviews::cards::to_operator(p, id, &text);
     }
     None
 }
@@ -138,7 +138,7 @@ pub fn moved(p: &mut Poster<'_>, a: Action, words: &str, tip: &Sha, ctx: Ctx<'_>
         "Your approved PR {pr} doesn't merge yet: {words}. It goes through the merge train again on {}, and merges after while your approval stands.",
         tip.short()
     );
-    crate::reviews::cards::to_andrei(p, &e.id, &text);
+    crate::reviews::cards::to_operator(p, &e.id, &text);
     super::entries::enter(p, e, tip.clone(), head, ctx);
 }
 
@@ -169,12 +169,12 @@ fn reverify(p: &mut Poster<'_>, mut c: Card, words: &str, tip: &Sha, head: Sha, 
 }
 
 // The merge of an approved head, acted once across polls and restarts: whether it is new. One held,
-// or dropped by a conflict or by Andrei, stands; any other dropped one is acted again.
+// or dropped by a conflict or by the operator, stands; any other dropped one is acted again.
 fn merge(p: &mut Poster<'_>, what: ActionWhat) -> bool {
     let key = what.key();
     let same = |a: &Action| a.key == key || a.key.starts_with(&format!("{key}@"));
-    let by_andrei = |a: &Action| a.words.as_deref() == Some(DROPPED_BY_ANDREI);
-    let known = p.all_actions().any(|a| same(a) && (a.status != ActionStatus::Dropped || left(a) || by_andrei(a)))
+    let by_operator = |a: &Action| a.words.as_deref() == Some(DROPPED_BY_OPERATOR);
+    let known = p.all_actions().any(|a| same(a) && (a.status != ActionStatus::Dropped || left(a) || by_operator(a)))
         || p.state.unloaded.alike(&key, |s| s != ActionStatus::Dropped).is_some();
     if known {
         return false;
@@ -208,14 +208,15 @@ pub fn conflicted(p: &mut Poster<'_>, mut a: Action, f: &ActionFailure, ctx: Ctx
     p.journal("action.dropped", Some(card.as_str()), json!({"id": a.id, "words": LEFT_FOR_JOIN}));
     p.put_action(a);
     let shown: Vec<&str> = files.iter().take(10).map(String::as_str).collect();
-    let mut why = format!("Bitbucket can't merge PR {pr}: it conflicts with {into}'s tip {}", tip.short());
+    let forge = ctx.config.forge_label(&c.project);
+    let mut why = format!("{forge} can't merge PR {pr}: it conflicts with {into}'s tip {}", tip.short());
     if !shown.is_empty() {
         why.push_str(&format!(" in {}", shown.join(", ")));
     }
     join(p, c, &why, tip, ctx);
 }
 
-// Our card's PR waiting for Andrei's approval.
+// Our card's PR waiting for the operator's approval.
 fn waits(c: &Card) -> bool {
     c.mode != Mode::Review && waiting(c)
 }
@@ -237,7 +238,7 @@ pub fn join(p: &mut Poster<'_>, mut c: Card, why: &str, tip: Sha, ctx: Ctx<'_>) 
     super::train::maintain(p, project.as_str(), ctx);
 }
 
-/// Leaves a published PR waiting for Andrei's approval, with its link: verified before it was published, it says so in
+/// Leaves a published PR waiting for the operator's approval, with its link: verified before it was published, it says so in
 /// one comment and asks his approval at once (fac-375); an older build's waits for its PR entry's review (fac-98).
 pub fn wait(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
     let (Some(Landing::Published { tree, base, commit, verified }), Some(pr)) = (c.landing.clone(), c.pr) else {
@@ -283,7 +284,7 @@ pub fn reverified(p: &mut Poster<'_>, mut c: Card, k: Candidate, head: Sha) {
     super::members::say(p, &id, "verified again: its PR merges on approval", &text);
 }
 
-/// Asks Andrei's approval once the review of our published head is clean; a verdict on another head sends no
+/// Asks the operator's approval once the review of our published head is clean; a verdict on another head sends no
 /// notice, as approval merges that head (fac-132).
 pub fn notify_reviewed(p: &mut Poster<'_>, review: &Card, ctx: Ctx<'_>) {
     let Some(pr) = review.pr else { return };
@@ -313,11 +314,11 @@ fn notify_approval(p: &mut Poster<'_>, c: &Card, reviewed: Option<&Sha>, ctx: Ct
     if current.is_some_and(|pr| pr.head != *head) {
         return;
     }
+    let forge = ctx.config.forge_label(&c.project);
     let (id, link) = (c.id.clone(), link(c, pr, ctx));
-    let words = format!(
-        "PR {pr} at {head} was reviewed with no findings. Please review and approve my PR on Bitbucket: {link}."
-    );
-    let stale: Vec<factory_types::AskId> = p
+    let words =
+        format!("PR {pr} at {head} was reviewed with no findings. Please review and approve my PR on {forge}: {link}.");
+    let stale: Vec<mork_types::AskId> = p
         .all_asks()
         .filter(|a| a.open && a.place == id.as_str() && a.kind == AskKind::ApprovePr && a.text != words)
         .map(|a| a.id.clone())
@@ -347,17 +348,17 @@ pub fn approval_read(p: &mut Poster<'_>, c: &mut Card, seen: &PrSeen, ctx: Ctx<'
     }
 }
 
-/// Whether a card's PR waits for Andrei's approval, out of the merge train: still read by the
+/// Whether a card's PR waits for the operator's approval, out of the merge train: still read by the
 /// poller, and a new head takes it back through its gates.
 pub fn waiting(c: &Card) -> bool {
     matches!(c.landing, Some(Landing::Approval { .. }))
 }
 
 fn link(c: &Card, pr: u64, ctx: Ctx<'_>) -> String {
-    format!("https://bitbucket.org/{}/pull-requests/{pr}", crate::queue::pr::repo_of(c, ctx.config))
+    ctx.config.projects.get(&c.project).and_then(|p| p.forge.pr_link(pr)).unwrap_or_default()
 }
 
-/// A new head pushed past the one Andrei was asked to approve closes that ask.
+/// A new head pushed past the one the operator was asked to approve closes that ask.
 pub fn close_stale(p: &mut Poster<'_>, project: &str, pr: &OpenPr) {
     let Some(c) = p.card_where(|c| holds(c, project, pr.pr)) else { return };
     if c.pushed.as_ref().is_some_and(|h| *h != pr.head) && c.previous_push.as_ref() != Some(&pr.head) {

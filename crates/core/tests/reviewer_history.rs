@@ -7,11 +7,11 @@
 mod common;
 
 use common::{Sim, reply, sha};
-use factory_core::decide::{Event, JobEnd, SessionSeen};
-use factory_types::card::Mode;
-use factory_types::review::Verdict;
-use factory_types::state::{Retiring, Sender};
-use factory_types::{ActionId, AgentKey, CardId};
+use mork_core::decide::{Event, JobEnd, SessionSeen};
+use mork_types::card::Mode;
+use mork_types::review::Verdict;
+use mork_types::state::{Retiring, Sender};
+use mork_types::{ActionId, AgentKey, CardId};
 use serde_json::{Value, json};
 
 fn finding(file: &str, line: i64, summary: &str) -> Value {
@@ -56,7 +56,7 @@ fn run_turn(sim: &mut Sim, key: &str, commands: &[Value], reply: Value) -> Strin
 fn resubmit_after_triage(sim: &mut Sim, card: &str, head: &str, fix: &[&str], decline: &[&str]) {
     sim.proofs_copied();
     sim.suite(card, 0);
-    sim.andrei(json!({"triage": {"card": card, "fix": fix, "decline": decline, "foreman": []}})).unwrap();
+    sim.operator(json!({"triage": {"card": card, "fix": fix, "decline": decline, "foreman": []}})).unwrap();
     sim.settle_actions();
     sim.imported(card);
     sim.built(card, head, "base1");
@@ -221,7 +221,7 @@ fn returning_reviewer_sees_verdict_reported_and_kept_findings_and_foreman_sees_k
     );
     assert!(round3_req.contains(&r1_passed), "missing passed verdict line `{r1_passed}` in:\n{round3_req}");
 
-    sim.andrei(json!({"fresh": {"agent": r2}})).unwrap();
+    sim.operator(json!({"fresh": {"agent": r2}})).unwrap();
     sim.turn_sending(&foreman, &[say_cmd(&rc, "reviewer-2", "Verify #2 again")], reply("working", "Tasked"));
     let p2_r3 = run_turn(
         &mut sim,
@@ -232,7 +232,7 @@ fn returning_reviewer_sees_verdict_reported_and_kept_findings_and_foreman_sees_k
     assert!(p2_r3.contains("- #2 (from round 1, open) src/b.rs:22: Still broken in round 2"), "{p2_r3}");
 }
 
-fn setup_withdrawn_round(sim: &mut Sim, card: &str) -> (String, factory_types::state::Agent) {
+fn setup_withdrawn_round(sim: &mut Sim, card: &str) -> (String, mork_types::state::Agent) {
     let rc = start_round_one(sim, card, "h1");
     let foreman = format!("{rc}/foreman");
     let r1 = format!("{rc}/reviewer-1");
@@ -264,7 +264,7 @@ fn setup_withdrawn_round(sim: &mut Sim, card: &str) -> (String, factory_types::s
     );
     let saved_r1 = sim.state.agents.get(&AgentKey::new(&r1)).unwrap().clone();
     sim.suite(card, 0);
-    sim.andrei(json!({"brief": {"card": card, "words": "Replan"}})).unwrap();
+    sim.operator(json!({"brief": {"card": card, "words": "Replan"}})).unwrap();
     sim.settle_actions();
     (rc, saved_r1)
 }
@@ -295,7 +295,7 @@ fn replan_and_ask_next_round(sim: &mut Sim, card: &str, head: &str) {
     recap["hand"]["message"] = json!("- where: src\n---\nNew plan.");
     sim.turn(&format!("{card}/planner"), recap);
     sim.turn(&format!("{card}/foreman"), reply("working", "No objection"));
-    sim.andrei(json!({"approve": {"card": card}})).unwrap();
+    sim.operator(json!({"approve": {"card": card}})).unwrap();
     sim.settle_actions();
     sim.built(card, head, "base1");
     sim.checks(card, 0, &[]);
@@ -319,7 +319,7 @@ fn finding_statuses_withdrawn_dropped_answered_superseded_afresh_and_resumed_clo
     sim.state.agents.insert(saved_r1.key.clone(), saved_r1);
 
     let dm = format!("{r1}/dm");
-    sim.andrei(json!({"say": {"place": dm, "to": "reviewer-1", "text": "Status check", "kind": "request"}})).unwrap();
+    sim.operator(json!({"say": {"place": dm, "to": "reviewer-1", "text": "Status check", "kind": "request"}})).unwrap();
     let (job_id, prompt) = sim.turn_started_with_argv(&r1, &["x"]);
     assert_contains_all(
         &prompt,
@@ -368,4 +368,38 @@ fn released_reviewer_marked_for_removal_is_omitted_from_kept_reviewers() {
     replan_and_ask_next_round(&mut sim, "web-3", "h2");
     let next_req = sim.engine_to(&rc, "foreman").pop().unwrap().text;
     assert!(!next_req.contains("Kept reviewers from earlier rounds"), "{next_req}");
+}
+
+#[test]
+fn compacted_reviewer_correction_restores_the_subject_and_carried_decisions() {
+    let mut sim = Sim::new();
+    let card = "web-1";
+    let rc = start_round_one(&mut sim, card, "h1");
+    let key = format!("{rc}/reviewer-1");
+    sim.turn_sending(&format!("{rc}/foreman"), &[spawn_cmd(&rc, "tests", "Review tests")], reply("working", "Review"));
+    let (id, _) = sim.turn_started_with_argv(&key, &["claude"]);
+    sim.apply(Event::JobEnded {
+        id,
+        end: JobEnd::Finished {
+            reply: Ok(Value::Null),
+            session: SessionSeen { started: true, compacted: true, ..SessionSeen::default() },
+        },
+    });
+    sim.state.board.get_mut(card).unwrap().description =
+        "operator 01.01: Subject discussion.\noperator 01.01: Decision: Subject rule.\n\nSubject words.".into();
+    sim.state.cards.get_mut(card).unwrap().carries.push(mork_types::card::Carried {
+        id: "web-2".into(),
+        title: "Carried title".into(),
+        description: "operator 01.01: Carried discussion.\noperator 01.01: Decision: Carried rule.\n\nCarried words."
+            .into(),
+        ..Default::default()
+    });
+    let (job, prompt) = sim.turn_started_with_argv(&key, &["claude"]);
+    let recorded = &sim.state.jobs[&job];
+    let prefix = &prompt[..recorded.specification_bytes];
+    for words in ["## Under review", "Subject words.", "Subject rule.", "Carried words.", "Carried rule."] {
+        assert!(prefix.contains(words), "{prefix}");
+    }
+    assert!(!prefix.contains("discussion."));
+    assert!(recorded.request_text().starts_with("Your reply was refused"));
 }

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
-use factory_types::ProjectId;
-use factory_types::state::{Message, Sender};
+use mork_types::ProjectId;
+use mork_types::state::{Message, Sender};
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -11,9 +11,9 @@ const BUDGET: usize = 600 * 1024;
 const TEXT_MAX: usize = 64 * 1024;
 const WORDS_MAX: usize = 4 * 1024;
 
-/// Whose journal the sender reaches, with no project limit for the factory's own card seats.
-pub fn scope(state: &State, from: &Sender, factory: &ProjectId) -> Result<Option<ProjectId>, String> {
-    super::search::scope(state, from).map(|p| p.filter(|p| p != factory))
+/// Whose journal the sender reaches, with no project limit for Mork's own card seats.
+pub fn scope(state: &State, from: &Sender, mork: Option<&ProjectId>) -> Result<Option<ProjectId>, String> {
+    super::search::scope(state, from).map(|p| p.filter(|p| Some(p) != mork))
 }
 
 /// Whether a target project is within the sender's journal reach.

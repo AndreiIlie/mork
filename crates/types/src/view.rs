@@ -64,7 +64,7 @@ pub struct Ram {
     pub total_mib: u64,
 }
 
-/// The pin against the factory repo's master (1.8.9), and the update (fac-19).
+/// The pin against Mork repo's master (1.8.9), and the update (fac-19).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PinLine {
     /// The pinned build's short commit, if one is pinned.
@@ -169,7 +169,7 @@ pub struct HandView {
     pub raised_ms: i64,
     /// The commands the engine would take for it now (1.5.2).
     pub offers: Vec<Offer>,
-    /// Andrei gave it to an orchestrator (fac-119): it shows so in its orchestrator button's place.
+    /// The operator gave it to an orchestrator (fac-119): it shows so in its orchestrator button's place.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub given: bool,
     /// A design question (fac-233): it shows a `design` tag.
@@ -247,7 +247,7 @@ pub struct MergeQueue {
 pub struct BoardRow {
     pub id: CardId,
     pub title: String,
-    /// The factory ran it: live, done or closed (Enter opens its room).
+    /// Mork ran it: live, done or closed (Enter opens its room).
     pub ran: bool,
     /// A live card's marks.
     pub live: Option<LiveMarks>,
@@ -295,7 +295,7 @@ pub struct PlaceView {
     /// The card's plan, in its room and its DMs (fac-36).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan: Option<crate::card::Plan>,
-    /// The card's dated notes, newest first, in its room and its DMs: Andrei's decisions among
+    /// The card's dated notes, newest first, in its room and its DMs: the operator's decisions among
     /// them, the card being its agents' memory (fac-94).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
@@ -368,7 +368,7 @@ pub struct AgentRow {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub setting: Option<Setting>,
     /// What its next turn launches with, where its session runs another: a pick, or its seat's
-    /// own for a model `factory.toml` dropped. A running turn keeps what it launched with.
+    /// own for a model `mork.toml` dropped. A running turn keeps what it launched with.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending: Option<Setting>,
     /// The models its session may pick, from the child list or the configured seats.
@@ -440,7 +440,7 @@ pub struct MessageView {
     pub text: String,
     /// The text was cut to keep the view within its line (M1.16).
     pub cut: bool,
-    /// Andrei's messages in main are numbered.
+    /// The operator's messages in main are numbered.
     pub number: Option<u64>,
     pub hand: Option<Box<ReplyHand>>,
     pub findings: Vec<Finding>,
@@ -468,13 +468,13 @@ pub struct ImageView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "is", rename_all = "kebab-case")]
 pub enum Author {
-    Andrei,
+    Operator,
     Engine,
     /// A project's outside orchestrator (fac-244).
     Orchestrator {
         project: String,
     },
-    /// Andrei's outside PA, on what it sent before the orchestrators replaced it (fac-119, fac-244).
+    /// The operator's outside PA, on what it sent before the orchestrators replaced it (fac-119, fac-244).
     Pa,
     Agent {
         label: String,
@@ -488,11 +488,11 @@ pub enum Author {
 pub enum Line {
     /// An engine message to an agent: a thin divider, its label and time, its text unfolding under it.
     Marker,
-    /// An engine message to Andrei or to everyone in a place: whole, or one line that unfolds
+    /// An engine message to the operator or to everyone in a place: whole, or one line that unfolds
     /// when long (fac-39).
     Engine,
-    /// Andrei's words: whole, bright.
-    Andrei,
-    /// An agent's message: its words to Andrei whole, to another agent one line that unfolds.
+    /// The operator's words: whole, bright.
+    Operator,
+    /// An agent's message: its words to the operator whole, to another agent one line that unfolds.
     Agent,
 }

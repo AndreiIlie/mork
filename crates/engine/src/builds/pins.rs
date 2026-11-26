@@ -66,7 +66,7 @@ pub fn moved_to_since(home: &Home, time: i64) -> Vec<String> {
         .collect()
 }
 
-/// Finishes a `factory pin` a crash cut short: logged when the pin moved, else dropped.
+/// Finishes a `mork pin` a crash cut short: logged when the pin moved, else dropped.
 pub fn reconcile(home: &Home) -> std::io::Result<()> {
     let Some(m) = files::read_json::<PinMove>(&home.pin_move()).ok().flatten() else { return Ok(()) };
     if pin(home).as_deref() == Some(m.to.as_str()) {
@@ -143,13 +143,11 @@ pub fn finish_reload(opts: &Options) -> Result<Option<ReloadNote>, BuildError> {
     {
         return Err(BuildError::Reload(format!("pin.next names reload {}, not {id}", next.id)));
     }
-    crate::faults::hit("reload.after-migrate");
     let pin_io = |source| BuildError::Io { what: "the pin".into(), source };
     let link = super::shortcut::installed().map_err(pin_io)?;
     files::write_whole(&home.pin(), next.target.as_bytes()).map_err(pin_io)?;
     log_once(home, &next.id, &next.from, &next.target, &next.who).map_err(pin_io)?;
     files::link_whole(&link, &super::binary(home, &next.target)).map_err(pin_io)?;
-    crate::faults::hit("reload.after-pin");
     let text = format!("Reloaded to {} (from {}).", short(&next.target), short(&next.from));
     let builds = (!next.from.is_empty()).then(|| (next.from.clone(), next.target.clone()));
     Ok(Some(ReloadNote { key: format!("reload:{}", next.id), text, builds }))

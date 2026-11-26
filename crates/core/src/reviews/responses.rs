@@ -1,8 +1,8 @@
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::card::{Card, Mode};
-use factory_types::review::Verdict;
-use factory_types::state::{MessageKind, Sender};
-use factory_types::{ActionId, CardId};
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::card::{Card, Mode};
+use mork_types::review::Verdict;
+use mork_types::state::{MessageKind, Sender};
+use mork_types::{ActionId, CardId};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -119,7 +119,7 @@ pub(crate) fn rejected(p: &mut Poster<'_>, id: &CardId, action: &ActionId, words
         a.words = Some(words.to_owned());
         p.put_action(a);
     }
-    let key = factory_types::AgentKey::new(format!("{id}/{by}"));
+    let key = mork_types::AgentKey::new(format!("{id}/{by}"));
     if let Some(who) = crate::messages::places::who_of(p.state, &key) {
         let kind = if underway { MessageKind::Request } else { MessageKind::Update };
         let text = format!(

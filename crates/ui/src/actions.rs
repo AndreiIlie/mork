@@ -1,12 +1,12 @@
 //! What the window does with a key, a line, a press or a click (section 5): the handlers
 //! behind `App::update`.
 
-use factory_types::command::Delivery;
-use factory_types::config::Effort;
-use factory_types::orchestrator::ReviewSection;
-use factory_types::reply::Role;
-use factory_types::view::{ModelChoice, PlaceKind};
-use factory_types::{CardId, Command};
+use mork_types::command::Delivery;
+use mork_types::config::Effort;
+use mork_types::orchestrator::ReviewSection;
+use mork_types::reply::Role;
+use mork_types::view::{ModelChoice, PlaceKind};
+use mork_types::{CardId, Command};
 
 use crate::app::{App, DOUBLE_CLICK_MS, Effect, Key, Overlay, SCROLL_STEP, ScrollOp, WindowOp};
 use crate::input::{self, Context, Parsed, draft_content};
@@ -188,7 +188,7 @@ impl App {
     pub(crate) fn open(&mut self, place: String) -> Vec<Effect> {
         if input::shown_nowhere(&place) {
             self.note = Some(format!(
-                "✗ {place} is the foreman's and planner's exchange, which the window shows nowhere: `factory ctl history {place}` reads it"
+                "✗ {place} is the foreman's and planner's exchange, which the window shows nowhere: `mork ctl history {place}` reads it"
             ));
             return Vec::new();
         }
@@ -210,7 +210,7 @@ impl App {
 
     /// A card's foreman's DM: `dm` sent, as `/dm <card> foreman` sends it, and its place opened.
     pub(crate) fn open_dm(&mut self, card: &str) -> Vec<Effect> {
-        let role = factory_types::reply::Role::Foreman;
+        let role = mork_types::reply::Role::Foreman;
         let mut fx = self.act_on(input::pressed(&Command::Dm { card: CardId::new(card), role }));
         fx.extend(self.open(format!("{card}/{}/dm", role.as_str())));
         fx
@@ -380,7 +380,7 @@ impl App {
     /// A message's image (fac-278): opened while a message of the place shown, pinned or loaded,
     /// carries it.
     pub(crate) fn image(&mut self, path: String) -> Vec<Effect> {
-        let shown = |v: &factory_types::view::PlaceView| {
+        let shown = |v: &mork_types::view::PlaceView| {
             v.pinned.iter().chain(&v.messages).any(|m| m.images.iter().any(|i| i.path == path))
         };
         if !self.place().is_some_and(shown) {
@@ -391,7 +391,7 @@ impl App {
         vec![Effect::Image(path)]
     }
 
-    /// A Board row: a card the factory ran opens its room; one it never ran, nothing (fac-37).
+    /// A Board row: a card Mork ran opens its room; one it never ran, nothing (fac-37).
     pub(crate) fn board(&mut self, id: &str) -> Vec<Effect> {
         if crate::board::ran(&self.screen, id) {
             self.open(crate::board::room_of(&self.screen, id))

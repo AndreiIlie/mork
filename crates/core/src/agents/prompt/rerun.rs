@@ -4,9 +4,9 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use factory_types::JobId;
-use factory_types::config::Config;
-use factory_types::state::{Agent, Job};
+use mork_types::JobId;
+use mork_types::config::Config;
+use mork_types::state::{Agent, Job};
 
 use super::held::{self, Sections};
 use super::specification::{FOREMAN_SPECIFICATION, planner_foreman};
@@ -101,9 +101,9 @@ fn without_again(prompt: &str) -> &str {
 }
 
 // The contract it runs under now, replacing the one the turn was asked with; none for this schema's.
-fn contract_since(asked: &factory_types::state::Job) -> Option<String> {
+fn contract_since(asked: &mork_types::state::Job) -> Option<String> {
     let schema = asked.io_files.get("schema.json").and_then(|s| serde_json::from_str(s).ok())?;
-    let (was, now) = (factory_types::reply::version_of(&schema), factory_types::reply::SCHEMA_VERSION);
+    let (was, now) = (mork_types::reply::version_of(&schema), mork_types::reply::SCHEMA_VERSION);
     (was != now).then(|| {
         format!(
             "The reply contract changed after this turn was first asked, under reply schema {was}; this turn's is {now}. Its whole text replaces the one you were given:\n\n{CONTRACT}\n\n`schema` is {now}."

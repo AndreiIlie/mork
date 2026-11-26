@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use factory_core::decide::JobEnd;
-use factory_types::state::Job;
-use factory_types::work::{Made, Purpose};
-use factory_types::{JobId, Sha};
+use mork_core::decide::JobEnd;
+use mork_types::state::Job;
+use mork_types::work::{Made, Purpose};
+use mork_types::{JobId, Sha};
 
 use super::queue_work::read_json;
 use super::work::{failed, finished};
@@ -24,8 +24,8 @@ impl Engine {
                 return true;
             }
         };
-        let paths = factory_core::reviews::gate::paths(&self.state, &work.card);
-        let before = factory_core::reviews::gate::last_read(&self.state, &work.card);
+        let paths = mork_core::reviews::gate::paths(&self.state, &work.card);
+        let before = mork_core::reviews::gate::last_read(&self.state, &work.card);
         let lock = self.pipe.locks.of(&work.card.project);
         self.pipe.work.settling.insert(job.id.clone(), work.card.id.clone());
         let (job, purpose, io, tx) = (job.id.clone(), purpose.clone(), io.to_path_buf(), self.tx.clone());
@@ -94,7 +94,7 @@ impl Worktree {
         let mut changed: BTreeSet<String> = m.contents.keys().cloned().collect();
         let rest: Vec<&str> = paths.iter().map(String::as_str).filter(|f| !m.contents.contains_key(*f)).collect();
         m.contents.extend(mirror::contents_at(home, mir, commit.as_str(), &rest)?);
-        if factory_core::reviews::gate::entry(&self.card) {
+        if mork_core::reviews::gate::entry(&self.card) {
             let last = self.card.review.as_deref().and_then(|r| r.last_read());
             let changes = match last {
                 Some(r) if r.head.as_ref() == Some(head) => None,

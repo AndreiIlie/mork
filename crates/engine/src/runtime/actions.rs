@@ -2,26 +2,24 @@
 // a board write on the engine's. After a crash `pending` ones run and `started` ones are checked first.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use factory_core::decide::{Decision, Event};
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::card::Stage;
+use mork_core::decide::{Decision, Event};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::card::Stage;
 
 use super::act_run::Call;
 use super::{Engine, Input};
-use crate::{clock, faults};
+use crate::clock;
+use crate::lock::Lock;
 
 /// Locks that keep a project's actions one at a time (a fetch racing another into a mirror).
 #[derive(Debug, Default, Clone)]
-pub struct Locks(Arc<Mutex<BTreeMap<String, Arc<Mutex<()>>>>>);
+pub struct Locks(Arc<Lock<BTreeMap<String, Arc<Lock<()>>>>>);
 
 impl Locks {
-    pub(super) fn of(&self, key: &str) -> Arc<Mutex<()>> {
-        match self.0.lock() {
-            Ok(mut m) => Arc::clone(m.entry(key.to_owned()).or_default()),
-            Err(_) => Arc::new(Mutex::new(())),
-        }
+    pub(super) fn of(&self, key: &str) -> Arc<Lock<()>> {
+        Arc::clone(self.0.lock().entry(key.to_owned()).or_default())
     }
 }
 
@@ -30,7 +28,7 @@ fn board_write(what: &ActionWhat) -> bool {
 }
 
 // The project an action belongs to, for its lock.
-pub(super) fn project_of(e: &Engine, what: &ActionWhat) -> factory_types::ProjectId {
+pub(super) fn project_of(e: &Engine, what: &ActionWhat) -> mork_types::ProjectId {
     match what {
         ActionWhat::Fetch { project, .. }
         | ActionWhat::OpenPr { project, .. }
@@ -50,7 +48,7 @@ pub(super) fn project_of(e: &Engine, what: &ActionWhat) -> factory_types::Projec
             e.state.cards.get(card).map(|c| c.project.clone()).unwrap_or_default()
         }
         // A door call's lock is its target's: one call at a time per target (fac-1).
-        ActionWhat::Door(c) => factory_types::ProjectId::new(format!("door:{}", c.target)),
+        ActionWhat::Door(c) => mork_types::ProjectId::new(format!("door:{}", c.target)),
     }
 }
 
@@ -87,14 +85,14 @@ impl Engine {
                 .values()
                 .filter(|c| c.project == project && c.stage.is_live() && c.stage != Stage::Starting)
                 // A card in the train lands its candidate, which the base must be in (fac-68).
-                .filter_map(|c| factory_core::queue::order::commit_of(c).map(|h| (c.id.clone(), h)))
+                .filter_map(|c| mork_core::queue::order::commit_of(c).map(|h| (c.id.clone(), h)))
                 .collect();
-            (heads, factory_core::reviews::gate::branches(&self.state, project.as_str()))
+            (heads, mork_core::reviews::gate::branches(&self.state, project.as_str()))
         } else {
             (Vec::new(), Vec::new())
         };
         // A comment's earlier ones on the same PR, of cards ended since, are in the store (fac-336).
-        let mut stored = factory_core::state::unloaded::alike_stored(&self.state, &action.what);
+        let mut stored = mork_core::state::unloaded::alike_stored(&self.state, &action.what);
         // A PR opening's earlier ones on the branch, under the old key or the new (fac-382).
         if let Some(prefix) = action.what.legacy_key() {
             let rest = |r: &str| r.is_empty() || r.starts_with([':', '@']);
@@ -113,7 +111,7 @@ impl Engine {
             same_done,
             now: clock::now_ms(),
             verdict: self.pipe.verdict.clone(),
-            fulls: self.pipe.fulls.clone(),
+            readers: self.pipe.readers.clone(),
             tx: self.tx.clone(),
             project,
             bin: self.opts.bin.clone(),
@@ -133,13 +131,9 @@ impl Engine {
         if action.result.is_some() || !after.is_empty() {
             return None;
         }
-        let call = self.call_for(id)?;
-        let b = super::act_board::backlog(&call, project).ok()?;
-        let before = std::fs::read_to_string(b.join(file)).ok()?;
-        let (after, _) = super::act_board::edited(&call, &b, file, &before, edit).ok()?;
-        Some(
-            serde_json::json!({"before": crate::files::sha256_hex(before.as_bytes()), "after": crate::files::sha256_hex(after.as_bytes())}),
-        )
+        use crate::board::BoardRead;
+        let config = &self.ctx.config.projects.get(project)?.board;
+        crate::board::read(config).prepare(file, edit, clock::now_ms())
     }
 
     /// Runs a pending action: `started` first, then the call on a thread, a board write's on this
@@ -159,7 +153,7 @@ impl Engine {
             return self.run_action_now(id);
         }
         let bitbucket =
-            self.state.actions.get(id).is_some_and(|a| super::act_run::reaches_bitbucket(&self.ctx.config, &a.what));
+            self.state.actions.get(id).is_some_and(|a| super::act_run::reaches_forge(&self.ctx.config, &a.what));
         if bitbucket && !self.pipe.token_asked {
             self.pipe.token_wait.push(id.into());
             return;
@@ -185,16 +179,11 @@ impl Engine {
         let Some(call) = self.call_for(id) else { return };
         let lock = self.pipe.locks.of(&project_of(self, &call.action.what));
         let tx = self.tx.clone();
-        let id = factory_types::ActionId::new(id);
+        let id = mork_types::ActionId::new(id);
         self.pipe.in_flight.insert(id.clone());
-        // A test's slow call (M5.17).
-        let hold = faults::test_env("FACTORY_TEST_ACTION_HOLD_MS").and_then(|v| v.parse().ok()).unwrap_or(0);
         std::thread::spawn(move || {
             let _held = lock.lock();
-            faults::hit("action.after-intent");
-            clock::sleep(std::time::Duration::from_millis(hold));
             let result = super::act_run::run(&call);
-            faults::hit("action.after-call");
             let _ = tx.send(Input::Event(Box::new(Event::ActionReturned { id, result })));
         });
     }
@@ -202,16 +191,14 @@ impl Engine {
     /// Runs a pending action on this thread, start to record: a board write, a command's
     /// answered with what was written (4.18).
     pub(super) fn run_action_now(&mut self, id: &str) {
-        self.pipe.later.retain(|i| !matches!(i, factory_core::decide::Intent::RunAction { id: x } if x == id));
+        self.pipe.later.retain(|i| !matches!(i, mork_core::decide::Intent::RunAction { id: x } if x == id));
         let prepared = self.prepare(id);
         let d = self.apply(&Event::ActionStarted { id: id.into(), prepared });
         if d.changes.is_empty() || self.state.actions.get(id).is_none_or(|a| a.status != ActionStatus::Started) {
             return;
         }
         let Some(call) = self.call_for(id) else { return };
-        faults::hit("action.after-intent");
         let result = super::act_run::run(&call);
-        faults::hit("action.after-call");
         self.event_in(&Event::ActionReturned { id: id.into(), result });
     }
 
@@ -219,8 +206,8 @@ impl Engine {
     // it; the boards are read first, so it is decided from the files as they are now.
     fn board_decided(
         &mut self,
-        cmd: &factory_types::Command,
-        from: &factory_types::state::Sender,
+        cmd: &mork_types::Command,
+        from: &mork_types::state::Sender,
     ) -> Result<(Decision, i64), String> {
         let secrets = crate::secrets::Secrets::gather(&self.opts.home, &self.ctx.config, &self.ctx.telemetry);
         if let Some(words) = super::act_board::command_leak(&secrets, cmd) {
@@ -230,7 +217,7 @@ impl Engine {
         let now = clock::now_ms();
         let d = self.decide(&Event::Command { from: from.clone(), cmd: cmd.clone() }, now);
         let leak = d.changes.iter().find_map(|c| match c {
-            factory_core::state::Change::PutAction(a) => super::act_board::write_leak(&secrets, &a.what, cmd),
+            mork_core::state::Change::PutAction(a) => super::act_board::write_leak(&secrets, &a.what, cmd),
             _ => None,
         });
         leak.map_or(Ok((d, now)), Err)
@@ -240,13 +227,13 @@ impl Engine {
     /// written, or refused with nothing written.
     pub(super) fn board_request(
         &mut self,
-        cmd: factory_types::Command,
-        from: factory_types::state::Sender,
-    ) -> Result<serde_json::Value, factory_types::protocol::ErrorBody> {
-        use factory_types::protocol::{ErrorBody, ErrorCode};
+        cmd: mork_types::Command,
+        from: mork_types::state::Sender,
+    ) -> Result<serde_json::Value, mork_types::protocol::ErrorBody> {
+        use mork_types::protocol::{ErrorBody, ErrorCode};
         // The decision checked is the one committed: nothing is decided between them.
         let (d, now) = self.board_decided(&cmd, &from).map_err(|words| ErrorBody::new(ErrorCode::Leak, words))?;
-        let d = self.commit_decided(d, now, None);
+        let d = self.commit_decided(d, now);
         let answer = d.answer.unwrap_or_else(|| Ok(serde_json::json!({})));
         let Ok(v) = &answer else { return answer };
         let Some(id) = v
@@ -299,9 +286,6 @@ impl Engine {
 
     /// An event a thread brought back: an action's answer is recorded here (2.5.6).
     pub(super) fn event_in(&mut self, event: &Event) {
-        if matches!(event, Event::ActionReturned { .. }) {
-            faults::hit("action.before-record");
-        }
         self.apply(event);
         if let Event::ActionReturned { id, .. } = event {
             self.pipe.in_flight.remove(id);
@@ -340,11 +324,8 @@ impl Engine {
             let lock = self.pipe.locks.of(&project_of(self, &call.action.what));
             let (tx, id) = (tx.clone(), a.id.clone());
             out += 1;
-            let hold = faults::test_env("FACTORY_TEST_FOUND_HOLD_MS").and_then(|v| v.parse().ok()).unwrap_or(0);
             std::thread::spawn(move || {
                 let _held = lock.lock();
-                // A test's slow check (M5.16).
-                clock::sleep(std::time::Duration::from_millis(hold));
                 let found = super::act_found::found(&call);
                 let _ = tx.send(Event::ActionFound { id, found });
             });
@@ -353,7 +334,7 @@ impl Engine {
         // A SIGTERM ends the wait: the checks left out find their actions `started` at the next
         // start (M5.31).
         let mut back = 0;
-        while back < out && !factory_sys::term_requested() {
+        while back < out && !mork_sys::term_requested() {
             match rx.recv_timeout(std::time::Duration::from_millis(250)) {
                 Ok(e) => {
                     back += 1;

@@ -1,14 +1,14 @@
 // A reload's last steps in the old app (1.8.6.4 and .5): `pin.next`, then the exec of the target,
 // with the lock and the listeners kept open.
 
-use factory_core::decide::Event;
+use mork_core::decide::Event;
 use std::os::fd::AsRawFd;
 
 use super::startup::INHERIT;
 use super::{Engine, Phase};
 use crate::builds::{self, PinNext};
 use crate::jobs::launch;
-use crate::{clock, faults, files};
+use crate::{clock, files};
 
 impl Engine {
     /// When a reload's hold is over, exec its target.
@@ -28,7 +28,6 @@ impl Engine {
             return;
         }
         // `ui-session.json` is the window's, kept current as it changes: left as it is (M4.7).
-        faults::hit("reload.before-exec");
         self.end_limits_read();
         self.hooks_settle();
         self.previews_end();
@@ -37,9 +36,9 @@ impl Engine {
         self.wall_runs_end();
         // Batches written during preview or mock teardown settle before exec (fac-665).
         self.settle_waiting_wakes();
-        let fds = [self.keep.lock.as_raw_fd(), self.keep.factory, self.keep.agent];
+        let fds = [self.keep.lock.as_raw_fd(), self.keep.mork, self.keep.agent];
         for fd in fds {
-            if let Err(e) = factory_sys::keep_across_exec(fd) {
+            if let Err(e) = mork_sys::keep_across_exec(fd) {
                 self.reload_failed(&format!("a descriptor couldn't be kept: {e}"));
                 return;
             }
@@ -50,7 +49,7 @@ impl Engine {
         let err = launch::exec(&builds::binary(&self.opts.home, &target), &args, &[(INHERIT.to_owned(), inherit)]);
         // The exec failed: the kept descriptors close on the next exec again (M1.3).
         for fd in fds {
-            let _ = factory_sys::close_on_exec(fd);
+            let _ = mork_sys::close_on_exec(fd);
         }
         self.reload_failed(&format!("the exec of {} failed: {err}", &target[..7.min(target.len())]));
     }

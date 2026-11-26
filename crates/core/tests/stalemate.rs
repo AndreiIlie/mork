@@ -6,16 +6,16 @@
 mod common;
 
 use common::{Sim, reply};
-use factory_core::decide::{Decision, Intent};
-use factory_core::state::Change;
-use factory_core::views::outside::Outside;
-use factory_core::views::place::place;
-use factory_core::views::screen::screen;
-use factory_types::ask::{Ask, AskKind, Color};
-use factory_types::card::Stage;
-use factory_types::orchestrator::{OrchestratorEvent, OrchestratorWhat};
-use factory_types::state::{MessageKind, Sender};
-use factory_types::work::Purpose;
+use mork_core::decide::{Decision, Intent};
+use mork_core::state::Change;
+use mork_core::views::outside::Outside;
+use mork_core::views::place::place;
+use mork_core::views::screen::screen;
+use mork_types::ask::{Ask, AskKind, Color};
+use mork_types::card::Stage;
+use mork_types::orchestrator::{OrchestratorEvent, OrchestratorWhat};
+use mork_types::state::{MessageKind, Sender};
+use mork_types::work::Purpose;
 use serde_json::{Value, json};
 
 const CARD: &str = "web-1";
@@ -25,7 +25,7 @@ fn f(file: &str, line: u32, summary: &str, proof: &str) -> Value {
 }
 
 fn start_delegated_build(s: &mut Sim, extra: Value) {
-    s.config.factory.notifications = true;
+    s.config.mork.notifications = true;
     s.board(CARD, "web");
     let mut start = json!({"card": CARD});
     if let (Some(dst), Some(src)) = (start.as_object_mut(), extra.as_object()) {
@@ -33,7 +33,7 @@ fn start_delegated_build(s: &mut Sim, extra: Value) {
             dst.insert(k.clone(), v.clone());
         }
     }
-    s.andrei(json!({"start": start})).unwrap();
+    s.operator(json!({"start": start})).unwrap();
     s.settle_actions();
     let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
     s.end_job(&clone, json!({}));
@@ -111,15 +111,15 @@ fn delegated_and_self_sustained_escalate_on_repeated_unresolved_findings() {
 
         assert_stalemate_views(&s, &ask);
 
-        // Re-running delegate / switching to self-sustained / off->on must keep the stalemate open on Andrei.
-        s.andrei(json!({"delegate": {"card": CARD, "self-sustained": true}})).unwrap();
+        // Re-running delegate / switching to self-sustained / off->on must keep the stalemate open on the operator.
+        s.operator(json!({"delegate": {"card": CARD, "self-sustained": true}})).unwrap();
         assert!(s.state.asks[&ask.id].open && s.card(CARD).triage.is_some());
-        s.andrei(json!({"delegate": {"card": CARD, "off": true}})).unwrap();
-        s.andrei(json!({"delegate": {"card": CARD}})).unwrap();
+        s.operator(json!({"delegate": {"card": CARD, "off": true}})).unwrap();
+        s.operator(json!({"delegate": {"card": CARD}})).unwrap();
         assert!(s.state.asks[&ask.id].open && s.card(CARD).triage.is_some());
 
-        // Andrei declines the finding -> verification restarts without waking foreman.
-        s.andrei(json!({"triage": {"card": CARD, "decline": ["1"]}})).unwrap();
+        // The operator declines the finding -> verification restarts without waking foreman.
+        s.operator(json!({"triage": {"card": CARD, "decline": ["1"]}})).unwrap();
         assert!(s.card(CARD).triage.is_none());
         assert_eq!(s.engine_to(CARD, "foreman").len(), reqs_before);
         assert_eq!(s.stage(CARD), Stage::Merging);
@@ -180,14 +180,14 @@ fn superseded_rounds_keep_stalemate_and_brief_resets_it() {
     s.candidate(CARD);
     s.round_asked(CARD);
     s.suite(CARD, 0);
-    s.andrei(json!({"say": {"place": CARD, "text": "push newer commit"}})).unwrap();
+    s.operator(json!({"say": {"place": CARD, "text": "push newer commit"}})).unwrap();
     run_failed_round(&mut s, "h3", &[f("src/a.rs", 3, "#1 Bug 1", "p1")], 0);
     let pending = s.card(CARD).triage.expect("superseded round 2 must not hide stalemate between rounds 1 and 3");
     assert!(pending.stalemate);
     assert!(open_triage(&s).text.contains("round 1"));
 
     // Going back to brief sets afresh and resets stalemate comparison until two new rounds stall.
-    s.andrei(json!({"brief": {"card": CARD}})).unwrap();
+    s.operator(json!({"brief": {"card": CARD}})).unwrap();
     assert!(s.card(CARD).triage.is_none());
     let mut recap = reply("brief-ready", "New plan");
     recap["hand"]["message"] = json!("- where: src\n---\nUpdated plan.");
@@ -217,7 +217,7 @@ fn stalemate_carries_suite_failure_re_escalates_and_covers_direct_path() {
     assert!(pending.stalemate && pending.suite_failure.is_some());
     assert!(!s.owed(&format!("{CARD}/foreman")));
 
-    s.andrei(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
+    s.operator(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
     s.imported(CARD);
     let req = s.engine_to(CARD, "foreman").into_iter().rfind(|m| m.kind == MessageKind::Request).unwrap();
     assert!(req.text.contains("[fix]") && req.text.contains("The suite failed (exit 1)"), "{}", req.text);
@@ -236,7 +236,7 @@ fn stalemate_carries_suite_failure_re_escalates_and_covers_direct_path() {
     d.checks(CARD, 0, &[]);
     d.candidate(CARD);
     d.round_asked(CARD);
-    let c = d.state.cards.get_mut(&factory_types::CardId::new(CARD)).unwrap();
+    let c = d.state.cards.get_mut(&mork_types::CardId::new(CARD)).unwrap();
     c.stage = Stage::Build;
     c.landing = None;
     d.round_ends(CARD, &[], &[f("src/a.rs", 3, "#1 Bug 1", "p1")]);

@@ -5,11 +5,11 @@ use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use factory_types::action::Action;
-use factory_types::door::{CALLER_WENT, NEVER_BLIND, UNSTOPPED};
-use factory_types::door_plan::{DispatchAnswer, DispatchRequest, Envelope, Plan, Session, WIRE};
-use factory_types::state::Sender;
-use factory_types::work::{ActionFailure, Found};
+use mork_types::action::Action;
+use mork_types::door::{CALLER_WENT, NEVER_BLIND, UNSTOPPED};
+use mork_types::door_plan::{DispatchAnswer, DispatchRequest, Envelope, Plan, Session, WIRE};
+use mork_types::state::Sender;
+use mork_types::work::{ActionFailure, Found};
 use serde_json::Value;
 
 use super::redact::Redactor;
@@ -68,16 +68,16 @@ fn durable(path: &Path, text: &str) -> std::io::Result<()> {
 }
 
 fn of(a: &Action) -> Result<(Envelope, String), ActionFailure> {
-    let (call, _) = factory_core::door::parts(a).ok_or_else(|| guard("not a door call"))?;
+    let (call, _) = mork_core::door::parts(a).ok_or_else(|| guard("not a door call"))?;
     let e: Envelope = serde_json::from_str(&call.plan).map_err(|e| guard(format!("its plan can't be read: {e}")))?;
     Ok((e, call.call_id(a.id.as_str())))
 }
 
-// An orchestrator's copy stays outside every wall; a turn's stays in its own `$FACTORY_IO`.
+// An orchestrator's copy stays outside every wall; a turn's stays in its own `$MORK_IO`.
 // Call ids keep copies apart without letting a caller choose a destination.
 fn into(home: &Home, a: &Action, e: &Envelope) -> Result<Option<String>, ActionFailure> {
     let Plan::Get { path, .. } = &e.plan else { return Ok(None) };
-    let (call, _) = factory_core::door::parts(a).ok_or_else(|| guard("not a door call"))?;
+    let (call, _) = mork_core::door::parts(a).ok_or_else(|| guard("not a door call"))?;
     let dir = match &call.job {
         Some(job) => turn_io(home, job.as_str())?,
         None if matches!(call.from, Sender::Orchestrator(_)) => {
@@ -101,11 +101,11 @@ fn into(home: &Home, a: &Action, e: &Envelope) -> Result<Option<String>, ActionF
     Ok(Some(dir.join(format!("{}-{name}", a.id)).display().to_string()))
 }
 
-// The asking turn's `FACTORY_IO`, as its spec names it (fac-654): its seat's folder or its job's `io/`, nothing else.
+// The asking turn's `MORK_IO`, as its spec names it (fac-654): its seat's folder or its job's `io/`, nothing else.
 fn turn_io(home: &Home, job: &str) -> Result<PathBuf, ActionFailure> {
     let spec = crate::jobs::folder::JobDir::new(home.job(job)).spec();
     let spec = spec.map_err(|e| guard(format!("its turn's spec can't be read: {e}")))?;
-    let io = spec.and_then(|s| s.env.get("FACTORY_IO").map(PathBuf::from));
+    let io = spec.and_then(|s| s.env.get("MORK_IO").map(PathBuf::from));
     let io = io.ok_or_else(|| guard("its turn names no io/ folder"))?;
     let seat = io
         .strip_prefix(home.seat_ios())
@@ -177,7 +177,7 @@ pub fn run(home: &Home, bin: &Path, a: &Action, r: &Redactor, stop: &AtomicBool)
     let r = &r;
     let known = known_store(home);
     if !receipts(home).is_dir() {
-        // A store lost is Andrei's to look into: made again unseen, its loss would go unnoticed.
+        // A store lost is the operator's to look into: made again unseen, its loss would go unnoticed.
         if known.is_some() {
             return Err(guard("its receipts folder is gone and isn't made again: make it by hand to go on"));
         }
@@ -209,7 +209,6 @@ pub fn run(home: &Home, bin: &Path, a: &Action, r: &Redactor, stop: &AtomicBool)
         keep_store(home, s);
     }
     keep_session(&d, answered.as_ref());
-    crate::faults::hit("door.before-receipt");
     let read = matches!(e.plan, Plan::Sql { .. });
     let result = match answered {
         None if read && captured.is_ok() => unanswered(home, bin, (&e, &req, &d), captured, stop, r),
@@ -235,7 +234,7 @@ fn unanswered(
     let stopped = answer.and_then(|a| a.stopped);
     if stop.is_some_and(|s| s.load(Ordering::SeqCst)) && stopped != Some(false) {
         let words = format!("{CALLER_WENT}, and {}", killed(stopped));
-        let ran = factory_types::door_plan::Ran { exit: Some(137), stderr: words, ..Default::default() };
+        let ran = mork_types::door_plan::Ran { exit: Some(137), stderr: words, ..Default::default() };
         let mut v = super::output::shape(&e.plan, &ran, &e.bounds, r);
         v["caller_went"] = serde_json::json!(true);
         return Ok(v);
@@ -274,8 +273,8 @@ fn keep_store(home: &Home, id: &str) {
 const LOST: &str = "its ssh connection ended with no conclusive result: it may have run there";
 const CUT_AT_BOUND: &str = "its query was cut at its deadline or cap";
 
-// A query cut while it ran, still running on its server, is no plain result: Andrei is asked.
-fn unstopped(ran: &factory_types::door_plan::Ran) -> bool {
+// A query cut while it ran, still running on its server, is no plain result: the operator is asked.
+fn unstopped(ran: &mork_types::door_plan::Ran) -> bool {
     (ran.timed_out || ran.truncated) && ran.stopped == Some(false)
 }
 

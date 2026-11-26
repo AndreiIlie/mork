@@ -1,10 +1,10 @@
 //! What a card agent's reply moves (4.4.2): the specification's recap, the reviews, the report,
 //! `blocked`, and the foreman's head.
 
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::reply::{Intent, Outcome, Reply, Role};
-use factory_types::state::{Agent, Job, ORCHESTRATOR};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::reply::{Intent, Outcome, Reply, Role};
+use mork_types::state::{Agent, Job, ORCHESTRATOR};
 
 use crate::decide::Ctx;
 use crate::messages::asks::{self, Raise};
@@ -250,7 +250,7 @@ fn foreman_replied(p: &mut Poster<'_>, card: &Card, who: &Who, r: &Reply, job: &
     }
     p.put_card(c);
     p.intent(crate::decide::Intent::StartJob {
-        purpose: factory_types::work::Purpose::Bundle {
+        purpose: mork_types::work::Purpose::Bundle {
             card: card.id.clone(),
             base_in: None,
             recover: None,
@@ -267,4 +267,4 @@ fn can_submit(card: &Card) -> bool {
 }
 
 // Why a `built` at the brief started nothing: a card's recap starts its build, not a `built`.
-const NOT_STARTED: &str = "The specification isn't agreed yet: `built` starts nothing until its plan is approved. A delegated plan never approves itself: it waits for `approve` from Andrei, or its project's orchestrator while its open approve-brief ask is given to it; a visual card's waits for Andrei's own.";
+const NOT_STARTED: &str = "The specification isn't agreed yet: `built` starts nothing until its plan is approved. A delegated plan never approves itself: it waits for `approve` from the operator, or its project's orchestrator while its open approve-brief ask is given to it; a visual card's waits for the operator's own.";

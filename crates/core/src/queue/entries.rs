@@ -1,19 +1,19 @@
 //! PR and branch entries reuse their review cards through merge, checks, then review and suite side by side (fac-111,
-//! fac-375), off the merge queue. They only report: a PR merges on Andrei's approval alone, a branch never.
+//! fac-375), off the merge queue. They only report: a PR merges on the operator's approval alone, a branch never.
 
-use factory_types::Sha;
-use factory_types::action::ActionWhat;
-use factory_types::ask::AskKind;
-use factory_types::card::{Candidate, Card, Landing, Stage};
-use factory_types::reply::Role;
-use factory_types::review::{Finished, Verdict};
-use factory_types::suites::Told;
-use factory_types::work::{Made, Purpose};
+use mork_types::Sha;
+use mork_types::action::ActionWhat;
+use mork_types::ask::AskKind;
+use mork_types::card::{Candidate, Card, Landing, Stage};
+use mork_types::reply::Role;
+use mork_types::review::{Finished, Verdict};
+use mork_types::suites::Told;
+use mork_types::work::{Made, Purpose};
 use serde_json::{Value, json};
 
 use crate::decide::Ctx;
 use crate::post::Poster;
-use crate::reviews::cards::to_andrei;
+use crate::reviews::cards::to_operator;
 
 /// A fetch read an entry's base and head: it enters the back of its project's train as our cards do, or
 /// keeps its place. A run's findings are its own; earlier ones stay open with their raisers until verified.
@@ -103,7 +103,7 @@ pub fn sync_open_head(c: &mut Card, head: &Sha) -> bool {
         return false;
     }
     c.head = Some(head.clone());
-    if let Some(open) = c.review.as_deref_mut().and_then(factory_types::review::Review::open_mut) {
+    if let Some(open) = c.review.as_deref_mut().and_then(mork_types::review::Review::open_mut) {
         open.head = Some(head.clone());
     }
     true
@@ -116,7 +116,7 @@ pub fn has(c: &Card, head: &Sha) -> bool {
 fn reviews_open(c: &Card, head: &Sha) -> bool {
     c.review
         .as_deref()
-        .and_then(factory_types::review::Review::open)
+        .and_then(mork_types::review::Review::open)
         .is_some_and(|o| crate::reviews::end::reviews_head(o, head))
 }
 
@@ -136,7 +136,7 @@ pub fn conflicted(p: &mut Poster<'_>, mut c: Card, k: Candidate, purpose: &Purpo
     if let Some(ours) = ours.and_then(|o| p.card(&o.id)) {
         super::approval::join(p, ours, &why, k.on.clone(), ctx);
     } else {
-        to_andrei(p, &c.id, &format!("Its run stops: {why}."));
+        to_operator(p, &c.id, &format!("Its run stops: {why}."));
         if let Some(pr) = c.pr {
             let body = format!("This PR conflicts with {into}: {why}.");
             let repo = super::pr::repo_of(&c, ctx.config);
@@ -164,7 +164,7 @@ pub fn finish(p: &mut Poster<'_>, mut c: Card, k: Candidate, failure: Option<Str
     // Our PR's failure goes to its card's foreman alone, in its fix request (fac-375).
     let ours = c.pr.and_then(|n| super::approval::owner(p.state, c.project.as_str(), n)).map(|o| o.id.clone());
     if let Some(f) = failure.as_ref().filter(|_| ours.is_none()) {
-        super::suite_news::send(p, &c.id, Told::Andrei { card: c.id.clone(), text: f.clone() });
+        super::suite_news::send(p, &c.id, Told::Operator { card: c.id.clone(), text: f.clone() });
     }
     // A finding's raiser still verifies its fix, a revert's too; approval alone isn't verification.
     let failed = c.review.as_ref().and_then(|r| r.rounds.last()?.verdict) == Some(Verdict::Failed);
@@ -183,7 +183,7 @@ pub fn finish(p: &mut Poster<'_>, mut c: Card, k: Candidate, failure: Option<Str
                     &text,
                 );
             }
-            None => to_andrei(p, &c.id, &text),
+            None => to_operator(p, &c.id, &text),
         }
         return if c.pr.is_some() {
             crate::reviews::results::report(p, c, false, None, &[], ctx)
@@ -222,7 +222,7 @@ fn fix_request(p: &mut Poster<'_>, c: &Card, at: &str, failure: Option<&str>, ct
     let moved = read(c, &ours, ctx);
     let closing = if failure.is_some() {
         format!(
-            "A `built` of the same head runs nothing. For a failure outside {0}'s files, such as a flaky test, `factory ctl rereview {0}` runs the same head again; else fix them on {0}'s branch and submit its new commit: its new head is published to PR {pr}, and the next run is on it, the reviewer of each finding verifying its fix.",
+            "A `built` of the same head runs nothing. For a failure outside {0}'s files, such as a flaky test, `mork ctl rereview {0}` runs the same head again; else fix them on {0}'s branch and submit its new commit: its new head is published to PR {pr}, and the next run is on it, the reviewer of each finding verifying its fix.",
             ours.id
         )
     } else {

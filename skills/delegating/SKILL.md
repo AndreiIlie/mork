@@ -10,21 +10,21 @@ Researchers and reviewers take questions and review topics.
 Use the least work that answers the task.
 
 - **Spawn a researcher, reviewer or baseline seat.**
-  Use `factory ctl spawn <card> researcher '<task>' --model <model> --effort <effort>` for a researcher, or `spawn` with `reviewer` on a review card.
+  Use `mork ctl spawn <card> researcher '<task>' --model <model> --effort <effort>` for a researcher, or `spawn` with `reviewer` on a review card.
   For a task with quotes or parentheses, its `--task-file <path>` option reads the task from a file in place of `'<task>'`, `-` reading stdin.
-  A visual card's `baseline` seat is the foreman's at its baseline step alone, one at a time: `factory ctl spawn <card> baseline '<task>'`, naming no model, effort or CLI, on its configured default (Sonnet 5.5 at high); only Andrei picks it later.
+  A visual card's `baseline` seat is the foreman's at its baseline step alone, one at a time: `mork ctl spawn <card> baseline '<task>'`, naming no model, effort or CLI, on its configured default (Sonnet 5.5 at high); only the operator picks it later.
   Task it with the pages to reproduce as they stand today, the mock's link, and "keep what the folder holds, fill what it lacks"; end `built` once its report says the baseline is done.
   A planner can spawn researchers at brief or during a specification dispute.
   The planner is no child: a foreman neither spawns nor picks it.
   A researcher spawn requires both model and effort.
   A reviewer requires `--topic '<topic>'`, quoted, what it reviews in your own words, and a researcher takes none.
   A reviewer may omit model, effort and CLI together to use its configured inside or outside default, without allowlist permission.
-  If any selection option is supplied, both model and effort are required, matching `[[picks.researcher]]` or the reviewer list for the review card's kind: `[[picks.reviewer.inside]]` or `[[picks.reviewer.outside]]`, in `factory.toml`.
+  If any selection option is supplied, both model and effort are required, matching `[[picks.researcher]]` or the reviewer list for the review card's kind: `[[picks.reviewer.inside]]` or `[[picks.reviewer.outside]]`, in `mork.toml`.
   Each entry has `cli`, `model`, `label` and `efforts`; the effort must be allowed for that particular CLI and model.
   An absent or empty list permits no foreman-selected model for that role or review kind, for spawns and later picks.
   The other review kind and the catalog grant no permissions.
   The review foreman's Allowed models and the refusals name `picks.reviewer.inside` or `picks.reviewer.outside`.
-  Automatic defaults and Andrei's own picks are independent of these lists.
+  Automatic defaults and the operator's own picks are independent of these lists.
   The lists supply the model and effort permissions.
   Selections also preserve the seat's wall: an unwalled Claude seat runs Claude models only.
   `--model` takes the full id or its label's first word; name `--cli` to pick another CLI than the model's own, or when the model has no default CLI.
@@ -43,7 +43,7 @@ Use the least work that answers the task.
   Seat defaults and foreman permissions are separate: `[seats.researcher]` sets researchers' defaults, and `[seats.reviewer]` has `inside` and `outside` settings for our work and outside work.
   Each setting may choose any CLI, model and effort, without constraining or granting a foreman's selections.
   With no overrides, researchers and reviewers, inside and outside, run on GPT-6.2 Sol at xhigh.
-  Fable, Astra and max are offered to Andrei's own picks alone.
+  Fable, Astra and max are offered to the operator's own picks alone.
   Explicit picks use the configured permissions at high or xhigh.
   - For a bounded research question, choose a model at the highest effort on the researcher's allowed list (Sol at xhigh today).
     For a short "where is X" lookup, choose a model at the lowest effort on that list (Sol at high today).
@@ -54,15 +54,15 @@ Use the least work that answers the task.
   - Going up, for a reviewer alone: when a reviewer's work comes back wrong (wrong logic, a missed case, a lost requirement; never for style or scope), take the next allowed step on its current selection: a higher allowed effort, else a stronger allowed model; with neither left, it stays as it is.
   - Equal fit: the lower effort, then the cheaper model.
 - **A good task names the question or review topic.**
-  Give the relevant files or behaviour, the runs the Factory manual allows, and any decisions the child needs.
+  Give the relevant files or behaviour, the runs the Mork manual allows, and any decisions the child needs.
 - **Steer a running child:** your ordinary message to it, a reply's or a `say`'s, reaches its running turn between its tool calls.
   A child on agy or unwalled Codex reads the message on its next turn.
-  Send now, `factory ctl say <card>/researcher-1/dm --kind request --delivery now '<text>'`, cuts its turn and drops its reply and continues its session with your words, after it checks what already happened: for a child heading the wrong way.
+  Send now, `mork ctl say <card>/researcher-1/dm --kind request --delivery now '<text>'`, cuts its turn and drops its reply and continues its session with your words, after it checks what already happened: for a child heading the wrong way.
   Only the command can; a reply's `messages` can't.
 - **One writer at a time.**
   The foreman writes the card's working tree.
-  Researchers work in folders of their own, the clone theirs to read only (`$FACTORY_CLONE`).
-  A baseline seat writes the clone's `.git/factory-mock/` alone, and it and the card's mock holder (the planner, or the foreman on a no-planner card once the mock is open) take turns there.
+  Researchers work in folders of their own, the clone theirs to read only (`$MORK_CLONE`).
+  A baseline seat writes the clone's `.git/mork-mock/` alone, and it and the card's mock holder (the planner, or the foreman on a no-planner card once the mock is open) take turns there.
 - **End your turn when only the child's work remains.**
   As foreman, after you send a task in your reply, with `say` or `spawn`, end `working` as soon as your independent work is done and the child's report is still outstanding.
   Never wait or poll for it in that turn.

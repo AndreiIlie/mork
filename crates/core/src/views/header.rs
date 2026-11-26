@@ -1,7 +1,7 @@
-use factory_types::CardId;
-use factory_types::about::CardAbout;
-use factory_types::card::{Card, Mode};
-use factory_types::view::{CardHeader, Fact, Times};
+use mork_types::CardId;
+use mork_types::about::CardAbout;
+use mork_types::card::{Card, Mode};
+use mork_types::view::{CardHeader, Fact, Times};
 
 use super::findings::folded_parent;
 use super::outside::Outside;
@@ -59,8 +59,7 @@ fn pr_url(state: &State, card: &Card, n: u64, ctx: Ctx<'_>) -> Option<String> {
     if let Some(p) = read.filter(|p| !p.link.is_empty()) {
         return Some(p.link.clone());
     }
-    let repo = ctx.config.projects.get(&card.project)?.bitbucket.as_ref()?;
-    Some(format!("https://bitbucket.org/{}/{}/pull-requests/{n}", repo.workspace, repo.slug))
+    ctx.config.projects.get(&card.project)?.forge.pr_link(n)
 }
 
 fn facts(card: &Card, outside: &Outside, ctx: Ctx<'_>) -> Vec<Fact> {

@@ -3,23 +3,23 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_types::Command;
-use factory_types::config::{Effort, TunnelConfig};
-use factory_types::view::{AgentRow, ModelChoice, PlaceView, Screen};
 use iced::Element;
 use iced::widget::text_editor;
+use mork_types::Command;
+use mork_types::config::{Effort, TunnelConfig};
+use mork_types::view::{AgentRow, ModelChoice, PlaceView, Screen};
 use serde::{Deserialize, Serialize};
 
 use crate::input::draft_content;
 use crate::session::{Tab, UiSession};
-use factory_types::web_tunnel::Status as TunnelStatus;
+use mork_types::web_tunnel::Status as TunnelStatus;
 
 /// The window's settings from the config (1.14).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Settings {
-    /// `[factory] editor`: `code -g {file}:{line}`.
+    /// `[mork] editor`: `code -g {file}:{line}`.
     pub editor: String,
-    /// `[factory] animations`.
+    /// `[mork] animations`.
     pub animations: bool,
     /// `[tunnels.<name>]`: window-owned SSH web forwards (fac-721).
     #[serde(default)]
@@ -126,7 +126,7 @@ pub enum Message {
     OpenDm(String),
     /// Main's tabs.
     Tab(Tab),
-    Lookback(factory_types::ProjectId, factory_types::lookback::Read),
+    Lookback(mork_types::ProjectId, mork_types::lookback::Read),
     /// A message's line: fold or unfold it.
     Fold(u64),
     /// A message's `copy`, by its number (fac-33).
@@ -171,9 +171,9 @@ pub enum Message {
     /// A side column's section header: it folds or opens (fac-105).
     Section(crate::side::Section),
     ClaudeAccount(String),
-    /// A project's part of a section, `send to orchestrator`: Andrei sends it its orchestrator to review
+    /// A project's part of a section, `send to orchestrator`: the operator sends it its orchestrator to review
     /// (fac-230, fac-249).
-    Review(factory_types::orchestrator::ReviewSection, String),
+    Review(mork_types::orchestrator::ReviewSection, String),
     /// A card's pull request: its page opens outside the window (fac-105).
     Link(String),
     /// A web address in the conversation opens in the browser (fac-152).

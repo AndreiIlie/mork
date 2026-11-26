@@ -1,11 +1,11 @@
-//! The factory's own updates (fac-19): a new commit on its master owes a build, which the engine pins when in place; a
-//! failed build or refused pin waits for Andrei's retry.
+//! Mork's own updates (fac-19): a new commit on its master owes a build, which the engine pins when in place; a
+//! failed build or refused pin waits for the operator's retry.
 
-use factory_types::job::JobKind;
-use factory_types::state::{Job, MessageKind, Sender, Settlement};
-use factory_types::view::Update;
-use factory_types::work::Purpose;
-use factory_types::{Command, JobId, Sha};
+use mork_types::job::JobKind;
+use mork_types::state::{Job, MessageKind, Sender, Settlement};
+use mork_types::view::Update;
+use mork_types::work::Purpose;
+use mork_types::{Command, JobId, Sha};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision, Intent};
@@ -38,7 +38,7 @@ pub(crate) fn seen(
 }
 
 /// Whether a build of `commit` is owed or has a job, whatever its end: one that failed is tried
-/// again only by Andrei's retry.
+/// again only by the operator's retry.
 pub fn built(state: &State, commit: &str) -> bool {
     let owed = Purpose::Build { commit: Sha::new(commit) }.key();
     state.owed_work.contains_key(&owed) || state.jobs.values().any(|j| of(j, commit))
@@ -53,7 +53,7 @@ pub fn in_place(state: &State, commit: &str) -> bool {
 // A build's job, or the job that says its build couldn't start (`work_refused`).
 fn of(j: &Job, commit: &str) -> bool {
     let owed = matches!(&j.purpose, Some(Purpose::Build { commit: c }) if c.as_str() == commit);
-    owed || (j.kind == JobKind::Build && j.spec.env.get("FACTORY_BUILD_COMMIT").is_some_and(|c| c == commit))
+    owed || (j.kind == JobKind::Build && j.spec.env.get("MORK_BUILD_COMMIT").is_some_and(|c| c == commit))
 }
 
 fn last_job<'a>(state: &'a State, commit: &str) -> Option<&'a Job> {
@@ -83,18 +83,18 @@ pub fn line(state: &State, tip: &str, current: &str, in_place: bool) -> Option<U
 pub(crate) fn start_failed(p: &mut Poster<'_>, purpose: &Purpose, words: &str) {
     let Purpose::Build { commit } = purpose else { return };
     let text = format!("The build of {} couldn't start: {words}{}", commit.short(), retry_build(commit.short()));
-    p.post(MAIN, Sender::Engine, Some("andrei"), MessageKind::Engine, "", &text);
+    p.post(MAIN, Sender::Engine, Some("operator"), MessageKind::Engine, "", &text);
 }
 
 // How a failed build of an update is tried again: the words after its failure in main.
 fn retry_build(short: &str) -> String {
-    format!(" The pin stays where it was; retry from the top line, or with `factory ctl build {short}`.")
+    format!(" The pin stays where it was; retry from the top line, or with `mork ctl build {short}`.")
 }
 
 // A build in place whose pin the checks refused: said in main.
 fn pin_refused(short: &str, why: &str) -> String {
     format!(
-        "The build of {short} is in place, but it wasn't pinned: {why}. The pin stays where it was; retry from the top line, or with `factory ctl pin {short}`."
+        "The build of {short} is in place, but it wasn't pinned: {why}. The pin stays where it was; retry from the top line, or with `mork ctl pin {short}`."
     )
 }
 
@@ -150,7 +150,7 @@ fn said(state: &State, text: &str, now: i64) -> Change {
         state,
         MAIN,
         Sender::Engine,
-        Some("andrei"),
+        Some("operator"),
         MessageKind::Engine,
         text,
         now,

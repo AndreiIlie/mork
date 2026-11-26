@@ -15,16 +15,14 @@ pub mod schema;
 
 use std::path::{Path, PathBuf};
 
-use factory_core::decide::Journal;
-use factory_core::state::{Change, State};
-use factory_types::ask::Ask;
-use factory_types::card::Card;
-use factory_types::lease::Lease;
-use factory_types::state::{Agent, Place};
-use factory_types::usage::Limit;
+use mork_core::decide::Journal;
+use mork_core::state::{Change, State};
+use mork_types::ask::Ask;
+use mork_types::card::Card;
+use mork_types::lease::Lease;
+use mork_types::state::{Agent, Place};
+use mork_types::usage::Limit;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
-
-use crate::faults;
 
 /// What went wrong opening or writing the state.
 #[derive(Debug)]
@@ -45,6 +43,9 @@ impl std::fmt::Display for StoreError {
         match self {
             Self::Sql(e) => write!(f, "state: {e}"),
             Self::Json(e) => write!(f, "state: a record that isn't valid: {e}"),
+            Self::Version { found, oldest, newest } if oldest == newest => {
+                write!(f, "state: version {found}, but this build requires version {newest}")
+            }
             Self::Version { found, oldest, newest } => {
                 write!(f, "state: version {found}, but this build reads {oldest} to {newest}")
             }
@@ -78,7 +79,6 @@ pub struct Store {
 }
 
 fn configure(conn: &Connection) -> Result<()> {
-    conn.busy_timeout(std::time::Duration::from_secs(10))?;
     conn.pragma_update(None, "journal_mode", "WAL")?;
     conn.pragma_update(None, "synchronous", "FULL")?;
     conn.pragma_update(None, "foreign_keys", "ON")?;
@@ -104,43 +104,36 @@ fn set_meta_in(tx: &rusqlite::Transaction<'_>, key: &str, value: &str) -> Result
 }
 
 impl Store {
-    /// Opens the state: its version, a baseline advanced to the newest, or a new one made in it (2.1.5).
+    /// Opens a supported state for writing or creates one at the newest version (2.1.5).
     /// `build` is the commit `meta` records as creating it (2.2.5).
     pub fn open(path: &Path, build: &str) -> Result<Self> {
-        let conn = Connection::open(path)?;
-        configure(&conn)?;
-        let found: u32 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        let tables: i64 = conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get(0))?;
-        let mut store = Self { conn, path: path.to_owned(), version: found };
-        let wrong = StoreError::Version { found, oldest: schema::OLDEST, newest: schema::NEWEST };
-        if found == 0 && tables > 0 {
+        let mut conn = Connection::open(path)?;
+        conn.busy_timeout(std::time::Duration::from_secs(10))?;
+        let mut version: u32 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+        let wrong = StoreError::Version { found: version, oldest: schema::OLDEST, newest: schema::NEWEST };
+        if version == 0 {
             // A state older than any version: not an empty file to start.
+            let tables: i64 = conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get(0))?;
+            if tables > 0 {
+                return Err(wrong);
+            }
+        } else if !(schema::OLDEST..=schema::NEWEST).contains(&version) {
             return Err(wrong);
         }
-        if found == 0 {
-            let tx = store.conn.transaction()?;
+        configure(&conn)?;
+        if version == 0 {
+            let tx = conn.transaction()?;
             schema::create(&tx)?;
             set_meta_in(&tx, "created_by", build)?;
             set_meta_in(&tx, "migrated_by", build)?;
             tx.pragma_update(None, "user_version", schema::NEWEST)?;
             tx.commit()?;
-            store.version = schema::NEWEST;
-            return Ok(store);
+            version = schema::NEWEST;
         }
-        if !(schema::OLDEST..=schema::NEWEST).contains(&found) {
-            return Err(wrong);
-        }
-        if found < schema::NEWEST {
-            let tx = store.conn.transaction()?;
-            set_meta_in(&tx, "migrated_by", build)?;
-            tx.pragma_update(None, "user_version", schema::NEWEST)?;
-            tx.commit()?;
-            store.version = schema::NEWEST;
-        }
-        Ok(store)
+        Ok(Self { conn, path: path.to_owned(), version })
     }
 
-    /// Opens a state read-only, as `factory status` and `factory doctor` do with no app. With no
+    /// Opens a state read-only, as `mork status` and `mork doctor` do with no app. With no
     /// write-ahead log beside it, it opens immutable, so not even a `-wal` file is made (T2.2).
     pub fn open_read_only(path: &Path) -> Result<Self> {
         let wal =
@@ -152,9 +145,6 @@ impl Store {
             Connection::open_with_flags(uri, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI)?
         };
         let version: u32 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if version > 0 && version < schema::OLDEST {
-            return Err(StoreError::Version { found: version, oldest: schema::OLDEST, newest: schema::NEWEST });
-        }
         Ok(Self { conn, path: path.to_owned(), version })
     }
 
@@ -215,8 +205,7 @@ impl Store {
     }
 
     /// Commits one transaction (2.1.4, 2.4.1), raising the revision by one when anything changed.
-    /// `mid_fault` (`job.mid-apply`) fires inside it, before it commits.
-    pub fn commit(&mut self, changes: &[Change], journal: &[Journal], now: i64, mid_fault: Option<&str>) -> Result<()> {
+    pub fn commit(&mut self, changes: &[Change], journal: &[Journal], now: i64) -> Result<()> {
         if !changes.iter().any(Change::is_stored) && journal.is_empty() {
             return Ok(());
         }
@@ -234,9 +223,6 @@ impl Store {
         }
         if changes.iter().any(Change::is_stored) {
             tx.execute("UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'revision'", [])?;
-        }
-        if let Some(point) = mid_fault {
-            faults::hit(point);
         }
         tx.commit()?;
         Ok(())
@@ -316,11 +302,11 @@ fn load_entity(s: &mut State, kind: &str, data: &str) -> Result<()> {
         "note" | "note-last" => notes::load(s, kind, data)?,
         "pass" => s.passes.push(serde_json::from_str(data)?),
         "auto" => {
-            let a: factory_types::orchestrator::Auto = serde_json::from_str(data)?;
+            let a: mork_types::orchestrator::Auto = serde_json::from_str(data)?;
             s.autos.insert(a.project.clone(), a);
         }
         "lookback" => {
-            let c: factory_types::lookback::Cursor = serde_json::from_str(data)?;
+            let c: mork_types::lookback::Cursor = serde_json::from_str(data)?;
             s.lookbacks.entry(c.project.clone()).or_default().insert(c.read, c);
         }
         "token" => s.world.token_refused = serde_json::from_str(data)?,
@@ -328,7 +314,7 @@ fn load_entity(s: &mut State, kind: &str, data: &str) -> Result<()> {
         "owed-work" => {
             let v: serde_json::Value = serde_json::from_str(data)?;
             if !retired::research_purpose(&v) {
-                let w: factory_types::work::Purpose = serde_json::from_value(v)?;
+                let w: mork_types::work::Purpose = serde_json::from_value(v)?;
                 s.owed_work.insert(w.key(), w);
             }
         }
@@ -402,4 +388,26 @@ fn write_change(tx: &rusqlite::Transaction<'_>, c: &Change) -> Result<()> {
 fn put_entity(tx: &rusqlite::Transaction<'_>, kind: &str, id: &str, data: &str) -> Result<()> {
     tx.execute("INSERT OR REPLACE INTO entities (kind, id, data) VALUES (?1, ?2, ?3)", params![kind, id, data])?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Store, StoreError, schema};
+
+    #[test]
+    // why: a failed database operation fails this test.
+    #[allow(clippy::unwrap_used)]
+    fn pre_cutover_state_can_be_inspected_but_requires_upgrade_for_writes() {
+        let dir = std::env::temp_dir().join(format!("mork-state-version-{}", crate::random::uuid()));
+        std::fs::create_dir(&dir).unwrap();
+        let db = dir.join("state.db");
+        let store = Store::open(&db, "test").unwrap();
+        assert_eq!(store.version, schema::NEWEST);
+        store.conn.pragma_update(None, "user_version", 54).unwrap();
+        drop(store);
+
+        assert!(matches!(Store::open(&db, "test"), Err(StoreError::Version { found: 54, oldest: 55, .. })));
+        assert_eq!(Store::open_read_only(&db).unwrap().version, 54);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

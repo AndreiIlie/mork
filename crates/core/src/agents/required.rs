@@ -2,12 +2,12 @@
 
 use std::fmt::Write as _;
 
-use factory_types::AgentKey;
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::config::Config;
-use factory_types::reply::{Intent, Outcome, Reply, Role};
-use factory_types::state::{Agent, Job, Message, MessageKind, Sender};
+use mork_types::AgentKey;
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::config::Config;
+use mork_types::reply::{Intent, Outcome, Reply, Role};
+use mork_types::state::{Agent, Job, Message, MessageKind, Sender};
 use serde_json::json;
 
 use crate::agents::prompt::held::Sections;
@@ -177,10 +177,10 @@ fn foreman_now(card: &Card) -> &'static str {
 
 fn foreman_rule(card: &Card) -> String {
     format!(
-        "\n## The challenge\n\n{} is agreeing its specification: its planner holds it, with Andrei in the card's \
+        "\n## The challenge\n\n{} is agreeing its specification: its planner holds it, with the operator in the card's \
          spec room, and you challenge each plan it recaps before the plan is offered. Your messages to `planner` \
          and its to you pass in the card's challenge place, which no window shows. Read the card and the code. \
-         Write, edit and commit nothing. Andrei's words in this build room reach you at every \
+         Write, edit and commit nothing. The operator's words in this build room reach you at every \
          stage: answer them, and send what would change the specification to `planner` as a request. Send your \
          objections to `planner` as one request, strongest first, and end `working`. \
          With none, end `working` with no request to the planner, an empty `ask` and no red hand. \

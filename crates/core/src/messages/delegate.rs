@@ -1,13 +1,13 @@
 //! Delegation gives seat questions and non-visual plan approvals to the project's orchestrator automatically;
-//! actionable engine asks stay Andrei's and request mechanical help (fac-474). Asks already given stay given.
+//! actionable engine asks stay the operator's and request mechanical help (fac-474). Asks already given stay given.
 
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::ask::{Ask, AskKind};
-use factory_types::card::Card;
-use factory_types::orchestrator::{OrchestratorAsk, OrchestratorEvent, OrchestratorWhat};
-use factory_types::reply::Intent;
-use factory_types::state::{Message, MessageKind, Sender};
-use factory_types::{CardId, Command, ProjectId};
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::ask::{Ask, AskKind};
+use mork_types::card::Card;
+use mork_types::orchestrator::{OrchestratorAsk, OrchestratorEvent, OrchestratorWhat};
+use mork_types::reply::Intent;
+use mork_types::state::{Message, MessageKind, Sender};
+use mork_types::{CardId, Command, ProjectId};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -33,7 +33,7 @@ pub(super) fn toggle(state: &State, card: &CardId, on: bool, self_sustained: boo
     let next = Card { delegated: on, self_sustained, ..c.clone() };
     if c.stage.is_live() && c.delegation() != next.delegation() {
         let text = format!(
-            "Andrei set {id}'s delegation level to {}.\n{}",
+            "The operator set {id}'s delegation level to {}.\n{}",
             next.delegation(),
             crate::agents::prompt::delegation_rule(&next)
         );
@@ -152,7 +152,7 @@ fn requests(state: &State, changes: &[Change], now: i64) -> Vec<(ProjectId, Mess
             continue;
         }
         let text = format!(
-            "Handle engine ask {}: {}\n\nThe ask stays Andrei's and is not given to you. Answer it with a command, not a message. Commands for `factory ctl --json`:\n{}",
+            "Handle engine ask {}: {}\n\nThe ask stays the operator's and is not given to you. Answer it with a command, not a message. Commands for `mork ctl --json`:\n{}",
             opened.ask,
             opened.text,
             commands.join("\n")

@@ -2,29 +2,30 @@
 
 use std::path::{Path, PathBuf};
 
-use factory_engine::paths::Home;
-use factory_engine::runtime::{self, Options};
-use factory_engine::{clock, config, faults, jobs};
+use mork_engine::cli::claude_hooks::Hook;
+use mork_engine::paths::Home;
+use mork_engine::runtime::{self, Options};
+use mork_engine::{clock, config, faults, jobs};
 
 use crate::{ctl, launcher, local};
 
-/// The commit this binary reports: `FACTORY_TEST_COMMIT` in a test build, else its own.
+/// The commit this binary reports: `MORK_TEST_COMMIT` in a test build, else its own.
 pub fn commit() -> String {
-    faults::test_env("FACTORY_TEST_COMMIT").unwrap_or_else(|| env!("FACTORY_COMMIT").to_owned())
+    faults::test_env("MORK_TEST_COMMIT").unwrap_or_else(|| env!("MORK_COMMIT").to_owned())
 }
 
 /// Whether this binary is of a tree with changes (`hello.dirty`).
 pub fn dirty() -> bool {
-    env!("FACTORY_DIRTY") == "true"
+    env!("MORK_DIRTY") == "true"
 }
 
 pub fn bin() -> PathBuf {
-    std::env::current_exe().unwrap_or_else(|_| PathBuf::from("factory"))
+    std::env::current_exe().unwrap_or_else(|_| PathBuf::from("mork"))
 }
 
 fn home() -> Result<Home, i32> {
     Home::from_env().ok_or_else(|| {
-        eprintln!("factory: no home: set FACTORY_HOME, XDG_DATA_HOME or HOME");
+        eprintln!("mork: no home: set MORK_HOME, XDG_DATA_HOME or HOME");
         2
     })
 }
@@ -36,7 +37,7 @@ pub fn run(args: &[String]) -> i32 {
     match sub {
         Some("supervise") => match rest.first() {
             Some(dir) => jobs::supervisor::main(Path::new(dir)),
-            None => usage("factory supervise <job folder>"),
+            None => usage("mork supervise <job folder>"),
         },
         Some("wall-exec") => {
             eprintln!("{}", jobs::wall_exec::run(rest));
@@ -47,19 +48,20 @@ pub fn run(args: &[String]) -> i32 {
             Some(order) => match jobs::work::run(Path::new(order)) {
                 Ok(()) => 0,
                 Err(e) => {
-                    eprintln!("factory work: {e}");
+                    eprintln!("mork work: {e}");
                     1
                 }
             },
-            None => usage("factory work <order.json>"),
+            None => usage("mork work <order.json>"),
         },
         Some("test") => jobs::slot_client::run(rest, &commit()),
         Some("manual") => manual(rest),
-        Some("claude-agent-hook") => claude_agent_hook(rest),
+        Some("claude-agent-hook") => claude_hook(Hook::Agent { fable: rest.iter().any(|arg| arg == "--seat-fable") }),
+        Some("claude-path-hook") => claude_hook(Hook::Path),
         // The door's dispatcher (fac-1, fac-86): the engine's own local child, reaching a target
-        // over Andrei's ssh alias with the box's own tools, nothing of the Factory's installed there.
+        // over the operator's ssh alias with the box's own tools, nothing of Mork's installed there.
         Some("door-dispatch") => jobs::door_dispatch::main(rest),
-        Some("live-probe") => factory_app::live::probe(rest),
+        Some("live-probe") => mork_app::live::probe(rest),
         _ => with_home(sub, args, rest),
     }
 }
@@ -73,7 +75,7 @@ fn with_home(sub: Option<&str>, args: &[String], rest: &[String]) -> i32 {
         None | Some("--no-window") => app(&home, args, None),
         Some("--reloaded") => match rest.first() {
             Some(id) => app(&home, args, Some(id.clone())),
-            None => usage("factory --reloaded <id>"),
+            None => usage("mork --reloaded <id>"),
         },
         Some("ctl") => ctl::run(&home, &commit(), &args[1..]),
         Some("build") => local::build(&home, rest),
@@ -83,8 +85,8 @@ fn with_home(sub: Option<&str>, args: &[String], rest: &[String]) -> i32 {
         Some("login") => local::login(&home, rest),
         Some("install") => local::install(rest),
         Some("web") => local::web(&home),
-        Some("live-check") => factory_app::live::run(&home, &bin()),
-        Some(other) => usage(&format!("factory: unknown command `{other}`; see 1.7")),
+        Some("live-check") => mork_app::live::run(&home, &bin()),
+        Some(other) => usage(&format!("mork: unknown command `{other}`; see 1.7")),
     }
 }
 
@@ -93,40 +95,30 @@ fn usage(text: &str) -> i32 {
     2
 }
 
-fn claude_agent_hook(rest: &[String]) -> i32 {
-    // Input failures must not stop every subagent (fac-403).
-    let Ok(input) = serde_json::from_reader::<_, serde_json::Value>(std::io::stdin().lock()) else { return 0 };
-    if input.get("tool_name").and_then(serde_json::Value::as_str) != Some("Agent") {
-        return 0;
-    }
-    let Some(call) = input.get("tool_input").filter(|v| v.is_object()) else { return 0 };
-    let refusal = factory_core::agents::subagents::refusal(
-        call.get("model").and_then(serde_json::Value::as_str),
-        call.get("subagent_type").and_then(serde_json::Value::as_str),
-        rest.iter().any(|arg| arg == "--seat-fable"),
-    );
-    if let Some(text) = refusal {
-        eprintln!("{text}");
-        2
-    } else {
-        0
+fn claude_hook(hook: Hook) -> i32 {
+    match hook.check(std::io::stdin().lock()) {
+        Ok(()) => 0,
+        Err(reason) => {
+            eprintln!("{reason}");
+            2
+        }
     }
 }
 
-// The running build's own text, built in: inside a wall `factory` is that build (fac-14).
+// The running build's own text, built in: inside a wall `mork` is that build (fac-14).
 fn manual(rest: &[String]) -> i32 {
-    let names = factory_core::maintenance::manuals::names().join(", ");
+    let names = mork_core::maintenance::manuals::names().join(", ");
     match rest.first().map(String::as_str) {
         None => {
-            println!("factory manual <name>: {names}");
+            println!("mork manual <name>: {names}");
             0
         }
-        Some(name) => match factory_core::maintenance::manuals::manual(name) {
+        Some(name) => match mork_core::maintenance::manuals::manual(name) {
             Some(text) => {
                 print!("{text}");
                 0
             }
-            None => usage(&format!("factory manual: no manual `{name}`; the manuals are {names}")),
+            None => usage(&format!("mork manual: no manual `{name}`; the manuals are {names}")),
         },
     }
 }
@@ -139,7 +131,7 @@ fn app(home: &Home, args: &[String], reloaded: Option<String>) -> i32 {
     {
         return code;
     }
-    let Some(config_path) = config::path() else { return usage("factory: no config path: set FACTORY_CONFIG or HOME") };
+    let Some(config_path) = config::path() else { return usage("mork: no config path: set MORK_CONFIG or HOME") };
     let no_window = args.iter().skip(1).any(|a| a == "--no-window");
     let mode_args = if no_window { vec!["--no-window".to_owned()] } else { Vec::new() };
     let opts = Options {
@@ -156,13 +148,9 @@ fn app(home: &Home, args: &[String], reloaded: Option<String>) -> i32 {
         return runtime::run(opts);
     }
     // The engine says what is wrong with a bad config.
-    let settings = config::read(&config_path).map_or(
-        factory_ui::app::Settings { editor: String::new(), animations: true, tunnels: Default::default() },
-        |c| factory_ui::app::Settings {
-            editor: c.factory.editor,
-            animations: c.factory.animations,
-            tunnels: c.tunnels,
-        },
-    );
+    let settings = config::read(&config_path)
+        .map_or(mork_ui::app::Settings { editor: String::new(), animations: true, tunnels: Default::default() }, |c| {
+            mork_ui::app::Settings { editor: c.mork.editor, animations: c.mork.animations, tunnels: c.tunnels }
+        });
     crate::window::run(home, settings, move || runtime::run(opts))
 }

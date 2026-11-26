@@ -1,10 +1,10 @@
-//! `say` (3.4.5): Andrei's or a seat's words, posted where they reach and waking the agent they address.
+//! `say` (3.4.5): the operator's or a seat's words, posted where they reach and waking the agent they address.
 
-use factory_types::Command;
-use factory_types::ask::AskKind;
-use factory_types::command::Delivery;
-use factory_types::reply::{Intent, Role};
-use factory_types::state::{MessageKind, Sender};
+use mork_types::Command;
+use mork_types::ask::AskKind;
+use mork_types::command::Delivery;
+use mork_types::reply::{Intent, Role};
+use mork_types::state::{MessageKind, Sender};
 use serde_json::json;
 
 use super::places::{self, MAIN};
@@ -13,19 +13,19 @@ use crate::post::Poster;
 use crate::state::State;
 
 /// `say`: a request to the agent it addresses, which wakes it (3.4.5). A seat's `say` is the
-/// same as Andrei's; its kind, which the buzz asks of a seat (fac-18), is kept with the message.
+/// same as the operator's; its kind, which the buzz asks of a seat (fac-18), is kept with the message.
 pub(super) fn say(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Decision {
     let Command::Say { place, to, text, images, kind, delivery, choice } = cmd else { return Decision::default() };
     let (place, to, images, kind) = (place.as_str(), to.as_deref(), images.as_deref().unwrap_or_default(), *kind);
     let (delivery, choice) = (*delivery, *choice);
-    if choice.is_some() && !(*from == Sender::Andrei || from.is_orchestrator()) {
-        return Decision::refused("only Andrei or an orchestrator answers with a choice");
+    if choice.is_some() && !(*from == Sender::Operator || from.is_orchestrator()) {
+        return Decision::refused("only the operator or an orchestrator answers with a choice");
     }
     // The window's image-only message is a message (fac-321).
     if text.trim().is_empty() && images.is_empty() {
         return Decision::invalid("`text` is empty: a message needs words or an image");
     }
-    if let Some(e) = to_andrei(state, from, place, to.or_else(|| places::addressee(text))) {
+    if let Some(e) = to_operator(state, from, place, to.or_else(|| places::addressee(text))) {
         return Decision::refused(e);
     }
     if place == MAIN && to.is_none() && places::addressee(text).is_none() && choice.is_none() {
@@ -44,7 +44,7 @@ pub(super) fn say(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> 
         },
     };
     if !places::planner_sender(state, from, &who) {
-        return Decision::refused("the planner reopens for its foreman, Andrei or an orchestrator");
+        return Decision::refused("the planner reopens for its foreman, the operator or an orchestrator");
     }
     // Said unnamed into the other seat's room or DM, it is still their exchange (fac-633).
     let place = exchange(state, from, &who).unwrap_or(place);
@@ -87,7 +87,7 @@ fn label(state: &State, place: &str, who: &places::Who) -> String {
 // ask given to it offers, as its message answers only that.
 fn chosen(state: &State, from: &Sender, who: &places::Who, choice: Option<u32>) -> Result<(), String> {
     let Some(n) = choice else { return Ok(()) };
-    let offers = |c: &factory_types::ask::Choices| usize::try_from(n).is_ok_and(|n| (1..=c.options.len()).contains(&n));
+    let offers = |c: &mork_types::ask::Choices| usize::try_from(n).is_ok_and(|n| (1..=c.options.len()).contains(&n));
     let open = state.asks.values().filter(|a| {
         a.open
             && a.kind == AskKind::Answer
@@ -102,10 +102,10 @@ fn chosen(state: &State, from: &Sender, who: &places::Who, choice: Option<u32>) 
     }
 }
 
-// A seat's words for Andrei, its plain words in main or a name that once posted for him, are refused (fac-390).
-fn to_andrei(state: &State, from: &Sender, place: &str, named: Option<&str>) -> Option<String> {
+// A seat's words for the operator, its plain words in main or a name that once posted for him, are refused (fac-390).
+fn to_operator(state: &State, from: &Sender, place: &str, named: Option<&str>) -> Option<String> {
     let Sender::Agent(key) = from else { return None };
-    if !named.map_or(place == MAIN, places::for_andrei) {
+    if !named.map_or(place == MAIN, places::for_operator) {
         return None;
     }
     let child = places::who_of(state, key)
@@ -190,7 +190,7 @@ fn unwoken(
 
 fn heard(p: &mut Poster<'_>, from: &Sender, who: &places::Who, kind: Option<Intent>) {
     let Some(card) = places::card_of(p.state, &who.place) else { return };
-    if !(*from == Sender::Andrei || from.is_orchestrator()) {
+    if !(*from == Sender::Operator || from.is_orchestrator()) {
         return;
     }
     // Only words in the holder's own room withdraw its recap: the build room's withdraw nothing (fac-633).

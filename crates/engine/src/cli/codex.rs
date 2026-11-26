@@ -1,7 +1,7 @@
 //! Codex's stream (`codex exec --json`), F-X1 to F-X4, and its `-o` last message.
 
-use factory_types::config::Seat;
-use factory_types::seen::DetailKind;
+use mork_types::config::Seat;
+use mork_types::seen::DetailKind;
 use serde_json::Value;
 
 use super::{StreamState, turn};
@@ -281,7 +281,7 @@ pub fn quote_key(name: &str) -> String {
 }
 
 /// The MCP servers a project-level `.codex/config.toml` declares, in the folders from `cwd`
-/// up, skipping the users' own (`user_codex_homes`: Andrei's and the agent home's), sorted (1.4.8, Codex 2).
+/// up, skipping the users' own (`user_codex_homes`: the operator's and the seat's), sorted (1.4.8, Codex 2).
 pub fn project_mcp_servers(cwd: &std::path::Path, user_codex_homes: &[&std::path::Path]) -> Vec<String> {
     let mut names = std::collections::BTreeSet::new();
     for dir in cwd.ancestors() {

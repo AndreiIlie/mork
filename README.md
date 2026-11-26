@@ -11,7 +11,7 @@
 
 Website: [https://mork.sh](https://mork.sh) · [Architecture](ARCHITECTURE.md) · [Security Model](SECURITY.md)
 
-Mork drives the coding CLIs you already pay for (Claude Code, OpenAI Codex, Gemini) through a deterministic Rust state machine (~89k LOC Rust across 8 crates, ~5.5k LOC React/TypeScript). Each work card runs in its own git clone inside a Linux Bubblewrap + Landlock sandbox, gets audited by fresh read-only reviewers from a different model family with zero builder chat history, and lands through a serialized merge queue after checks and tests pass.
+Mork drives the coding CLIs you already pay for (Claude Code, OpenAI Codex, Gemini) through a deterministic Rust state machine (~95k LOC Rust across 8 crates, ~5.5k LOC React/TypeScript). Each work card runs in its own git clone inside a Linux Bubblewrap + Landlock + seccomp-bpf sandbox with an isolated per-seat home directory, gets audited by fresh read-only reviewers from a different model family with zero builder chat history, and lands through a serialized merge queue after checks and tests pass.
 
 ![Mork Board](docs/screenshots/board.png)
 
@@ -21,12 +21,12 @@ Over 39 days of daily use (1,049 shipped work cards across four repositories: Mo
 
 A single CLI session reviewing its own diff stays anchored on its own assumptions. Mork enforces the boundaries in code:
 
-- **Sandboxed clones ("walls"):** Each card runs in its own git clone inside Linux Bubblewrap + Landlock (`crates/engine/src/jobs/wall.rs`, `wall_exec.rs`, `crates/sys/src/landlock.rs`). Reviewers inspect a clean read-only clone with no builder history.
-- **Cross-family pairing:** Different model families plan, build, challenge plans, and review code, configured in `factory.toml`.
-- **Proof-required findings:** Every review finding carries a `file:line`, failure path, and proof. Failed rounds route to structured triage (`Fix`, `Decline`, `Foreman decides`).
-- **Raised Hands:** Seats stay quiet while working and interrupt you only when a product decision, visual mock approval, plan approval, or failed-round triage is needed.
-- **Serialized merge queue:** Approved branches run checks, review rounds, and full test suites side by side, then land serially onto base so parallel cards do not trample each other.
-- **Local web dashboard:** React + TypeScript UI served over a keyed localhost bridge (`crates/engine/src/web/`, `web/`), with a full-width Board, 50/50 Card Room, live test-suite progress, and Usage / Quota pace tracking.
+- **Sandboxed clones ("walls"):** Each card runs in its own git clone inside Linux Bubblewrap + Landlock + seccomp-bpf (`crates/engine/src/jobs/wall.rs`, `wall_exec.rs`, `crates/sys/src/{landlock,seccomp}.rs`). Every seat gets its own private writable home directory (`crates/engine/src/seat_homes.rs`), and reviewers inspect a clean read-only clone with no builder history.
+- **Cross-family pairing:** Different model families plan, build, challenge plans, and review code, configured in `mork.toml`.
+- **Proof-required findings & deliberation:** Every review finding carries a `file:line`, failure path, and proof. Disputed findings run one bounded deliberation turn before being dropped, and failed rounds route to structured triage (`Fix`, `Decline`, `Foreman decides`).
+- **Raised Hands:** Seats stay quiet while working and interrupt you only when a product decision, visual direction/mock approval, plan approval, or failed-round triage is needed.
+- **Serialized merge queue & early checks:** Candidate diffs are scanned for secrets and modified/deleted test assertions before verification, then approved branches run checks, review rounds, and full test suites side by side before landing serially onto base.
+- **Local web dashboard & CLI search:** React + TypeScript UI served over a keyed localhost bridge (`crates/engine/src/web/`, `web/`), with Board, Card Room, live test-suite progress, per-`(cli, model)` prompt-cache tracking, and instant command discovery via `mork ctl search <query>`.
 
 ![Mork Card Room](docs/screenshots/card-room.png)
 ![Mork Usage and Quotas](docs/screenshots/usage.png)
@@ -37,26 +37,23 @@ Mork is an 8-crate Rust workspace with a dependency graph and boundary rules enf
 
 | Path | Role |
 | --- | --- |
-| `crates/types/` | Wire protocol, view models, config schema, and domain identifiers (`CardId`, `AskId`, `JobId`). |
+| `crates/types/` | Wire protocol, view models, modular provider config schema (`board`, `forge`, `tickets`), and domain identifiers (`CardId`, `AskId`, `JobId`). |
 | `crates/core/` | Pure deterministic state machine: card lifecycle, review rounds, triage, merge queue, SQL/file door rules, and view builders (zero I/O). |
-| `crates/engine/` | Runtime loop, SQLite event journal (`store/`), Bubblewrap + Landlock sandboxing (`jobs/wall.rs`, `jobs/wall_exec.rs`), CLI drivers (`cli/`), live test-suite watcher, Vite visual mock host, and keyed localhost web bridge (`web/`). |
-| `crates/sys/` | Isolated OS primitives (Landlock syscall bindings and process/sandbox helpers; the only crate permitted to use `unsafe`). |
+| `crates/engine/` | Runtime loop, SQLite event journal (`store/`), Bubblewrap + Landlock + seccomp-bpf sandboxing (`jobs/`), per-seat homes (`seat_homes.rs`), modular `board`/`forge`/`tickets` traits, CLI drivers (`cli/`), live test-suite watcher, Vite visual mock host, and keyed localhost web bridge (`web/`). |
+| `crates/sys/` | Isolated OS primitives (Landlock and seccomp-bpf syscall bindings and `openat`-rooted symlink-safe file helpers; the only crate permitted to use `unsafe`). |
 | `crates/ui/` | Native Linux desktop window crate. |
-| `crates/app/` | Main binary (`factory`), CLI control client (`factory ctl`), and embedded roles/manuals/skills. |
-| `crates/fakes/` | Fake CLI/Bitbucket harnesses used by integration tests. |
-| `crates/xtask/` | Workspace verification: rustfmt, comments, clippy, crate-graph and capability audits, file/function size caps, web Tailwind/TS checks, and parallel test runner. |
+| `crates/app/` | Main binary (`mork`), CLI control client (`mork ctl`, `mork ctl search`), and embedded roles/manuals/skills. |
+| `crates/fakes/` | Fake CLI/forge harnesses used by integration tests. |
+| `crates/xtask/` | Workspace verification: rustfmt, comments, clippy, crate-graph and capability audits, file/function size caps, test-assertion diff checks, web Tailwind/TS checks, and parallel test runner. |
 | `web/` | Local web UI (React 19, TypeScript, Tailwind CSS v4, Vite). |
 | `manuals/`, `roles/`, `skills/` | Operating manuals and on-demand skills loaded into agent seats. |
 
-> **Transition note:** Mork started as a personal tool named `factory`. Crate names, the binary (`factory`), `~/.config/factory/factory.toml`, and some operator strings still carry that history while the full `factory` -> `mork` rename is underway.
-
 ## Security Model and Current Limitations
 
-- **Filesystem vs. network isolation:** File isolation is enforced by Bubblewrap mounts (`--ro-bind / /`, tmpfs over host home directories, read-write only inside the card's clone and scratch paths) with `--unshare-user/pid/ipc` and `--cap-drop ALL`. The network namespace is not unshared because CLIs need HTTPS access to model APIs; Landlock restricts outbound TCP connect ports (default `443`, `80`, `53` in `crates/types/src/config.rs`) and does not add Landlock filesystem rules.
-- **Shared agent home:** Seats share one `~/.local/share/factory/agent-home` directory for CLI credentials and session state. Per-seat home isolation is not yet implemented.
-- **Autonomous CLI execution:** Inside the sandbox, seats run with CLI permission prompts disabled so work does not stall waiting on interactive shell prompts. The sandbox wall and door allowlists are the enforcement boundary.
-- **PR automation:** Local git merge-queue landings work with any git repository. Hosted pull-request review/merge automation currently targets Bitbucket only (GitHub PR automation is not implemented yet).
-- **Self-build project setting:** `[factory] project` in `factory.toml` identifies Mork's own repository for self-rebuilds and an extra unwalled verification run on Mork's own test suite. Leave it set to `"mork"` (not your app's `[projects.<name>]`) unless you are developing Mork itself; making this field optional is planned alongside the `mork` rename.
+- **Filesystem, syscall, and per-seat isolation:** File isolation is enforced by Bubblewrap mounts (`--ro-bind / /`, tmpfs over host home directories, read-write only inside the card's clone and scratch paths) with `--unshare-user/pid/ipc`, `--cap-drop ALL`, a minimal seccomp-bpf filter denying x32 ABI, `io_uring_setup`, `userfaultfd`, and `ptrace`, and private per-seat home directories (`homes/`).
+- **Network egress (on the roadmap):** The network namespace is not yet unshared because CLIs need HTTPS access to model APIs; Landlock restricts outbound TCP connect ports (default `443`, `80`, `53` in `crates/types/src/config.rs`). Replacing port allowlists with `--unshare-net` and a host-bridged domain-allowlist proxy is on the roadmap.
+- **Autonomous CLI execution:** Inside the sandbox, seats run with CLI permission prompts disabled so work does not stall waiting on interactive shell prompts. The sandbox wall, fail-closed `PreToolUse` hooks, and door allowlists are the enforcement boundary.
+- **Hosted forge support:** Local git merge-queue landings work with any git repository. Hosted PR automation currently implements Bitbucket behind the `ForgeRead`/`ForgeWrite` traits; a GitHub Issues + Pull Requests provider is next on the roadmap.
 
 ## Quick Start (Linux)
 
@@ -78,21 +75,22 @@ cd mork
 cargo xtask web
 
 # 3. Copy and edit the example config
-mkdir -p ~/.config/factory
-cp factory.example.toml ~/.config/factory/factory.toml
-# Edit ~/.config/factory/factory.toml with your repo, board, and toolchain paths
+mkdir -p ~/.config/mork
+cp mork.example.toml ~/.config/mork/mork.toml
+# Edit ~/.config/mork/mork.toml with your repo, board, and toolchain paths
 
 # 4. Build and run the engine
-cargo build --release -p factory-app
-./target/release/factory
+cargo build --release -p mork-app
+./target/release/mork
 ```
 
-Open the keyed localhost URL printed by `./target/release/factory web` to access the web UI, or control cards directly from the CLI:
+Open the keyed localhost URL printed by `./target/release/mork web` to access the web UI, or control cards directly from the CLI:
 
 ```bash
-factory ctl card.create my-app "Short title" "Problem statement and evidence"
-factory ctl start <card-id>
-factory status
+mork ctl card.create my-app "Short title" "Problem statement and evidence"
+mork ctl start <card-id>
+mork ctl search <query>
+mork status
 ```
 
 ## Development Checks
@@ -100,7 +98,7 @@ factory status
 ```bash
 cargo xtask web        # Tailwind class audit, TypeScript typecheck, and Vite production build
 cargo xtask check      # rustfmt, comments, clippy, crate graph, size caps, and web checks
-cargo xtask test       # Parallel workspace test runner (set FACTORY_UNWALLED=1 inside containers without bwrap)
+cargo xtask test       # Parallel workspace test runner (set MORK_UNWALLED=1 inside containers without bwrap)
 ```
 
 ## License

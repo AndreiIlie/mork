@@ -1,4 +1,4 @@
-//! The factory's own repo, for a rig whose cards build it.
+//! Mork's own repo, for a rig whose cards build it.
 
 use std::path::Path;
 
@@ -10,9 +10,9 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&out.stdout).trim().to_owned()
 }
 
-/// The factory's own repo with `n` commits on master; their hashes, oldest first.
-pub fn factory_repo(rig: &Rig, n: usize) -> Vec<String> {
-    let repo = rig.t.root.join("factory-repo");
+/// Mork's own repo with `n` commits on master; their hashes, oldest first.
+pub fn mork_repo(rig: &Rig, n: usize) -> Vec<String> {
+    let repo = rig.t.root.join("mork-repo");
     git(&repo, &["init", "-q", "-b", "master"]);
     git(&repo, &["config", "user.email", "t@example.invalid"]);
     git(&repo, &["config", "user.name", "T"]);

@@ -2,8 +2,8 @@
 //! and gives `core` what happened as events (1.12.1). One module per outside world (1.12.2).
 #![forbid(unsafe_code)]
 
-pub mod azure;
-pub mod bitbucket;
+mod azure;
+mod bitbucket;
 pub mod board;
 pub mod builds;
 mod claude_accounts;
@@ -14,17 +14,22 @@ pub mod config;
 mod config_checks;
 pub mod doctor;
 pub mod door;
+mod encoding;
 pub mod faults;
 pub mod files;
+mod forge;
 pub mod git;
 pub mod jobs;
+mod lock;
+pub mod login_files;
 pub mod paths;
 pub mod random;
 pub mod resources;
 pub mod runtime;
+pub mod seat_homes;
 pub mod secrets;
 pub mod settings;
 pub mod sockets;
 pub mod store;
-pub mod token;
+mod tickets;
 pub mod web;

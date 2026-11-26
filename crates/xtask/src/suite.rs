@@ -15,7 +15,7 @@ use serde_json::Value;
 // How often a running binary's output is read for the results it printed (fac-697).
 const POLL: Duration = Duration::from_millis(100);
 
-/// A test binary to run: its program, arguments, folder and the environment it adds.
+/// A test binary to run: its program, arguments, folder and environment settings.
 #[derive(Debug)]
 pub struct Binary {
     pub name: String,
@@ -35,7 +35,7 @@ pub fn at_most() -> usize {
 pub const WORKSPACE: [&str; 1] = ["--workspace"];
 
 /// The tests named `production`, all in these two targets of the app, for `build`'s `select`.
-pub const PRODUCTION: [&str; 6] = ["-p", "factory-app", "--test", "m0_walled_turn", "--test", "t1_walls"];
+pub const PRODUCTION: [&str; 6] = ["-p", "mork-app", "--test", "m0_walled_turn", "--test", "t1_walls"];
 
 /// Builds the tests `select` names with `cargo test` and `extra`, without running them,
 /// and gives the test binaries it made, each to run with `args`.
@@ -120,11 +120,9 @@ fn judge(b: &Binary, ran: std::io::Result<(ExitStatus, Vec<u8>)>, took: Duration
 // can't hold its run open, and the hygiene step still finds it.
 fn run_one(b: &Binary) -> std::io::Result<(ExitStatus, Vec<u8>)> {
     let mut log = scratch()?;
-    let mut child = Command::new(&b.program)
-        .args(&b.args)
-        .current_dir(&b.dir)
-        // Only the walled phase's binaries record their skips, each told its own file (fac-65).
-        .env_remove(crate::walls::RECORD)
+    let mut cmd = Command::new(&b.program);
+    cmd.args(&b.args).current_dir(&b.dir).env_remove(crate::walls::RECORD);
+    let mut child = cmd
         .envs(b.env.iter().map(|(k, v)| (k, v)))
         .stdin(Stdio::null())
         .stdout(log.try_clone()?)
@@ -168,12 +166,10 @@ fn is_result(line: &str) -> bool {
 /// The tests `b` runs with its arguments, as its harness lists them: `<name>: test`, by the names
 /// `--exact` matches.
 pub fn listed(b: &Binary) -> Result<BTreeSet<String>, String> {
-    let out = Command::new(&b.program)
-        .args(&b.args)
-        .arg("--list")
-        .current_dir(&b.dir)
+    let mut cmd = Command::new(&b.program);
+    cmd.args(&b.args).arg("--list").current_dir(&b.dir).env_remove(crate::walls::RECORD);
+    let out = cmd
         .envs(b.env.iter().map(|(k, v)| (k, v)))
-        .env_remove(crate::walls::RECORD)
         .stdin(Stdio::null())
         .stderr(Stdio::inherit())
         .output()

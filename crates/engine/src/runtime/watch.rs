@@ -6,18 +6,18 @@ use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 use std::time::Duration;
 
-use factory_core::decide::{Event, JobEnd, SessionSeen};
-use factory_types::config::Cli;
-use factory_types::job::{JobKind, WallMode};
-use factory_types::seen::{StepList, TurnView};
-use factory_types::state::JobStatus;
-use factory_types::{AgentKey, JobId};
+use mork_core::decide::{Event, JobEnd, SessionSeen};
+use mork_types::config::Cli;
+use mork_types::job::{JobKind, WallMode};
+use mork_types::seen::{StepList, TurnView};
+use mork_types::state::JobStatus;
+use mork_types::{AgentKey, JobId};
 
 use super::{Engine, Live};
 use crate::jobs::folder::JobDir;
 use crate::jobs::stamps::Stamps;
 use crate::jobs::{procs, published};
-use crate::{builds, cli, clock, faults};
+use crate::{builds, cli, clock};
 
 const CLAIM_WAIT: Duration = Duration::from_secs(5);
 // What is read of a retained stream's end, to show its turn again after a restart.
@@ -25,7 +25,7 @@ const RESTORE_MAX: u64 = 4 * 1024 * 1024;
 
 /// The CLI an agent's job runs, read off its own command: its seat, or a pick, may say another
 /// since it launched (fac-96).
-pub(super) fn cli_of(state: &factory_core::state::State, id: &JobId) -> Option<Cli> {
+pub(super) fn cli_of(state: &mork_core::state::State, id: &JobId) -> Option<Cli> {
     let j = state.jobs.get(id).filter(|j| state.agents.contains_key(&j.owner))?;
     j.spec.argv.first().and_then(|w| Cli::parse(w))
 }
@@ -247,25 +247,20 @@ impl Engine {
             self.apply(&Event::SessionSeen { id: id.clone(), session: session.clone() });
         }
         let exit_facts = exit.as_ref().map(|e| (e.stopped, e.error.clone()));
-        let mut end = factory_core::agents::recovery::end_of(
-            job.stop_requested,
-            exit_facts,
-            stream.result.clone(),
-            session,
-            || self.cli_words(&dir),
-        );
-        // The reply's images become copies read beneath this job's `$FACTORY_IO`, before anything reads them (fac-278).
+        let mut end =
+            mork_core::agents::recovery::end_of(job.stop_requested, exit_facts, stream.result.clone(), session, || {
+                self.cli_words(&dir)
+            });
+        // The reply's images become copies read beneath this job's `$MORK_IO`, before anything reads them (fac-278).
         if let JobEnd::Finished { reply: Ok(reply), .. } = &mut end {
-            published::publish(&self.opts.home.jobs(), id.as_str(), &dir.factory_io(&job.spec), reply);
+            published::publish(&self.opts.home.jobs(), id.as_str(), &dir.mork_io(&job.spec), reply);
         }
-        faults::hit("job.before-apply");
-        self.apply_with(&Event::JobEnded { id: id.clone(), end }, Some("job.mid-apply"));
-        faults::hit("job.after-apply");
+        self.apply(&Event::JobEnded { id: id.clone(), end });
         self.close_turn(id);
         self.live.remove(id);
     }
 
-    fn read_session(&mut self, job: &factory_types::state::Job, dir: &JobDir) -> (cli::StreamState, SessionSeen) {
+    fn read_session(&mut self, job: &mork_types::state::Job, dir: &JobDir) -> (cli::StreamState, SessionSeen) {
         self.read_lines(&job.id, dir, true);
         let mut stream = self.live.get(&job.id).map(|l| l.stream.clone()).unwrap_or_default();
         if self.live.get(&job.id).and_then(|l| l.cli) == Some(Cli::Codex) {
@@ -282,7 +277,7 @@ impl Engine {
             limit_reached: stream.limit_rejected.is_some(),
             limit_reset: stream.limit_rejected.flatten(),
             cost_micros: stream.cost_usd.map(cli::micros),
-            selection: factory_types::cost::Selection::from_argv(&job.spec.argv),
+            selection: mork_types::cost::Selection::from_argv(&job.spec.argv),
             token_totals: stream.token_totals.clone(),
             window: cli::window_of(&stream),
             context: stream.context.as_ref().map(|c| c.used),
@@ -325,18 +320,16 @@ impl Engine {
         self.stream_seen(id);
     }
 
-    fn settle_build(&mut self, job: &factory_types::state::Job, exit: Option<&factory_types::job::ExitRecord>) {
+    fn settle_build(&mut self, job: &mork_types::state::Job, exit: Option<&mork_types::job::ExitRecord>) {
         let ok = exit.is_some_and(|e| e.code == Some(0));
         let err = std::fs::read_to_string(self.job_dir(&job.id).err()).unwrap_or_default();
-        // The state keeps the build's error as Andrei reads it.
+        // The state keeps the build's error as the operator reads it.
         let result = builds::finish(&self.opts.home, &job.spec, ok, &err).map_err(|e| e.to_string());
         let commit = builds::commit_of(&job.spec);
         // Pinned before the end is applied: a crash between them pins it again, or finds it pinned (fac-19).
         let pinned = if result.is_ok() { self.update_pin(&commit) } else { None };
-        faults::hit("job.before-apply");
         let ended = Event::BuildEnded { id: job.id.clone(), commit, result, pinned };
-        self.apply_with(&ended, Some("job.mid-apply"));
-        faults::hit("job.after-apply");
+        self.apply(&ended);
         self.live.remove(&job.id);
     }
 
@@ -366,13 +359,12 @@ impl Engine {
     /// Stopping (1.4.5): the stop is in the state already; signal the supervisor, or, with
     /// none holding the lock, end the job's processes here.
     pub(super) fn stop_job(&mut self, id: &JobId) {
-        faults::hit("job.before-stop-signal");
         let dir = self.job_dir(id);
         if dir.lock_held()
             && let Ok(Some(claim)) = dir.claim()
             && procs::start_time(claim.pid) == Some(claim.start_time)
         {
-            let _ = factory_sys::kill(claim.pid, procs::libc_sig::TERM);
+            let _ = mork_sys::kill(claim.pid, procs::libc_sig::TERM);
             return;
         }
         // Not claimed yet: claim it here, so no supervisor ever starts it, and settle it.

@@ -1,9 +1,9 @@
 //! The window owns these controls (fac-35), so opening a forward never sends an agent command.
 
-use factory_types::config::TunnelConfig;
-use factory_types::web_tunnel::Status;
 use iced::widget::{Column, column, row};
 use iced::{Element, Length};
+use mork_types::config::TunnelConfig;
+use mork_types::web_tunnel::Status;
 
 use crate::app::{App, Effect, Message};
 use crate::spans::Tone;
@@ -44,7 +44,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
         app.settings.tunnels.iter().map(|(name, cfg)| tunnel_row(name, cfg, app.tunnels.get(name).unwrap_or(&CLOSED)));
     column![
         Column::with_children(rows).spacing(16),
-        txt("Tunnels close when Factory exits and open again when it starts.", Tone::Dim),
+        txt("Tunnels close when Mork exits and open again when it starts.", Tone::Dim),
     ]
     .spacing(16)
     .into()

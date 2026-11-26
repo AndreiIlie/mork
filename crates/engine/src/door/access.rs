@@ -1,9 +1,9 @@
-//! Andrei's access file (fac-86): only the engine reads it; nothing in it is followed or run. Its
+//! The operator's access file (fac-86): only the engine reads it; nothing in it is followed or run. Its
 //! errors never name a value (agents see them), and every secret-looking value is masked in door output.
 
 use std::path::Path;
 
-use factory_types::door_plan::Pair;
+use mork_types::door_plan::Pair;
 
 const MAX: u64 = 1024 * 1024;
 
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn fac86_an_access_file_others_can_read_is_refused() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("factory-test-access-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("mork-test-access-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("ACCESS.md");
         std::fs::write(&path, "[access:x]\nuser = a\npassword = SENTINEL-p\n").unwrap();

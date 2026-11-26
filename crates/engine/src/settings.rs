@@ -1,5 +1,5 @@
 //! Claude's settings file, `~/.claude/settings.json` (F-A3): its `env` block's telemetry
-//! variables, passed into every wall explicitly (1.4.8, Claude 5); and Andrei's output style (fac-596).
+//! variables, passed into every wall explicitly (1.4.8, Claude 5); and the operator's output style (fac-596).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -22,15 +22,15 @@ pub fn telemetry(text: &str) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// Reads them from Andrei's home; none when the file is missing.
+/// Reads them from the operator's home; none when the file is missing.
 pub fn read_telemetry(home: &Path) -> BTreeMap<String, String> {
     std::fs::read_to_string(home.join(".claude/settings.json")).map(|t| telemetry(&t)).unwrap_or_default()
 }
 
-/// Andrei's output style, `~/.claude/output-styles/andrei.md`, its front matter dropped: a planner's or foreman's
+/// The operator's output style, `~/.claude/output-styles/operator.md`, its front matter dropped: a planner's or foreman's
 /// system prompt carries it (fac-596). Why it can't be read, when it can't.
 pub fn read_style(home: &Path) -> Result<String, String> {
-    let path = home.join(".claude/output-styles/andrei.md");
+    let path = home.join(".claude/output-styles/operator.md");
     let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     let body = text.trim_start();
     let mut lines = body.split_inclusive('\n');

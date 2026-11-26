@@ -1,9 +1,9 @@
 //! Where a card stands in its merge queue (fac-68, fac-375): its place, its candidate, what is before it, and the
-//! commit it lands. Only the front lands; a company PR waiting for Andrei's approval is out of the queue (fac-98).
+//! commit it lands. Only the front lands; a company PR waiting for the operator's approval is out of the queue (fac-98).
 
-use factory_types::Sha;
-use factory_types::card::{Candidate, Card, Landing, Stage};
-use factory_types::work::Purpose;
+use mork_types::Sha;
+use mork_types::card::{Candidate, Card, Landing, Stage};
+use mork_types::work::Purpose;
 
 use crate::post::Poster;
 

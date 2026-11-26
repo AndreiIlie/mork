@@ -1,4 +1,4 @@
-//! `factory test --checks` (fac-165, fac-261): the gate's checks on the clone as it stands, from its
+//! `mork test --checks` (fac-165, fac-261): the gate's checks on the clone as it stands, from its
 //! branch point, uncommitted changes and new files included; nothing kept.
 
 use std::path::{Path, PathBuf};
@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use super::slot_client::{Link, fail, io_dir, lease, run_leased};
 use crate::runtime::locate::locate;
 
-/// `factory test --checks [paths…]`; its exit code. Paths are accepted and ignored: the gate checks
+/// `mork test --checks [paths…]`; its exit code. Paths are accepted and ignored: the gate checks
 /// the whole diff from the branch point.
 pub(super) fn run(mut link: Link, args: &[String], paths: &[String], own: &str) -> i32 {
     let root = match git(None, &["rev-parse", "--show-toplevel"]) {
@@ -32,7 +32,7 @@ pub(super) fn run(mut link: Link, args: &[String], paths: &[String], own: &str) 
         (Err(e), _) | (_, Err(e)) => return fail(&e, 2),
     };
     let extra = if dirty { ", with the uncommitted changes and new files" } else { "" };
-    println!("factory test --checks: the engine's checks stage on the whole committed diff, {fork}..{head}{extra}");
+    println!("mork test --checks: the project's checks command on the whole committed diff, {fork}..{head}{extra}");
     if !paths.is_empty() {
         println!("  the paths given are ignored: {}", paths.join(" "));
     }
@@ -78,7 +78,7 @@ fn checks_stage(mut link: Link, lease: &str, answer: &Value, root: &Path, fork: 
         .map(|f| locate(root, f["file"].as_str().unwrap_or_default(), f["line"].as_i64().unwrap_or(0)))
         .collect();
     // The gate's own judgement of the run (4.7.5); the folder's state was judged before it.
-    match factory_core::lifecycle::gates::report_verdict(Some(code), report.as_ref(), &located) {
+    match mork_core::lifecycle::gates::report_verdict(Some(code), report.as_ref(), &located) {
         Err(why) => fail(&format!("checks: the gate wouldn't trust this run: {why}"), 2),
         Ok(0) => 0,
         Ok(n) => {
@@ -107,10 +107,10 @@ fn print_findings(findings: &[Value]) {
 }
 
 // The gate's base: the branch point with the project's base as this clone last fetched it. A clone
-// with no `origin/<base>` (a review round's) has the fork the factory gave it.
+// with no `origin/<base>` (a review round's) has the fork Mork gave it.
 fn merge_base(root: &Path, base: &str, fork: Option<&str>) -> Result<String, String> {
     if base.is_empty() {
-        return Err("the factory named no base branch".into());
+        return Err("Mork named no base branch".into());
     }
     let tracked = format!("refs/remotes/origin/{base}");
     if git(Some(root), &["rev-parse", "--verify", "-q", &tracked]).is_err() {

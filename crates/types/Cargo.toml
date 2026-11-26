@@ -1,5 +1,5 @@
 [package]
-name = "factory-types"
+name = "mork-types"
 description = "Everything that crosses a boundary: commands, answers, views, job records, replies, the config."
 version.workspace = true
 edition.workspace = true

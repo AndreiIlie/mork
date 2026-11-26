@@ -1,4 +1,4 @@
-//! The images a seat's reply attaches (fac-278): each is read beneath its turn's `$FACTORY_IO` through no symlink and
+//! The images a seat's reply attaches (fac-278): each is read beneath its turn's `$MORK_IO` through no symlink and
 //! kept as a copy in the job's `published/`, outside every wall, so no path an agent pointed elsewhere is ever read.
 
 use std::collections::HashMap;
@@ -10,7 +10,7 @@ use serde_json::Value;
 /// The folder of a job's published copies, in its job folder, outside every wall.
 pub const FOLDER: &str = "published";
 
-/// Replaces each image the reply names with its copy, read beneath `io`, the job's `$FACTORY_IO`, or why it made
+/// Replaces each image the reply names with its copy, read beneath `io`, the job's `$MORK_IO`, or why it made
 /// none, trusting no path the agent wrote; a source named again is copied once, its result reused (fac-614).
 pub fn publish(jobs: &Path, job: &str, io: &Path, reply: &mut Value) {
     let mut n = 0usize;
@@ -56,12 +56,12 @@ fn copy_of(jobs: &Path, job: &str, io: &Path, src: &str, n: usize) -> io::Result
 // a regular file fail.
 fn read_in(io: &Path, src: &str) -> io::Result<(String, Vec<u8>)> {
     let refused = |why: &str| io::Error::new(io::ErrorKind::InvalidInput, why.to_owned());
-    let rel = Path::new(src).strip_prefix(io).map_err(|_| refused("not in your io/ folder, $FACTORY_IO"))?;
+    let rel = Path::new(src).strip_prefix(io).map_err(|_| refused("not in your io/ folder, $MORK_IO"))?;
     let name = match rel.file_name().and_then(|f| f.to_str()) {
         Some(name) if rel.components().all(|c| matches!(c, Component::Normal(_))) => name.to_owned(),
         _ => return Err(refused("not a plain path")),
     };
-    let mut file = factory_sys::open_beneath(io, rel)?;
+    let mut file = mork_sys::open_beneath(io, rel)?;
     if !file.metadata()?.is_file() {
         return Err(refused("not a regular file"));
     }
@@ -71,11 +71,11 @@ fn read_in(io: &Path, src: &str) -> io::Result<(String, Vec<u8>)> {
 }
 
 fn folder(jobs: &Path, job: &str) -> io::Result<PathBuf> {
-    factory_sys::mkdir_beneath(&jobs.join(job), Path::new(FOLDER))?;
+    mork_sys::mkdir_beneath(&jobs.join(job), Path::new(FOLDER))?;
     Ok(jobs.join(job).join(FOLDER))
 }
 
 fn write_copy(dir: &Path, copy: &str, bytes: &[u8]) -> io::Result<String> {
-    factory_sys::write_beneath(dir, Path::new(copy), bytes)?;
+    mork_sys::write_beneath(dir, Path::new(copy), bytes)?;
     Ok(dir.join(copy).display().to_string())
 }

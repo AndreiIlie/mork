@@ -4,29 +4,29 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use factory_core::decide::Event;
-use factory_types::Command;
-use factory_types::JobId;
-use factory_types::config::Config;
-use factory_types::protocol::{ErrorBody, ErrorCode, Request};
-use factory_types::state::{ORCHESTRATOR, Sender};
+use mork_core::decide::Event;
+use mork_types::Command;
+use mork_types::JobId;
+use mork_types::config::Config;
+use mork_types::protocol::{ErrorBody, ErrorCode, Request};
+use mork_types::state::{ORCHESTRATOR, Sender};
 use serde_json::{Value, json};
 
 use super::{Engine, Input, Phase};
 use crate::jobs::folder::JobDir;
 use crate::sockets::{Conn, Incoming};
-use crate::{builds, clock, faults};
+use crate::{builds, clock};
 
 fn err(code: ErrorCode, m: impl Into<String>) -> Result<Value, ErrorBody> {
     Err(ErrorBody::new(code, m))
 }
 
 // Work jobs need purpose attribution; agent turns carry their card only in their owner key (fac-280).
-fn job_card(j: &factory_types::state::Job) -> Option<&str> {
+fn job_card(j: &mork_types::state::Job) -> Option<&str> {
     j.purpose.as_ref().and_then(|p| p.card()).map(|c| c.as_str()).or_else(|| j.owner.as_str().split('/').next())
 }
 
-// Who a request counts as: its socket's sender, or a configured project's orchestrator on Andrei's
+// Who a request counts as: its socket's sender, or a configured project's orchestrator on the operator's
 // socket (fac-119, fac-244).
 fn sent_as(sent_as: Option<&str>, from: Option<Sender>, config: &Config) -> Result<Sender, ErrorBody> {
     let Some(from) = from else {
@@ -38,8 +38,8 @@ fn sent_as(sent_as: Option<&str>, from: Option<Sender>, config: &Config) -> Resu
         let words = format!("`as` is `{ORCHESTRATOR}<project>` or nothing, not `{name}`{gone}");
         return Err(ErrorBody::new(ErrorCode::Invalid, words));
     };
-    if from != Sender::Andrei {
-        let words = "`--as` is for Andrei's socket: an agent always sends as itself";
+    if from != Sender::Operator {
+        let words = "`--as` is for the operator's socket: an agent always sends as itself";
         return Err(ErrorBody::new(ErrorCode::Refused, words));
     }
     if !config.projects.contains_key(project) {
@@ -89,7 +89,7 @@ impl Engine {
         }
         // `buzz` runs on every command before any handler, the engine's own included (3.6.3,
         // M3.20): a buzzed one goes to `core`, which refuses it and journals the buzz.
-        if factory_core::decide::buzz::buzz(&self.state, &from, &cmd, self.ctx_now()).is_some() {
+        if mork_core::decide::buzz::buzz(&self.state, &from, &cmd, self.ctx_now()).is_some() {
             let d = self.apply(&Event::Command { from, cmd });
             return Some(d.answer.unwrap_or_else(|| err(ErrorCode::Buzz, "buzzed")));
         }
@@ -140,9 +140,14 @@ impl Engine {
 
     fn claude_account(&mut self, name: &str) -> Result<Value, ErrorBody> {
         let refused = |message| ErrorBody::new(ErrorCode::Refused, message);
-        let home = self.opts.home.agent_home();
-        let switch =
-            crate::claude_accounts::Switch::prepare(&home, name, &self.ctx.config.claude_accounts).map_err(refused)?;
+        let home = self.opts.home.login_home();
+        let switch = crate::claude_accounts::Switch::prepare(
+            &home,
+            &self.opts.home.logins(),
+            name,
+            &self.ctx.config.claude_accounts,
+        )
+        .map_err(refused)?;
         self.forget_claude_readings().map_err(refused)?;
         let result = switch.apply();
         self.views_cache.claude_accounts.reload(&home);
@@ -158,21 +163,22 @@ impl Engine {
             _ => return Ok(()),
         };
         let secrets = crate::secrets::Secrets::gather(&self.opts.home, &self.ctx.config, &self.ctx.telemetry);
-        super::act_bitbucket::check_words(&self.opts.home, &self.ctx.config, &secrets, text, "the reply on the PR")
-            .map_err(|failure| {
+        super::act_forge::check_words(&self.opts.home, &self.ctx.config, &secrets, text, "the reply on the PR").map_err(
+            |failure| {
                 let (code, words) = match failure {
-                    factory_types::work::ActionFailure::Leak { words } => (ErrorCode::Leak, words),
-                    factory_types::work::ActionFailure::Internals { words } => (ErrorCode::Internals, words),
+                    mork_types::work::ActionFailure::Leak { words } => (ErrorCode::Leak, words),
+                    mork_types::work::ActionFailure::Internals { words } => (ErrorCode::Internals, words),
                     other => (ErrorCode::Refused, format!("{other:?}")),
                 };
                 ErrorBody::new(code, format!("Reword the reply: {words}; nothing was recorded."))
-            })
+            },
+        )
     }
 
     fn forget_claude_readings(&mut self) -> Result<(), String> {
         for job in self.state.jobs.values().filter(|job| {
             job.settled.is_none()
-                && job.kind == factory_types::job::JobKind::Turn
+                && job.kind == mork_types::job::JobKind::Turn
                 && job.spec.argv.first().map(String::as_str) == Some("claude")
         }) {
             JobDir::new(self.opts.home.job(job.id.as_str()))
@@ -188,7 +194,7 @@ impl Engine {
 
     pub(super) fn align_claude_readings(&mut self) {
         let active = self.views_cache.claude_accounts.live.as_ref().map(|a| &a.id);
-        for live in self.live.values_mut().filter(|live| live.cli == Some(factory_types::config::Cli::Claude)) {
+        for live in self.live.values_mut().filter(|live| live.cli == Some(mork_types::config::Cli::Claude)) {
             if live.stream.account.as_ref().map(|a| &a.id) != active {
                 live.stream.account = None;
                 live.stream.limits.clear();
@@ -224,7 +230,7 @@ impl Engine {
     }
 
     fn status(&self, jobs: Option<bool>, all: Option<bool>, card: Option<&str>) -> Value {
-        let lines = factory_core::views::status::status_lines(&self.state);
+        let lines = mork_core::views::status::status_lines(&self.state);
         let mut status = json!({"lines": lines, "revision": self.state.revision});
         if jobs.unwrap_or(false) {
             status["jobs"] = json!(self.status_jobs(all.unwrap_or(false), card));
@@ -268,7 +274,7 @@ impl Engine {
     pub(super) fn start_build(
         &mut self,
         commit: &str,
-        purpose: Option<&factory_types::work::Purpose>,
+        purpose: Option<&mork_types::work::Purpose>,
     ) -> Result<Value, ErrorBody> {
         let spec =
             builds::prepare(&self.ctx, commit, clock::now_ms()).map_err(|e| ErrorBody::new(ErrorCode::Refused, e))?;
@@ -314,14 +320,13 @@ impl Engine {
         if let Err(e) = builds::check_shortcut() {
             return err(ErrorCode::Refused, e.to_string());
         }
-        let hold = faults::test_env("FACTORY_TEST_RELOAD_HOLD_MS").and_then(|v| v.parse().ok()).unwrap_or(0);
         let id = crate::random::uuid();
         // A tenth of a second at least before the exec, for the watchers' writers to send this
         // answer and the views that show the reload (5.1.3, M4.14).
         self.phase = Phase::Reloading {
             target: full.clone(),
             id: id.clone(),
-            at: clock::instant() + Duration::from_millis(hold.max(100)),
+            at: clock::instant() + Duration::from_millis(100),
             who: from.label(),
         };
         self.publish();

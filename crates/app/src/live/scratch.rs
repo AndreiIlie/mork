@@ -1,4 +1,4 @@
-// Everything lives under the temporary folder, so the check never touches Andrei's own factory (1.11).
+// Everything lives under the temporary folder, so the check never touches the operator's own mork (1.11).
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
@@ -6,10 +6,10 @@ use std::path::{Path, PathBuf};
 use std::process::Child;
 use std::time::Duration;
 
-use factory_core::state::State;
-use factory_engine::jobs::launch;
-use factory_engine::paths::Home;
-use factory_types::config::{Cli, Effort, SOL};
+use mork_core::state::State;
+use mork_engine::jobs::launch;
+use mork_engine::paths::Home;
+use mork_types::config::{Cli, Effort, SOL};
 use serde_json::{Value, json};
 
 const SHORT: Duration = Duration::from_secs(30);
@@ -31,7 +31,7 @@ impl Scratch {
         let root = root_in(&std::env::temp_dir())?;
         let home = Home::new(root.join("home"));
         let mut s = Self {
-            config: root.join("factory.toml"),
+            config: root.join("mork.toml"),
             root,
             home,
             bin: bin.to_owned(),
@@ -60,7 +60,7 @@ impl Scratch {
             .map_err(|e| e.to_string())?;
         }
         s.repo()?;
-        s.logins = super::logins::Logins::copy_in(&real.agent_home(), &s.home.agent_home())?;
+        s.logins = super::logins::Logins::copy_in(real, &s.home)?;
         s.foreman_walled(true)?;
         Ok(s)
     }
@@ -89,7 +89,7 @@ impl Scratch {
     }
 
     fn config_text(&self, foreman_walled: bool) -> Result<String, String> {
-        let real: toml::Table = factory_engine::config::path()
+        let real: toml::Table = mork_engine::config::path()
             .and_then(|p| std::fs::read_to_string(p).ok())
             .and_then(|t| toml::from_str(&t).ok())
             .unwrap_or_default();
@@ -100,43 +100,43 @@ impl Scratch {
         &self.config
     }
 
-    /// Starts the factory (`--no-window`) and waits for it to be ready.
+    /// Starts Mork (`--no-window`) and waits for it to be ready.
     pub fn start(&mut self) -> Result<(), String> {
         let env = vec![
-            ("FACTORY_HOME".to_owned(), self.home.root().display().to_string()),
-            ("FACTORY_CONFIG".to_owned(), self.config.display().to_string()),
+            ("MORK_HOME".to_owned(), self.home.root().display().to_string()),
+            ("MORK_CONFIG".to_owned(), self.config.display().to_string()),
         ];
         let argv = vec![self.bin.display().to_string(), "--no-window".into()];
-        let log = self.root.join("factory.log");
+        let log = self.root.join("mork.log");
         self.app = Some(launch::child(self.home.root(), &argv, &env, &log).map_err(|e| e.to_string())?);
-        let start = factory_engine::clock::instant();
-        while factory_engine::clock::elapsed(start) < Duration::from_secs(120) && !interrupted() {
+        let start = mork_engine::clock::instant();
+        while mork_engine::clock::elapsed(start) < Duration::from_secs(120) && !interrupted() {
             if self.ask(&json!({"status": {}})).is_ok() {
                 return Ok(());
             }
             if self.app.as_mut().is_some_and(|c| c.try_wait().ok().flatten().is_some()) {
                 return Err(format!("it exited: {}", tail(&log)));
             }
-            factory_engine::clock::sleep(Duration::from_millis(300));
+            mork_engine::clock::sleep(Duration::from_millis(300));
         }
         Err(format!("not ready in 2 minutes: {}", tail(&log)))
     }
 
-    /// Ends the factory cleanly and starts it again, its config read anew.
+    /// Ends Mork cleanly and starts it again, its config read anew.
     pub fn restart(&mut self) -> Result<(), String> {
         self.end_app();
         self.start()
     }
 
-    /// Kills the factory with SIGKILL, as a crash would.
+    /// Kills Mork with SIGKILL, as a crash would.
     pub fn kill(&mut self) {
         if let Some(mut c) = self.app.take() {
-            let _ = factory_sys::kill(i32::try_from(c.id()).unwrap_or(0), 9);
+            let _ = mork_sys::kill(i32::try_from(c.id()).unwrap_or(0), 9);
             let _ = c.wait();
         }
     }
 
-    /// Ends the check on any path (M5.18): jobs stopped, factory ended with SIGTERM; the folder is removed
+    /// Ends the check on any path (M5.18): jobs stopped, mork ended with SIGTERM; the folder is removed
     /// only once no job runs, else it is kept and why is said.
     pub fn end(&mut self) -> Result<(), String> {
         if self.ended {
@@ -160,16 +160,16 @@ impl Scratch {
         let unsettled = |s: &Self| {
             s.state().map(|st| st.jobs.into_values().filter(|j| j.settled.is_none()).collect()).unwrap_or_default()
         };
-        let jobs: Vec<factory_types::state::Job> = unsettled(self);
+        let jobs: Vec<mork_types::state::Job> = unsettled(self);
         if jobs.is_empty() || self.app.is_none() {
             return;
         }
         for j in &jobs {
             let _ = self.ask(&json!({"stop": {"agent": j.owner.as_str()}}));
         }
-        let start = factory_engine::clock::instant();
-        while !unsettled(self).is_empty() && factory_engine::clock::elapsed(start) < Duration::from_secs(30) {
-            factory_engine::clock::sleep(Duration::from_millis(300));
+        let start = mork_engine::clock::instant();
+        while !unsettled(self).is_empty() && mork_engine::clock::elapsed(start) < Duration::from_secs(30) {
+            mork_engine::clock::sleep(Duration::from_millis(300));
         }
     }
 
@@ -178,27 +178,27 @@ impl Scratch {
     fn supervisors_down(&self) -> Vec<i32> {
         let first = self.recorded_alive();
         for p in &first {
-            let _ = factory_sys::kill(*p, 15);
+            let _ = mork_sys::kill(*p, 15);
         }
-        let start = factory_engine::clock::instant();
-        while !self.recorded_alive().is_empty() && factory_engine::clock::elapsed(start) < Duration::from_secs(10) {
-            factory_engine::clock::sleep(Duration::from_millis(200));
+        let start = mork_engine::clock::instant();
+        while !self.recorded_alive().is_empty() && mork_engine::clock::elapsed(start) < Duration::from_secs(10) {
+            mork_engine::clock::sleep(Duration::from_millis(200));
         }
         for p in self.recorded_alive() {
-            let _ = factory_sys::kill(p, 9);
+            let _ = mork_sys::kill(p, 9);
         }
-        factory_engine::clock::sleep(Duration::from_millis(500));
+        mork_engine::clock::sleep(Duration::from_millis(500));
         self.recorded_alive()
     }
 
     // Only the processes their records name: a pid reused since is someone else's. A zombie has
     // ended, though its start time stays: unwalled, a subreaper ancestor may never reap it (fac-131).
     fn recorded_alive(&self) -> Vec<i32> {
-        use factory_engine::jobs::procs::{boot_id, start_time};
+        use mork_engine::jobs::procs::{boot_id, start_time};
         let boot = boot_id();
         let dirs = std::fs::read_dir(self.home.jobs()).into_iter().flatten().flatten();
         dirs.flat_map(|e| {
-            let d = factory_engine::jobs::folder::JobDir::new(e.path());
+            let d = mork_engine::jobs::folder::JobDir::new(e.path());
             let claim = d.claim().ok().flatten().filter(|c| c.boot_id == boot);
             let run = claim.as_ref().and_then(|_| d.run().ok().flatten());
             let recorded = [
@@ -217,21 +217,20 @@ impl Scratch {
 
     fn end_app(&mut self) {
         if let Some(mut c) = self.app.take() {
-            let _ = factory_sys::kill(i32::try_from(c.id()).unwrap_or(0), 15);
-            let start = factory_engine::clock::instant();
-            while c.try_wait().ok().flatten().is_none()
-                && factory_engine::clock::elapsed(start) < Duration::from_secs(10)
+            let _ = mork_sys::kill(i32::try_from(c.id()).unwrap_or(0), 15);
+            let start = mork_engine::clock::instant();
+            while c.try_wait().ok().flatten().is_none() && mork_engine::clock::elapsed(start) < Duration::from_secs(10)
             {
-                factory_engine::clock::sleep(Duration::from_millis(100));
+                mork_engine::clock::sleep(Duration::from_millis(100));
             }
             let _ = c.kill();
             let _ = c.wait();
         }
     }
 
-    /// One command over `factory.sock`: its answer, or the refusal's words.
+    /// One command over `mork.sock`: its answer, or the refusal's words.
     pub fn ask(&self, cmd: &Value) -> Result<Value, String> {
-        let mut stream = UnixStream::connect(self.home.factory_sock()).map_err(|e| e.to_string())?;
+        let mut stream = UnixStream::connect(self.home.mork_sock()).map_err(|e| e.to_string())?;
         stream.set_read_timeout(Some(SHORT)).map_err(|e| e.to_string())?;
         let mut reader = BufReader::new(stream.try_clone().map_err(|e| e.to_string())?);
         stream.write_all(format!("{}\n", json!({"id": 1, "cmd": cmd})).as_bytes()).map_err(|e| e.to_string())?;
@@ -250,14 +249,14 @@ impl Scratch {
         }
     }
 
-    /// The scratch factory's state, when it can be read now.
+    /// The scratch mork's state, when it can be read now.
     pub fn state(&self) -> Option<State> {
-        factory_engine::store::Store::open_read_only(&self.home.root().join("state.db")).ok()?.load().ok()
+        mork_engine::store::Store::open_read_only(&self.home.root().join("state.db")).ok()?.load().ok()
     }
 
     /// The journal's lines of a kind, with their data.
     pub fn events(&self, kind: &str) -> Vec<Value> {
-        let Ok(store) = factory_engine::store::Store::open_read_only(&self.home.root().join("state.db")) else {
+        let Ok(store) = mork_engine::store::Store::open_read_only(&self.home.root().join("state.db")) else {
             return Vec::new();
         };
         store.events().unwrap_or_default().into_iter().filter(|e| e.2 == kind).map(|e| e.3).collect()
@@ -278,7 +277,7 @@ pub fn alive(pid: i32) -> bool {
 /// Whether SIGINT or SIGTERM asked the check to end: it stops where it is, and its clean-up
 /// runs (M5.28).
 pub fn interrupted() -> bool {
-    factory_sys::term_requested()
+    mork_sys::term_requested()
 }
 
 /// The scratch board's card: a report card, its foreman the check's Codex turn (fac-25).
@@ -297,7 +296,7 @@ const CLAUDE_FIRST: &str = "Report one line: ready.";
 fn card(id: &str, title: &str, work: &str) -> String {
     let (upper, title) = (id.to_uppercase(), title.replace('-', " ").replace("checks", "check's"));
     format!(
-        "---\nid: {upper}\ntitle: {title}\nstatus: Backlog\nassignee: []\ncreated_date: '2026-10-17 00:00'\nlabels: []\ndependencies: []\npriority: p3\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nThe factory's live check. {work} Nothing else is asked.\n<!-- SECTION:DESCRIPTION:END -->\n"
+        "---\nid: {upper}\ntitle: {title}\nstatus: Backlog\nassignee: []\ncreated_date: '2026-10-17 00:00'\nlabels: []\ndependencies: []\npriority: p3\n---\n\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\nMork's live check. {work} Nothing else is asked.\n<!-- SECTION:DESCRIPTION:END -->\n"
     )
 }
 
@@ -305,7 +304,7 @@ fn card(id: &str, title: &str, work: &str) -> String {
 // (fac-131).
 pub(crate) fn root_in(base: &Path) -> Result<PathBuf, String> {
     loop {
-        let root = base.join(format!("live-{}", &factory_engine::random::uuid()[..6]));
+        let root = base.join(format!("live-{}", &mork_engine::random::uuid()[..6]));
         match std::fs::create_dir(&root) {
             Ok(()) => return Ok(root),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
@@ -320,18 +319,18 @@ fn tail(log: &Path) -> String {
     lines[lines.len().saturating_sub(5)..].join(" | ")
 }
 
-// The scratch config: the real one's toolchains, `[factory] env`, `[git]` and seats, so the
-// real CLIs are reached as the real factory reaches them.
+// The scratch config: the real one's toolchains, `[mork] env`, `[git]` and seats, so the
+// real CLIs are reached as the real mork reaches them.
 fn scratch_config(real: &toml::Table, root: &Path, foreman_walled: bool) -> Result<String, String> {
-    let mut factory = toml::Table::new();
-    factory.insert("project".into(), "live".into());
+    let mut mork = toml::Table::new();
+    mork.insert("project".into(), "live".into());
     for key in ["toolchains", "env"] {
-        if let Some(v) = real.get("factory").and_then(|f| f.get(key)) {
-            factory.insert(key.into(), v.clone());
+        if let Some(v) = real.get("mork").and_then(|f| f.get(key)) {
+            mork.insert(key.into(), v.clone());
         }
     }
     let mut out = toml::Table::new();
-    out.insert("factory".into(), factory.into());
+    out.insert("mork".into(), mork.into());
     let git = real.get("git").cloned().unwrap_or_else(|| {
         toml::Value::Table(toml::Table::from_iter([("author".to_owned(), "Live Check <live@example.invalid>".into())]))
     });
@@ -350,7 +349,11 @@ fn scratch_config(real: &toml::Table, root: &Path, foreman_walled: bool) -> Resu
     out.insert("seats".into(), seats.into());
     let mut live = toml::Table::new();
     live.insert("repo".into(), root.join("repo").display().to_string().into());
-    live.insert("board".into(), root.join("board").display().to_string().into());
+    let board = toml::Table::from_iter([
+        ("kind".into(), "markdown".into()),
+        ("path".into(), root.join("board").display().to_string().into()),
+    ]);
+    live.insert("board".into(), board.into());
     live.insert("test".into(), "true".into());
     out.insert("projects".into(), toml::Value::Table(toml::Table::from_iter([("live".to_owned(), live.into())])));
     toml::to_string(&out).map_err(|e| e.to_string())

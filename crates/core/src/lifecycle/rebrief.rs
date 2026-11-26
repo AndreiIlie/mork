@@ -1,10 +1,10 @@
-//! `brief <card> [words]` (fac-638): an approved full card sent back to brief in the same run by Andrei or its own
+//! `brief <card> [words]` (fac-638): an approved full card sent back to brief in the same run by the operator or its own
 //! foreman, its whole submission withdrawn and its build held until its new plan's approve.
 
-use factory_types::CardId;
-use factory_types::card::{Card, Mode};
-use factory_types::reply::Role;
-use factory_types::state::{Agent, AgentStatus, Job, Owed, Sender};
+use mork_types::CardId;
+use mork_types::card::{Card, Mode};
+use mork_types::reply::Role;
+use mork_types::state::{Agent, AgentStatus, Job, Owed, Sender};
 use serde_json::json;
 
 use super::reopen::Back;
@@ -122,7 +122,7 @@ fn discard(state: &State, a: &mut Agent) {
 // The request to the specification's holder, in its own room: the planner's, or a no-planner card's foreman's.
 fn ask(p: &mut Poster<'_>, c: &Card, from: &Sender, words: Option<&str>) -> u64 {
     let id = &c.id;
-    let who = if *from == Sender::Andrei { "Andrei" } else { "its foreman" };
+    let who = if *from == Sender::Operator { "the operator" } else { "its foreman" };
     let said = words.map(|w| format!("\n\nThe words it was sent back with:\n\n{w}")).unwrap_or_default();
     let next = if c.no_planner {
         "Once nothing needs clarifying, recap it as at its first brief and end `brief-ready`: it is offered at once."

@@ -1,12 +1,12 @@
 //! Door reads whose outcome is unclear (fac-184): settled `failed`, never held, and a query that may still
 //! run on its server refuses the same one until its kill is taken or its time limit has passed.
 
-use factory_types::ActionId;
-use factory_types::action::{Action, ActionWhat};
-use factory_types::door::{CUT, NEVER_BLIND, is_read, status};
-use factory_types::door_call::DoorCall;
-use factory_types::door_plan::Session;
-use factory_types::state::{MessageKind, Sender};
+use mork_types::ActionId;
+use mork_types::action::{Action, ActionWhat};
+use mork_types::door::{CUT, NEVER_BLIND, is_read, status};
+use mork_types::door_call::DoorCall;
+use mork_types::door_plan::Session;
+use mork_types::state::{MessageKind, Sender};
 use serde_json::{Value, json};
 
 use super::parts;
@@ -49,7 +49,7 @@ pub fn running(state: &State, call: &DoorCall, now: i64) -> Option<(ActionId, Se
 }
 
 /// A cut read whose server didn't take the kill of its query: it may still run there, on `s`. The
-/// same query is refused until it has ended, and Andrei is told once, with nothing to answer.
+/// same query is refused until it has ended, and the operator is told once, with nothing to answer.
 pub fn unstopped(p: &mut Poster<'_>, a: &mut Action, s: Session) {
     let ActionWhat::Door(call) = &a.what else { return };
     let call = call.clone();
@@ -63,7 +63,7 @@ pub fn unstopped(p: &mut Poster<'_>, a: &mut Action, s: Session) {
         "{}: connection {} didn't take the kill of a read's query, which may still run there: {query}",
         call.target, s.session
     );
-    p.post(MAIN, Sender::Engine, Some("andrei"), MessageKind::Engine, "", &text);
+    p.post(MAIN, Sender::Engine, Some("operator"), MessageKind::Engine, "", &text);
     p.journal(
         "door.unstopped",
         call.card.as_ref().map(|c| c.as_str()),

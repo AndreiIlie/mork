@@ -3,11 +3,11 @@
 
 use std::fmt::Write as _;
 
-use factory_types::CardId;
-use factory_types::card::{Card, Mode};
-use factory_types::reply::{Outcome, Reply, Role};
-use factory_types::review::{FindingState, Raised, ReportedFinding, Review, ReviewerVerdict, Round, Verdict};
-use factory_types::state::Agent;
+use mork_types::CardId;
+use mork_types::card::{Card, Mode};
+use mork_types::reply::{Outcome, Reply, Role};
+use mork_types::review::{FindingState, Raised, ReportedFinding, Review, ReviewerVerdict, Round, Verdict};
+use mork_types::state::Agent;
 
 use super::findings::at;
 use crate::post::Poster;
@@ -50,7 +50,7 @@ pub(crate) fn for_reviewer(rc: &Card, a: &Agent) -> String {
         return String::new();
     }
     let mut out = String::from(
-        "\n## Your earlier rounds\n\nWhat the factory recorded of your earlier rounds on this card, and what became of findings kept under your name:\n",
+        "\n## Your earlier rounds\n\nWhat Mork recorded of your earlier rounds on this card, and what became of findings kept under your name:\n",
     );
     for (r, v, kept) in entries {
         write_round(&mut out, review, r, v, &kept);
@@ -145,7 +145,7 @@ pub(super) fn kept_reviewers(state: &State, rc: &Card, n: u32) -> String {
         return String::new();
     }
     let mut out = String::from(
-        "\n\nKept reviewers from earlier rounds (each is also told its own earlier verdict and findings by the factory):",
+        "\n\nKept reviewers from earlier rounds (each is also told its own earlier verdict and findings by Mork):",
     );
     for a in kept {
         let name = a.key.as_str().rsplit('/').next().unwrap_or_default();

@@ -1,5 +1,5 @@
 //! Strict engine-only target configuration, with credential references instead of secret values.
-//! Targets use Andrei's own access (fac-1, fac-86, fac-124).
+//! Targets use the operator's own access (fac-1, fac-86, fac-124).
 
 use std::collections::BTreeMap;
 
@@ -11,7 +11,7 @@ pub const TARGETS_VERSION: u32 = 2;
 #[serde(deny_unknown_fields)]
 pub struct TargetsFile {
     pub version: u32,
-    /// Andrei's access file, an absolute path: the `[access:<name>]` sections credentials are
+    /// The operator's access file, an absolute path: the `[access:<name>]` sections credentials are
     /// read from, by the engine alone, as a call is dispatched.
     #[serde(default)]
     pub access: Option<String>,
@@ -81,7 +81,7 @@ impl Limits {
 pub enum Transport {
     /// On this machine.
     Local,
-    /// Through Andrei's own ssh alias, as its login: commands run there with the box's own tools,
+    /// Through the operator's own ssh alias, as its login: commands run there with the box's own tools,
     /// services are reached through a forward of that connection.
     Ssh,
 }
@@ -105,13 +105,13 @@ pub struct Target {
     pub file: Option<Files>,
     #[serde(default)]
     pub sh: BTreeMap<String, ShCommand>,
-    /// The misc door: any command over the target's alias, which Andrei approves each time.
+    /// The misc door: any command over the target's alias, which the operator approves each time.
     #[serde(default)]
     pub misc: bool,
 }
 
-/// `[targets.<id>.ssh]`: one of Andrei's own ssh aliases. Its host, login and keys are his ssh
-/// configuration's; the Factory names none of them.
+/// `[targets.<id>.ssh]`: one of the operator's own ssh aliases. Its host, login and keys are his ssh
+/// configuration's; Mork names none of them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Ssh {
@@ -153,7 +153,7 @@ pub struct Sql {
     #[serde(default = "d_mysql")]
     pub port: u16,
     pub database: String,
-    /// Andrei's declaration that this SQL server refuses writes (fac-92): only the target's own
+    /// The operator's declaration that this SQL server refuses writes (fac-92): only the target's own
     /// `limits.max_rows` caps its rows, and its `timeout_ms` may pass the default.
     #[serde(default)]
     pub read_only: bool,

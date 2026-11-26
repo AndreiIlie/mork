@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_types::view::{HandView, PlaceKind, RoomRow, Screen};
+use mork_types::view::{HandView, PlaceKind, RoomRow, Screen};
 
 /// A line of the rooms column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

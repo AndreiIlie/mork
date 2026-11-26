@@ -6,11 +6,11 @@ use std::os::unix::net::{SocketAddr, UnixListener};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use factory_engine::jobs::context::Context;
-use factory_engine::jobs::{folder, launch};
-use factory_engine::paths::Home;
-use factory_types::job::{JobKind, WallMode};
-use factory_types::{AgentKey, JobId};
+use mork_engine::jobs::context::Context;
+use mork_engine::jobs::{folder, launch};
+use mork_engine::paths::Home;
+use mork_types::job::{JobKind, WallMode};
+use mork_types::{AgentKey, JobId};
 use serde_json::Value;
 
 use super::Report;
@@ -33,7 +33,7 @@ impl Planted {
         let secret = s.root.join("outside/dummy-secret.txt");
         std::fs::create_dir_all(s.root.join("outside")).map_err(|e| e.to_string())?;
         std::fs::write(&secret, "dummy-live-check-secret-4b1d\n").map_err(|e| e.to_string())?;
-        let abstract_name = format!("factory-live-{}", std::process::id());
+        let abstract_name = format!("mork-live-{}", std::process::id());
         let addr = SocketAddr::from_abstract_name(abstract_name.as_bytes()).map_err(|e| e.to_string())?;
         let abstract_listener = UnixListener::bind_addr(&addr).map_err(|e| e.to_string())?;
         let tcp = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
@@ -42,10 +42,10 @@ impl Planted {
 }
 
 fn crash() -> Result<(PathBuf, UnixListener), String> {
-    let dir = factory_engine::faults::test_env("FACTORY_TEST_CRASH_DIR").unwrap_or_else(|| "/var/crash".into());
-    let path = Path::new(&dir).join(format!("factory-live-{}.sock", std::process::id()));
+    let dir = mork_engine::faults::test_env("MORK_TEST_CRASH_DIR").unwrap_or_else(|| "/var/crash".into());
+    let path = Path::new(&dir).join(format!("mork-live-{}.sock", std::process::id()));
     let l = UnixListener::bind(&path).map_err(|e| format!("{} can't be made: {e}", path.display()))?;
-    if let Err(e) = factory_sys::chmod(&path, 0o777) {
+    if let Err(e) = mork_sys::chmod(&path, 0o777) {
         let _ = std::fs::remove_file(&path);
         return Err(format!("{} can't be made world-writable: {e}", path.display()));
     }
@@ -74,9 +74,9 @@ pub fn run(s: &Scratch, real: &Home, bin: &Path, report: &mut Report) {
 }
 
 fn spec_of(s: &Scratch, real: &Home, planted: &Planted) -> Spec {
-    let config = factory_engine::config::path().map(|p| p.display().to_string());
+    let config = mork_engine::config::path().map(|p| p.display().to_string());
     let token = |name: &str| {
-        std::env::var_os("HOME").map(|h| Path::new(&h).join(".config/factory").join(name).display().to_string())
+        std::env::var_os("HOME").map(|h| Path::new(&h).join(".config/mork").join(name).display().to_string())
     };
     let secrets = [
         Some(planted.secret.display().to_string()),
@@ -90,8 +90,8 @@ fn spec_of(s: &Scratch, real: &Home, planted: &Planted) -> Spec {
     Spec {
         secrets: secrets.into_iter().flatten().collect(),
         absent: vec![
-            s.home.factory_sock().display().to_string(),
-            real.factory_sock().display().to_string(),
+            s.home.mork_sock().display().to_string(),
+            real.mork_sock().display().to_string(),
             "/run/dbus/system_bus_socket".into(),
             format!("{runtime}/bus"),
         ],
@@ -104,10 +104,10 @@ fn spec_of(s: &Scratch, real: &Home, planted: &Planted) -> Spec {
 
 // Walled as an agent's turn is, so it sees what a turn would.
 fn probe(s: &Scratch, bin: &Path, spec: &Spec) -> Result<Value, String> {
-    let id = format!("{}-main-live-probe", factory_engine::clock::now_ms());
+    let id = format!("{}-main-live-probe", mork_engine::clock::now_ms());
     let io = s.home.job(&id).join("io");
     // The wall a turn gets: `Context::places`, with the scratch config's toolchains (M5.19).
-    let config = factory_engine::config::read(s.config_path()).map_err(|e| e.to_string())?;
+    let config = mork_engine::config::read(s.config_path()).map_err(|e| e.to_string())?;
     let ctx = Context::new(s.home.clone(), config, bin.to_owned(), Default::default());
     let places = ctx.places(&io, Vec::new(), Vec::new(), None, &[])?;
     let (id, owner) = (JobId::new(&id), AgentKey::new("main/live-probe"));
@@ -115,23 +115,23 @@ fn probe(s: &Scratch, bin: &Path, spec: &Spec) -> Result<Value, String> {
     let argv =
         vec![bin.display().to_string(), "live-probe".into(), serde_json::to_string(spec).map_err(|e| e.to_string())?];
     let agent_home = s.home.agent_home().display().to_string();
-    let now = factory_engine::clock::now_ms();
+    let now = mork_engine::clock::now_ms();
     let job = ctx.spec(&id, JobKind::Turn, &owner, argv, &agent_home, &places, env, Some(vec![443, 80, 53]), now);
     if job.wall != WallMode::Full {
         return Err("the walls are off in this build".into());
     }
     let new = folder::NewFolder { spec: &job, stdin: b"", io_files: &[] };
     let dir = folder::write(&s.home.root().join("jobs"), &new).map_err(|e| e.to_string())?;
-    launch::start_supervisor(bin, &dir.dir, s.home.root(), false).map_err(|e| e.to_string())?;
-    let start = factory_engine::clock::instant();
+    launch::start_supervisor(bin, &dir.dir, s.home.root()).map_err(|e| e.to_string())?;
+    let start = mork_engine::clock::instant();
     while dir.exit().ok().flatten().is_none() {
         if super::scratch::interrupted() {
             return Err("interrupted".into());
         }
-        if factory_engine::clock::elapsed(start) > Duration::from_secs(120) {
+        if mork_engine::clock::elapsed(start) > Duration::from_secs(120) {
             return Err("the probe didn't end in 2 minutes".into());
         }
-        factory_engine::clock::sleep(Duration::from_millis(200));
+        mork_engine::clock::sleep(Duration::from_millis(200));
     }
     let out = std::fs::read_to_string(dir.out()).unwrap_or_default();
     out.lines()
@@ -152,7 +152,7 @@ fn judge(seen: &Value, planted: &Planted, s: &Scratch, report: &mut Report) {
         None => Err("not reported".to_owned()),
     };
     report.check("inside the wall, no planted secret is readable", none("readable"));
-    report.check("inside the wall, factory.sock and D-Bus are absent", none("present"));
+    report.check("inside the wall, mork.sock and D-Bus are absent", none("present"));
     let host = if seen["host_proc"] == false { Ok(()) } else { Err("the host's processes are visible".to_owned()) };
     report.check("inside the wall, the host's /proc is absent", host);
     report.check("inside the wall, Xwayland's and a planted abstract socket are refused", none("abstract"));

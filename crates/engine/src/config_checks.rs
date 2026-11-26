@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::config::Config;
+use mork_types::config::Config;
 
 use crate::config::{ConfigError, key_line, table_line};
 
@@ -24,11 +24,11 @@ fn web_url(s: &str) -> bool {
 }
 
 fn check_skills(text: &str, config: &Config) -> Result<(), ConfigError> {
-    let Some(skills) = config.factory.skills.as_deref() else { return Ok(()) };
+    let Some(skills) = config.mork.skills.as_deref() else { return Ok(()) };
     let ok = skills.starts_with('/') && skills.split('/').all(|c| c != "." && c != "..");
     if !ok {
         return Err(ConfigError::Value {
-            line: key_line(text, Some("factory"), "skills"),
+            line: key_line(text, Some("mork"), "skills"),
             message: "`skills` must be an absolute path with no `.` or `..` component".into(),
         });
     }
@@ -59,20 +59,26 @@ fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError>
 
 fn check_projects(text: &str, config: &Config) -> Result<(), ConfigError> {
     for (name, p) in &config.projects {
-        if let Some(tag) = &p.review_tag
+        if let mork_types::config::ForgeConfig::Bitbucket { review_tag: Some(tag), .. } = &p.forge
             && tag.trim().is_empty()
         {
             return Err(ConfigError::Value {
-                line: key_line(text, Some(&format!("projects.{name}")), "review_tag"),
+                line: key_line(text, Some(&format!("projects.{name}.forge")), "review_tag"),
                 message: format!("project `{name}` `review_tag` must not be empty"),
             });
         }
         if let Some(t) = &p.tickets {
             let table = format!("projects.{name}.tickets");
-            let api_ok = t.api.starts_with("https://")
-                && t.api.len() > "https://".len()
-                && !t.api.ends_with('/')
-                && !has_ws_or_ctrl(&t.api);
+            if !std::path::Path::new(t.token()).is_absolute() {
+                return Err(ConfigError::Value {
+                    line: key_line(text, Some(&table), "token"),
+                    message: format!("project {name} tickets.token must be an absolute path"),
+                });
+            }
+            let api_ok = t.api().starts_with("https://")
+                && t.api().len() > "https://".len()
+                && !t.api().ends_with('/')
+                && !has_ws_or_ctrl(t.api());
             if !api_ok {
                 return Err(ConfigError::Value {
                     line: key_line(text, Some(&table), "api"),
@@ -81,7 +87,7 @@ fn check_projects(text: &str, config: &Config) -> Result<(), ConfigError> {
                     ),
                 });
             }
-            if !web_url(&t.page) {
+            if !web_url(t.page()) {
                 return Err(ConfigError::Value {
                     line: key_line(text, Some(&table), "page"),
                     message: format!(
@@ -136,6 +142,32 @@ fn check_tunnels(text: &str, config: &Config) -> Result<(), ConfigError> {
                 message: format!("tunnel `{name}` `url` must be an `http://` or `https://` URL with no whitespace"),
             });
         }
+    }
+    Ok(())
+}
+
+pub(crate) fn caches(text: &str, config: &mut mork_types::config::MorkConfig) -> Result<(), ConfigError> {
+    use std::path::Path;
+    let folders = &config.caches;
+    for (key, entries) in [("caches", folders), ("cache_files", &config.cache_files)] {
+        for name in entries {
+            let invalid = name.split('/').any(|p| matches!(p, "" | "." | "..") || p.contains('\0'));
+            let under_file =
+                Path::new(name).ancestors().skip(1).any(|p| config.cache_files.iter().any(|f| Path::new(f) == p));
+            if invalid || under_file || (key == "cache_files" && folders.contains(name)) {
+                return Err(ConfigError::Value {
+                    line: key_line(text, Some("mork"), key),
+                    message: format!("invalid or conflicting {key} entry: {name:?}"),
+                });
+            }
+        }
+    }
+    let folders = folders.clone();
+    for entries in [&mut config.cache_files, &mut config.caches] {
+        entries
+            .retain(|entry| !Path::new(entry).ancestors().skip(1).any(|p| folders.iter().any(|f| Path::new(f) == p)));
+        entries.sort();
+        entries.dedup();
     }
     Ok(())
 }

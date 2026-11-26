@@ -1,10 +1,10 @@
 //! The engine's requests and updates to a card's agents, in each one's room: a request wakes its agent,
-//! but for a foreman whose recap waits on Andrei (fac-228).
+//! but for a foreman whose recap waits on the operator (fac-228).
 
-use factory_types::card::Stage;
-use factory_types::reply::Role;
-use factory_types::state::{MessageKind, Sender};
-use factory_types::{AgentKey, CardId};
+use mork_types::card::Stage;
+use mork_types::reply::Role;
+use mork_types::state::{MessageKind, Sender};
+use mork_types::{AgentKey, CardId};
 
 use super::places::Who;
 use crate::post::Poster;
@@ -57,7 +57,7 @@ fn ask(p: &mut Poster<'_>, card: &CardId, role: Role, headline: &str, text: &str
 }
 
 // A foreman woken while its recap or checked specification waits would withdraw it (fac-228):
-// the request stays in the room for the turn Andrei's answer brings.
+// the request stays in the room for the turn the operator's answer brings.
 fn recap_waits(p: &Poster<'_>, card: &CardId, role: Role) -> bool {
     p.card(card).is_some_and(|c| {
         crate::lifecycle::facts::holder(&c) == role

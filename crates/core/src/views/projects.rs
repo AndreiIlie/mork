@@ -1,6 +1,6 @@
 // Projects stay visible before their first look-back and while a report is paused or still starting.
 
-use factory_types::lookback::{LastView, ProjectView, Read, ReadView};
+use mork_types::lookback::{LastView, ProjectView, Read, ReadView};
 
 use crate::decide::Ctx;
 use crate::state::State;

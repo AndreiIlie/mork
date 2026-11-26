@@ -1,10 +1,10 @@
 //! Connection-bound wall-test jobs (fac-480): permissions, cancellation and settlement stay separate from gates.
 
-use factory_types::card::Mode;
-use factory_types::reply::Role;
-use factory_types::state::{Job, Settlement};
-use factory_types::work::Purpose;
-use factory_types::{AgentKey, CardId};
+use mork_types::card::Mode;
+use mork_types::reply::Role;
+use mork_types::state::{Job, Settlement};
+use mork_types::work::Purpose;
+use mork_types::{AgentKey, CardId};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision, JobEnd};
@@ -19,14 +19,14 @@ pub(crate) fn command(
     ctx: Ctx<'_>,
 ) -> Result<Vec<String>, String> {
     let c = state.cards.get(card).ok_or("no card to run wall tests in")?;
-    if c.project != ctx.config.factory.project {
-        return Err("`factory test --walls` is only for the factory's own project".into());
+    if ctx.config.mork.project.as_ref() != Some(&c.project) {
+        return Err("`mork test --walls` is only for Mork's own project".into());
     }
     if c.mode != Mode::Full {
-        return Err("`factory test --walls` is only for a full card".into());
+        return Err("`mork test --walls` is only for a full card".into());
     }
     if !state.agents.get(key).is_some_and(|a| a.role == Role::Foreman) {
-        return Err("`factory test --walls` is only for a full card's foreman".into());
+        return Err("`mork test --walls` is only for a full card's foreman".into());
     }
     let project = ctx.config.projects.get(&c.project).ok_or("the card's project is not configured")?;
     super::own_runs::walls_argv(project, words)

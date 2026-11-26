@@ -6,17 +6,17 @@
 mod common;
 
 use common::{Sim, reply};
-use factory_core::decide::Event;
-use factory_types::card::Stage;
-use factory_types::state::{MessageKind, Sender};
-use factory_types::work::Purpose;
+use mork_core::decide::Event;
+use mork_types::card::Stage;
+use mork_types::state::{MessageKind, Sender};
+use mork_types::work::Purpose;
 use serde_json::{Value, json};
 
 const CARD: &str = "web-1";
 
 fn start_brief(s: &mut Sim) {
     s.board(CARD, "web");
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
+    s.operator(json!({"start": {"card": CARD}})).unwrap();
     s.settle_actions();
     let id = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
     s.end_job(&id, json!({}));
@@ -97,7 +97,7 @@ fn build_stall_check_ignores_brief_objection_and_tracks_build_request() {
         json!({"say": {"place": CARD, "to": "planner", "text": "Late brief question", "kind": "request"}}),
     )
     .unwrap();
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     s.settle_actions();
     assert_eq!(s.stage(CARD), Stage::Build);
 

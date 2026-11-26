@@ -1,4 +1,4 @@
-// fac-1, fac-124: an outside call needs Andrei's exact-plan approval; invalid calls never become asks.
+// fac-1, fac-124: an outside call needs the operator's exact-plan approval; invalid calls never become asks.
 #![cfg(feature = "faults")]
 // why: test code: a failed unwrap is the test failing, which 1.12.4 leaves to tests.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -9,13 +9,13 @@ use std::time::Duration;
 
 use common::door::{STAGING_ALIAS, answers, ctl_turn, door_args, remote_commands};
 use common::{CODEX_FOREMAN, Client, Rig, reply, wait_until};
-use factory_types::ask::AskKind;
-use factory_types::card::Mode;
+use mork_types::ask::AskKind;
+use mork_types::card::Mode;
 use serde_json::{Value, json};
 
 const LONG: Duration = Duration::from_secs(60);
 
-fn door_asks(rig: &Rig) -> Vec<factory_types::ask::Ask> {
+fn door_asks(rig: &Rig) -> Vec<mork_types::ask::Ask> {
     rig.state().asks.into_values().filter(|a| a.kind == AskKind::Door).collect()
 }
 
@@ -24,16 +24,16 @@ fn ask_of(rig: &Rig, text: &str) -> String {
     found.unwrap_or_else(|| panic!("no ask with {text}")).id.to_string()
 }
 
-// The card's foreman makes the requests: Andrei's `@foreman` wakes it. Its project's repo is
+// The card's foreman makes the requests: the operator's `@foreman` wakes it. Its project's repo is
 // one, so its fetches pass.
 fn card(rig: &Rig) {
     rig.write_config(&rig.config(CODEX_FOREMAN));
     let c = rig.card("ex-1", Mode::Full);
     rig.put_cards(vec![c]);
-    common::builds::factory_repo(rig, 1);
+    common::builds::mork_repo(rig, 1);
 }
 
-fn news(rig: &Rig, place: &str, to: &str) -> Vec<factory_types::state::Message> {
+fn news(rig: &Rig, place: &str, to: &str) -> Vec<mork_types::state::Message> {
     rig.messages(place)
         .into_iter()
         .filter(|m| m.to.as_deref() == Some(to) && m.headline.starts_with("door: "))
@@ -74,14 +74,14 @@ fn probed() -> (Rig, Vec<Value>) {
 }
 
 #[test]
-fn fac1_refusals_and_misc_are_andreis_asks() {
+fn fac1_refusals_and_misc_are_operators_asks() {
     let (rig, a) = probed();
     let status: Vec<&str> = a.iter().map(|x| x["door"]["status"].as_str().unwrap_or("")).collect();
     let want = ["done", "ask raised", "ask raised", "ask raised", "unsupported", "not allowed", "not allowed"];
     assert_eq!(&status[..7], want, "{a:#?}");
     assert_eq!(&status[7..9], ["failed", "not allowed"], "{a:#?}");
     for x in &a[1..4] {
-        assert_eq!(x["door"]["words"], "waiting for Andrei");
+        assert_eq!(x["door"]["words"], "waiting for the operator");
     }
     let text = a[7]["door"]["text"].as_str().unwrap();
     assert!(text.contains("passwd"), "a symlink under the root isn't followed: {}", a[7]);
@@ -114,11 +114,11 @@ fn fac1_once_runs_once_and_no_refuses() {
     assert_eq!(again["err"]["code"], "refused", "{again}");
     let outside = ask_of(&rig, "refuse ran");
     assert!(rig.send(json!({"door.no": {"ask": outside}})).get("ok").is_some());
-    let told_no = || news(&rig, "ex-1", "foreman").iter().any(|m| m.text.contains("Andrei said no"));
+    let told_no = || news(&rig, "ex-1", "foreman").iter().any(|m| m.text.contains("The operator said no"));
     wait_until("the no's news", LONG, told_no);
     let parallel = ask_of(&rig, "parallel ran");
-    let mut c1 = Client::connect(&rig.fhome().join("factory.sock"));
-    let mut c2 = Client::connect(&rig.fhome().join("factory.sock"));
+    let mut c1 = Client::connect(&rig.fhome().join("mork.sock"));
+    let mut c2 = Client::connect(&rig.fhome().join("mork.sock"));
     c1.request(json!({"door.once": {"ask": parallel}}));
     c2.request(json!({"door.once": {"ask": parallel}}));
     let (r1, r2) = (c1.answer(), c2.answer());
@@ -130,7 +130,7 @@ fn fac1_once_runs_once_and_no_refuses() {
     assert_eq!(remote_commands(&rig, "parallel ran"), 1, "it ran once");
 }
 
-// An approval binds to the plan Andrei saw: a configuration changed since voids it.
+// An approval binds to the plan the operator saw: a configuration changed since voids it.
 #[test]
 fn fac1_a_changed_configuration_voids_an_approval() {
     let mut rig = Rig::new();
@@ -182,7 +182,7 @@ fn fac124_a_revoked_misc_door_voids_an_approval() {
     assert_eq!(remote_commands(&rig, "revoke-probe"), 0, "nothing ran");
 }
 
-// The generic action commands never run a door call, nor settle one for Andrei.
+// The generic action commands never run a door call, nor settle one for the operator.
 #[test]
 fn fac1_generic_commands_never_bypass_the_door() {
     let mut rig = Rig::new();
@@ -211,10 +211,10 @@ fn fac1_generic_commands_never_bypass_the_door() {
         assert_eq!(r["err"]["code"], "refused", "{cmd}: {r}");
     }
     assert_eq!(remote_commands(&rig, "x"), 0);
-    // Andrei's drop is his no.
+    // The operator's drop is his no.
     assert!(rig.send(json!({"action.drop": {"action": "act-2"}})).get("ok").is_some());
     let st = rig.state();
     assert!(st.asks.values().all(|x| !x.open || x.kind != AskKind::Door), "its ask closed");
-    assert_eq!(factory_core::door::status_of(&st.actions["act-2"]), "not allowed");
+    assert_eq!(mork_core::door::status_of(&st.actions["act-2"]), "not allowed");
     let _: Value = json!(null);
 }

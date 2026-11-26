@@ -1,6 +1,6 @@
-use factory_types::CardId;
-use factory_types::action::{Action, ActionStatus};
-use factory_types::card::{Card, Stage};
+use mork_types::CardId;
+use mork_types::action::{Action, ActionStatus};
+use mork_types::card::{Card, Stage};
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Decision};
@@ -24,9 +24,9 @@ fn brief(run: Option<&Card>) -> Value {
 }
 
 // The cards its run carries (fac-563), titled as their boards hold them.
-fn carries(state: &State, run: Option<&factory_types::card::Card>) -> Vec<Value> {
+fn carries(state: &State, run: Option<&mork_types::card::Card>) -> Vec<Value> {
     let all = run.map(|c| c.carries.as_slice()).unwrap_or_default();
-    let title = |k: &factory_types::card::Carried| state.board.get(&k.id).map_or(k.title.clone(), |b| b.title.clone());
+    let title = |k: &mork_types::card::Carried| state.board.get(&k.id).map_or(k.title.clone(), |b| b.title.clone());
     all.iter().map(|k| json!({"card": k.id, "title": title(k)})).collect()
 }
 
@@ -90,7 +90,7 @@ pub(super) fn card(state: &State, card: &str) -> Decision {
 // Each note with its number, the oldest's #1, which `card.change --withdraw` takes (fac-347).
 fn numbered(notes: &[String]) -> Vec<Value> {
     let total = notes.len();
-    let at = |i| factory_types::decisions::number(total, i);
+    let at = |i| mork_types::decisions::number(total, i);
     notes.iter().enumerate().map(|(i, text)| json!({"number": at(i), "text": text})).collect()
 }
 
@@ -98,7 +98,7 @@ fn numbered(notes: &[String]) -> Vec<Value> {
 // tasks, its current task's number (none before it has tasks), and whether it is worked on now.
 fn deliverables(run: Option<&Card>) -> Value {
     let Some(plan) = run.and_then(|c| c.plan.as_ref()) else { return json!([]) };
-    let one = |(i, d): (usize, &factory_types::card::Deliverable)| {
+    let one = |(i, d): (usize, &mork_types::card::Deliverable)| {
         let task = (!d.tasks.is_empty()).then_some(d.current + 1);
         json!({"n": i + 1, "name": d.name, "tasks": d.tasks, "task": task, "current": i == plan.current})
     };
@@ -115,9 +115,8 @@ pub(super) fn projects(state: &State, ctx: Ctx<'_>) -> Decision {
             let prefix = state.world.board_prefixes.get(name).cloned().or_else(|| {
                 state.board.values().find(|b| &b.project == name && !b.prefix.is_empty()).map(|b| b.prefix.clone())
             });
-            let bitbucket = p.bitbucket.as_ref().map(|b| json!({"workspace": b.workspace, "slug": b.slug}));
             let auto = json!({"on": crate::messages::auto::on(state, name)});
-            json!({"name": name, "base": p.base, "prefix": prefix, "local": bitbucket.is_none(), "bitbucket": bitbucket, "auto": auto})
+            json!({"name": name, "base": p.base, "prefix": prefix, "local": !p.forge.hosted(), "forge": p.forge.project_view(), "auto": auto})
         })
         .collect();
     Decision::ok(json!({"projects": {"projects": list}}))
@@ -128,8 +127,8 @@ pub(super) fn prs(state: &State, project: &str, ctx: Ctx<'_>) -> Decision {
     let Some(cfg) = ctx.config.projects.get(project) else {
         return Decision::refused(format!("no project `{project}`"));
     };
-    if cfg.bitbucket.is_none() {
-        return Decision::refused(format!("{project} isn't on Bitbucket: it has no PRs"));
+    if !cfg.forge.hosted() {
+        return Decision::refused(format!("{project}'s forge is local: it has no PRs"));
     }
     let Some(read) = state.world.open_prs.get(project) else {
         return Decision::refused(format!(

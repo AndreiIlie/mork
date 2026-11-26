@@ -1,20 +1,22 @@
-//! The two sockets (1.6): `factory.sock`, Andrei's, and `run/agent.sock`, the agents'. Until the
+//! The two sockets (1.6): `mork.sock`, the operator's, and `run/agent.sock`, the agents'. Until the
 //! engine is ready, every request is answered `recovering` here, without reaching it.
 
 use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, SyncSender, TrySendError};
-use std::sync::{Arc, Mutex};
 
-use factory_types::protocol::{Answer, ErrorBody, ErrorCode, Hello, HelloLine, MAX_LINE, Request};
-use factory_types::state::Sender;
+use mork_types::protocol::{Answer, ErrorBody, ErrorCode, Hello, HelloLine, MAX_LINE, Request};
+use mork_types::state::Sender;
+
+use crate::lock::Lock;
 
 /// Which socket a connection came in on: the sender's identity (1.5.4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Origin {
-    Andrei,
+    Operator,
     Agent,
 }
 
@@ -35,7 +37,7 @@ pub struct Conn {
     pub id: u64,
     pub origin: Origin,
     pub peer_pid: i32,
-    queue: Mutex<Option<SyncSender<Outgoing>>>,
+    queue: Lock<Option<SyncSender<Outgoing>>>,
     stream: UnixStream,
     open: AtomicBool,
     // Lines queued and lines written, counted from its `hello`: an orchestrator's hook reads what it was
@@ -52,7 +54,7 @@ impl Conn {
             id,
             origin,
             peer_pid,
-            queue: Mutex::new(Some(tx)),
+            queue: Lock::new(Some(tx)),
             stream,
             open: AtomicBool::new(true),
             queued: AtomicU64::new(0),
@@ -89,7 +91,7 @@ impl Conn {
     }
 
     fn enqueue(&self, outgoing: Outgoing) -> bool {
-        let Ok(mut q) = self.queue.lock() else { return false };
+        let mut q = self.queue.lock();
         let full = match q.as_ref().map(|tx| tx.try_send(outgoing)) {
             Some(Ok(())) => false,
             Some(Err(TrySendError::Full(_) | TrySendError::Disconnected(_))) | None => true,
@@ -111,9 +113,7 @@ impl Conn {
 
     /// Ends its queue: the lines already queued are written, then its writing side is closed.
     pub fn finish(&self) {
-        if let Ok(mut q) = self.queue.lock() {
-            *q = None;
-        }
+        *self.queue.lock() = None;
     }
 
     // Its reader ends, and its leases with it.
@@ -159,7 +159,7 @@ pub enum Incoming {
         conn: Arc<Conn>,
         req: Request,
         sender: Option<Sender>,
-        job: Option<factory_types::JobId>,
+        job: Option<mork_types::JobId>,
     },
     Closed {
         conn: u64,
@@ -173,7 +173,7 @@ pub struct Shared {
     pub dirty: bool,
     pub home: String,
     /// The open state's version, or none while it is being opened (1.6.3).
-    pub state_version: Mutex<Option<u32>>,
+    pub(crate) state_version: Lock<Option<u32>>,
     /// Commands reach the engine only once recovery has ended (2.7.2).
     pub ready: AtomicBool,
     /// The home's `jobs/`, where a peer of `agent.sock` is looked up (1.5.4).
@@ -189,19 +189,19 @@ impl Shared {
             dirty,
             home,
             jobs_dir,
-            state_version: Mutex::new(None),
+            state_version: Lock::new(None),
             ready: AtomicBool::new(false),
             next_conn: AtomicU64::new(1),
         })
     }
 
     fn hello(&self) -> String {
-        let state_version = self.state_version.lock().ok().and_then(|v| *v);
+        let state_version = *self.state_version.lock();
         let h = HelloLine {
             hello: Hello {
                 build: self.build.clone(),
                 dirty: self.dirty,
-                protocol: factory_types::protocol::PROTOCOL,
+                protocol: mork_types::protocol::PROTOCOL,
                 state_version,
                 home: self.home.clone(),
             },
@@ -216,7 +216,7 @@ pub fn bind(path: &Path) -> io::Result<UnixListener> {
         std::fs::remove_file(path)?;
     }
     let l = UnixListener::bind(path)?;
-    factory_sys::chmod(path, 0o600)?;
+    mork_sys::chmod(path, 0o600)?;
     Ok(l)
 }
 
@@ -233,12 +233,12 @@ pub fn serve(listener: UnixListener, origin: Origin, shared: Arc<Shared>, tx: mp
 }
 
 fn connection(stream: UnixStream, origin: Origin, shared: &Shared, tx: &mpsc::Sender<Incoming>) {
-    let peer_pid = factory_sys::peer_pid(&stream).unwrap_or(0);
+    let peer_pid = mork_sys::peer_pid(&stream).unwrap_or(0);
     let Ok(reader) = stream.try_clone() else { return };
     let Ok(conn) = Conn::new(shared.next_conn.fetch_add(1, Ordering::SeqCst), origin, peer_pid, stream) else { return };
     conn.send_line(&shared.hello());
     let mut reader = BufReader::new(reader);
-    let mut sender: Option<Option<(Sender, Option<factory_types::JobId>)>> = None;
+    let mut sender: Option<Option<(Sender, Option<mork_types::JobId>)>> = None;
     loop {
         match read_line(&mut reader) {
             Ok(None) => break,
@@ -259,7 +259,7 @@ fn handle_line(
     shared: &Shared,
     tx: &mpsc::Sender<Incoming>,
     text: &str,
-    sender: &mut Option<Option<(Sender, Option<factory_types::JobId>)>>,
+    sender: &mut Option<Option<(Sender, Option<mork_types::JobId>)>>,
 ) {
     let req: Request = match serde_json::from_str(text) {
         Ok(r) => r,
@@ -271,16 +271,16 @@ fn handle_line(
         }
     };
     if !shared.ready.load(Ordering::SeqCst) {
-        conn.answer(req.id, Err(ErrorBody::new(ErrorCode::Recovering, "the factory is recovering")));
+        conn.answer(req.id, Err(ErrorBody::new(ErrorCode::Recovering, "Mork is recovering")));
         return;
     }
-    // The sender, known once per connection: the socket says Andrei unless the peer runs in an
+    // The sender, known once per connection: the socket says the operator unless the peer runs in an
     // unwalled job, or the wall says which agent (looked up here, never on the engine's thread).
     let who = sender
         .get_or_insert_with(|| match conn.origin {
-            Origin::Andrei => Some(
+            Origin::Operator => Some(
                 crate::jobs::identity::of_unwalled_peer(&shared.jobs_dir, conn.peer_pid)
-                    .map_or((Sender::Andrei, None), |(agent, job)| (Sender::Agent(agent), Some(job))),
+                    .map_or((Sender::Operator, None), |(agent, job)| (Sender::Agent(agent), Some(job))),
             ),
             Origin::Agent => crate::jobs::identity::of_peer(&shared.jobs_dir, conn.peer_pid)
                 .map(|(agent, job)| (Sender::Agent(agent), Some(job))),

@@ -3,33 +3,33 @@
 
 use std::fmt::Write as _;
 
-use factory_types::card::{Card, Mode};
-use factory_types::reply::Role;
-use factory_types::state::Agent;
+use mork_types::card::{Card, Mode};
+use mork_types::reply::Role;
+use mork_types::state::Agent;
 
 use super::card_of;
 use super::held::Sections;
 use crate::state::State;
 
-pub(super) const FOREMAN_SPECIFICATION: &str = "On a full card the planner settles specification questions. Send those questions to `planner` as requests, including any finding you hold contradicts the plan, and any words from Andrei that change the specification. Raise your other asks to Andrei in your hand.";
+pub(super) const FOREMAN_SPECIFICATION: &str = "On a full card the planner settles specification questions. Send those questions to `planner` as requests, including any finding you hold contradicts the plan, and any words from the operator that change the specification. Raise your other asks to the operator in your hand.";
 
-// How the agent holding a card's specification agrees it with Andrei (fac-16): the procedure is
-// the Factory manual's; this says that the agent holds it.
+// How the agent holding a card's specification agrees it with the operator (fac-16): the procedure is
+// the Mork manual's; this says that the agent holds it.
 const SPECIFICATION: &str = "## The specification\n\nYou hold this card's specification. Read the card and scout with researchers as the `agreeing-a-specification` skill says. Recap the plan with `brief-ready`, its sketch in the hand's `changes` and `code_shape`.";
 
 const CHALLENGED_RECAPS: &str = "Each recap is challenged by the card's `foreman` before it is offered. Settle its objections with it, by messages as long as it takes, and recap once settled: that recap is challenged again. Your messages to `foreman` and its to you pass in the card's challenge place, which no window shows; any disagreement left unsettled opens as your ask (given to the project's orchestrator when delegated). Approval ends your work at brief and hands the build to that foreman.";
 
-const WITHDRAWN: &str = "A recap waiting for `approve` is withdrawn by Andrei's words in your room, the card's project's orchestrator's words while its open plan ask is given to it (unless answering your unanswered mechanical request), an `answer` ask you raise, your hand's `ask` or a red headline raised as one; a reply raising none, a `blocked` one included, leaves it waiting. A new recap replaces it and is offered under the card's current delegation.";
+const WITHDRAWN: &str = "A recap waiting for `approve` is withdrawn by the operator's words in your room, the card's project's orchestrator's words while its open plan ask is given to it (unless answering your unanswered mechanical request), an `answer` ask you raise, your hand's `ask` or a red headline raised as one; a reply raising none, a `blocked` one included, leaves it waiting. A new recap replaces it and is offered under the card's current delegation.";
 
 const UNCHALLENGED_RECAPS: &str = "This card has no planner, and no seat challenges your recap: it is offered once made. Write, edit and commit nothing before approval. Approval releases your brief researchers, and the build request comes to you in this session.";
 
-const UNCHALLENGED_VISUAL_RECAPS: &str = "This card has no planner, and no seat challenges your recap: it is offered once made. Edit no tracked repository files before approval: only `.git/factory-mock/` is yours to edit at brief. Approval releases your brief researchers, and the build request comes to you in this session.";
+const UNCHALLENGED_VISUAL_RECAPS: &str = "This card has no planner, and no seat challenges your recap: it is offered once made. Edit no tracked repository files before approval. Edit `.git/mork-mock/` only after the visual direction is confirmed. Approval releases your brief researchers, and the build request comes to you in this session.";
 
-const ALONE_BASELINE: &str = "\n## The baseline\n\nThis visual card is at its baseline step. Read the card and the code, name the pages the card changes, and spawn its baseline seat (`factory ctl spawn <card> baseline '<task>'`, naming no model or effort) to reproduce them as they stand today in `.git/factory-mock/`. Write nothing yourself. Once its report says the baseline is done, end `built` to release the seat and move on to agreeing the specification and changing the mock; with no existing page to reproduce, spawn nothing and end `built` at once.\n";
+const ALONE_BASELINE: &str = "\n## The baseline\n\nThis visual card is at its baseline step. Read the card and the code, name the pages the card changes, and spawn its baseline seat (`mork ctl spawn <card> baseline '<task>'`, naming no model or effort) to reproduce them as they stand today in `.git/mork-mock/`. Write nothing yourself. Once its report says the baseline is done, end `built` to release the seat and begin agreeing the visual direction; with no existing page to reproduce, spawn nothing and end `built` at once.\n";
 
 const DISPUTE: &str = "\n## The specification\n\nFor this dispute, read the card and its recorded decisions. Never decide a specification question alone: raise any open question in your hand's `ask` under the current delegation level, record each settled decision and answer whoever asked. Leave the card at its current stage.\n";
 
-const ALONE_AFTER: &str = "\n## The specification\n\nThis card has no planner: you hold its specification after approval too. Never decide a specification question alone: raise any open question in your hand's `ask` under the current delegation level, including a finding that contradicts the plan or words of Andrei's that change it; record each settled decision and answer whoever asked. Leave the card at its current stage.\n";
+const ALONE_AFTER: &str = "\n## The specification\n\nThis card has no planner: you hold its specification after approval too. Never decide a specification question alone: raise any open question in your hand's `ask` under the current delegation level, including a finding that contradicts the plan or words of the operator's that change it; record each settled decision and answer whoever asked. Leave the card at its current stage.\n";
 
 /// Whether an agent is a full card's foreman under a planner, which settles its specification questions.
 pub(super) fn planner_foreman(state: &State, a: &Agent) -> bool {
@@ -66,10 +66,10 @@ pub(super) fn specification(state: &State, a: &Agent, s: &mut Sections<'_>, out:
     }
     let mut rule = String::new();
     if !c.delegated {
-        rule.push_str("\nThis card is not delegated: settle specification questions with Andrei and wait for the plan's approve.\n");
+        rule.push_str("\nThis card is not delegated: settle specification questions with the operator and wait for the plan's approve.\n");
     }
     if c.visual {
-        rule.push_str("\nThis card is visual: its plan, its mock included, waits for Andrei's own approve, whatever its delegation; it is never given to an orchestrator.\n");
+        rule.push_str("\nThis card is visual: its plan, its mock included, waits for the operator's own approve, whatever its delegation; it is never given to an orchestrator.\n");
     }
     let recaps = match (alone, c.visual) {
         (true, true) => UNCHALLENGED_VISUAL_RECAPS,
@@ -91,12 +91,15 @@ fn stands(state: &State, a: &Agent, c: &Card, (alone, s): (bool, &mut Sections<'
     let (below, plan) = draft.map_or(("", String::new()), |d| (", below,", format!("\n\n{d}")));
     match (&c.draft, c.recap) {
         (Some(_), true) if c.visual => {
-            let _ = writeln!(out, "your recap{below}, the plan and its mock, waits for Andrei's own `approve`.{plan}");
+            let _ = writeln!(
+                out,
+                "your recap{below}, the plan and its mock, waits for the operator's own `approve`.{plan}"
+            );
         }
         (Some(_), true) => {
             let _ = writeln!(
                 out,
-                "your recap{below} waits for `approve` from Andrei, or its project's orchestrator while its open plan ask is given to it.{plan}"
+                "your recap{below} waits for `approve` from the operator, or its project's orchestrator while its open plan ask is given to it.{plan}"
             );
         }
         (Some(_), false) => {
@@ -110,7 +113,7 @@ fn stands(state: &State, a: &Agent, c: &Card, (alone, s): (bool, &mut Sections<'
             let _ = writeln!(out, "{now}.{plan}");
         }
         (None, _) => {
-            let me = factory_types::state::Sender::Agent(a.key.clone());
+            let me = mork_types::state::Sender::Agent(a.key.clone());
             let last = state
                 .messages_in(a.place.as_str())
                 .filter(|m| m.seq >= c.first_seq && m.from == me)

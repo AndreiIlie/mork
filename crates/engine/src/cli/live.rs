@@ -1,8 +1,8 @@
 //! A live turn's stdin (fac-389): its prompt, then each message delivered while it works, spoken as its CLI reads
 //! them. Claude stages each with `shouldQuery: false` for its next call; Codex's app-server steers its turn.
 
-use factory_types::config::Effort;
-use factory_types::job::Live;
+use mork_types::config::Effort;
+use mork_types::job::Live;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -136,7 +136,7 @@ impl Codex {
     // effort would otherwise win over the command line's (fac-637), else a new one in the process's folder.
     fn start(&self, thread: Option<&str>) -> Vec<String> {
         let init = json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
-            "clientInfo": {"name": "factory", "title": "factory", "version": "1"},
+            "clientInfo": {"name": "mork", "title": "mork", "version": "1"},
             "capabilities": {"experimentalApi": false}}});
         let initialized = json!({"jsonrpc": "2.0", "method": "initialized"});
         let open = match thread {

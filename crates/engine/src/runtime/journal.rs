@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use factory_core::views::journal::{Read, scope};
-use factory_types::Command;
-use factory_types::protocol::{ErrorBody, ErrorCode};
-use factory_types::state::Sender;
+use mork_core::views::journal::{Read, scope};
+use mork_types::Command;
+use mork_types::protocol::{ErrorBody, ErrorCode};
+use mork_types::state::Sender;
 use serde_json::Value;
 
 use super::Engine;
@@ -18,7 +18,7 @@ impl Engine {
         from: &Sender,
         cmd: Command,
     ) -> Option<Result<Value, ErrorBody>> {
-        let project = match scope(&self.state, from, &self.ctx.config.factory.project) {
+        let project = match scope(&self.state, from, self.ctx.config.mork.project.as_ref()) {
             Ok(p) => p,
             Err(why) => return Some(Err(ErrorBody::new(ErrorCode::Refused, why))),
         };

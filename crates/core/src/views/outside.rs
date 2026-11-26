@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::lookback::Read;
-use factory_types::view::{Phase, PinLine, Resources, Share, SuiteProgress};
-use factory_types::{AgentKey, CardId, JobId, ProjectId, Sha};
+use mork_types::lookback::Read;
+use mork_types::view::{Phase, PinLine, Resources, Share, SuiteProgress};
+use mork_types::{AgentKey, CardId, JobId, ProjectId, Sha};
 
 use super::timeline::Point;
 
@@ -31,13 +31,13 @@ pub struct Outside {
     pub card_costs: BTreeMap<CardId, u64>,
     pub card_costs_unknown: std::collections::BTreeSet<CardId>,
     /// Each current run's journal sums by seat, including seats already gone (fac-526).
-    pub seat_costs: BTreeMap<CardId, Vec<factory_types::about::SeatCost>>,
+    pub seat_costs: BTreeMap<CardId, Vec<mork_types::about::SeatCost>>,
     /// Each card's clone folder, where a finding's `file:line` opens (5.7.5).
     pub clones: BTreeMap<CardId, String>,
-    /// The agents whose `factory test` waits for a slot now (4.9).
+    /// The agents whose `mork test` waits for a slot now (4.9).
     pub slot_waits: std::collections::BTreeSet<AgentKey>,
     /// The files the card's agents' turns produced, newest first (fac-105).
-    pub outputs: BTreeMap<CardId, Vec<factory_types::seen::OutputFile>>,
+    pub outputs: BTreeMap<CardId, Vec<mork_types::seen::OutputFile>>,
     /// Each live card's suite runs' counts so far, by job (fac-697).
     pub suites: BTreeMap<JobId, SuiteProgress>,
 }
@@ -49,7 +49,7 @@ pub struct AgentSeen {
     pub doing: Option<String>,
     pub context: Option<(u64, u64)>,
     /// Its latest turn's steps with their text and thinking (fac-96).
-    pub turn: Option<std::sync::Arc<factory_types::seen::TurnView>>,
+    pub turn: Option<std::sync::Arc<mork_types::seen::TurnView>>,
     /// Its own step list, as its latest turn's stream left it (fac-128).
-    pub list: Option<factory_types::seen::StepList>,
+    pub list: Option<mork_types::seen::StepList>,
 }

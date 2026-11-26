@@ -1,4 +1,4 @@
-//! Local HTTP and WebSocket bridge (fac-671): serves static UI assets and relays `/ws` to `factory.sock`.
+//! Local HTTP and WebSocket bridge (fac-671): serves static UI assets and relays `/ws` to `mork.sock`.
 
 pub mod assets;
 pub mod frames;
@@ -38,7 +38,7 @@ pub fn start(home: &Home, port: u16, assets: Option<PathBuf>) -> Option<SocketAd
     };
     crate::runtime::upkeep::log(home, &format!("web bridge listening on http://{addr}"));
     let assets = Arc::new(assets);
-    let sock = Arc::new(home.factory_sock());
+    let sock = Arc::new(home.mork_sock());
     let jobs = Arc::new(home.jobs());
     std::thread::spawn(move || {
         for stream in listener.incoming() {
@@ -52,7 +52,7 @@ pub fn start(home: &Home, port: u16, assets: Option<PathBuf>) -> Option<SocketAd
 }
 
 fn report_error(home: &Home, msg: &str) {
-    eprintln!("factory: {msg}");
+    eprintln!("mork: {msg}");
     crate::runtime::upkeep::log(home, msg);
 }
 

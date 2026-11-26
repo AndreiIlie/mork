@@ -1,15 +1,12 @@
-//! The state's version (2.3, fac-313): a state before `OLDEST` needs an archived build that reads
-//! it; one in `OLDEST..NEWEST` advances at open.
+//! A state older than `OLDEST` needs an archived build that can upgrade it (2.3).
 
 use rusqlite::Transaction;
 
-/// The oldest state version this build reads (fac-658).
-pub const OLDEST: u32 = 49;
+/// The oldest version this build opens for writing, after the rename migrations (fac-747).
+pub const OLDEST: u32 = 55;
 
-// 50 fences builds without `gated` (fac-658); 51 without `AskKind::Triage`/`Card::triage` (fac-680); 52 those
-// dropping `PendingTriage::stalemate` (fac-694); 53 those whose strict `Hand` refuses its typed fields (fac-696).
 /// The newest state version this build writes.
-pub const NEWEST: u32 = 53;
+pub const NEWEST: u32 = 55;
 
 const V31: &str = "
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);

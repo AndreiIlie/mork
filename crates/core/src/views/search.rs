@@ -4,20 +4,19 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use factory_types::action::Action;
-use factory_types::card::Card;
-use factory_types::decisions;
-use factory_types::state::{Message, Sender};
-use factory_types::{CardId, ProjectId};
+use mork_types::action::Action;
+use mork_types::card::Card;
+use mork_types::decisions;
+use mork_types::state::{Message, Sender};
+use mork_types::{CardId, ProjectId};
 use serde_json::{Value, json};
 
 use crate::board::notes::Written;
 use crate::board::writes::name;
+use crate::search_text::{excerpt, fold};
 use crate::state::State;
 
 const HITS_MAX: usize = 20;
-const BEFORE: usize = 80;
-const AFTER: usize = 220;
 
 /// One record the store reads for a search.
 pub enum Found {
@@ -52,7 +51,7 @@ pub struct OnBoard {
 /// The board cards of `project` (every project's with none), taken from the state for a search.
 pub fn on_boards(state: &State, project: Option<&ProjectId>) -> BTreeMap<CardId, OnBoard> {
     let theirs = state.board.values().filter(|b| project.is_none_or(|p| *p == b.project));
-    let one = |b: &factory_types::card::BoardCard| OnBoard {
+    let one = |b: &mork_types::card::BoardCard| OnBoard {
         project: b.project.clone(),
         file: b.file.clone(),
         description: b.description.clone(),
@@ -188,36 +187,4 @@ fn words_of(v: &Value, out: &mut String) {
         Value::Object(m) => m.values().for_each(|v| words_of(v, out)),
         Value::Null | Value::Bool(_) | Value::Number(_) => {}
     }
-}
-
-// Folded char by char, so a match maps back to the text; a final sigma folds as any other.
-fn fold_char(c: char) -> impl Iterator<Item = char> {
-    c.to_lowercase().map(|l| if l == 'ς' { 'σ' } else { l })
-}
-
-fn fold(s: &str) -> String {
-    s.chars().flat_map(fold_char).collect()
-}
-
-// The text around its first match, on one line.
-fn excerpt(text: &str, words: &[String]) -> String {
-    let mut hay = String::new();
-    let mut starts = Vec::new();
-    for (i, c) in text.char_indices() {
-        hay.extend(fold_char(c));
-        starts.resize(hay.len(), i);
-    }
-    let first = words.iter().filter_map(|w| hay.find(w.as_str())).min();
-    let at = first.and_then(|b| starts.get(b).copied()).unwrap_or(0);
-    let (head, tail) = text.split_at(at);
-    let from = head.char_indices().rev().nth(BEFORE.saturating_sub(1)).map_or(0, |(i, _)| i);
-    let to = tail.char_indices().nth(AFTER).map_or(text.len(), |(i, _)| at + i);
-    let mut out = text.get(from..to).unwrap_or_default().split_whitespace().collect::<Vec<_>>().join(" ");
-    if from > 0 {
-        out.insert(0, '…');
-    }
-    if to < text.len() {
-        out.push('…');
-    }
-    out
 }

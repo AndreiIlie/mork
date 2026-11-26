@@ -3,11 +3,11 @@
 
 use std::path::{Path, PathBuf};
 
-use factory_core::decide::{Event, JobEnd};
-use factory_types::job::ExitRecord;
-use factory_types::state::Job;
-use factory_types::work::Purpose;
-use factory_types::{CardId, Sha};
+use mork_core::decide::{Event, JobEnd};
+use mork_types::job::ExitRecord;
+use mork_types::state::Job;
+use mork_types::work::Purpose;
+use mork_types::{CardId, Sha};
 use serde_json::{Value, json};
 
 use super::Engine;
@@ -41,7 +41,7 @@ impl Engine {
                     self.work_result(job, &purpose, &dir.io(), code, &self.failure_words(&purpose, &dir, code))
                 }
                 // No end at all: its supervisor died, and the job is cut (1.4.6, M3.10).
-                (None, None) => JobEnd::Cut { session: factory_core::decide::SessionSeen::default() },
+                (None, None) => JobEnd::Cut { session: mork_core::decide::SessionSeen::default() },
                 (Some(e), None) => failed(e.error.clone().unwrap_or_else(|| self.words(&dir))),
             }
         };
@@ -53,9 +53,7 @@ impl Engine {
 
     pub(super) fn finish_work(&mut self, job: &Job, end: JobEnd) {
         self.pipe.review_threads.remove(&job.id);
-        crate::faults::hit("job.before-apply");
-        self.apply_with(&Event::JobEnded { id: job.id.clone(), end }, Some("job.mid-apply"));
-        crate::faults::hit("job.after-apply");
+        self.apply(&Event::JobEnded { id: job.id.clone(), end });
         self.live.remove(&job.id);
     }
 
@@ -78,7 +76,7 @@ impl Engine {
         };
         let tail = Some(last(dir.out())).filter(|t| !t.is_empty()).unwrap_or_else(|| last(dir.err()));
         let tail = if tail.is_empty() { self.words(dir) } else { tail };
-        format!("{}{code}): {tail}", factory_core::decide::jobs::EXIT_MARK)
+        format!("{}{code}): {tail}", mork_core::decide::jobs::EXIT_MARK)
     }
 
     fn work_result(&mut self, job: &Job, purpose: &Purpose, io: &Path, code: i32, words: &str) -> JobEnd {
@@ -90,8 +88,10 @@ impl Engine {
             }
             _ if !ok_exit => return failed(words.to_owned()),
             Purpose::Clone { card, at, .. } => self.cloned(card, at.as_str(), io),
-            // Andrei may resolve a finding while the install runs (fac-298).
-            Purpose::Install { card, cloned: Some(_) } => Ok(finished(json!({"resolved": self.andrei_resolved(card)}))),
+            // The operator may resolve a finding while the install runs (fac-298).
+            Purpose::Install { card, cloned: Some(_) } => {
+                Ok(finished(json!({"resolved": self.operator_resolved(card)})))
+            }
             Purpose::Install { .. } => Ok(done()),
             Purpose::Bundle { .. } => {
                 read_json(&io.join("status.json")).map(finished).ok_or_else(|| "it wrote no status.json".to_owned())
@@ -115,15 +115,14 @@ impl Engine {
             copy_in(&Path::new(&p.repo).join(f), &dir, f).map_err(|e| format!("the copy file {f}: {e}"))?;
         }
         // A review's branch, or a later run's, forks from the base before its tip (fac-111).
-        let fork = match c.base_tip.as_ref().filter(|t| c.mode == factory_types::card::Mode::Review || t.as_str() != at)
-        {
+        let fork = match c.base_tip.as_ref().filter(|t| c.mode == mork_types::card::Mode::Review || t.as_str() != at) {
             Some(tip) => {
                 let m = mirror::ensure(&self.opts.home, &c.project)?;
                 mirror::merge_base(&self.opts.home, &m, at, tip.as_str()).unwrap_or_else(|_| at.to_owned())
             }
             None => at.to_owned(),
         };
-        let resolved = self.andrei_resolved(card);
+        let resolved = self.operator_resolved(card);
         let mut result = json!({"fork": fork, "resolved": resolved});
         if let Some(rebased) = read_json(&io.join("rebased.json")) {
             result["rebased"] = rebased;
@@ -139,11 +138,11 @@ impl Engine {
         Ok(finished(result))
     }
 
-    // Andrei's resolutions, which a round's request tells its reviewers not to raise again (fac-298).
-    fn andrei_resolved(&self, card: &CardId) -> Vec<u64> {
+    // The operator's resolutions, which a round's request tells its reviewers not to raise again (fac-298).
+    fn operator_resolved(&self, card: &CardId) -> Vec<u64> {
         let events = self.store.card_events(card.as_str()).unwrap_or_default();
-        let by_andrei = events.iter().filter(|e| e.2 == "review.resolved" && e.3["from"] == "andrei");
-        by_andrei.filter_map(|e| e.3["n"].as_u64()).collect()
+        let by_operator = events.iter().filter(|e| e.2 == "review.resolved" && e.3["from"] == "operator");
+        by_operator.filter_map(|e| e.3["n"].as_u64()).collect()
     }
 
     fn check_result(&self, card: &CardId, head: &Sha, io: &Path, code: i32, started: Option<&str>) -> JobEnd {
@@ -181,7 +180,7 @@ impl Engine {
 // links the clone's commits planted (R9).
 pub(super) fn copy_in(src: &Path, clone: &Path, rel: &str) -> std::io::Result<()> {
     let bad = |why: &str| std::io::Error::other(why.to_owned());
-    let mut from = factory_sys::open_no_follow(src)?;
+    let mut from = mork_sys::open_no_follow(src)?;
     if !from.metadata()?.is_file() {
         return Err(bad("it isn't a plain file"));
     }
@@ -198,7 +197,7 @@ pub(super) fn copy_in(src: &Path, clone: &Path, rel: &str) -> std::io::Result<()
             Err(_) => std::fs::create_dir(&at)?,
         }
     }
-    let mut to = factory_sys::create_no_follow(&clone.join(rel))?;
+    let mut to = mork_sys::create_no_follow(&clone.join(rel))?;
     std::io::copy(&mut from, &mut to)?;
     Ok(())
 }

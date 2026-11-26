@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 
-use factory_types::config::Cli;
+use mork_types::config::Cli;
 use serde_json::Value;
 
 // Past all but 2 of 4,860 saved sessions seen, a first turn's far smaller: a larger one, or one grown past it as
@@ -86,10 +86,10 @@ fn codex_file(env: &BTreeMap<String, String>, thread: &str) -> Result<File, Stri
     let root = File::open(&base).map_err(|e| format!("its home: {e}"))?;
     let suffix = format!("-{thread}.jsonl");
     for day in [0, 1, -1] {
-        let (y, m, d, ..) = factory_core::state::names::civil_from_ms(began.saturating_add(day * DAY_MS));
+        let (y, m, d, ..) = mork_core::state::names::civil_from_ms(began.saturating_add(day * DAY_MS));
         let dated = rel.join(format!("{y:04}/{m:02}/{d:02}"));
-        let Ok(dir) = factory_sys::open_dir_beneath(&root, &dated) else { continue };
-        let names = factory_sys::read_dir_of(&dir).into_iter().flatten().take(ENTRIES_MAX).flatten();
+        let Ok(dir) = mork_sys::open_dir_beneath(&root, &dated) else { continue };
+        let names = mork_sys::read_dir_of(&dir).into_iter().flatten().take(ENTRIES_MAX).flatten();
         let mut names = names.filter_map(|e| e.file_name().into_string().ok());
         if let Some(name) = names.find(|n| n.starts_with("rollout-") && n.ends_with(&suffix)) {
             return open(&base, &dated.join(name));
@@ -107,7 +107,7 @@ fn began_ms(thread: &str) -> Option<i64> {
 
 // A seat may plant a link or a FIFO in its home: neither is followed or waited on.
 fn open(base: &Path, rel: &Path) -> Result<File, String> {
-    let file = factory_sys::open_beneath(base, rel).map_err(|e| format!("no saved session: {e}"))?;
+    let file = mork_sys::open_beneath(base, rel).map_err(|e| format!("no saved session: {e}"))?;
     let meta = file.metadata().map_err(|e| e.to_string())?;
     if !meta.is_file() {
         return Err("its saved session isn't a regular file".into());

@@ -54,7 +54,7 @@ pub fn main(name: &str) -> i32 {
     crate::runlog::append(name, &argv, &stdin);
     report_paths();
     let prompt = String::from_utf8_lossy(&stdin).into_owned();
-    let agent = std::env::var("FACTORY_AGENT").unwrap_or_default();
+    let agent = std::env::var("MORK_AGENT").unwrap_or_default();
     let who = Who { fake: name, agent: &agent, run, prompt: &prompt };
     let steps = Scenario::load().steps_for(&who).unwrap_or_else(|| scenario::default_steps(name));
     let mut ctx = RunCtx::new(name, argv, prompt);
@@ -198,15 +198,15 @@ fn sh(script: &str) {
     let _ = Command::new("sh").args(["-c", script]).output();
 }
 
-// `{io}` is the turn's `FACTORY_IO`, its seat's folder (fac-654); `{job}` its job's folder, `{jobs}` all jobs',
+// `{io}` is the turn's `MORK_IO`, its seat's folder (fac-654); `{job}` its job's folder, `{jobs}` all jobs',
 // `{seats}` all seats' folders.
 fn with_io(s: &str) -> String {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let id = std::env::var("FACTORY_JOB").unwrap_or_default();
-    let root = std::path::Path::new(&home).parent().map(std::path::Path::to_path_buf).unwrap_or_default();
+    let socket = std::env::var_os("MORK_AGENT_SOCK").map(std::path::PathBuf::from).unwrap_or_default();
+    let id = std::env::var("MORK_JOB").unwrap_or_default();
+    let root = socket.parent().and_then(std::path::Path::parent).unwrap_or(std::path::Path::new(""));
     let jobs = root.join("jobs");
     let job = jobs.join(id);
-    let io = std::env::var("FACTORY_IO")
+    let io = std::env::var("MORK_IO")
         .ok()
         .filter(|io| !io.is_empty())
         .unwrap_or_else(|| job.join("io").display().to_string());
@@ -216,11 +216,11 @@ fn with_io(s: &str) -> String {
 }
 
 fn ctl(args: &[String]) {
-    factory_cmd("fake-ctl", "ctl", args, None);
+    mork_cmd("fake-ctl", "ctl", args, None);
 }
 
-fn factory_cmd(kind: &str, sub: &str, args: &[String], dir: Option<&str>) {
-    let mut cmd = Command::new("factory");
+fn mork_cmd(kind: &str, sub: &str, args: &[String], dir: Option<&str>) {
+    let mut cmd = Command::new("mork");
     if let Some(d) = dir {
         let _ = std::fs::create_dir_all(d);
         cmd.current_dir(d);
@@ -261,7 +261,7 @@ fn show_env() {
 }
 
 fn cargo_build(argv: &[String], as_commit: Option<&str>, link: Option<&str>) -> i32 {
-    let commit = as_commit.map_or_else(|| std::env::var("FACTORY_BUILD_COMMIT").unwrap_or_default(), str::to_owned);
+    let commit = as_commit.map_or_else(|| std::env::var("MORK_BUILD_COMMIT").unwrap_or_default(), str::to_owned);
     let target = arg_after(argv, "--target-dir")
         .or_else(|| std::env::var("CARGO_TARGET_DIR").ok())
         .unwrap_or_else(|| "target".into());
@@ -269,9 +269,9 @@ fn cargo_build(argv: &[String], as_commit: Option<&str>, link: Option<&str>) -> 
     if std::fs::create_dir_all(&release).is_err() {
         return 101;
     }
-    let real = sibling("factory");
-    let script = format!("#!/bin/sh\nFACTORY_TEST_COMMIT={commit} exec {} \"$@\"\n", real.display());
-    let bin = release.join("factory");
+    let real = sibling("mork");
+    let script = format!("#!/bin/sh\nMORK_TEST_COMMIT={commit} exec {} \"$@\"\n", real.display());
+    let bin = release.join("mork");
     if let Some(to) = link {
         let _ = std::fs::remove_file(&bin);
         return if std::os::unix::fs::symlink(to, &bin).is_ok() { 0 } else { 101 };

@@ -2,8 +2,8 @@
 // why: test code: a failed unwrap is the test failing, which 1.12.4 leaves to tests.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use factory_engine::jobs::suite_progress::{Output, Reader};
-use factory_types::view::SuiteProgress;
+use mork_engine::jobs::suite_progress::{Output, Reader};
+use mork_types::view::SuiteProgress;
 
 fn read(output: &str) -> Option<SuiteProgress> {
     let mut r = Reader::default();
@@ -18,11 +18,11 @@ fn xtask_passes_add_their_counts_and_its_binaries_output_is_not_counted() {
     let output = "\
 xtask: building the suite, with faults
 xtask: the suite, with faults: 2 test binaries, 5 tests, 2 at a time
-xtask: started factory-core tests/a.rs
-xtask: factory-core tests/a.rs: test one ... ok
-xtask: factory-core tests/a.rs: test two ... FAILED
-xtask: factory-core tests/a.rs: test three ... ignored, needs a wall
-xtask: factory-core tests/a.rs: FAILED, exit status: 101, in 0.3s
+xtask: started mork-core tests/a.rs
+xtask: mork-core tests/a.rs: test one ... ok
+xtask: mork-core tests/a.rs: test two ... FAILED
+xtask: mork-core tests/a.rs: test three ... ignored, needs a wall
+xtask: mork-core tests/a.rs: FAILED, exit status: 101, in 0.3s
 
 running 3 tests
 test one ... ok
@@ -30,7 +30,7 @@ test two ... FAILED
 test three ... ignored, needs a wall
 xtask: building the suite, production-only
 xtask: the production-only tests: 1 test binaries, 1 tests, 2 at a time
-xtask: factory-app tests/m0_walled_turn.rs: test m0_production_build_refuses_a_partial_wall ... ok
+xtask: mork-app tests/m0_walled_turn.rs: test m0_production_build_refuses_a_partial_wall ... ok
 ";
     let want = SuiteProgress {
         passed: 3,
@@ -46,7 +46,7 @@ xtask: factory-app tests/m0_walled_turn.rs: test m0_production_build_refuses_a_p
 fn an_xtask_pass_without_its_count_leaves_the_whole_total_unknown() {
     let output = "\
 xtask: the suite, with faults: 1 test binaries, 3 tests, 2 at a time
-xtask: factory-core tests/a.rs: test one ... ok
+xtask: mork-core tests/a.rs: test one ... ok
 xtask: the production-only tests: 1 test binaries, 2 at a time
 ";
     let got = read(output).unwrap();
@@ -83,7 +83,7 @@ fn output_no_reader_knows_gives_no_progress() {
 
 #[test]
 fn a_suite_output_made_anew_after_the_install_is_read_from_its_start() {
-    let dir = std::env::temp_dir().join(format!("factory-test-suite-progress-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("mork-test-suite-progress-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let file = dir.join("suite.out");
     std::fs::write(&file, "added 1200 packages, and audited 1201 packages in 9s\nfound 0 vulnerabilities\n").unwrap();

@@ -4,10 +4,10 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use factory_types::card::{Card, Mode};
-use factory_types::config::Config;
-use factory_types::reply::Role;
-use factory_types::state::{Agent, Message, MessageKind};
+use mork_types::card::{Card, Mode};
+use mork_types::config::Config;
+use mork_types::reply::Role;
+use mork_types::state::{Agent, Message, MessageKind};
 
 use crate::decide::Ctx;
 use crate::messages::announce::{self, Heard};
@@ -44,7 +44,7 @@ pub(super) fn turn(state: &State, a: &Agent, ctx: Ctx<'_>, codex_exec: bool) -> 
 
 fn startup(state: &State, a: &Agent, ctx: Ctx<'_>, s: &mut Sections<'_>) -> String {
     let mut out = String::new();
-    for part in [crate::maintenance::manuals::factory_for(a.role).as_str(), role_file(a.role)] {
+    for part in [crate::maintenance::manuals::mork_for(a.role).as_str(), role_file(a.role)] {
         out.push_str(part.trim());
         out.push_str("\n\n");
     }
@@ -64,23 +64,20 @@ fn startup(state: &State, a: &Agent, ctx: Ctx<'_>, s: &mut Sections<'_>) -> Stri
     if let Some(c) = card_of(state, a) {
         card(state, c, a.role == Role::Reviewer, &mut out);
         // A gate's review reads the specification of the card it gates, none of its discussion (fac-95).
-        if let Some(s) = crate::reviews::gate::subject_of(c).and_then(|s| state.cards.get(s)).or_else(|| {
-            c.pr.filter(|_| crate::reviews::gate::entry(c))
-                .and_then(|pr| crate::queue::approval::owner(state, c.project.as_str(), pr))
-        }) {
+        if let Some(s) = under_review(state, c) {
             out.push_str("\n## Under review\n\nThe card this review card gates, as its specification was agreed:\n");
             card(state, s, true, &mut out);
         }
     }
     let project = card_of(state, a).map(|c| c.project.as_str());
-    out.push_str(&crate::memory::index(state, project, &ctx.config.factory.project));
+    out.push_str(&crate::memory::index(state, project, ctx.config.mork.project.as_ref()));
     live(state, a, ctx, s, &mut out);
     let outcomes: Vec<&str> = super::reply::outcomes(state, a).iter().map(|o| o.as_str()).collect();
     let _ = write!(
         out,
         "\n## The reply\n\n{CONTRACT}\n\nYour outcomes: {}. `schema` is {}.\n",
         outcomes.join(", "),
-        factory_types::reply::SCHEMA_VERSION
+        mork_types::reply::SCHEMA_VERSION
     );
     out
 }
@@ -112,7 +109,7 @@ fn reminder(state: &State, a: &Agent) -> String {
         out.push_str(crate::maintenance::manuals::FOREMAN_REMINDER);
     }
     let _ =
-        writeln!(out, " Your outcomes: {}. `schema` is {}.", outcomes.join(", "), factory_types::reply::SCHEMA_VERSION);
+        writeln!(out, " Your outcomes: {}. `schema` is {}.", outcomes.join(", "), mork_types::reply::SCHEMA_VERSION);
     out
 }
 
@@ -166,11 +163,11 @@ fn delegation(state: &State, a: &Agent, s: &mut Sections<'_>, out: &mut String) 
 /// The specification rule for the card's current delegation level.
 pub(crate) fn delegation_rule(c: &Card) -> &'static str {
     if !c.delegated {
-        "Settle specification questions with Andrei in your hand's `ask`."
+        "Settle specification questions with the operator in your hand's `ask`."
     } else if c.self_sustained {
         "Never decide a specification question alone: raise every open question in your hand's `ask` as with delegation off, and the engine gives it to the project's orchestrator automatically. The orchestrator answers all given asks, departures included; record each settled rule citing the ask and naming any departure."
     } else {
-        "Never decide a specification question alone: raise every open question in your hand's `ask` as with delegation off, and the engine gives it to the project's orchestrator automatically. Name in the ask's text when the answer would depart from the card's words, reverse an earlier decision of Andrei's, or need his own words so the orchestrator leaves it to Andrei. Record each settled rule citing the ask."
+        "Never decide a specification question alone: raise every open question in your hand's `ask` as with delegation off, and the engine gives it to the project's orchestrator automatically. Name in the ask's text when the answer would depart from the card's words, reverse an earlier decision of the operator's, or need his own words so the orchestrator leaves it to the operator. Record each settled rule citing the ask."
     }
 }
 
@@ -198,10 +195,10 @@ fn choices(state: &State, card: &Card, config: &Config, role: Role) -> String {
 // How full an agent's context is, as its CLI last reported it (fac-25): its own call to make
 // when it is heavy, `fresh` being the way.
 fn context_line(a: &Agent, ctx: Ctx<'_>) -> String {
-    if super::models::seat(ctx.config, a).map(|s| s.cli) == Some(factory_types::config::Cli::Codex) {
+    if super::models::seat(ctx.config, a).map(|s| s.cli) == Some(mork_types::config::Cli::Codex) {
         return format!(
             "Unknown: {} reports no context size.",
-            super::models::cli_name(factory_types::config::Cli::Codex)
+            super::models::cli_name(mork_types::config::Cli::Codex)
         );
     }
     match super::costs::stored_context(ctx.config, a) {
@@ -219,7 +216,7 @@ fn card_of<'a>(state: &'a State, a: &Agent) -> Option<&'a Card> {
     places::card_of(state, &a.place).and_then(|id| state.cards.get(&id))
 }
 
-// Whom the agent's messages reach, from the router's own table, and that nobody else does, Andrei included.
+// Whom the agent's messages reach, from the router's own table, and that nobody else does, the operator included.
 fn recipient_line(state: &State, a: &Agent, ctx: Ctx<'_>) -> String {
     let who = places::Who { key: a.key.clone(), seat: a.seat.clone(), role: a.role, place: a.place.clone() };
     let names = places::recipients(state, &who, ctx);
@@ -228,11 +225,11 @@ fn recipient_line(state: &State, a: &Agent, ctx: Ctx<'_>) -> String {
         Some((last, [])) => last.clone(),
         Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
     };
-    let andrei = places::hand_only(crate::agents::children::is_child(a));
-    let mut chars = andrei.chars();
-    let andrei: String = chars.next().map(|c| c.to_uppercase().chain(chars).collect()).unwrap_or_default();
+    let operator = places::hand_only(crate::agents::children::is_child(a));
+    let mut chars = operator.chars();
+    let operator: String = chars.next().map(|c| c.to_uppercase().chain(chars).collect()).unwrap_or_default();
     format!(
-        "Your messages reach {reach}. A message to anyone else is not delivered: you are told so, and a request so sent wakes you with the notice. {andrei}."
+        "Your messages reach {reach}. A message to anyone else is not delivered: you are told so, and a request so sent wakes you with the notice. {operator}."
     )
 }
 
@@ -240,12 +237,12 @@ fn place_words(state: &State, place: &str) -> String {
     match places::kind(state, place) {
         places::PlaceKind::Main => "main".into(),
         places::PlaceKind::Room(c) if state.cards.get(&c).is_some_and(places::two_rooms) => {
-            format!("{c}'s build room, with Andrei")
+            format!("{c}'s build room, with the operator")
         }
         places::PlaceKind::Room(c) => format!("{c}'s room"),
-        places::PlaceKind::Spec(c) => format!("{c}'s spec room, with Andrei"),
+        places::PlaceKind::Spec(c) => format!("{c}'s spec room, with the operator"),
         places::PlaceKind::Challenge(c) => format!("{c}'s challenge place"),
-        places::PlaceKind::Dm(c, r) => format!("a DM with Andrei about {c}, as its {}", r.as_str()),
+        places::PlaceKind::Dm(c, r) => format!("a DM with the operator about {c}, as its {}", r.as_str()),
         places::PlaceKind::Child(c, _) => format!("your DM, under {c} in the window"),
         places::PlaceKind::Other(p) => p,
     }
@@ -261,16 +258,31 @@ fn standing(c: &Card) -> String {
     )
 }
 
+fn under_review<'a>(state: &'a State, c: &Card) -> Option<&'a Card> {
+    crate::reviews::gate::subject_of(c).and_then(|s| state.cards.get(s)).or_else(|| {
+        let pr = c.pr.filter(|_| crate::reviews::gate::entry(c))?;
+        crate::queue::approval::owner(state, c.project.as_str(), pr)
+    })
+}
+
+// The final request includes short retries and corrections. Its saved prefix stays apart from the text to replay.
+pub(super) fn after_compaction(state: &State, a: &Agent) -> String {
+    let Some(c) = a.needs_specification.then(|| card_of(state, a)).flatten() else { return String::new() };
+    let mut text = String::from("# Current card specification\n");
+    let notes = card_text(state, c, true, &mut text);
+    text.push_str(&later_decisions(&notes));
+    if let Some(subject) = under_review(state, c) {
+        text.push_str("\n## Under review\n");
+        let notes = card_text(state, subject, true, &mut text);
+        text.push_str(&later_decisions(&notes));
+    }
+    text.push('\n');
+    text
+}
+
 // A blind review keeps the specification's marked decisions, but none of the discussion (fac-194).
 fn card(state: &State, c: &Card, blind: bool, out: &mut String) {
-    let board = state.board.get(&c.id);
-    let (description, acceptance) = board.map_or((&c.description, &c.acceptance), |b| (&b.description, &b.acceptance));
-    let title = board.map_or(&c.title, |b| &b.title);
-    let (notes, text) =
-        if blind { crate::board::notes::apart(state, board, description) } else { (Vec::new(), description.clone()) };
-    let _ = write!(out, "\n## The card\n\n{}: {title}\n\n{}\n", c.id, text.trim());
-    carried::accepts(acceptance, out);
-    carried::carried(state, c, blind, out);
+    let notes = card_text(state, c, blind, out);
     let _ = write!(out, "\n{}\n", standing(c));
     if let Some(b) = &c.brief {
         let _ = write!(out, "\n## {}\n\n{}\n", brief_heading(c), b.trim());
@@ -278,14 +290,29 @@ fn card(state: &State, c: &Card, blind: bool, out: &mut String) {
     out.push_str(&later_decisions(&notes));
 }
 
+fn card_text(state: &State, c: &Card, blind: bool, out: &mut String) -> Vec<String> {
+    let board = state.board.get(&c.id);
+    let (description, acceptance) = board.map_or((&c.description, &c.acceptance), |b| (&b.description, &b.acceptance));
+    let title = board.map_or(&c.title, |b| &b.title);
+    let (notes, text) = if blind {
+        crate::board::notes::apart_verbatim(state, board, description)
+    } else {
+        (Vec::new(), description.trim())
+    };
+    let _ = write!(out, "\n## The card\n\n{}: {title}\n\n{}\n", c.id, text);
+    carried::accepts(acceptance, out);
+    carried::carried(state, c, blind, out);
+    notes
+}
+
 /// The specification's decisions still standing among these notes, as a blind review keeps them.
 pub fn later_decisions(notes: &[String]) -> String {
-    standing_decisions(notes, "## Andrei's later decisions\n\nPart of the specification, newest first:")
+    standing_decisions(notes, "## The operator's later decisions\n\nPart of the specification, newest first:")
 }
 
 /// The decisions still standing among these notes under `heading`, newest first; nothing when none stands.
 pub fn standing_decisions(notes: &[String], heading: &str) -> String {
-    let decisions = factory_types::decisions::standing(notes);
+    let decisions = mork_types::decisions::standing(notes);
     if decisions.is_empty() {
         return String::new();
     }
@@ -295,7 +322,7 @@ pub fn standing_decisions(notes: &[String], heading: &str) -> String {
 // A brief its holder's reply settled, nothing left to clarify, was approved by nobody (fac-24).
 fn brief_heading(c: &Card) -> &'static str {
     if crate::lifecycle::facts::clear(c) {
-        "The brief\n\nThis recap settled it with nothing to clarify: Andrei approved no recap."
+        "The brief\n\nThis recap settled it with nothing to clarify: the operator approved no recap."
     } else {
         "The approved brief"
     }
@@ -308,7 +335,7 @@ fn eligible(a: &Agent, m: &Message, addressed_only: bool) -> bool {
     if m.seq < a.seen || a.taken.contains(&m.seq) {
         return false;
     }
-    let own = factory_types::state::Sender::Agent(a.key.clone());
+    let own = mork_types::state::Sender::Agent(a.key.clone());
     let name = a.key.as_str().rsplit('/').next().unwrap_or_default();
     let manual = crate::maintenance::material::audience(m);
     let addressed = m.to.as_deref().is_some_and(|t| t == name || t == a.key.as_str()) || manual == Some(a.role);
@@ -345,19 +372,19 @@ pub(crate) fn unread_request(state: &State, a: &Agent) -> bool {
 
 // The verb distinguishes requests from responses and updates (fac-18).
 fn said(m: &Message) -> String {
-    let verb = m.intent.map_or("says", factory_types::reply::Intent::verb);
+    let verb = m.intent.map_or("says", mork_types::reply::Intent::verb);
     let to = match (m.to.as_deref(), m.intent) {
-        (Some(t), Some(factory_types::reply::Intent::Update)) => format!(" to {t}"),
+        (Some(t), Some(mork_types::reply::Intent::Update)) => format!(" to {t}"),
         (Some(t), _) => format!(" {t}"),
         (None, _) => String::new(),
     };
     format!("{} {verb}{to}: {}", author(m), m.text)
 }
 
-// A message's author as news names it: an orchestrator's answer to an ask Andrei gave it says so (fac-160).
+// A message's author as news names it: an orchestrator's answer to an ask the operator gave it says so (fac-160).
 fn author(m: &Message) -> String {
     match &m.delegated {
-        Some(ask) => format!("{}, on Andrei's delegation, answering {}", m.from.label(), ask.as_str()),
+        Some(ask) => format!("{}, on the operator's delegation, answering {}", m.from.label(), ask.as_str()),
         None => m.from.label(),
     }
 }
@@ -387,7 +414,7 @@ fn news_line(a: &Agent, m: &Message) -> Option<String> {
     if a.role == Role::Foreman
         && let Some(lead) = announce::approval_lead(m)
     {
-        return Some(format!("Factory announcement: {lead}"));
+        return Some(format!("Mork announcement: {lead}"));
     }
     match announce::heard_by(m, a.key.as_str()) {
         Heard::Whole => line(m),
@@ -399,7 +426,7 @@ fn news_line(a: &Agent, m: &Message) -> Option<String> {
 // A message delivered into a turn that ended before reading it may still have reached its session (fac-389).
 const MISSED: &str = "(Delivered while your last turn ran, which ended before it read it: it may already be in your session. Act on it once.)\n";
 
-const QUESTION_REMINDER: &str = "Andrei's message contains a question. Answer it in plain words, the answer first, from the evidence. A question is a probe, never an instruction and never a hint of what he wants: change nothing because of it, in your files or in what you proposed. If your own answer turns up a reason to change, say the reason and then the change. Act only on the parts that tell you to do something.";
+const QUESTION_REMINDER: &str = "The operator's message contains a question. Answer it in plain words, the answer first, from the evidence. A question is a probe, never an instruction and never a hint of what he wants: change nothing because of it, in your files or in what you proposed. If your own answer turns up a reason to change, say the reason and then the change. Act only on the parts that tell you to do something.";
 
 /// A message delivered into its recipient's running turn (fac-389), as its news says it.
 pub fn delivered(m: &Message) -> String {
@@ -412,9 +439,9 @@ fn line(m: &Message) -> Option<String> {
     let to = m.to.as_deref().map(|t| format!(" (to {t})")).unwrap_or_default();
     let mut out = match m.kind {
         MessageKind::Hand => format!("{n}{}'s hand: {}\n{}", m.from.label(), m.headline, m.text),
-        MessageKind::Engine if announce::is(m) => format!("Factory announcement: {}", m.text),
+        MessageKind::Engine if announce::is(m) => format!("Mork announcement: {}", m.text),
         MessageKind::Request | MessageKind::Update if m.intent.is_some() => format!("{n}{}", said(m)),
-        MessageKind::Request | MessageKind::Update if m.from != factory_types::state::Sender::Andrei => {
+        MessageKind::Request | MessageKind::Update if m.from != mork_types::state::Sender::Operator => {
             format!("{n}{}{to}: {}", author(m), m.text)
         }
         MessageKind::Request | MessageKind::Update | MessageKind::Engine => format!("{n}{}: {}", author(m), m.text),
@@ -425,7 +452,7 @@ fn line(m: &Message) -> Option<String> {
     if let Some(n) = m.choice {
         out.push_str(&format!("\n(It chose option {n} of your ask.)"));
     }
-    if m.from == factory_types::state::Sender::Andrei && m.text.contains('?') {
+    if m.from == mork_types::state::Sender::Operator && m.text.contains('?') {
         out.push('\n');
         out.push_str(QUESTION_REMINDER);
     }

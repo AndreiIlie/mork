@@ -3,15 +3,15 @@
 
 use std::collections::BTreeSet;
 
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::Mode;
-use factory_types::chat::{ChatTurn, MessagesView};
-use factory_types::job::JobKind;
-use factory_types::reply::Role;
-use factory_types::seen::{ReadPoint, TurnView};
-use factory_types::state::{Message, Sender};
-use factory_types::view::{Author, HistoryPage, ImageView, Line, MessageView};
-use factory_types::{AgentKey, PlaceId};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::Mode;
+use mork_types::chat::{ChatTurn, MessagesView};
+use mork_types::job::JobKind;
+use mork_types::reply::Role;
+use mork_types::seen::{ReadPoint, TurnView};
+use mork_types::state::{Message, Sender};
+use mork_types::view::{Author, HistoryPage, ImageView, Line, MessageView};
+use mork_types::{AgentKey, PlaceId};
 
 use crate::state::State;
 
@@ -84,7 +84,7 @@ pub(super) fn open_asks(state: &State, place: &str, all: &[&Message]) -> BTreeSe
 }
 
 /// The seq of the hand among `hands` that raised ask `a`, open or closed.
-pub(super) fn source_hand(state: &State, a: &factory_types::ask::Ask, hands: &[&Message]) -> Option<u64> {
+pub(super) fn source_hand(state: &State, a: &mork_types::ask::Ask, hands: &[&Message]) -> Option<u64> {
     let key = owner(state, a)?;
     let mine = hands.iter().rev().filter(|m| matches!(&m.from, Sender::Agent(k) if *k == key));
     let raised = |m: &&&Message| {
@@ -105,20 +105,20 @@ pub(super) fn source_hand(state: &State, a: &factory_types::ask::Ask, hands: &[&
 
 // A report's `done` ask names no agent: its foreman raised it with its report (4.4.5). A review
 // card's names none either, and carries no hand's ask.
-fn owner(state: &State, a: &factory_types::ask::Ask) -> Option<AgentKey> {
+fn owner(state: &State, a: &mork_types::ask::Ask) -> Option<AgentKey> {
     if let Some(key) = &a.agent {
         return Some(key.clone());
     }
     let card = state.cards.get(a.card.as_ref()?)?;
     (a.kind == AskKind::Done && card.mode == Mode::Report).then(|| AgentKey::new(format!("{}/foreman", card.id)))
 }
-// An engine message to an agent is a marker whose text unfolds under it (fac-384); one to Andrei shows whole (5.7.5).
+// An engine message to an agent is a marker whose text unfolds under it (fac-384); one to the operator shows whole (5.7.5).
 pub(super) fn message(m: &Message) -> MessageView {
     let (from, kind) = match &m.from {
-        Sender::Andrei => (Author::Andrei, Line::Andrei),
+        Sender::Operator => (Author::Operator, Line::Operator),
         Sender::Orchestrator(p) => (Author::Orchestrator { project: p.to_string() }, Line::Agent),
         Sender::Pa => (Author::Pa, Line::Agent),
-        Sender::Engine if m.to.as_deref().is_some_and(|t| t != "andrei") => (Author::Engine, Line::Marker),
+        Sender::Engine if m.to.as_deref().is_some_and(|t| t != "operator") => (Author::Engine, Line::Marker),
         Sender::Engine if crate::maintenance::material::is_announcement(m) => (Author::Engine, Line::Marker),
         Sender::Engine => (Author::Engine, Line::Engine),
         Sender::Agent(key) => {
@@ -206,7 +206,7 @@ pub fn turns(state: &State, place: &str, messages: &[MessageView], before: Optio
         .collect()
 }
 
-fn place_of(state: &State, key: &factory_types::AgentKey) -> Option<String> {
+fn place_of(state: &State, key: &mork_types::AgentKey) -> Option<String> {
     if let Some(a) = state.agents.get(key) {
         return Some(a.place.to_string());
     }
@@ -215,7 +215,7 @@ fn place_of(state: &State, key: &factory_types::AgentKey) -> Option<String> {
     if name == "dm" {
         Some(key.to_string())
     } else if name == Role::Planner.as_str() {
-        Some(crate::messages::places::spec_room(&factory_types::CardId::new(parent)))
+        Some(crate::messages::places::spec_room(&mork_types::CardId::new(parent)))
     } else if crate::agents::children::role_of(name).is_some() || crate::agents::children::builder_dm_name(name) {
         Some(format!("{key}/dm"))
     } else {

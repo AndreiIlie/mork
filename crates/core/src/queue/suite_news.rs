@@ -1,8 +1,8 @@
 //! A failed candidate's news (fac-164): each delivery's log line names the receiving card's copy
 //! of its whole log. Its failing tests go unmarked, as no base tip's run compares them (fac-311).
 
-use factory_types::CardId;
-use factory_types::suites::Told;
+use mork_types::CardId;
+use mork_types::suites::Told;
 
 use crate::post::Poster;
 
@@ -24,13 +24,13 @@ pub(crate) fn told(p: &mut Poster<'_>, id: &CardId) {
 
 fn to(told: &Told) -> &CardId {
     match told {
-        Told::Andrei { card, .. } | Told::Agent { card, .. } | Told::Fix { card, .. } => card,
+        Told::Operator { card, .. } | Told::Agent { card, .. } | Told::Fix { card, .. } => card,
     }
 }
 
 fn with_text(told: Told, f: impl Fn(&str) -> String) -> Told {
     match told {
-        Told::Andrei { card, text } => Told::Andrei { card, text: f(&text) },
+        Told::Operator { card, text } => Told::Operator { card, text: f(&text) },
         Told::Agent { card, role, headline, text } => Told::Agent { card, role, headline, text: f(&text) },
         Told::Fix { card, mut fix } => {
             fix.text = f(&fix.text);
@@ -46,7 +46,7 @@ fn pointed(text: &str, path: &str) -> String {
 
 fn deliver(p: &mut Poster<'_>, told: Told) {
     match told {
-        Told::Andrei { card, text } => crate::reviews::cards::to_andrei(p, &card, &text),
+        Told::Operator { card, text } => crate::reviews::cards::to_operator(p, &card, &text),
         Told::Agent { card, role, headline, text } => {
             crate::messages::requests::ask_agent(p, &card, role, &headline, &text);
         }

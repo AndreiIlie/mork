@@ -3,12 +3,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_core::state::State;
-use factory_core::state::unloaded::{Records, companions};
-use factory_types::action::{Action, ActionStatus};
-use factory_types::card::Card;
-use factory_types::state::{Job, Owed};
-use factory_types::{ActionId, CardId, JobId};
+use mork_core::state::State;
+use mork_core::state::unloaded::{Records, companions};
+use mork_types::action::{Action, ActionStatus};
+use mork_types::card::Card;
+use mork_types::state::{Job, Owed};
+use mork_types::{ActionId, CardId, JobId};
 use rusqlite::{OptionalExtension, params};
 
 use super::{Result, Store, load_entity, retired};
@@ -118,7 +118,7 @@ impl Store {
                 continue;
             }
             let c: Card = serde_json::from_str(&data)?;
-            if factory_core::lifecycle::carried::holding(s, &c) {
+            if mork_core::lifecycle::carried::holding(s, &c) {
                 s.cards.insert(c.id.clone(), c);
             }
         }
@@ -209,14 +209,14 @@ impl Store {
             newest = newest.max(settled.unwrap_or(0));
             match (job_id_card(chosen, &id), job_owner(&id)) {
                 (Some(c), _) if chosen.load.contains(c) => wanted.push(JobId::new(id)),
-                (None, Some("factory-build")) => builds.push(id),
+                (None, Some("mork-build")) => builds.push(id),
                 (None, Some(owner)) if seats.contains(owner) => {
                     theirs.entry(owner.to_owned()).or_default().push((id, settled));
                 }
                 _ => {}
             }
         }
-        let kept = |t: Option<i64>| t.is_none_or(|t| t >= newest - factory_core::maintenance::upkeep::KEEP_JOBS);
+        let kept = |t: Option<i64>| t.is_none_or(|t| t >= newest - mork_core::maintenance::upkeep::KEEP_JOBS);
         for mut jobs in theirs.into_values() {
             let latest = jobs.pop();
             wanted.extend(jobs.into_iter().filter(|(_, t)| kept(*t)).chain(latest).map(|(id, _)| JobId::new(id)));
@@ -266,12 +266,12 @@ impl Store {
             // A call whose news is owed: `door_recover` tells it after a crash.
             if owed.contains(&id)
                 && let Some(a) = self.action(&id)?
-                && factory_core::door::owed_news(&a)
+                && mork_core::door::owed_news(&a)
             {
                 s.actions.insert(a.id.clone(), a);
                 continue;
             }
-            s.unloaded.actions.insert(key, (factory_types::ActionId::new(id), status));
+            s.unloaded.actions.insert(key, (mork_types::ActionId::new(id), status));
         }
         s.unloaded.action_top = s.actions.keys().map(|k| number(k.as_str())).fold(top, u64::max);
         Ok(())

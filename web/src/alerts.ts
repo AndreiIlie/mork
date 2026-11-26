@@ -18,7 +18,7 @@ const BADGE_COLOR: Record<Exclude<FaviconTone, null>, string> = {
   red: "hsl(358,75%,59%)",
 };
 
-/** Open hands waiting on Andrei; excludes hands already sent to an orchestrator. */
+/** Open hands waiting on the operator; excludes hands already sent to an orchestrator. */
 export function ownHands(hands: HandView[]): HandView[] {
   return hands.filter((h) => !h.given);
 }

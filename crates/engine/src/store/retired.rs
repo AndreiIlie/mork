@@ -1,10 +1,10 @@
 // fac-312 removed the standalone researchers: an older state's transcripts stay, its research
 // records are rows no build reads, and its runtime records are skipped as it loads, never resumed.
 
-use factory_core::state::State;
-use factory_types::action::{Action, ActionWhat};
-use factory_types::card::{Card, Stage};
-use factory_types::state::Sender;
+use mork_core::state::State;
+use mork_types::action::{Action, ActionWhat};
+use mork_types::card::{Card, Stage};
+use mork_types::state::Sender;
 use rusqlite::{Transaction, params};
 use serde_json::Value;
 
@@ -47,7 +47,7 @@ pub(super) fn mocker(agent: &Value) -> bool {
 fn research_place(s: &State, key: &str) -> bool {
     let place = key.split('/').next().unwrap_or_default();
     let n = place.strip_prefix("r-").unwrap_or_default();
-    let card = factory_types::CardId::new(place);
+    let card = mork_types::CardId::new(place);
     !n.is_empty()
         && n.bytes().all(|b| b.is_ascii_digit())
         && !s.cards.contains_key(&card)

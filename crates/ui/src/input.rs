@@ -1,8 +1,8 @@
 //! Reading a line typed in a place (5.10): a command, a place to go to, or a note saying what
 //! is wrong. It changes nothing; the buttons go through it too.
 
-use factory_types::Command;
-use factory_types::catalog::{self, CommandSpec};
+use mork_types::Command;
+use mork_types::catalog::{self, CommandSpec};
 
 /// An input holding a draft, its cursor at the end.
 pub(crate) fn draft_content(text: &str) -> iced::widget::text_editor::Content {
@@ -111,7 +111,7 @@ fn slash(rest: &str, ctx: &Context) -> Parsed {
     };
     // A start's words go to the shared reader as typed: the card first, then those it carries (fac-563).
     let args = if NAMES_ITS_CARD.contains(&spec.name) { args.to_vec() } else { fill(spec, args, ctx) };
-    match factory_types::words::command(spec, &args) {
+    match mork_types::words::command(spec, &args) {
         Ok(v) => read(&v),
         Err(e) => Parsed::Note(format!("✗ {e}: nothing sent")),
     }
@@ -134,7 +134,7 @@ fn read(v: &serde_json::Value) -> Parsed {
     }
 }
 
-// A `/` line's words, as `factory ctl`'s shell splits them (5.10.2). A quote opens a stretch only at a
+// A `/` line's words, as `mork ctl`'s shell splits them (5.10.2). A quote opens a stretch only at a
 // word's start, so an apostrophe inside a word (`it's`) stays a letter.
 fn shell_words(line: &str) -> Result<Vec<String>, String> {
     let mut words = Vec::new();

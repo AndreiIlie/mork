@@ -1,6 +1,3 @@
-//! The HTTP calls to Bitbucket's API (F-B1–F-B12), with the token's header. Every answer comes
-//! back as status, body and `Location`; what they mean is `parse`'s and the caller's.
-
 use std::time::Duration;
 
 use serde_json::Value;
@@ -8,8 +5,6 @@ use serde_json::Value;
 /// One repository's API.
 #[derive(Debug, Clone)]
 pub struct Repo {
-    /// `https://api.bitbucket.org/2.0`, or the test's fake (1.10.6).
-    pub api: String,
     pub workspace: String,
     pub slug: String,
     /// The `Authorization` header's value.
@@ -59,10 +54,7 @@ impl std::fmt::Display for BitbucketError {
 
 impl std::error::Error for BitbucketError {}
 
-/// The API's root: the fake's under the test settings, else Bitbucket's.
-pub fn api() -> String {
-    crate::faults::test_env("FACTORY_TEST_BITBUCKET").unwrap_or_else(|| "https://api.bitbucket.org/2.0".into())
-}
+const API: &str = "https://api.bitbucket.org/2.0";
 
 fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
@@ -83,7 +75,7 @@ fn answer(r: Result<ureq::http::Response<ureq::Body>, ureq::Error>) -> Result<An
 
 impl Repo {
     fn url(&self, path: &str) -> String {
-        format!("{}/repositories/{}/{}{path}", self.api, self.workspace, self.slug)
+        format!("{API}/repositories/{}/{}{path}", self.workspace, self.slug)
     }
 
     /// A GET of a path under the repository, or of a whole URL (a `next` link, a task).
@@ -114,7 +106,7 @@ impl Repo {
 
     /// `GET /user`: the account the token acts as (F-B12).
     pub fn user(&self) -> Result<Answer, BitbucketError> {
-        answer(agent().get(&format!("{}/user", self.api)).header("Authorization", &self.header).call())
+        answer(agent().get(&format!("{API}/user")).header("Authorization", &self.header).call())
     }
 
     /// Every page of a list, following `next` (at most 20 pages).

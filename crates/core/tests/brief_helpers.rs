@@ -6,15 +6,15 @@
 mod common;
 
 use common::{Sim, reply};
-use factory_core::agents::required;
-use factory_core::decide::Decision;
-use factory_core::lifecycle::brief;
-use factory_core::messages::places::Who;
-use factory_core::post::Poster;
-use factory_types::ask::AskKind;
-use factory_types::card::{MockStep, Stage};
-use factory_types::reply::{Reply, Role};
-use factory_types::work::Purpose;
+use mork_core::agents::required;
+use mork_core::decide::Decision;
+use mork_core::lifecycle::brief;
+use mork_core::messages::places::Who;
+use mork_core::post::Poster;
+use mork_types::ask::AskKind;
+use mork_types::card::{MockStep, Stage};
+use mork_types::reply::{Reply, Role};
+use mork_types::work::Purpose;
 use serde_json::{Value, json};
 
 const CARD: &str = "web-1";
@@ -25,7 +25,7 @@ fn start_brief(s: &mut Sim, start: Value) {
     for (k, v) in start.as_object().unwrap() {
         cmd[k] = v.clone();
     }
-    s.andrei(json!({"start": cmd})).unwrap();
+    s.operator(json!({"start": cmd})).unwrap();
     s.settle_actions();
     let id = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == CARD))[0].clone();
     s.end_job(&id, json!({}));
@@ -39,7 +39,7 @@ fn recap_reply() -> Value {
     r
 }
 
-fn open_approve_asks(s: &Sim) -> Vec<factory_types::ask::Ask> {
+fn open_approve_asks(s: &Sim) -> Vec<mork_types::ask::Ask> {
     s.state
         .asks
         .values()
@@ -122,18 +122,18 @@ fn visual_toggle_at_brief_keeps_switch_on_waiting_recap_and_challenge() {
     s.turn(&format!("{CARD}/foreman"), reply("working", "No objection"));
     assert!(s.card(CARD).recap);
 
-    s.andrei(json!({"visual": {"card": CARD}})).unwrap();
+    s.operator(json!({"visual": {"card": CARD}})).unwrap();
     let c = s.card(CARD);
     assert!(c.visual, "turning visual on at brief must keep the switch");
     assert!(c.draft.is_none() && !c.recap && c.challenge.is_none());
     assert_eq!(c.mock.unwrap().step, MockStep::Baseline);
     assert!(open_approve_asks(&s).is_empty());
 
-    s.andrei(json!({"visual": {"card": CARD, "off": true}})).unwrap();
+    s.operator(json!({"visual": {"card": CARD, "off": true}})).unwrap();
     s.turn(&format!("{CARD}/planner"), recap_reply());
     assert!(s.card(CARD).challenge.is_some());
 
-    s.andrei(json!({"visual": {"card": CARD}})).unwrap();
+    s.operator(json!({"visual": {"card": CARD}})).unwrap();
     let c = s.card(CARD);
     assert!(c.visual);
     assert!(c.draft.is_none() && !c.recap && c.challenge.is_none());
@@ -147,19 +147,19 @@ fn visual_toggle_at_brief_reoffers_given_plan_and_keeps_switch() {
     s.turn(&format!("{CARD}/foreman"), reply("built", "Baseline ready"));
     s.turn(&format!("{CARD}/planner"), recap_reply());
     s.turn(&format!("{CARD}/foreman"), reply("working", "No objection"));
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
     assert_eq!(s.card(CARD).mock.unwrap().step, MockStep::Approved);
 
     // Send back to brief with visual off so a delegated recap is auto-given while mock stays Approved.
-    s.andrei(json!({"visual": {"card": CARD, "off": true}})).unwrap();
-    s.andrei(json!({"brief": {"card": CARD, "words": "Revisit the plan"}})).unwrap();
+    s.operator(json!({"visual": {"card": CARD, "off": true}})).unwrap();
+    s.operator(json!({"brief": {"card": CARD, "words": "Revisit the plan"}})).unwrap();
     s.turn(&format!("{CARD}/planner"), recap_reply());
     s.turn(&format!("{CARD}/foreman"), reply("working", "No objection"));
     let given = open_approve_asks(&s);
     assert_eq!(given.len(), 1);
     assert!(given[0].given);
 
-    s.andrei(json!({"visual": {"card": CARD}})).unwrap();
+    s.operator(json!({"visual": {"card": CARD}})).unwrap();
     let c = s.card(CARD);
     assert!(c.visual);
     assert!(c.recap);

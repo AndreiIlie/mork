@@ -1,15 +1,16 @@
 // Codex's usage limits (1.4.8, Codex 7) and agy's while its token exists (fac-657): each CLI's read walled with the
-// agent home, one at a time, cut at 20 s, on a thread of its own so the engine never waits on it.
+// login home, one at a time, cut at 20 s, on a thread of its own so the engine never waits on it.
 
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicI32;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::Duration;
 
-use factory_core::decide::Event;
-use factory_types::AgentKey;
-use factory_types::config::Cli;
-use factory_types::job::WallMode;
+use mork_core::decide::Event;
+use mork_types::AgentKey;
+use mork_types::config::Cli;
+use mork_types::job::WallMode;
 
 use super::{Engine, Phase};
 use crate::jobs::launch::{self, Answer};
@@ -17,7 +18,7 @@ use crate::{cli, clock, random};
 
 /// The exchange, as F-X5 records it.
 pub const LINES: [&str; 3] = [
-    r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"factory","title":"factory usage","version":"1"},"capabilities":{"experimentalApi":false}}}"#,
+    r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"mork","title":"mork usage","version":"1"},"capabilities":{"experimentalApi":false}}}"#,
     r#"{"jsonrpc":"2.0","method":"initialized"}"#,
     r#"{"jsonrpc":"2.0","id":2,"method":"account/rateLimits/read"}"#,
 ];
@@ -100,9 +101,9 @@ impl Engine {
         launch::end_group(&self.limits_read.agy.group);
     }
 
-    // Opened beneath the agent home as a regular file, never read: a seat writes the agent home.
+    // A seat can replace the token, so check its type through the logins root.
     fn agy_signed_in(&self) -> bool {
-        crate::secrets::regular_file_beneath(&self.opts.home.agent_home(), cli::agy::TOKEN).is_some()
+        crate::login_files::regular(&self.opts.home.logins(), Path::new(crate::login_files::AGY)).is_ok()
     }
 
     fn limits_answered(&mut self, cli: Cli, result: std::io::Result<String>) {
@@ -116,11 +117,11 @@ impl Engine {
         }
     }
 
-    // The read's wall: the agent home, no seat.
-    fn limits_spec(&self, cli: Cli, now: i64) -> Result<factory_types::job::JobSpec, String> {
+    // Limits reads need the shared login outside any seat's home.
+    fn limits_spec(&self, cli: Cli, now: i64) -> Result<mork_types::job::JobSpec, String> {
         let owner = AgentKey::new(format!("limits/{}", cli.as_str()));
-        let id = factory_core::state::names::job_id(now, &owner, random::salt());
-        let home = self.opts.home.agent_home();
+        let id = mork_core::state::names::job_id(now, &owner, random::salt());
+        let home = self.opts.home.login_home();
         let mut env = self.ctx.env(&id, &owner, None, &[], &self.opts.home.job(id.as_str()).join("io"));
         let argv: Vec<String> = match cli {
             Cli::Agy => {
@@ -129,16 +130,18 @@ impl Engine {
             }
             _ => vec!["codex".into(), "app-server".into()],
         };
-        let places = self.ctx.places(&home, Vec::new(), Vec::new(), None, &[])?;
+        crate::seat_homes::env(&self.opts.home, &home, &mut env);
+        let mut places = self.ctx.places(&home, Vec::new(), Vec::new(), None, &[])?;
+        crate::seat_homes::login_places(&self.opts.home, &home, cli, &mut places).map_err(|e| e.to_string())?;
         Ok(self.ctx.spec(
             &id,
-            factory_types::job::JobKind::Turn,
+            mork_types::job::JobKind::Turn,
             &owner,
             argv,
             &home.display().to_string(),
             &places,
             env,
-            Some(self.ctx.config.factory.ports.clone()),
+            Some(self.ctx.config.mork.ports.clone()),
             now,
         ))
     }

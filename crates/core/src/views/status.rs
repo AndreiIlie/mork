@@ -1,10 +1,10 @@
-//! Where things stand, in the lights and words the views and `factory status` show: a card's light (4.4.4), its
+//! Where things stand, in the lights and words the views and `mork status` show: a card's light (4.4.4), its
 //! stage's word, an agent's state and what it does.
 
-use factory_types::AgentKey;
-use factory_types::ask::Color;
-use factory_types::card::{Card, Stage};
-use factory_types::view::{AgentLight, Doing};
+use mork_types::AgentKey;
+use mork_types::ask::Color;
+use mork_types::card::{Card, Stage};
+use mork_types::view::{AgentLight, Doing};
 
 use super::findings::folded_review;
 use super::outside::Outside;
@@ -44,7 +44,7 @@ pub fn color_word(c: Color) -> &'static str {
     }
 }
 
-/// `factory status` (1.7): one line per live card in start order; the engine's answer and the offline read of the state
+/// `mork status` (1.7): one line per live card in start order; the engine's answer and the offline read of the state
 /// both print these (M5.24).
 pub fn status_lines(state: &State) -> Vec<String> {
     let mut live: Vec<&Card> = state.cards.values().filter(|c| c.stage.is_live()).collect();
@@ -77,8 +77,8 @@ pub fn doing(state: &State, agent: &AgentKey, outside: &Outside) -> Doing {
     }
 }
 
-fn error_words(status: &factory_types::state::AgentStatus) -> String {
-    use factory_types::state::AgentStatus;
+fn error_words(status: &mork_types::state::AgentStatus) -> String {
+    use mork_types::state::AgentStatus;
     match status {
         AgentStatus::Error { words } => words.clone(),
         AgentStatus::Cut => "cut twice in a row".into(),
@@ -90,7 +90,7 @@ fn error_words(status: &factory_types::state::AgentStatus) -> String {
 
 /// An agent's state, as its square and icon draw it (5.6.1).
 pub fn agent_light(state: &State, agent: &AgentKey, outside: &Outside) -> AgentLight {
-    use factory_types::state::AgentStatus;
+    use mork_types::state::AgentStatus;
     let Some(a) = state.agents.get(agent) else { return AgentLight::Idle };
     let asking = state.asks.values().any(|k| k.open && k.agent.as_ref() == Some(agent));
     match &a.status {

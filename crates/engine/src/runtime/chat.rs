@@ -3,16 +3,16 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use factory_types::JobId;
-use factory_types::chat::ChatTurn;
-use factory_types::seen::TurnView;
-use factory_types::view::MessageView;
+use mork_types::JobId;
+use mork_types::chat::ChatTurn;
+use mork_types::seen::TurnView;
+use mork_types::view::MessageView;
 
 use super::Engine;
 
 pub(super) const BUDGET: usize = 192 * 1024;
 
-const CACHED: usize = factory_core::views::conversation::MESSAGES_MAX;
+const CACHED: usize = mork_core::views::conversation::MESSAGES_MAX;
 
 type Ended = BTreeMap<JobId, Option<Arc<Log>>>;
 
@@ -58,7 +58,7 @@ impl Cache {
 
 impl Engine {
     pub(super) fn chat_turns(&self, place: &str, messages: &[MessageView], before: Option<u64>) -> Vec<ChatTurn> {
-        factory_core::views::conversation::turns(&self.state, place, messages, before)
+        mork_core::views::conversation::turns(&self.state, place, messages, before)
             .into_iter()
             .filter_map(|mut t| {
                 let log = self.chat_log(place, &t.turn.job, t.running)?;

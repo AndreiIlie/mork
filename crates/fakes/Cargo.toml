@@ -1,5 +1,5 @@
 [package]
-name = "factory-fakes"
+name = "mork-fakes"
 description = "Stand-in claude, codex, agy, cargo, notify-send, checks, editor, a probe, and the test home, for tests only."
 version.workspace = true
 edition.workspace = true

@@ -1,8 +1,8 @@
 // A command's decision: its authority first (the buzz), then the area its catalog declaration names.
 
-use factory_types::Command;
-use factory_types::catalog::Area;
-use factory_types::state::Sender;
+use mork_types::Command;
+use mork_types::catalog::Area;
+use mork_types::state::Sender;
 
 use super::{Ctx, Decision, buzz};
 use crate::state::State;

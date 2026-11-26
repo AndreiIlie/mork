@@ -7,7 +7,7 @@ use std::fmt;
 pub struct Target {
     /// The build exists, with its manifest's ranges.
     pub manifest: Option<Manifest>,
-    /// Its commit is on the factory repo's master.
+    /// Its commit is on Mork repo's master.
     pub on_master: bool,
 }
 
@@ -60,7 +60,7 @@ impl fmt::Display for Refusal {
         match self {
             Self::NoBuild { short } => write!(f, "there is no build of {short}"),
             Self::NotOnMaster { short } => {
-                write!(f, "{short} isn't on the factory repo's master: a pin is a commit Andrei merged")
+                write!(f, "{short} isn't on Mork repo's master: a pin is a commit the operator merged")
             }
             Self::StateVersion { short, oldest, newest, state } => {
                 write!(f, "{short} reads state versions {oldest} to {newest}, and the state is at {state}")

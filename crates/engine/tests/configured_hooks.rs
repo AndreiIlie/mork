@@ -6,32 +6,32 @@
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
-use factory_engine::builds::skills::materialize_into;
-use factory_engine::config::{ConfigError, parse};
+use mork_engine::builds::skills::materialize_into;
+use mork_engine::config::{ConfigError, parse};
 
 const BASE: &str = r#"
-[factory]
-project = "factory"
+[mork]
+project = "mork"
 
 [git]
 author = "Test <test@example.invalid>"
 
 [projects."example.com"]
 repo = "/r/example"
-board = "/b/example"
+board = { kind = "markdown", path = "/b/example" }
 test = "npm test"
 "#;
 
-fn parse_with(extra: &str) -> Result<factory_types::config::Config, ConfigError> {
+fn parse_with(extra: &str) -> Result<mork_types::config::Config, ConfigError> {
     parse(&format!("{BASE}\n{extra}"))
 }
 
 #[test]
 fn config_parse_accepts_all_configured_tables_and_values() {
     let text = r#"
-[factory]
-project = "factory"
-skills = "/srv/factory/skills"
+[mork]
+project = "mork"
+skills = "/srv/mork/skills"
 
 [git]
 author = "Test <test@example.invalid>"
@@ -42,11 +42,17 @@ work-1 = "Claude · work"
 
 [projects."example.com"]
 repo = "/r/example"
-board = "/b/example"
+board = { kind = "markdown", path = "/b/example" }
 test = "npm test"
+[projects."example.com".forge]
+kind = "bitbucket"
+workspace = "ws"
+slug = "repo"
 review_tag = "@review-bot"
 
 [projects."example.com".tickets]
+kind = "azure-devops"
+token = "/credentials/tickets"
 api = "https://example.invalid/org/proj/_apis/wit/workitems"
 page = "https://example.invalid/org/proj/_workitems/edit/"
 
@@ -63,92 +69,84 @@ remote_port = 9000
 url = "http://localhost:4001"
 "#;
     let c = parse(text).unwrap();
-    assert_eq!(c.factory.skills.as_deref(), Some("/srv/factory/skills"));
+    assert_eq!(c.mork.skills.as_deref(), Some("/srv/mork/skills"));
     assert_eq!(c.claude_accounts.get("personal").map(String::as_str), Some("Claude · personal"));
     assert_eq!(c.claude_accounts.get("work-1").map(String::as_str), Some("Claude · work"));
     let p = &c.projects["example.com"];
-    assert_eq!(p.review_tag.as_deref(), Some("@review-bot"));
+    assert!(p.forge.has_review_trigger());
     let t = p.tickets.as_ref().unwrap();
-    assert_eq!(t.api, "https://example.invalid/org/proj/_apis/wit/workitems");
-    assert_eq!(t.page, "https://example.invalid/org/proj/_workitems/edit/");
+    assert_eq!(t.api(), "https://example.invalid/org/proj/_apis/wit/workitems");
+    assert_eq!(t.page(), "https://example.invalid/org/proj/_workitems/edit/");
     assert_eq!(c.tunnels.keys().cloned().collect::<Vec<_>>(), vec!["production", "staging"]);
     assert_eq!(c.tunnels["production"].alias, "ops@prod-box");
     assert_eq!(c.tunnels["staging"].port, 4001);
 }
 
 const VALUE_CASES: &[(&str, usize, &str)] = &[
+    ("[mork]\nproject = \"mork\"\nskills = \"relative/path\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n", 3, "skills"),
+    ("[mork]\nproject = \"mork\"\nskills = \"/srv/../skills\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n", 3, "skills"),
     (
-        "[factory]\nproject = \"factory\"\nskills = \"relative/path\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n",
-        3,
-        "skills",
-    ),
-    (
-        "[factory]\nproject = \"factory\"\nskills = \"/srv/../skills\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n",
-        3,
-        "skills",
-    ),
-    (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[claude_accounts]\n\"bad/name\" = \"Header\"\n",
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[claude_accounts]\n\"bad/name\" = \"Header\"\n",
         8,
         "invalid Claude account name",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[claude_accounts]\n\"..\" = \"Header\"\n",
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[claude_accounts]\n\"..\" = \"Header\"\n",
         8,
         "invalid Claude account name",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[claude_accounts]\npersonal = \"   \"\n",
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[claude_accounts]\npersonal = \"   \"\n",
         8,
         "non-empty header",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[projects.ex]\nrepo = \"/r\"\nboard = \"/b\"\ntest = \"t\"\nreview_tag = \"  \"\n",
-        11,
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[projects.ex]\nrepo = \"/r\"\nboard = { kind = \"markdown\", path = \"/b\" }\ntest = \"t\"\n[projects.ex.forge]\nkind = \"bitbucket\"\nworkspace = \"ws\"\nslug = \"ex\"\nreview_tag = \"  \"\n",
+        15,
         "review_tag",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[projects.ex]\nrepo = \"/r\"\nboard = \"/b\"\ntest = \"t\"\n\n[projects.ex.tickets]\napi = \"http://not-https.invalid\"\npage = \"https://example.invalid/\"\n",
-        13,
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[projects.ex]\nrepo = \"/r\"\nboard = { kind = \"markdown\", path = \"/b\" }\ntest = \"t\"\n\n[projects.ex.tickets]\nkind = \"azure-devops\"\ntoken = \"/cred\"\napi = \"http://not-https.invalid\"\npage = \"https://example.invalid/\"\n",
+        15,
         "tickets.api",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[projects.ex]\nrepo = \"/r\"\nboard = \"/b\"\ntest = \"t\"\n\n[projects.ex.tickets]\napi = \"https://example.invalid/api/\"\npage = \"https://example.invalid/\"\n",
-        13,
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[projects.ex]\nrepo = \"/r\"\nboard = { kind = \"markdown\", path = \"/b\" }\ntest = \"t\"\n\n[projects.ex.tickets]\nkind = \"azure-devops\"\ntoken = \"/cred\"\napi = \"https://example.invalid/api/\"\npage = \"https://example.invalid/\"\n",
+        15,
         "tickets.api",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[projects.ex]\nrepo = \"/r\"\nboard = \"/b\"\ntest = \"t\"\n\n[projects.ex.tickets]\napi = \"https://example.invalid/api\"\npage = \"ftp://example.invalid/\"\n",
-        14,
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[projects.ex]\nrepo = \"/r\"\nboard = { kind = \"markdown\", path = \"/b\" }\ntest = \"t\"\n\n[projects.ex.tickets]\nkind = \"azure-devops\"\ntoken = \"/cred\"\napi = \"https://example.invalid/api\"\npage = \"ftp://example.invalid/\"\n",
+        16,
         "tickets.page",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.\"bad name\"]\nalias = \"box\"\nport = 4000\nremote_port = 9000\nurl = \"http://localhost:4000\"\n",
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.\"bad name\"]\nalias = \"box\"\nport = 4000\nremote_port = 9000\nurl = \"http://localhost:4000\"\n",
         7,
         "tunnel name",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.prod]\nalias = \"-oProxyCommand=bad\"\nport = 4000\nremote_port = 9000\nurl = \"http://localhost:4000\"\n",
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.prod]\nalias = \"-oProxyCommand=bad\"\nport = 4000\nremote_port = 9000\nurl = \"http://localhost:4000\"\n",
         8,
         "alias",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.prod]\nalias = \"prod-box\"\nport = 0\nremote_port = 9000\nurl = \"http://localhost:4000\"\n",
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.prod]\nalias = \"prod-box\"\nport = 0\nremote_port = 9000\nurl = \"http://localhost:4000\"\n",
         9,
         "port",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.a]\nalias = \"a-box\"\nport = 4000\nremote_port = 9000\nurl = \"http://localhost:4000\"\n\n[tunnels.b]\nalias = \"b-box\"\nport = 4000\nremote_port = 9000\nurl = \"http://localhost:4001\"\n",
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.a]\nalias = \"a-box\"\nport = 4000\nremote_port = 9000\nurl = \"http://localhost:4000\"\n\n[tunnels.b]\nalias = \"b-box\"\nport = 4000\nremote_port = 9000\nurl = \"http://localhost:4001\"\n",
         15,
         "shares local port",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.prod]\nalias = \"prod-box\"\nport = 4000\nremote_port = 0\nurl = \"http://localhost:4000\"\n",
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.prod]\nalias = \"prod-box\"\nport = 4000\nremote_port = 0\nurl = \"http://localhost:4000\"\n",
         10,
         "remote_port",
     ),
     (
-        "[factory]\nproject = \"factory\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.prod]\nalias = \"prod-box\"\nport = 4000\nremote_port = 9000\nurl = \"localhost:4000\"\n",
+        "[mork]\nproject = \"mork\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n\n[tunnels.prod]\nalias = \"prod-box\"\nport = 4000\nremote_port = 9000\nurl = \"localhost:4000\"\n",
         11,
         "url",
     ),
@@ -174,7 +172,7 @@ fn config_parse_rejects_non_tables_and_invalid_values_with_lines() {
 
 fn fresh_root(tag: &str) -> PathBuf {
     let base = std::fs::canonicalize(std::env::temp_dir()).unwrap();
-    let dir = base.join(format!("factory-test-skills-{tag}-{}", std::process::id()));
+    let dir = base.join(format!("mork-test-skills-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -239,4 +237,25 @@ fn skills_materialize_merges_skips_links_and_refuses_bad_roots_and_collisions() 
     assert!(err.to_string().contains("collides"), "{err}");
 
     cleanup(&root);
+}
+
+#[test]
+fn provider_tables_are_strict() {
+    let project = "example.com";
+    let cfg = parse(BASE).unwrap();
+    assert!(!cfg.projects[project].forge.hosted());
+    let cfg = parse_with(r#"forge = { kind = "local", backup = "origin" }"#).unwrap();
+    assert_eq!(cfg.projects[project].forge.backup().map(String::as_str), Some("origin"));
+    for extra in [
+        r#"bitbucket = { workspace = "ws", slug = "ex" }"#,
+        r#"review_tag = "tag""#,
+        r#"backup = "origin""#,
+        r#"forge = { kind = "local", workspace = "ws" }"#,
+        r#"tickets = { api = "https://a", page = "https://p" }"#,
+        r#"tickets = { kind = "azure-devops", api = "https://a", page = "https://p" }"#,
+        r#"tickets = { kind = "azure-devops", api = "https://a", page = "https://p", token = "relative" }"#,
+    ] {
+        assert!(parse_with(extra).is_err(), "{extra}");
+    }
+    assert!(parse(&BASE.replace(r#"{ kind = "markdown", path = "/b/example" }"#, r#""/b/example""#)).is_err());
 }

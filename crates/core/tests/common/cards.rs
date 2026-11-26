@@ -1,18 +1,18 @@
-use factory_core::decide::{Decision, Event, Intent};
-use factory_types::CardId;
-use factory_types::action::ActionWhat;
-use factory_types::card::Stage;
-use factory_types::work::{PrSeen, PrState, Purpose};
+use mork_core::decide::{Decision, Event, Intent};
+use mork_types::CardId;
+use mork_types::action::ActionWhat;
+use mork_types::card::Stage;
+use mork_types::work::{PrSeen, PrState, Purpose};
 use serde_json::{Value, json};
 
 use super::{Sim, reply};
 
 impl Sim {
-    /// A full card started by Andrei, cloned, its brief the shortest way: a recap, a challenge with no objection, his
+    /// A full card started by the operator, cloned, its brief the shortest way: a recap, a challenge with no objection, his
     /// approve.
     pub fn through_brief(&mut self, card: &str, project: &str) {
         self.board(card, project);
-        self.andrei(json!({"start": {"card": card}})).unwrap();
+        self.operator(json!({"start": {"card": card}})).unwrap();
         self.settle_actions();
         let id = self.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == card))[0].clone();
         self.end_job(&id, json!({}));
@@ -22,7 +22,7 @@ impl Sim {
         recap["hand"]["message"] = json!("- where: src\n---\nThe plan.");
         self.turn(&format!("{card}/planner"), recap);
         self.turn(&format!("{card}/foreman"), reply("working", "No objection"));
-        self.andrei(json!({"approve": {"card": card}})).unwrap();
+        self.operator(json!({"approve": {"card": card}})).unwrap();
         self.settle_actions();
         assert_eq!(self.stage(card), Stage::Build);
     }
@@ -78,7 +78,7 @@ impl Sim {
         d
     }
 
-    /// The card's PR read by the poller on its pushed head, with Andrei's approval standing or not.
+    /// The card's PR read by the poller on its pushed head, with the operator's approval standing or not.
     pub fn pr_read(&mut self, card: &str, approved: bool) -> Decision {
         let c = self.card(card);
         let head = c.pushed.clone().unwrap();

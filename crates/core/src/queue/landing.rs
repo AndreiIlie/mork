@@ -1,11 +1,11 @@
 //! Landing (4.10, 4.11): the front published, the local base moved, the merge checked, an alarm raised, and a card
 //! landed; its PR is `pr`'s.
 
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Candidate, Card, Landing, Mode, Stage};
-use factory_types::work::{PrSeen, Purpose};
-use factory_types::{CardId, Sha};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Candidate, Card, Landing, Mode, Stage};
+use mork_types::work::{PrSeen, Purpose};
+use mork_types::{CardId, Sha};
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Intent};
@@ -21,9 +21,9 @@ fn base(card: &Card, ctx: Ctx<'_>) -> String {
 pub fn publish(p: &mut Poster<'_>, mut c: Card, k: Candidate, ctx: Ctx<'_>) {
     let (Some(commit), Some(tree)) = (k.commit, k.tree) else { return };
     let id = c.id.clone();
-    let bitbucket = ctx.config.projects.get(&c.project).is_some_and(|x| x.bitbucket.is_some());
+    let hosted = ctx.config.projects.get(&c.project).is_some_and(|x| x.forge.hosted());
     let (tree, base, commit_at) = (Some(tree), k.on.clone(), Some(commit.clone()));
-    if bitbucket {
+    if hosted {
         c.landing = Some(Landing::Published { tree, base, commit: commit_at, verified: true });
         // The head it replaces stays known too: the poll may read it until this push lands.
         if !c.verified_pushes.contains(&commit) {
@@ -47,7 +47,7 @@ pub fn publish(p: &mut Poster<'_>, mut c: Card, k: Candidate, ctx: Ctx<'_>) {
 /// published: dropped, and pushed on a name the push accepts (fac-394). Else given back.
 pub fn repushed(p: &mut Poster<'_>, mut a: Action, words: &str, ctx: Ctx<'_>) -> Option<Action> {
     let ActionWhat::Push { card, branch, commit } = a.what.clone() else { return Some(a) };
-    let refused = |b: &str| crate::board::tickets::refused(&ctx.config.internals.words, b).is_some();
+    let refused = |b: &str| crate::board::tickets::refused(&ctx.config.internals, b).is_some();
     let proven = a.unwritten == Some(true) && !a.cancelled;
     let c = p.card(&card).filter(|c| proven && super::pr::published(c, &commit) && refused(&branch));
     let Some(mut c) = c else { return Some(a) };
@@ -70,7 +70,7 @@ pub fn repushed(p: &mut Poster<'_>, mut a: Action, words: &str, ctx: Ctx<'_>) ->
     None
 }
 
-/// The local base moved to the tested head, in Andrei's checkout (4.11.3).
+/// The local base moved to the tested head, in the operator's checkout (4.11.3).
 pub fn move_base(p: &mut Poster<'_>, mut c: Card, target: Sha, ctx: Ctx<'_>) {
     c.stage = Stage::Merging;
     let from = c.base_tip.clone().or(c.fork.clone()).unwrap_or_else(|| target.clone());
@@ -94,8 +94,7 @@ pub fn moved(p: &mut Poster<'_>, mut c: Card, target: &Sha, v: &Value, ctx: Ctx<
     if !base_moved {
         let after = v.get("after").and_then(Value::as_str).map(Sha::new);
         if let Some(project) = ctx.config.projects.get(&c.project)
-            && project.bitbucket.is_none()
-            && let Some(remote) = &project.backup
+            && let Some(remote) = project.forge.backup()
         {
             p.act(ActionWhat::BackupPush {
                 project: c.project.clone(),
@@ -113,7 +112,7 @@ pub fn moved(p: &mut Poster<'_>, mut c: Card, target: &Sha, v: &Value, ctx: Ctx<
     let words = format!("{}'s base moved to {} since its run", c.project, tip.short());
     if let (true, Some(head)) = (crate::reviews::gate::entry(&c), c.head.clone()) {
         let text = format!("{words}: it goes through the merge train's steps again on it before it lands.");
-        crate::reviews::cards::to_andrei(p, &c.id, &text);
+        crate::reviews::cards::to_operator(p, &c.id, &text);
         return super::entries::enter(p, c, tip, head, ctx);
     }
     c.stage = Stage::Merging;
@@ -126,8 +125,8 @@ pub fn alarm(p: &mut Poster<'_>, c: Card, words: &str) {
 }
 
 /// An alarm tied to the action it holds (a merge whose check failed): `action.done` answers
-/// it, once Andrei has looked (4.11.2, R12).
-pub fn alarm_on(p: &mut Poster<'_>, mut c: Card, words: &str, action: Option<factory_types::ActionId>) {
+/// it, once the operator has looked (4.11.2, R12).
+pub fn alarm_on(p: &mut Poster<'_>, mut c: Card, words: &str, action: Option<mork_types::ActionId>) {
     if c.alarm {
         return;
     }
@@ -140,7 +139,7 @@ pub fn alarm_on(p: &mut Poster<'_>, mut c: Card, words: &str, action: Option<fac
     // Its landing gone, nothing waits on its merge (fac-200).
     asks::close(p, id.as_str(), &[AskKind::ApprovePr]);
     // Nor starts what waited to land it, a merge approved behind its turn or its stop among it; a held
-    // one, and the one the alarm holds, stay for Andrei (fac-98).
+    // one, and the one the alarm holds, stay for the operator (fac-98).
     let waiting = |a: &Action| a.status == ActionStatus::Pending && Some(&a.id) != action.as_ref();
     super::members::drop_landing_actions(p, &id, "its card is alarmed", waiting);
     let mut r = Raise::new(id.as_str(), AskKind::Alarm, Color::Red, words.to_owned());
@@ -148,7 +147,7 @@ pub fn alarm_on(p: &mut Poster<'_>, mut c: Card, words: &str, action: Option<fac
     asks::raise(p, r);
 }
 
-/// An alarm acked (fac-157): the PR's head the poller last read is the factory's own push, and a
+/// An alarm acked (fac-157): the PR's head the poller last read is Mork's own push, and a
 /// head that passed its gates goes to the back of its train; a cause that still holds alarms again.
 pub fn alarm_closed(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
     c.alarm = false;
@@ -170,7 +169,7 @@ pub fn alarm_closed(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
 }
 
 /// The merge call returned: the merge commit's tree and first parent checked (4.11.2.5); a
-/// company PR's merged on Andrei's approval, which no tested tree or base binds (fac-98).
+/// company PR's merged on the operator's approval, which no tested tree or base binds (fac-98).
 pub fn merged(p: &mut Poster<'_>, c: Card, v: &Value, ctx: Ctx<'_>) {
     if c.mode == Mode::Review {
         return crate::reviews::end::merged(p, c, v, ctx);
@@ -245,13 +244,13 @@ pub(crate) fn none_left(p: &mut Poster<'_>, id: &CardId, words: &str) {
     super::members::drop_landing_actions(p, id, words, left);
 }
 
-// A merge made outside the factory has no action that could supply its bounds later (fac-75).
+// A merge made outside Mork has no action that could supply its bounds later (fac-75).
 pub(crate) fn merge_span(seen: &PrSeen, head: &str) -> Option<(Option<Sha>, Sha)> {
     let base = seen.merge_parents.first().filter(|b| seen.merge_parents.len() > 1 && b.0 != head).cloned();
     Some((base, seen.merge_commit.clone()?))
 }
 
-/// Finishes a landing and schedules a build for the factory's new tip. `span` can record a landed
+/// Finishes a landing and schedules a build for Mork's new tip. `span` can record a landed
 /// commit with no known previous base. `keep` takes the head into the mirror first (fac-171).
 pub fn landed_at(
     p: &mut Poster<'_>,
@@ -262,7 +261,7 @@ pub fn landed_at(
     keep: bool,
     ctx: Ctx<'_>,
 ) {
-    if let Some(commit) = new_tip.clone().filter(|_| c.project == ctx.config.factory.project) {
+    if let Some(commit) = new_tip.clone().filter(|_| ctx.config.mork.project.as_ref() == Some(&c.project)) {
         p.intent(Intent::StartJob { purpose: Purpose::Build { commit } });
     }
     c.stage = Stage::Done;

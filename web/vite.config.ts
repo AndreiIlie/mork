@@ -8,8 +8,8 @@ function parsePort(raw: string | undefined): number | undefined {
   return Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined;
 }
 
-const port = parsePort(process.env.FACTORY_PORT);
-const webPort = parsePort(process.env.FACTORY_WEB_PORT);
+const port = parsePort(process.env.MORK_PORT);
+const webPort = parsePort(process.env.MORK_WEB_PORT);
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

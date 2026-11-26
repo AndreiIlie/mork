@@ -1,6 +1,6 @@
 //! The merge train at the engine's start (fac-68): an interrupted fetch is asked again, and owed imports recover.
 
-use factory_types::card::{Card, Landing, Stage};
+use mork_types::card::{Card, Landing, Stage};
 
 use crate::post::Poster;
 

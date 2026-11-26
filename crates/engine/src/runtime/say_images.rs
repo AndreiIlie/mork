@@ -4,10 +4,10 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use factory_core::decide::Event;
-use factory_types::protocol::{ErrorBody, ErrorCode};
-use factory_types::state::Sender;
-use factory_types::{Command, JobId};
+use mork_core::decide::Event;
+use mork_types::protocol::{ErrorBody, ErrorCode};
+use mork_types::state::Sender;
+use mork_types::{Command, JobId};
 use serde_json::{Value, json};
 
 use super::Engine;
@@ -25,7 +25,7 @@ impl Engine {
         answer
     }
 
-    // Each image named once is copied once, read beneath the calling job's `$FACTORY_IO`; one that can't be refuses
+    // Each image named once is copied once, read beneath the calling job's `$MORK_IO`; one that can't be refuses
     // the whole message, its copies made so far removed.
     fn say_copies(&self, cmd: &mut Command, from: &Sender, job: Option<&JobId>) -> Result<Vec<PathBuf>, ErrorBody> {
         let (Command::Say { images: Some(images), .. }, Sender::Agent(key)) = (cmd, from) else {
@@ -37,7 +37,7 @@ impl Engine {
         let refused = |m: String| ErrorBody::new(ErrorCode::Refused, m);
         let running = job.and_then(|id| self.state.jobs.get(id)).filter(|j| &j.owner == key && j.settled.is_none());
         let Some(j) = running else { return Err(refused("an agent's images are sent from its running turn".into())) };
-        let io = self.job_dir(&j.id).factory_io(&j.spec);
+        let io = self.job_dir(&j.id).mork_io(&j.spec);
         let jobs = self.opts.home.jobs();
         let mut made: HashMap<String, String> = HashMap::new();
         for image in images.iter_mut() {
@@ -52,7 +52,7 @@ impl Engine {
                 }
                 Err(e) => {
                     remove(&made.into_values().map(PathBuf::from).collect::<Vec<_>>());
-                    let words = "an agent's images are regular files in its io/ folder, $FACTORY_IO";
+                    let words = "an agent's images are regular files in its io/ folder, $MORK_IO";
                     return Err(refused(format!("the image {image} can't be sent ({e}): {words}")));
                 }
             }

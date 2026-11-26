@@ -1,8 +1,8 @@
 //! Asks (3.5.5, 3.9, 4.4.5, 2.6): raised with their colour and words, joined when one decision
 //! raises two, claimed for one desktop notice, closed by what answers them.
 
-use factory_types::AgentKey;
-use factory_types::ask::{Ask, AskKind, Color};
+use mork_types::AgentKey;
+use mork_types::ask::{Ask, AskKind, Color};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision, Intent};
@@ -34,17 +34,17 @@ pub fn word(k: AskKind) -> &'static str {
 
 #[derive(Debug, Clone)]
 pub struct Raise {
-    pub place: factory_types::PlaceId,
+    pub place: mork_types::PlaceId,
     pub kind: AskKind,
     pub color: Color,
     pub text: String,
     pub detail: String,
     pub agent: Option<AgentKey>,
-    pub action: Option<factory_types::ActionId>,
+    pub action: Option<mork_types::ActionId>,
     /// A foreman's design question (fac-233).
     pub design: bool,
     /// Its hand's options and pick (fac-696).
-    pub choices: Option<factory_types::ask::Choices>,
+    pub choices: Option<mork_types::ask::Choices>,
 }
 
 impl Raise {
@@ -64,16 +64,14 @@ impl Raise {
 }
 
 /// Whether a planner or foreman's own hand marks its ask a design question (fac-233).
-pub fn marked(state: &State, who: &super::places::Who, r: &factory_types::reply::Reply) -> bool {
+pub fn marked(state: &State, who: &super::places::Who, r: &mork_types::reply::Reply) -> bool {
     let child = state.agents.get(&who.key).is_some_and(crate::agents::children::is_child);
-    r.hand.design
-        && matches!(who.role, factory_types::reply::Role::Planner | factory_types::reply::Role::Foreman)
-        && !child
+    r.hand.design && matches!(who.role, mork_types::reply::Role::Planner | mork_types::reply::Role::Foreman) && !child
 }
 
 /// Reuses an open headline, matching the action too for door approvals; otherwise notifies once.
 /// Returns the ask's `<place>/<kind>/<n>` id (2.6.4, fac-124).
-pub fn raise(p: &mut Poster<'_>, r: Raise) -> factory_types::AskId {
+pub fn raise(p: &mut Poster<'_>, r: Raise) -> mork_types::AskId {
     if let Some(same) = p.all_asks().find(|a| {
         a.open
             && a.place == r.place
@@ -91,7 +89,7 @@ pub fn raise(p: &mut Poster<'_>, r: Raise) -> factory_types::AskId {
     let stored = p.state.unloaded.asks.get(&prefix).copied().unwrap_or(0);
     let here = p.all_asks().filter(|a| a.place == r.place && a.kind == r.kind);
     let n = here.filter_map(|a| a.id.as_str().rsplit_once('/')?.1.parse().ok()).fold(stored, u64::max) + 1;
-    let id = factory_types::AskId::new(format!("{prefix}/{n}"));
+    let id = mork_types::AskId::new(format!("{prefix}/{n}"));
     let card = super::places::card_of(p.state, &r.place);
     let mut a = Ask::new(id.clone(), &r.place, card.clone(), r.kind, r.color, &r.text);
     a.agent = r.agent;

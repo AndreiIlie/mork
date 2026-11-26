@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::work::Failing;
+use mork_types::work::Failing;
 
 /// What a Rust binary that failed without naming a failing test, killed or crashed, is listed as.
 pub const NO_TEST: &str = "(the binary failed, naming no failing test)";

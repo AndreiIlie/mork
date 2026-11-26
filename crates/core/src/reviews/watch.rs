@@ -1,36 +1,33 @@
 //! Which PRs review themselves (fac-98, fac-111): every PR into a repository's base, its results authorizing no
 //! merge; the poller's open PRs are verified on first sight or a new head, our own verified head never again (fac-375).
 
-use factory_types::CardId;
-use factory_types::ask::AskKind;
-use factory_types::card::{Card, Mode};
-use factory_types::config::ProjectConfig;
-use factory_types::review::Review;
-use factory_types::work::OpenPr;
+use mork_types::CardId;
+use mork_types::ask::AskKind;
+use mork_types::card::{Card, Mode};
+use mork_types::config::ProjectConfig;
+use mork_types::review::Review;
+use mork_types::work::OpenPr;
 
 use crate::decide::{Ctx, Decision, Intent};
 use crate::messages::asks;
 use crate::post::Poster;
 use crate::state::{Change, State};
 
-/// Whether a card's repository has PRs: on Bitbucket, where every one merges on Andrei's approval
+/// Whether a card's repository has PRs: on Bitbucket, where every one merges on the operator's approval
 /// alone (fac-111).
 pub fn prs(c: &Card, ctx: Ctx<'_>) -> bool {
-    ctx.config.projects.get(&c.project).is_some_and(|p| p.bitbucket.is_some())
+    ctx.config.projects.get(&c.project).is_some_and(|p| p.forge.hosted())
 }
 
 /// Whether a project's PRs into `dest` are watched: on any repository with PRs, those into its
-/// base (master), each reviewed by itself and merged on Andrei's approval (fac-111).
+/// base (master), each reviewed by itself and merged on the operator's approval (fac-111).
 pub fn watched(p: &ProjectConfig, dest: &str) -> bool {
-    p.bitbucket.is_some() && dest == p.base
+    p.forge.hosted() && dest == p.base
 }
 
 // Whether a PR is reviewed automatically: base PRs, and tagged requests into any branch when configured.
 fn reviews_itself(project: &str, pr: &OpenPr, ctx: Ctx<'_>) -> bool {
-    ctx.config.projects.get(project).is_some_and(|p| {
-        watched(p, &pr.dest)
-            || (p.bitbucket.is_some() && p.review_tag.as_deref().is_some_and(|tag| pr.title.contains(tag)))
-    })
+    ctx.config.projects.get(project).is_some_and(|p| watched(p, &pr.dest) || pr.review_requested)
 }
 
 /// The poller read a project's open PRs: those the rules review start by themselves (fac-98); no ask
@@ -38,7 +35,7 @@ fn reviews_itself(project: &str, pr: &OpenPr, ctx: Ctx<'_>) -> bool {
 pub fn open_prs(state: &State, project: &str, prs: &[OpenPr], ctx: Ctx<'_>) -> Decision {
     let mut p = Poster::for_ctx(state, ctx);
     let prefix = format!("(review {project} ");
-    let obsolete: Vec<factory_types::AskId> = p
+    let obsolete: Vec<mork_types::AskId> = p
         .all_asks()
         .filter(|a| a.open && a.kind == AskKind::NewPr && a.text.contains(&prefix))
         .map(|a| a.id.clone())
@@ -74,7 +71,7 @@ fn left(p: &mut Poster<'_>, project: &str, prs: &[OpenPr]) {
 // Enters detected PRs into the train on first sight or head movement, reusing their review cards.
 // Persisted card heads prevent duplicate runs after restart (fac-98, fac-111).
 fn review_open(p: &mut Poster<'_>, project: &str, prs: &[OpenPr], ctx: Ctx<'_>) {
-    let tagged_project = ctx.config.projects.get(project).is_some_and(|c| c.review_tag.is_some());
+    let tagged_project = ctx.config.projects.get(project).is_some_and(|c| c.forge.has_review_trigger());
     let mut fetch = false;
     for pr in prs {
         crate::queue::approval::close_stale(p, project, pr);

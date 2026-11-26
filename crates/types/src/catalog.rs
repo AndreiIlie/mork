@@ -1,4 +1,4 @@
-//! The command catalog (1.13): one declaration per command drives strict parsing (1.6.6), `factory ctl`'s
+//! The command catalog (1.13): one declaration per command drives strict parsing (1.6.6), `mork ctl`'s
 //! subcommands (1.7.1) and `core`'s dispatch to the concern that decides it.
 
 use serde_json::Value;
@@ -36,7 +36,7 @@ pub enum Area {
     Lifecycle,
     /// Review cards, and our cards' PR reviews.
     Reviews,
-    /// Messages, asks, and what Andrei hands the orchestrators.
+    /// Messages, asks, and what the operator hands the orchestrators.
     Messages,
     /// Seats: children, their models and sessions.
     Agents,
@@ -277,10 +277,10 @@ pub fn type_name(ty: FieldType) -> &'static str {
     }
 }
 
-/// A command's signature as `factory ctl` takes it: its name, its required fields in order, then
+/// A command's signature as `mork ctl` takes it: its name, its required fields in order, then
 /// its optional ones. Help, the API index and the reference all show this one line (fac-14).
 pub fn signature(spec: &CommandSpec) -> String {
-    let mut line = format!("factory ctl {}", spec.name);
+    let mut line = format!("mork ctl {}", spec.name);
     for f in spec.fields {
         let t = type_name(f.ty);
         line.push_str(&if f.optional && f.ty == FieldType::Bool {

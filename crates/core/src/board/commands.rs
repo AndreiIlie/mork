@@ -1,6 +1,6 @@
-use factory_types::action::{BoardEdit, BoardNote};
-use factory_types::state::Sender;
-use factory_types::{CardId, Command};
+use mork_types::action::{BoardEdit, BoardNote};
+use mork_types::state::Sender;
+use mork_types::{CardId, Command};
 use serde_json::json;
 
 use super::writes;
@@ -67,8 +67,8 @@ fn create(state: &State, project: &str, title: &str, description: &str, id: Opti
     // The same request is the same action, pending, started or done, whatever the board holds
     // now: it gets the first one's result (2.5.4, M4.19).
     let same = state.actions.values().find(|a| {
-        a.status != factory_types::action::ActionStatus::Dropped
-            && matches!(&a.what, factory_types::action::ActionWhat::CreateBoardCard {
+        a.status != mork_types::action::ActionStatus::Dropped
+            && matches!(&a.what, mork_types::action::ActionWhat::CreateBoardCard {
                 project: p, title: t, description: x, id: i, card: None, ..
             } if p.as_str() == project && t == title && x == description && i.as_ref() == asked.as_ref())
     });
@@ -92,7 +92,7 @@ fn create(state: &State, project: &str, title: &str, description: &str, id: Opti
     d
 }
 
-fn file_of(state: &State, card: &str) -> Result<(factory_types::ProjectId, String), Decision> {
+fn file_of(state: &State, card: &str) -> Result<(mork_types::ProjectId, String), Decision> {
     let id = CardId::new(card.to_lowercase());
     state
         .board
@@ -160,13 +160,13 @@ fn withdrawal(state: &State, from: &Sender, card: &str, number: &str, others: bo
         return Err(format!("{card} has no note #{n}: it has {}", notes.len()));
     }
     let i = notes.len() - n;
-    let Some(words) = factory_types::decisions::decision_words(&notes[i]) else {
+    let Some(words) = mork_types::decisions::decision_words(&notes[i]) else {
         return Err(format!("note #{n} of {card} is not a marked decision"));
     };
-    if factory_types::decisions::withdrawn(&notes)[i] {
+    if mork_types::decisions::withdrawn(&notes)[i] {
         return Err(format!("decision #{n} of {card} is already withdrawn"));
     }
-    Ok(BoardEdit::Note { who: from.label(), text: factory_types::decisions::withdrawal(n, words) })
+    Ok(BoardEdit::Note { who: from.label(), text: mork_types::decisions::withdrawal(n, words) })
 }
 
 // Each value is checked, and a refusal names its field.

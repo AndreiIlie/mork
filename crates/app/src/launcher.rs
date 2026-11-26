@@ -1,10 +1,10 @@
 // Rule 1.7.4: run the pinned build when it is another one, unless started with `--reloaded`.
 // Exception (1.8.6.9): a `pin.next` build reading a state this build can't runs that build.
 
-use factory_engine::builds::{self, PinNext};
-use factory_engine::jobs::launch;
-use factory_engine::paths::Home;
-use factory_engine::{files, store};
+use mork_engine::builds::{self, PinNext};
+use mork_engine::jobs::launch;
+use mork_engine::paths::Home;
+use mork_engine::{files, store};
 
 /// Hands over to another build when the rule says so; `None` to carry on as this one.
 pub fn hand_over(home: &Home, own: &str, args: &[String]) -> Option<i32> {
@@ -34,6 +34,6 @@ pub fn hand_over(home: &Home, own: &str, args: &[String]) -> Option<i32> {
 
 fn exec(home: &Home, commit: &str, args: &[String]) -> i32 {
     let err = launch::exec(&builds::binary(home, commit), args.get(1..).unwrap_or(&[]), &[]);
-    eprintln!("factory: couldn't run build {commit}: {err}");
+    eprintln!("mork: couldn't run build {commit}: {err}");
     1
 }

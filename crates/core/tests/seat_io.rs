@@ -1,4 +1,4 @@
-// fac-654: a seat's `$FACTORY_IO` is named by its first turn and kept for its run, whatever turn follows; a reply's
+// fac-654: a seat's `$MORK_IO` is named by its first turn and kept for its run, whatever turn follows; a reply's
 // images, and a say's, are the copies the engine published for the sender's running job.
 
 // why: test code: a failed unwrap is the test failing, which 1.12.4 leaves to tests.
@@ -7,9 +7,9 @@
 mod common;
 
 use common::{HOME, Sim, reply};
-use factory_core::decide::{Event, JobEnd, SessionSeen};
-use factory_types::state::{Owed, Sender};
-use factory_types::{AgentKey, JobId};
+use mork_core::decide::{Event, JobEnd, SessionSeen};
+use mork_types::state::{Owed, Sender};
+use mork_types::{AgentKey, JobId};
 use serde_json::{Value, json};
 
 const CARD: &str = "web-1";
@@ -35,9 +35,9 @@ fn building() -> (Sim, String) {
     (s, first)
 }
 
-// Andrei's message to the foreman, waking it.
+// The operator's message to the foreman, waking it.
 fn wake(s: &mut Sim) {
-    s.andrei(json!({"say": {"place": CARD, "to": "foreman", "text": "Go on."}})).unwrap();
+    s.operator(json!({"say": {"place": CARD, "to": "foreman", "text": "Go on."}})).unwrap();
 }
 
 fn ends(s: &mut Sim, id: &JobId, reply: Value) {
@@ -69,7 +69,7 @@ fn a_seats_folder_is_kept_through_its_corrections_retries_and_fresh_sessions() {
     let id = s.turn_started(FOREMAN);
     ends(&mut s, &id, with_images(&[format!("{HOME}/io/{first}/shot.png")]));
     let why = correction_owed(&s, FOREMAN).expect("an image the engine didn't publish is refused");
-    assert!(why.contains("isn't a regular file of your io/ folder, $FACTORY_IO"), "{why}");
+    assert!(why.contains("isn't a regular file of your io/ folder, $MORK_IO"), "{why}");
     s.turn(FOREMAN, reply("working", "Corrected"));
     wake(&mut s);
     let id = s.turn_started(FOREMAN);
@@ -80,7 +80,7 @@ fn a_seats_folder_is_kept_through_its_corrections_retries_and_fresh_sessions() {
     s.apply(Event::JobEnded { id, end: JobEnd::Failed { words: "it broke".into() } });
     wake(&mut s);
     s.turn(FOREMAN, reply("working", "Back"));
-    s.andrei(json!({"fresh": {"agent": FOREMAN}})).unwrap();
+    s.operator(json!({"fresh": {"agent": FOREMAN}})).unwrap();
     wake(&mut s);
     s.turn(FOREMAN, reply("working", "Fresh"));
     assert_eq!(turns(&s, FOREMAN).len(), 8, "its brief's turn, and seven since");
@@ -90,16 +90,16 @@ fn a_seats_folder_is_kept_through_its_corrections_retries_and_fresh_sessions() {
 #[test]
 fn a_new_run_names_a_new_folder() {
     let (mut s, first) = building();
-    s.andrei(json!({"close": {"card": CARD, "why": "Again."}})).unwrap();
+    s.operator(json!({"close": {"card": CARD, "why": "Again."}})).unwrap();
     s.settle_actions();
     for id in s.open_jobs(|_| true) {
         s.end_job(&id, json!({}));
     }
     s.settle_actions();
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
+    s.operator(json!({"start": {"card": CARD}})).unwrap();
     assert_eq!(io(&s, FOREMAN), None, "a new run's foreman has no folder before its first turn");
     s.settle_actions();
-    let clone = s.open_jobs(|p| matches!(p, factory_types::work::Purpose::Clone { .. }));
+    let clone = s.open_jobs(|p| matches!(p, mork_types::work::Purpose::Clone { .. }));
     s.end_job(&clone[0], json!({}));
     s.settle_actions();
     wake(&mut s);
@@ -155,7 +155,7 @@ fn a_message_names_its_senders_published_copies_alone() {
     ];
     for image in refused {
         let e = s.cmd(from.clone(), say(image.clone())).expect_err(&image);
-        assert!(e.message.contains("isn't in your io/ folder, $FACTORY_IO"), "{image}: {}", e.message);
+        assert!(e.message.contains("isn't in your io/ folder, $MORK_IO"), "{image}: {}", e.message);
     }
     s.cmd(from, say(own("say-1-a.png"))).unwrap();
     assert!(s.state.messages.iter().any(|m| m.images == [own("say-1-a.png")]), "the message carries its copy");

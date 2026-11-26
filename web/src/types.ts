@@ -98,7 +98,7 @@ export interface RecentBurn {
   roles: RoleBurn[];
   ended_cards: number;
   average_cents?: number;
-  cache_hit_percent?: number;
+  cache_by_model: { cli: string; model: string; cache_hit_percent?: number }[];
   cards_left?: CardsLeft;
   /** The last 14 local days, oldest first, for the Usage charts. */
   daily?: DayBurn[];
@@ -333,13 +333,13 @@ export interface AgentRow {
 }
 
 export type Author =
-  | { is: "andrei" }
+  | { is: "operator" }
   | { is: "engine" }
   | { is: "orchestrator"; project: string }
   | { is: "pa" }
   | { is: "agent"; label: string; role: Role };
 
-export type LineKind = "marker" | "engine" | "andrei" | "agent";
+export type LineKind = "marker" | "engine" | "operator" | "agent";
 
 export interface ReplyHand {
   color: Color;

@@ -30,7 +30,7 @@ pub struct Spec {
 /// Runs inside the wall; prints what it saw.
 pub fn run(args: &[String]) -> i32 {
     let Some(spec) = args.first().and_then(|a| serde_json::from_str::<Spec>(a).ok()) else {
-        eprintln!("factory live-probe <spec as JSON>");
+        eprintln!("mork live-probe <spec as JSON>");
         return 2;
     };
     println!("{}", look(&spec));

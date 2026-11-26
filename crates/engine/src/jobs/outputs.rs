@@ -8,9 +8,9 @@ use std::io::{self, Read};
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Component, Path, PathBuf};
 
-use factory_types::JobId;
-use factory_types::seen::OutputFile;
-use factory_types::state::Job;
+use mork_types::JobId;
+use mork_types::seen::OutputFile;
+use mork_types::state::Job;
 
 use crate::paths::Home;
 
@@ -38,7 +38,7 @@ pub fn produced<'a>(home: &Home, turns: impl IntoIterator<Item = &'a Job>) -> Ve
     let mut seats: BTreeMap<&OsStr, Vec<&Job>> = BTreeMap::new();
     let ios = home.seat_ios();
     for job in turns {
-        let io = job.spec.env.get("FACTORY_IO").and_then(|io| Path::new(io).strip_prefix(&ios).ok());
+        let io = job.spec.env.get("MORK_IO").and_then(|io| Path::new(io).strip_prefix(&ios).ok());
         if let Some((seat, rest)) = io.and_then(first)
             && rest.as_os_str().is_empty()
         {
@@ -49,7 +49,7 @@ pub fn produced<'a>(home: &Home, turns: impl IntoIterator<Item = &'a Job>) -> Ve
     let mut out = Vec::new();
     for (seat, jobs) in seats.iter().filter_map(|(s, jobs)| Some((s.to_str()?, jobs))) {
         let (mut found, mut left) = (Vec::new(), ENTRIES);
-        if let Ok(io) = factory_sys::open_dir_beneath(&root, Path::new(seat)) {
+        if let Ok(io) = mork_sys::open_dir_beneath(&root, Path::new(seat)) {
             walk(&io, "", DEPTH, &mut left, &mut found);
         }
         let Some(agent) = jobs.first().map(|j| j.owner.clone()) else { continue };
@@ -82,14 +82,14 @@ fn supplied(job: &Job, name: &str) -> bool {
 // The regular files in the open folder `dir`, named from `prefix`, down to `depth` folders and
 // within `left` entries read: each folder read through its descriptor, a symlink never followed.
 fn walk(dir: &File, prefix: &str, depth: usize, left: &mut usize, found: &mut Vec<(String, u64, i64)>) {
-    let Ok(entries) = factory_sys::read_dir_of(dir) else { return };
+    let Ok(entries) = mork_sys::read_dir_of(dir) else { return };
     for e in entries.flatten() {
         let Some(l) = left.checked_sub(1) else { return };
         *left = l;
         let (Some(own), Ok(meta)) = (e.file_name().to_str().map(str::to_owned), e.metadata()) else { continue };
         let name = format!("{prefix}{own}");
         if meta.is_dir() && depth > 1 {
-            if let Ok(sub) = factory_sys::open_dir_beneath(dir, Path::new(&own)) {
+            if let Ok(sub) = mork_sys::open_dir_beneath(dir, Path::new(&own)) {
                 walk(&sub, &format!("{name}/"), depth - 1, left, found);
             }
         } else if meta.is_file() && name.len() <= NAME_MAX {
@@ -121,7 +121,7 @@ fn beneath(dir: &Path, rel: &Path) -> io::Result<File> {
     if !kind.is_some_and(|k| VIEWABLE.contains(&k.as_str())) {
         return Err(refused("not a kind of file the viewer is given"));
     }
-    let file = factory_sys::open_beneath(dir, rel)?;
+    let file = mork_sys::open_beneath(dir, rel)?;
     if !file.metadata()?.is_file() {
         return Err(refused("not a regular file"));
     }
@@ -190,7 +190,7 @@ fn sweep(dir: &Path, now_ms: i64) {
 }
 
 /// Opens a file a turn produced in the system's viewer: a [`stage`]d copy of what [`checked`]
-/// opened, in `$XDG_RUNTIME_DIR/factory-viewer`, the desktop session's own, outside every wall.
+/// opened, in `$XDG_RUNTIME_DIR/mork-viewer`, the desktop session's own, outside every wall.
 pub fn open(home: &Home, seat: &str, name: &str) -> io::Result<()> {
     view(home, &checked(home, seat, name)?, name)
 }
@@ -198,7 +198,7 @@ pub fn open(home: &Home, seat: &str, name: &str) -> io::Result<()> {
 /// Opens a message's image (fac-278) in the system's viewer, as [`open`] does a produced file:
 /// the copy [`staged_image`] made of it.
 pub fn open_image(home: &Home, path: &str) -> io::Result<()> {
-    super::launch::viewer(home.root(), &staged_image(home, path, &runtime()?.join("factory-viewer"))?)
+    super::launch::viewer(home.root(), &staged_image(home, path, &runtime()?.join("mork-viewer"))?)
 }
 
 /// A message's image, [`stage`]d in `dir`: `path` names a file of a seat's `io/`, a job's published copy or a file of
@@ -208,7 +208,7 @@ pub fn staged_image(home: &Home, path: &str, dir: &Path) -> io::Result<PathBuf> 
     if !plain(rel) {
         return Err(refused("not a path inside its folder"));
     }
-    let file = factory_sys::open_beneath(&folder, rel)?;
+    let file = mork_sys::open_beneath(&folder, rel)?;
     if !file.metadata()?.is_file() {
         return Err(refused("not a regular file"));
     }
@@ -245,7 +245,7 @@ fn image_folder<'a>(home: &Home, path: &'a Path) -> io::Result<(PathBuf, &'a Pat
 }
 
 fn view(home: &Home, file: &File, name: &str) -> io::Result<()> {
-    super::launch::viewer(home.root(), &stage(&runtime()?.join("factory-viewer"), file, name)?)
+    super::launch::viewer(home.root(), &stage(&runtime()?.join("mork-viewer"), file, name)?)
 }
 
 fn runtime() -> io::Result<PathBuf> {

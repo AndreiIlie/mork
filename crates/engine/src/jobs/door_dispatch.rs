@@ -1,10 +1,10 @@
-//! `factory door-dispatch [--allow sql,mongo,libra,file,sh] [--receipts <dir>] [--tunnels <dir>]` (fac-1, fac-86):
+//! `mork door-dispatch [--allow sql,mongo,libra,file,sh] [--receipts <dir>] [--tunnels <dir>]` (fac-1, fac-86):
 //! runs only allowed kinds, as argv never through a local shell, masking secrets; with `--receipts` a call runs once.
 
 use std::io::{BufRead, Read, Write};
 use std::path::{Path, PathBuf};
 
-use factory_types::door_plan::{Bounds, DispatchAnswer, DispatchRequest, Plan, Session, WIRE};
+use mork_types::door_plan::{Bounds, DispatchAnswer, DispatchRequest, Plan, Session, WIRE};
 
 use super::door_services::{Call, execute, kill};
 use crate::door::redact::Redactor;
@@ -113,7 +113,7 @@ fn stop(s: &Settings, req: &DispatchRequest, answer: DispatchAnswer) -> Dispatch
         return answer;
     };
     let answer = DispatchAnswer { session: Some(recorded), ..answer };
-    if recorded.until_ms < crate::clock::real_now_ms() {
+    if recorded.until_ms < crate::clock::now_ms() {
         let _ = std::fs::remove_file(&path);
         return answer;
     }
@@ -173,7 +173,7 @@ fn run(s: &Settings, req: &DispatchRequest, plan: &Plan, bounds: Bounds) -> Disp
     }
     // The gate again, on what runs: a query it didn't give back as itself never ran through it.
     if let Plan::Sql { query, .. } = plan {
-        let Some(read) = factory_core::door::sql::read(query).ok().filter(|r| &r.text() == query) else {
+        let Some(read) = mork_core::door::sql::read(query).ok().filter(|r| &r.text() == query) else {
             return refused("its query isn't a canonical read");
         };
         if let Err(e) = read.timed(bounds.timeout_ms) {

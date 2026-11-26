@@ -4,11 +4,11 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use factory_types::action::{Action, ActionWhat};
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::config::{Config, ProjectConfig as Project};
-use factory_types::work::{ActionFailure, Taken};
-use factory_types::{CardId, Sha};
+use mork_types::action::{Action, ActionWhat};
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::config::{Config, ProjectConfig as Project};
+use mork_types::work::{ActionFailure, Taken};
+use mork_types::{CardId, Sha};
 use serde_json::{Value, json};
 
 use crate::git::{self, checkout, mirror};
@@ -35,10 +35,10 @@ pub struct Call {
     /// The token's verdict (3.7.2), read under the project's lock right before the call (M4.5).
     pub verdict: super::verdict::Verdict,
     /// Bitbucket's short hashes made full, the pipe's (fac-361).
-    pub fulls: crate::bitbucket::calls::Fulls,
+    pub(super) readers: crate::forge::Readers,
     /// Where a token file changed since Bitbucket was asked about it sends what it now says.
     pub tx: std::sync::mpsc::Sender<super::Input>,
-    pub project: factory_types::ProjectId,
+    pub project: mork_types::ProjectId,
     /// The running binary: the door's dispatcher, the engine's own local child for every target (fac-1).
     pub bin: std::path::PathBuf,
     /// Set once a door read's last waiting caller has gone: the read is cut (fac-183).
@@ -59,16 +59,7 @@ pub fn git_failure(words: impl Into<String>) -> ActionFailure {
     }
 }
 
-/// Where a project's mirror fetches from: Andrei's checkout, or origin with the token in the
-/// environment (4.2.1). The test origin under the test settings (1.10.6).
-pub fn source(project: &Project) -> Result<(String, Vec<(String, String)>), String> {
-    let Some(bb) = &project.bitbucket else { return Ok((project.repo.clone(), Vec::new())) };
-    if let Some(root) = crate::faults::test_env("FACTORY_TEST_ORIGIN") {
-        return Ok((format!("{root}/{}/{}.git", bb.workspace, bb.slug), Vec::new()));
-    }
-    let token = crate::token::read()?;
-    Ok((format!("https://bitbucket.org/{}/{}.git", bb.workspace, bb.slug), git::token_env(&token.git_header())))
-}
+pub(super) use crate::forge::source;
 
 impl Call {
     pub fn project(&self, name: &str) -> Result<Project, ActionFailure> {
@@ -93,7 +84,7 @@ impl Call {
 }
 
 /// Whether an action reaches Bitbucket: its calls, and a fetch of a project on it.
-pub fn reaches_bitbucket(config: &Config, what: &ActionWhat) -> bool {
+pub fn reaches_forge(config: &Config, what: &ActionWhat) -> bool {
     match what {
         ActionWhat::Push { .. }
         | ActionWhat::OpenPr { .. }
@@ -101,7 +92,7 @@ pub fn reaches_bitbucket(config: &Config, what: &ActionWhat) -> bool {
         | ActionWhat::ReplyComment { .. }
         | ActionWhat::ResolveComment { .. }
         | ActionWhat::Merge { .. } => true,
-        ActionWhat::Fetch { project, .. } => config.projects.get(project).is_some_and(|p| p.bitbucket.is_some()),
+        ActionWhat::Fetch { project, .. } => config.projects.get(project).is_some_and(|p| p.forge.hosted()),
         ActionWhat::Take { .. }
         | ActionWhat::TakeJoin { .. }
         | ActionWhat::BackupPush { .. }
@@ -114,23 +105,24 @@ pub fn reaches_bitbucket(config: &Config, what: &ActionWhat) -> bool {
     }
 }
 
-// The guards needing no read of their own (2.5.8): no Bitbucket call under a token found Andrei's (3.7.2), its verdict
+// The guards needing no read of their own (2.5.8): no Bitbucket call under a token found the operator's (3.7.2), its verdict
 // read now under the lock, re-asked when the token file changed (M4.5); the call uses only the text read here (M5.1).
-fn guard(c: &Call) -> Result<Option<String>, ActionFailure> {
-    if !reaches_bitbucket(&c.config, &c.action.what) {
+fn guard(c: &Call) -> Result<Option<crate::forge::Credential>, ActionFailure> {
+    if !reaches_forge(&c.config, &c.action.what) {
         return Ok(None);
     }
-    let text = crate::token::read_text().map_err(|e| ActionFailure::Token { words: e.to_string() })?;
-    let repo = crate::token::pinned(text.clone(), || super::act_bitbucket::repo(&c.project(c.project.as_str())?))?;
-    match c.verdict.now(&repo, &text, &c.tx) {
-        Ok(None) => Ok(Some(text)),
+    let forge = c.project(c.project.as_str())?.forge;
+    let credential = crate::forge::Credential::read(&forge)?;
+    let reader = credential.pinned(|| c.readers.read(&forge))?;
+    match c.verdict.now(reader.as_ref(), credential.text(), forge.label(), &c.tx) {
+        Ok(None) => Ok(Some(credential)),
         Ok(Some(words)) | Err(words) => Err(ActionFailure::Token { words }),
     }
 }
 
 pub fn run(c: &Call) -> Result<Value, ActionFailure> {
     match guard(c)? {
-        Some(text) => crate::token::pinned(text, || call(c)),
+        Some(credential) => credential.pinned(|| call(c)),
         None => call(c),
     }
 }
@@ -175,7 +167,7 @@ fn call(c: &Call) -> Result<Value, ActionFailure> {
         | ActionWhat::Comment { .. }
         | ActionWhat::ReplyComment { .. }
         | ActionWhat::ResolveComment { .. }
-        | ActionWhat::Merge { .. } => super::act_bitbucket::run(c),
+        | ActionWhat::Merge { .. } => super::act_forge::run(c),
         ActionWhat::Door(_) => crate::door::call::run(&c.home, &c.bin, &c.action, &c.door_redactor(), &c.stop),
     }
 }
@@ -183,7 +175,7 @@ fn call(c: &Call) -> Result<Value, ActionFailure> {
 // The clone's handoff, copied into its project's records: where it is, and what it holds. A copy
 // recorded whole was made before a removal that was cut short, and is what the clone held.
 fn preserve(c: &Call, card: &CardId, run: u32, clone: &Path) -> Result<Option<Value>, ActionFailure> {
-    let to = c.home.records().join(c.project.as_str()).join(factory_core::memory::handoff_dir(card, run));
+    let to = c.home.records().join(c.project.as_str()).join(mork_core::memory::handoff_dir(card, run));
     let aside = c.home.handoffs().join(card.as_str());
     let copied = match super::handoff::recorded(&to) {
         Ok(None) => match super::handoff::settle_aside(&aside, clone, &to) {
@@ -223,8 +215,7 @@ pub fn fetch(c: &Call, project: &str) -> Result<Value, ActionFailure> {
     let p = c.project(project)?;
     let m = c.mirror(project)?;
     let (from, env) = source(&p).map_err(failed)?;
-    mirror::fetch(&c.home, &m, &from, &env)
-        .map_err(|e| if p.bitbucket.is_some() { git_failure(e) } else { failed(e) })?;
+    mirror::fetch(&c.home, &m, &from, &env).map_err(|e| if p.forge.hosted() { git_failure(e) } else { failed(e) })?;
     let heads = mirror::heads(&c.home, &m);
     let tip_of = |b: &str| heads.iter().find(|h| h.name == b).and_then(|h| h.commit.clone());
     let tip = tip_of(&p.base).ok_or_else(|| failed(format!("{project} has no branch {}", p.base)))?;

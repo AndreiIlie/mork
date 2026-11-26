@@ -1,9 +1,9 @@
 //! An accepted reply's effects (3.4, 3.5): its hand posted, its messages routed and their
 //! recipients woken and its `answer` ask. What its outcome moves is section 4's.
 
-use factory_types::ask::{AskKind, Color};
-use factory_types::reply::{Intent, Outcome, Reply, ReplyMessage};
-use factory_types::state::{MessageKind, Sender};
+use mork_types::ask::{AskKind, Color};
+use mork_types::reply::{Intent, Outcome, Reply, ReplyMessage};
+use mork_types::state::{MessageKind, Sender};
 use serde_json::json;
 
 use super::places::{self, Route, Who};
@@ -29,10 +29,10 @@ pub fn apply(
     let state = p.state;
     let from = Sender::Agent(who.key.clone());
     let h = &reply.hand;
-    // Every numbered child's question remains its foreman's (fac-499); the planner's hand is Andrei's (fac-633).
+    // Every numbered child's question remains its foreman's (fac-499); the planner's hand is the operator's (fac-633).
     let parent =
         state.agents.get(&who.key).filter(|a| crate::agents::children::is_child(a)).and_then(|a| a.parent.as_ref());
-    let to = parent.and_then(|k| k.as_str().rsplit('/').next()).unwrap_or("andrei");
+    let to = parent.and_then(|k| k.as_str().rsplit('/').next()).unwrap_or("operator");
     // A recap's typed sketch heads its words in the room, as it heads its plan (fac-696).
     let text = h.sketch().map_or_else(|| h.message.clone(), |s| format!("{}\n\n{}", s.words(), h.message));
     let hand_seq = p.post(&who.place, from.clone(), Some(to), MessageKind::Hand, &h.headline, &text);
@@ -82,7 +82,7 @@ fn message(
                 None => p.wake(target, &from),
             }
         }
-        // Posted nowhere, Andrei's chat included: he is reached only by a raised hand (fac-390).
+        // Posted nowhere, the operator's chat included: he is reached only by a raised hand (fac-390).
         Route::Unplaced { to, why } => {
             let card = places::card_of(p.state, &who.place);
             p.journal(
@@ -96,7 +96,7 @@ fn message(
             let notice =
                 format!("Your message to `{to}` was not delivered: {why}. Names that reach from here: {reach}.");
             let name = who.key.as_str().rsplit('/').next().unwrap_or_default();
-            let asked = m.kind == Some(factory_types::reply::Intent::Request);
+            let asked = m.kind == Some(mork_types::reply::Intent::Request);
             let kind = if asked { MessageKind::Request } else { MessageKind::Update };
             p.post(&who.place, Sender::Engine, Some(name), kind, "", &notice);
             if asked {

@@ -4,15 +4,15 @@
 mod common;
 
 use common::{Sim, reply};
-use factory_core::decide::{Decision, Event, Intent, JobEnd};
-use factory_core::messages::wakes;
-use factory_core::state::Change;
-use factory_types::ask::{Ask, AskKind};
-use factory_types::card::Stage;
-use factory_types::orchestrator::{OrchestratorEvent, OrchestratorWhat};
-use factory_types::protocol::ErrorCode;
-use factory_types::state::{MessageKind, Sender};
-use factory_types::work::Purpose;
+use mork_core::decide::{Decision, Event, Intent, JobEnd};
+use mork_core::messages::wakes;
+use mork_core::state::Change;
+use mork_types::ask::{Ask, AskKind};
+use mork_types::card::Stage;
+use mork_types::orchestrator::{OrchestratorEvent, OrchestratorWhat};
+use mork_types::protocol::ErrorCode;
+use mork_types::state::{MessageKind, Sender};
+use mork_types::work::Purpose;
 use serde_json::json;
 
 const CARD: &str = "web-1";
@@ -20,7 +20,7 @@ const CARD: &str = "web-1";
 // why: test helper: a refused start is a test failure.
 #[allow(clippy::unwrap_used)]
 fn start_brief(s: &mut Sim, card: &str, extra: serde_json::Value) {
-    s.config.factory.notifications = true;
+    s.config.mork.notifications = true;
     s.board(card, "web");
     let mut start = json!({"card": card});
     if let (Some(dst), Some(src)) = (start.as_object_mut(), extra.as_object()) {
@@ -28,7 +28,7 @@ fn start_brief(s: &mut Sim, card: &str, extra: serde_json::Value) {
             dst.insert(k.clone(), v.clone());
         }
     }
-    s.andrei(json!({"start": start})).unwrap();
+    s.operator(json!({"start": start})).unwrap();
     s.settle_actions();
     let clone = s.open_jobs(|p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == card))[0].clone();
     s.end_job(&clone, json!({}));
@@ -96,7 +96,7 @@ fn answer_asks_are_auto_given_without_notice_when_delegated_and_notified_when_of
 }
 
 #[test]
-fn delegated_non_visual_plan_waits_for_approve_and_visual_plan_stays_andreis() {
+fn delegated_non_visual_plan_waits_for_approve_and_visual_plan_stays_operators() {
     for flag in ["delegated", "self-sustained"] {
         let mut s = Sim::new();
         start_brief(&mut s, CARD, json!({flag: true}));
@@ -109,13 +109,15 @@ fn delegated_non_visual_plan_waits_for_approve_and_visual_plan_stays_andreis() {
         assert_eq!(given_events(&d).len(), 1);
         s.cmd(Sender::Orchestrator("web".into()), json!({"approve": {"card": CARD}})).unwrap();
         assert_eq!(s.stage(CARD), Stage::Build);
-        let approved =
-            s.messages(CARD).into_iter().any(|m| m.text.contains("orchestrator:web, on Andrei's delegation, approved"));
-        assert!(approved, "{flag}: approval must be announced as orchestrator's on Andrei's delegation");
+        let approved = s
+            .messages(CARD)
+            .into_iter()
+            .any(|m| m.text.contains("orchestrator:web, on the operator's delegation, approved"));
+        assert!(approved, "{flag}: approval must be announced as orchestrator's on the operator's delegation");
     }
 
     let mut s = Sim::new();
-    s.config.factory.vite = Some("vite".into());
+    s.config.mork.vite = Some("vite".into());
     start_brief(&mut s, CARD, json!({"delegated": true, "visual": true}));
     s.turn(&format!("{CARD}/foreman"), reply("built", "Baseline done"));
     let d = offer_plan(&mut s, CARD);
@@ -171,7 +173,7 @@ fn delegate_toggle_gives_waiting_asks_and_rewakes_on_self_sustained() {
     assert!(!s.state.asks[&plan_ask].given);
 
     let on = s.apply(Event::Command {
-        from: Sender::Andrei,
+        from: Sender::Operator,
         cmd: serde_json::from_value(json!({"delegate": {"card": CARD}})).unwrap(),
     });
     assert_eq!(s.stage(CARD), Stage::Brief, "delegate on must not approve a waiting plan");
@@ -184,7 +186,7 @@ fn delegate_toggle_gives_waiting_asks_and_rewakes_on_self_sustained() {
     );
 
     let ss = s.apply(Event::Command {
-        from: Sender::Andrei,
+        from: Sender::Operator,
         cmd: serde_json::from_value(json!({"delegate": {"card": CARD, "self-sustained": true}})).unwrap(),
     });
     let re = given_events(&ss);
@@ -194,7 +196,7 @@ fn delegate_toggle_gives_waiting_asks_and_rewakes_on_self_sustained() {
         Some(format!("ask given to you (self-sustained): {plan_ask}").as_str())
     );
 
-    s.andrei(json!({"delegate": {"card": CARD, "off": true}})).unwrap();
+    s.operator(json!({"delegate": {"card": CARD, "off": true}})).unwrap();
     assert!(s.state.asks[&plan_ask].given, "delegate off leaves already-given asks with the orchestrator");
     assert_eq!(wakes::line(&s.state, &re[0].what).as_deref(), Some(format!("ask given to you: {plan_ask}").as_str()));
 }
@@ -202,7 +204,7 @@ fn delegate_toggle_gives_waiting_asks_and_rewakes_on_self_sustained() {
 #[test]
 fn visual_off_on_delegated_waiting_plan_gives_plan_without_mock_link() {
     let mut s = Sim::new();
-    s.config.factory.vite = Some("vite".into());
+    s.config.mork.vite = Some("vite".into());
     start_brief(&mut s, CARD, json!({"delegated": true, "visual": true}));
     s.turn(&format!("{CARD}/foreman"), reply("built", "Baseline done"));
     offer_plan(&mut s, CARD);
@@ -211,7 +213,7 @@ fn visual_off_on_delegated_waiting_plan_gives_plan_without_mock_link() {
     assert!(old.text.contains("mock:"));
 
     let d = s.apply(Event::Command {
-        from: Sender::Andrei,
+        from: Sender::Operator,
         cmd: serde_json::from_value(json!({"visual": {"card": CARD, "off": true}})).unwrap(),
     });
     assert_eq!(s.stage(CARD), Stage::Brief);
@@ -252,7 +254,7 @@ fn to_round_failed(s: &mut Sim, extra: serde_json::Value, findings: &[serde_json
     if s.card(CARD).delegated {
         s.cmd(Sender::Orchestrator("web".into()), json!({"approve": {"card": CARD}})).unwrap();
     } else {
-        s.andrei(json!({"approve": {"card": CARD}})).unwrap();
+        s.operator(json!({"approve": {"card": CARD}})).unwrap();
     }
     s.settle_actions();
     s.built(CARD, "h1", "base1");
@@ -290,13 +292,16 @@ fn failed_review_round_routes_by_delegation_level() {
             .unwrap();
         } else {
             let ask = open_ask(&s, AskKind::Triage);
-            assert!(!ask.given, "{extra}: non-delegated triage ask must stay Andrei's");
-            assert!(ask.notice && notifies(&d, ask.id.as_str()), "{extra}: non-delegated triage must notify Andrei");
+            assert!(!ask.given, "{extra}: non-delegated triage ask must stay the operator's");
+            assert!(
+                ask.notice && notifies(&d, ask.id.as_str()),
+                "{extra}: non-delegated triage must notify the operator"
+            );
             assert!(
                 s.cmd(Sender::Orchestrator("web".into()), json!({"triage": {"card": CARD, "fix": ["1"]}})).is_err(),
                 "{extra}: ungiven orchestrator must be refused"
             );
-            s.andrei(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
+            s.operator(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
             s.imported(CARD);
             let req = s.engine_to(CARD, "foreman").into_iter().rfind(|m| m.kind == MessageKind::Request).unwrap();
             assert!(req.text.contains("[fix]"), "{extra}: {}", req.text);
@@ -332,7 +337,7 @@ fn turning_delegation_on_releases_ungiven_triage_and_keeps_given_triage() {
         s.suite(CARD, 1);
         let ask_id = open_ask(&s, AskKind::Triage).id.clone();
 
-        let d = s.apply(Event::Command { from: Sender::Andrei, cmd: serde_json::from_value(cmd.clone()).unwrap() });
+        let d = s.apply(Event::Command { from: Sender::Operator, cmd: serde_json::from_value(cmd.clone()).unwrap() });
         assert!(d.answer.as_ref().is_some_and(Result::is_ok));
         assert!(!s.state.asks[&ask_id].open, "{cmd}: ungiven triage ask must close on delegate on");
         assert!(s.card(CARD).triage.is_none());
@@ -347,9 +352,9 @@ fn turning_delegation_on_releases_ungiven_triage_and_keeps_given_triage() {
     to_round_failed(&mut s, json!({}), std::slice::from_ref(&finding));
     s.suite(CARD, 0);
     let ask_id = open_ask(&s, AskKind::Triage).id.clone();
-    s.andrei(json!({"give": {"ask": ask_id.as_str()}})).unwrap();
+    s.operator(json!({"give": {"ask": ask_id.as_str()}})).unwrap();
     let d = s.apply(Event::Command {
-        from: Sender::Andrei,
+        from: Sender::Operator,
         cmd: serde_json::from_value(json!({"delegate": {"card": CARD}})).unwrap(),
     });
     assert!(s.state.asks[&ask_id].open && s.state.asks[&ask_id].given, "already-given triage stays given");
@@ -364,7 +369,7 @@ fn delegation_toggle_while_failed_round_waits_for_suite_uses_current_level() {
     let finding = json!({"file": "src/a.rs", "line": 3, "summary": "Late toggle", "proof": "a proof"});
     let mut s = Sim::new();
     to_round_failed(&mut s, json!({}), std::slice::from_ref(&finding));
-    s.andrei(json!({"delegate": {"card": CARD}})).unwrap();
+    s.operator(json!({"delegate": {"card": CARD}})).unwrap();
     let d = s.suite(CARD, 0);
     assert!(s.card(CARD).triage.is_none());
     assert!(given_events(&d).is_empty());
@@ -374,7 +379,7 @@ fn delegation_toggle_while_failed_round_waits_for_suite_uses_current_level() {
 
     let mut off = Sim::new();
     to_round_failed(&mut off, json!({"delegated": true}), std::slice::from_ref(&finding));
-    off.andrei(json!({"delegate": {"card": CARD, "off": true}})).unwrap();
+    off.operator(json!({"delegate": {"card": CARD, "off": true}})).unwrap();
     let d = off.suite(CARD, 0);
     let ask = open_ask(&off, AskKind::Triage);
     assert!(!ask.given && ask.notice && notifies(&d, ask.id.as_str()));
@@ -387,13 +392,13 @@ fn paused_all_resolved_triage_restarts_gates_on_resume_and_direct_non_verificati
     to_round_failed(&mut s, json!({}), std::slice::from_ref(&finding));
     s.suite(CARD, 0);
     let rc = s.review_card(CARD);
-    s.andrei(json!({"stop": {"card": CARD}})).unwrap();
-    s.andrei(json!({"resolve": {"card": rc, "n": 1, "declined": true}})).unwrap();
-    s.andrei(json!({"delegate": {"card": CARD}})).unwrap();
+    s.operator(json!({"stop": {"card": CARD}})).unwrap();
+    s.operator(json!({"resolve": {"card": rc, "n": 1, "declined": true}})).unwrap();
+    s.operator(json!({"delegate": {"card": CARD}})).unwrap();
     assert!(s.card(CARD).triage.is_none());
     assert_eq!(s.card(CARD).gates.checks_waiting, s.card(CARD).head);
     assert_eq!(s.stage(CARD), Stage::Build, "paused card must not start checks until resume");
-    s.andrei(json!({"resume": {"card": CARD}})).unwrap();
+    s.operator(json!({"resume": {"card": CARD}})).unwrap();
     assert_eq!(s.stage(CARD), Stage::Checks, "resume must restart checks after paused all-resolved release");
 
     let mut d = Sim::new();
@@ -405,7 +410,7 @@ fn paused_all_resolved_triage_restarts_gates_on_resume_and_direct_non_verificati
     d.checks(CARD, 0, &[]);
     d.candidate(CARD);
     d.round_asked(CARD);
-    let c = d.state.cards.get_mut(&factory_types::CardId::new(CARD)).unwrap();
+    let c = d.state.cards.get_mut(&mork_types::CardId::new(CARD)).unwrap();
     c.stage = Stage::Build;
     c.landing = None;
     d.round_ends(CARD, &[], std::slice::from_ref(&finding));
@@ -419,28 +424,28 @@ fn paused_all_resolved_triage_restarts_gates_on_resume_and_direct_non_verificati
 }
 
 #[test]
-fn visual_on_over_approved_mock_at_brief_replaces_given_plan_ask_with_andreis() {
+fn visual_on_over_approved_mock_at_brief_replaces_given_plan_ask_with_operators() {
     let mut s = Sim::new();
-    s.config.factory.vite = Some("vite".into());
+    s.config.mork.vite = Some("vite".into());
     start_brief(&mut s, CARD, json!({"delegated": true, "visual": true}));
     s.turn(&format!("{CARD}/foreman"), reply("built", "Baseline done"));
     offer_plan(&mut s, CARD);
-    s.andrei(json!({"approve": {"card": CARD}})).unwrap();
-    s.andrei(json!({"visual": {"card": CARD, "off": true}})).unwrap();
-    s.andrei(json!({"brief": {"card": CARD}})).unwrap();
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
+    s.operator(json!({"visual": {"card": CARD, "off": true}})).unwrap();
+    s.operator(json!({"brief": {"card": CARD}})).unwrap();
     offer_plan(&mut s, CARD);
     let old = open_ask(&s, AskKind::ApproveBrief);
     assert!(old.given);
     let old_id = old.id.clone();
 
     let d = s.apply(Event::Command {
-        from: Sender::Andrei,
+        from: Sender::Operator,
         cmd: serde_json::from_value(json!({"visual": {"card": CARD}})).unwrap(),
     });
     assert!(!s.state.asks[&old_id].open, "old given plan ask must close when visual turns on");
     let next = open_ask(&s, AskKind::ApproveBrief);
-    assert!(!next.given, "visual card's plan ask must stay Andrei's alone");
-    assert!(next.notice, "visual card's plan ask must notify Andrei");
+    assert!(!next.given, "visual card's plan ask must stay the operator's alone");
+    assert!(next.notice, "visual card's plan ask must notify the operator");
     assert!(notifies(&d, next.id.as_str()));
     assert!(given_events(&d).is_empty());
 }
@@ -473,7 +478,7 @@ fn orchestrator_plan_correction_marks_approve_brief_over_other_given_asks() {
     blocked["hand"]["ask"] = json!("Grant access");
     s.turn(&format!("{CARD}/planner"), blocked);
     let blocked_id = open_ask(&s, AskKind::Blocked).id.clone();
-    s.andrei(json!({"give": {"ask": blocked_id.as_str()}})).unwrap();
+    s.operator(json!({"give": {"ask": blocked_id.as_str()}})).unwrap();
     assert!(s.card(CARD).recap);
 
     s.cmd(

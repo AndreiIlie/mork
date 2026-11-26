@@ -1,9 +1,9 @@
 //! `/help`, `/usage`, an agent's picker and its latest turn (fac-96) in the place's area, until Esc
 //! (5.10.3).
 
-use factory_types::catalog::{CATALOG, FieldType};
 use iced::widget::{Column, Row, column, row};
 use iced::{Element, Length};
+use mork_types::catalog::{CATALOG, FieldType};
 use serde_json::Value;
 
 use crate::app::{App, Message, Overlay};

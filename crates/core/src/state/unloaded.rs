@@ -3,12 +3,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::ask::Ask;
-use factory_types::card::{BoardCard, Card};
-use factory_types::hash::short;
-use factory_types::state::{Agent, Job, Message, Place};
-use factory_types::{ActionId, CardId, Command};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::ask::Ask;
+use mork_types::card::{BoardCard, Card};
+use mork_types::hash::short;
+use mork_types::state::{Agent, Job, Message, Place};
+use mork_types::{ActionId, CardId, Command};
 use serde_json::Value;
 
 use super::State;
@@ -69,7 +69,7 @@ impl Wanted {
         }
     }
 
-    // The notes the factory wrote into a board card's file, which tell them from its description:
+    // The notes Mork wrote into a board card's file, which tell them from its description:
     // their key names the file it was in, which a close moves (`dest`) under the same name.
     fn notes(&mut self, state: &State, b: &BoardCard) {
         let name = b.file.rsplit('/').next().unwrap_or(&b.file);

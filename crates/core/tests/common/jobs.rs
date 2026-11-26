@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
-use factory_core::decide::{Decision, Event, Intent, JobEnd, SessionSeen};
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::job::{JobKind, JobSpec, Mount, WallMode};
-use factory_types::state::{Job, JobStatus, Sender};
-use factory_types::work::{ActionFailure, Purpose};
-use factory_types::{ActionId, AgentKey, JobId};
+use mork_core::decide::{Decision, Event, Intent, JobEnd, SessionSeen};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::job::{JobKind, JobSpec, Mount, WallMode};
+use mork_types::state::{Job, JobStatus, Sender};
+use mork_types::work::{ActionFailure, Purpose};
+use mork_types::{ActionId, AgentKey, JobId};
 use serde_json::{Value, json};
 
 use super::{HOME, Sim, sha};
@@ -24,7 +24,7 @@ impl Sim {
             env: BTreeMap::new(),
             ports: None,
             wall: WallMode::Full,
-            factory_bin: "/f".into(),
+            mork_bin: "/f".into(),
             bwrap: "/b".into(),
             created_ms: self.now,
             launch: Default::default(),
@@ -39,6 +39,7 @@ impl Sim {
             owner: spec.owner.clone(),
             spec,
             stdin,
+            specification_bytes: 0,
             io_files: BTreeMap::new(),
             status: JobStatus::Launching,
             settled: None,
@@ -79,7 +80,7 @@ impl Sim {
                 Purpose::Clone { .. } | Purpose::Bundle { .. } | Purpose::Candidate { .. } => JobKind::Bundle,
                 _ => JobKind::Check,
             };
-            let owner = AgentKey::new(format!("{}/work", p.card().map_or("factory", |c| c.as_str())));
+            let owner = AgentKey::new(format!("{}/work", p.card().map_or("mork", |c| c.as_str())));
             let mut job = Self::job(self.spec(kind, &owner, 1), String::new());
             if matches!(p, Purpose::Check { .. }) {
                 job.checks_at = Some("c1".into());
@@ -193,22 +194,28 @@ impl Sim {
     /// Starts an agent's due turn with `argv`, returning its job id and planned prompt.
     pub fn turn_started_with_argv(&mut self, key: &str, argv: &[&str]) -> (JobId, String) {
         let k = AgentKey::new(key);
-        let due = factory_core::agents::turns::due(&self.state, &self.config, self.now);
+        let due = mork_core::agents::turns::due(&self.state, &self.config, self.now);
         assert!(self.owed(key), "{key} isn't owed a turn; due: {due:?}");
-        let plan = factory_core::agents::turns::plan(&self.state, &k, self.ctx(), false).unwrap();
-        let format = factory_types::job::JOB_FORMAT;
+        let plan = mork_core::agents::turns::plan(&self.state, &k, self.ctx(), false).unwrap();
+        let format = mork_types::job::JOB_FORMAT;
         let mut spec = self.spec(JobKind::Turn, &k, format);
         spec.argv = argv.iter().map(|s| (*s).to_owned()).collect();
         let mut job = Self::job(spec, plan.prompt.clone());
         job.corrects = plan.corrects.clone();
         job.opening = plan.corrects.is_none() && !plan.resume;
         job.staged = plan.staged.clone();
+        job.specification_bytes = plan.specification_bytes;
         let agent = &self.state.agents[&k];
-        let schema = factory_core::agents::reply::schema_of(&self.state, agent, factory_types::config::Cli::Codex);
+        let schema = mork_core::agents::reply::schema_of(
+            &self.state,
+            agent,
+            mork_types::config::Cli::Codex,
+            self.config.mork.project.is_some(),
+        );
         job.io_files.insert("schema.json".into(), schema.to_string());
         let named = self.state.agents.get(&k).and_then(|a| a.io.clone());
         let io = format!("{HOME}/io/{}", named.unwrap_or_else(|| job.id.as_str().to_owned()));
-        job.spec.env.insert("FACTORY_IO".into(), io.clone());
+        job.spec.env.insert("MORK_IO".into(), io.clone());
         job.spec.mounts.push(Mount::Rw { path: io });
         let id = job.id.clone();
         let session = (argv.first() != Some(&"agy")).then(|| format!("session-{key}"));
@@ -220,7 +227,7 @@ impl Sim {
     // The cards whose head holds the base's tip, as a fetch reads them: those whose take read it.
     fn holding(&self) -> serde_json::Map<String, Value> {
         let tip = sha(self.tip);
-        let holds = |c: &&factory_types::card::Card| c.fork.as_ref() == Some(&tip);
+        let holds = |c: &&mork_types::card::Card| c.fork.as_ref() == Some(&tip);
         self.state.cards.values().filter(holds).map(|c| (c.id.to_string(), json!(true))).collect()
     }
 }

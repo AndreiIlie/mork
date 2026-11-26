@@ -1,4 +1,4 @@
-//! A foreman's or planner's `factory ctl say`, read from its command line and any shell line it wraps (fac-633): its
+//! A foreman's or planner's `mork ctl say`, read from its command line and any shell line it wraps (fac-633): its
 //! step leaves out the message when it reaches the card's other seat, or when the line doesn't show where it goes.
 
 use serde_json::Value;

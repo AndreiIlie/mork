@@ -1,9 +1,9 @@
 //! The route a reply's message, or a seat's `say` to a name, takes from its sender's place (3.4.2): a full card's
 //! foreman and planner reach each other only in its challenge place (fac-633).
 
-use factory_types::CardId;
-use factory_types::reply::Role;
-use factory_types::state::Sender;
+use mork_types::CardId;
+use mork_types::reply::Role;
+use mork_types::state::Sender;
 
 use super::places::{self, MAIN, PlaceKind, Who, card_agent, card_of, kind};
 use crate::decide::Ctx;
@@ -26,7 +26,7 @@ pub fn route(state: &State, from: &Who, to: &str, ctx: Ctx<'_>) -> Route {
         if let Route::Agent { who, .. } = &route
             && !places::planner_sender(state, &Sender::Agent(from.key.clone()), who)
         {
-            return Err("the planner reopens for its foreman, Andrei or an orchestrator".into());
+            return Err("the planner reopens for its foreman, the operator or an orchestrator".into());
         }
         Ok(route)
     });
@@ -41,7 +41,7 @@ fn placed(state: &State, from: &Who, to: &str, ctx: Ctx<'_>) -> Result<Route, St
     let name = own.as_ref().and_then(|c| lower.strip_prefix(c.as_str())?.strip_prefix('/')).unwrap_or(&lower);
     let orchestrator = own.as_ref().and_then(|c| state.cards.get(c)).map(|c| format!("orchestrator:{}", c.project));
     let name = if orchestrator.is_some_and(|o| o.to_lowercase() == name) { "orchestrator" } else { name };
-    if places::for_andrei(name) {
+    if places::for_operator(name) {
         return Err(places::hand_only(matches!(kind(state, &from.place), PlaceKind::Child(..))));
     }
     let post = |place: &str, to: &str| Ok(Route::Post { place: place.to_owned(), to: to.to_owned() });

@@ -1,8 +1,8 @@
 //! A board note's or a push's proof that nothing of it was written (fac-318, fac-394): a note only adds lines, so one
 //! proven unwritten is made again from the file as it is now; a push's branch is renamed only while it holds.
 
-use factory_types::action::{Action, ActionWhat, BoardEdit};
-use factory_types::work::ActionFailure;
+use mork_types::action::{Action, ActionWhat, BoardEdit};
+use mork_types::work::ActionFailure;
 
 use crate::post::Poster;
 

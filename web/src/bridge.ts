@@ -24,7 +24,7 @@ export const INITIAL_STATE: BridgeState = {
   views: {},
 };
 
-const KEY_STORAGE = "factory.web.key";
+const KEY_STORAGE = "mork.web.key";
 const KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
 const RETRY_MS = 2000;
 const PROBE_MS = 500;
@@ -245,13 +245,13 @@ class Dial {
   }
 }
 
-/** Sends one command as Andrei and resolves with its `ok` body; rejects with the engine's words on refusal or a drop. */
+/** Sends one command as the operator and resolves with its `ok` body; rejects with the engine's words on refusal or a drop. */
 export function requestCommand(command: unknown): Promise<unknown> {
   if (liveDial === null) return Promise.reject(new Error("not connected"));
   return liveDial.send(command);
 }
 
-/** Sends one command as Andrei over the live socket; rejects with the engine's words on refusal or a drop. */
+/** Sends one command as the operator over the live socket; rejects with the engine's words on refusal or a drop. */
 /** A message's image from the bridge, fetched with the key, as an object URL its caller revokes (fac-696). */
 export async function fetchImage(url: string): Promise<string> {
   const key = resolveKey();

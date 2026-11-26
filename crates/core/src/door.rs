@@ -1,5 +1,5 @@
 //! The door (fac-1, fac-124): a request resolves on its target's allowlist; an allowed call runs, an outside one
-//! waits for Andrei's once/no bound to its exact plan, and how a call stands is answered and told once.
+//! waits for the operator's once/no bound to its exact plan, and how a call stands is answered and told once.
 
 pub mod approval;
 pub mod asking;
@@ -11,11 +11,11 @@ pub mod reads;
 pub mod sql;
 pub mod target;
 
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::door::{WAITING, status};
-use factory_types::door_call::{DoorCall, DoorState, Phase};
-use factory_types::state::{MessageKind, Sender};
-use factory_types::{ActionId, Command};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::door::{WAITING, status};
+use mork_types::door_call::{DoorCall, DoorState, Phase};
+use mork_types::state::{MessageKind, Sender};
+use mork_types::{ActionId, Command};
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Decision};
@@ -71,7 +71,7 @@ pub fn answer(a: &Action) -> Value {
     };
     // A result marked done by hand (`action.done`) says so.
     if let Some(note) = v.get("by_hand").cloned() {
-        v = json!({"status": status::DONE, "text": format!("marked done by Andrei: {}", note.as_str().unwrap_or(""))});
+        v = json!({"status": status::DONE, "text": format!("marked done by the operator: {}", note.as_str().unwrap_or(""))});
     }
     if let Some(o) = v.as_object_mut() {
         o.insert("action".into(), json!(a.id));
@@ -84,7 +84,7 @@ pub fn status_of(a: &Action) -> String {
 }
 
 /// Whether its requester is owed news of it: only approval-gated calls and held calls (or a held
-/// call settled by Andrei), once settled or held and not yet told that status.
+/// call settled by the operator), once settled or held and not yet told that status.
 pub fn owed_news(a: &Action) -> bool {
     let Some((_, d)) = parts(a) else { return false };
     let held = a.status == ActionStatus::Held && d.phase != Phase::Asked;
@@ -92,7 +92,7 @@ pub fn owed_news(a: &Action) -> bool {
         || held
         || d.told.as_deref() == Some(status::HELD)
         || a.result.as_ref().and_then(|r| r.get("by_hand")).is_some()
-        || (d.phase == Phase::Refused && a.words.as_deref() == Some(crate::decide::actions::DROPPED_BY_ANDREI));
+        || (d.phase == Phase::Refused && a.words.as_deref() == Some(crate::decide::actions::DROPPED_BY_OPERATOR));
     needs_news && (settled(a) || held) && d.told.as_deref() != Some(status_of(a).as_str())
 }
 
@@ -129,8 +129,8 @@ fn news(p: &mut Poster<'_>, a: &Action, call: &DoorCall, word: &str) {
             p.post(who.place.as_str(), Sender::Engine, Some(who.role.as_str()), MessageKind::Request, &headline, &text);
             p.wake(&who, &Sender::Engine);
         }
-        Sender::Andrei | Sender::Engine | Sender::Orchestrator(_) | Sender::Pa => {
-            p.post(call.place.as_str(), Sender::Engine, Some("andrei"), MessageKind::Engine, &headline, &text);
+        Sender::Operator | Sender::Engine | Sender::Orchestrator(_) | Sender::Pa => {
+            p.post(call.place.as_str(), Sender::Engine, Some("operator"), MessageKind::Engine, &headline, &text);
         }
     }
 }

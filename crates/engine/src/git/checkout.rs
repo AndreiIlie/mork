@@ -1,4 +1,4 @@
-//! A local `/merge` in Andrei's checkout (4.11.3): checked before anything moves, with an optional
+//! A local `/merge` in the operator's checkout (4.11.3): checked before anything moves, with an optional
 //! non-forced backup push after landing.
 
 use std::path::Path;
@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
-use factory_core::queue::checkout::{Facts, Move};
+use mork_core::queue::checkout::{Facts, Move};
 
 use super::{GitError, git, git_env, mirror};
 use crate::paths::Home;
@@ -45,7 +45,7 @@ fn facts(home: &Home, checkout: &Path, base: &str, cur: &str, target: &str) -> R
 pub fn follow(home: &Home, mirror_dir: &Path, base: &str, target: &str) -> Result<(), GitError> {
     mirror::set_ref(home, mirror_dir, &format!("refs/heads/{base}"), target).map_err(|e| {
         GitError::Refused(format!(
-            "{base} in Andrei's checkout already moved to {target}, but the mirror's {base} couldn't follow: {e}. \
+            "{base} in the operator's checkout already moved to {target}, but the mirror's {base} couldn't follow: {e}. \
              Retry finishes it"
         ))
     })
@@ -61,15 +61,15 @@ pub fn move_base(
     base: &str,
     target: &str,
 ) -> Result<Value, GitError> {
-    let cur =
-        base_at(home, checkout, base).ok_or_else(|| GitError::Refused(format!("Andrei's checkout has no {base}")))?;
+    let cur = base_at(home, checkout, base)
+        .ok_or_else(|| GitError::Refused(format!("The operator's checkout has no {base}")))?;
     if cur != target {
-        let r = format!("refs/factory/land-{card}");
+        let r = format!("refs/mork/land-{card}");
         mirror::set_ref(home, mirror_dir, &r, target)?;
         let from = mirror_dir.display().to_string();
         git(home, checkout, &["fetch", "-q", "--no-tags", &from, &r], T)?;
     }
-    match factory_core::queue::checkout::decide(&facts(home, checkout, base, &cur, target)?) {
+    match mork_core::queue::checkout::decide(&facts(home, checkout, base, &cur, target)?) {
         Move::Done => {
             follow(home, mirror_dir, base, target)?;
             Ok(json!({"base_moved": false, "before": cur, "after": target}))
@@ -105,8 +105,8 @@ pub fn push_backup(home: &Home, checkout: &Path, base: &str, remote: &str) -> Re
 /// After a crash (2.5.2): the base at the target is done; at `from`, the move runs; anywhere
 /// else, it is held.
 pub fn found(home: &Home, checkout: &Path, base: &str, from: &str, target: &str) -> Result<Option<Value>, GitError> {
-    let cur =
-        base_at(home, checkout, base).ok_or_else(|| GitError::Refused(format!("Andrei's checkout has no {base}")))?;
+    let cur = base_at(home, checkout, base)
+        .ok_or_else(|| GitError::Refused(format!("The operator's checkout has no {base}")))?;
     if cur == target {
         Ok(Some(json!({"base_moved": false, "before": from, "after": target})))
     } else if cur == from {

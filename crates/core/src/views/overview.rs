@@ -1,9 +1,9 @@
 // Per-card Overview stage spine built in `core` for the web Card Room (fac-684); it carries no messages (fac-719).
 
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::decisions;
-use factory_types::review::{FindingState, Review, Round, RoundView, Verdict};
-use factory_types::view::{OverviewStage, OverviewStageAt, OverviewStageKind, OverviewView};
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::decisions;
+use mork_types::review::{FindingState, Review, Round, RoundView, Verdict};
+use mork_types::view::{OverviewStage, OverviewStageAt, OverviewStageKind, OverviewView};
 
 use super::findings::{review_card, round_findings, round_view, state_of};
 use super::outside::Outside;

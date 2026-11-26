@@ -1,8 +1,8 @@
 //! Send now (fac-78): a message cuts its recipient's running turn, and once that turn has settled
 //! its session continues with the message. The card and its other agents run on.
 
-use factory_types::AgentKey;
-use factory_types::state::{Agent, AgentStatus, Job, Owed, Settlement};
+use mork_types::AgentKey;
+use mork_types::state::{Agent, AgentStatus, Job, Owed, Settlement};
 use serde_json::json;
 
 use crate::decide::Intent;

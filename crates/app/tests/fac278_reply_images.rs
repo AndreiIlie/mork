@@ -7,7 +7,7 @@
 mod common;
 
 use common::{CODEX_FOREMAN, Rig, reply};
-use factory_types::card::Mode;
+use mork_types::card::Mode;
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -130,11 +130,11 @@ fn fac278_reply_images_are_published_from_their_seats_io_only() {
 
 // Every turn, corrections too, had the one seat folder, where the good turn's files stayed; the next turn read the
 // published copy into it, and overwriting the shot there left that copy as it was.
-fn kept_in_its_seat(rig: &Rig, jobs: &[factory_types::state::Job], two: &Path) {
-    let seat = jobs[0].spec.env.get("FACTORY_IO").cloned().unwrap();
+fn kept_in_its_seat(rig: &Rig, jobs: &[mork_types::state::Job], two: &Path) {
+    let seat = jobs[0].spec.env.get("MORK_IO").cloned().unwrap();
     assert!(seat.starts_with(&rig.fhome().join("io/").display().to_string()), "{seat} is a seat's folder");
     for j in jobs {
-        assert_eq!(j.spec.env.get("FACTORY_IO"), Some(&seat), "{} had its seat's folder", j.id);
+        assert_eq!(j.spec.env.get("MORK_IO"), Some(&seat), "{} had its seat's folder", j.id);
     }
     let seat = Path::new(&seat);
     let read = |p: &Path| std::fs::read_to_string(p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
@@ -199,8 +199,8 @@ fn fac654_a_said_image_is_copied_as_it_is_sent() {
 }
 
 // The woken turn and its retry were each given the say's copy, the retry again after its first try overwrote them.
-fn given_the_copy(turns: &[factory_types::state::Job], copy: &str) {
-    let seat = Path::new(turns[0].spec.env.get("FACTORY_IO").unwrap());
+fn given_the_copy(turns: &[mork_types::state::Job], copy: &str) {
+    let seat = Path::new(turns[0].spec.env.get("MORK_IO").unwrap());
     let read = |p: &Path| std::fs::read_to_string(p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
     let woken = &turns[0].io_copies;
     assert!(!woken.is_empty() && woken.values().all(|s| s == copy), "{woken:?}");
@@ -219,9 +219,9 @@ fn given_the_copy(turns: &[factory_types::state::Job], copy: &str) {
 
 #[test]
 fn fac278_a_clicked_image_is_staged_from_beneath_its_folder_only() {
-    let t = factory_fakes::TestHome::new();
-    let home = factory_engine::paths::Home::new(t.factory_home());
-    let pasted = factory_engine::clipboard::save(&home, 1, 1, &[0, 0, 0, 255]).unwrap();
+    let t = mork_fakes::TestHome::new();
+    let home = mork_engine::paths::Home::new(t.mork_home());
+    let pasted = mork_engine::clipboard::save(&home, 1, 1, &[0, 0, 0, 255]).unwrap();
     let png = std::fs::read(&pasted).unwrap();
     let (job, seat, outside) = (home.jobs().join("20200101-j"), home.seat_io("20200101-s"), t.root.join("outside"));
     for d in [job.join("io/folder.png"), job.join("published"), job.join("other"), seat.clone(), outside.clone()] {
@@ -237,7 +237,7 @@ fn fac278_a_clicked_image_is_staged_from_beneath_its_folder_only() {
     std::os::unix::fs::symlink(&outside, job.join("io/dir")).unwrap();
     assert!(std::process::Command::new("mkfifo").arg(job.join("io/fifo.png")).status().unwrap().success());
     let (viewer, at) = (t.root.join("viewer"), |rel: &str| job.join(rel).display().to_string());
-    let stage = |path: &str| factory_engine::jobs::outputs::staged_image(&home, path, &viewer);
+    let stage = |path: &str| mork_engine::jobs::outputs::staged_image(&home, path, &viewer);
     let in_seat = |rel: &str| seat.join(rel).display().to_string();
     let good =
         [(at("published/1-shot"), "1-shot.png"), (at("io/pic.png"), "pic.png"), (in_seat("seat.png"), "seat.png")];

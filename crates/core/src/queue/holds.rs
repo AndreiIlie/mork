@@ -1,11 +1,11 @@
 //! What a card's landing holds (fac-10, fac-98): its agents' turns from its publication until it lands, and its landing
 //! actions until nothing of the card may still change under them; the tick starts them once they may.
 
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::state::Agent;
-use factory_types::work::Purpose;
-use factory_types::{ActionId, AgentKey, CardId, ProjectId};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::state::Agent;
+use mork_types::work::Purpose;
+use mork_types::{ActionId, AgentKey, CardId, ProjectId};
 
 use super::order::{cards, landing};
 use super::train::maintain;
@@ -14,12 +14,12 @@ use crate::post::Poster;
 use crate::state::State;
 
 // Whether a card holds its project's landing: at the train's front, publishing or merging, with
-// no alarm raised. A company PR waiting for Andrei's approval holds none (fac-98).
+// no alarm raised. A company PR waiting for the operator's approval holds none (fac-98).
 fn holds_slot(c: &Card) -> bool {
     c.stage == Stage::Merging && !c.alarm && landing(c) && !crate::queue::approval::waiting(c)
 }
 
-// Whether landing holds a card's turns; a landing held for Andrei releases them until retry.
+// Whether landing holds a card's turns; a landing held for the operator releases them until retry.
 // A PR waiting for approval holds them only while its approved merge is pending or started (fac-98).
 fn holds_turns(state: &State, c: &Card) -> bool {
     let mut mine = state.actions.values().filter(|a| a.what.card() == Some(&c.id) && landing_action(&a.what));

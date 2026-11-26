@@ -1,4 +1,5 @@
 mod diagnostics;
+mod test_changes;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -123,13 +124,24 @@ pub(super) fn run() -> u8 {
             None
         }
     };
+    let mut test_changes = Vec::new();
+    report.step(
+        "test changes",
+        test_changes::against(&root, &base).map(|flags| {
+            for flag in &flags {
+                eprintln!("xtask: test change: {flag}");
+            }
+            test_changes = flags;
+            Vec::new()
+        }),
+    );
     report.step("rustfmt", child("rustfmt"));
     report.step("comments", problems(&root, xtask::comments::check(&root), "comments"));
     report.step("clippy", child("clippy"));
     report.step("audits", problems(&root, super::audits(), "audits"));
     report.step("web", web(&root));
     let document = json!({"status": report.status, "components": report.components,
-        "findings": report.findings, "base": base, "head": head});
+        "findings": report.findings, "test_changes": test_changes, "base": base, "head": head});
     if let Err(e) = write(&path, &document) {
         eprintln!("xtask checks: couldn't write {}: {e}", path.display());
         return 2;

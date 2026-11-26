@@ -1,9 +1,9 @@
 // A card's room's summaries above its seats, the same in its spec and build rooms (fac-594, fac-633): its card's, then each carried card's under
 // its id and title, in one box at the conversation's width that scrolls inside itself when tall.
 
-use factory_types::view::{PlaceKind, PlaceView};
 use iced::widget::{Column, container};
 use iced::{Element, Length, Padding};
+use mork_types::view::{PlaceKind, PlaceView};
 
 use crate::app::{App, Message};
 use crate::conversation::{COLUMN_PAD, COLUMN_W};

@@ -6,14 +6,14 @@ pub mod unloaded;
 
 use std::collections::BTreeMap;
 
-use factory_types::CardId;
-use factory_types::action::Action;
-use factory_types::ask::Ask;
-use factory_types::card::{BoardCard, Card};
-use factory_types::lease::{Lease, Pass};
-use factory_types::state::{Agent, Job, Message, MessageKind, Place};
-use factory_types::usage::Limit;
-use factory_types::{AgentKey, JobId};
+use mork_types::CardId;
+use mork_types::action::Action;
+use mork_types::ask::Ask;
+use mork_types::card::{BoardCard, Card};
+use mork_types::lease::{Lease, Pass};
+use mork_types::state::{Agent, Job, Message, MessageKind, Place};
+use mork_types::usage::Limit;
+use mork_types::{AgentKey, JobId};
 use serde::{Deserialize, Serialize};
 
 /// Everything `core` decides on.
@@ -21,37 +21,36 @@ use serde::{Deserialize, Serialize};
 pub struct State {
     pub revision: u64,
     pub agents: BTreeMap<AgentKey, Agent>,
-    pub places: BTreeMap<factory_types::PlaceId, Place>,
+    pub places: BTreeMap<mork_types::PlaceId, Place>,
     pub jobs: BTreeMap<JobId, Job>,
     pub messages: Vec<Message>,
     pub next_seq: u64,
     pub cards: BTreeMap<CardId, Card>,
-    pub notes: BTreeMap<u64, factory_types::note::Note>,
+    pub notes: BTreeMap<u64, mork_types::note::Note>,
     /// The last allocated note id survives deletion, so triage cannot delete a later note by an old id.
     pub notes_last: u64,
     /// Asks by id, open and answered.
-    pub asks: BTreeMap<factory_types::AskId, Ask>,
+    pub asks: BTreeMap<mork_types::AskId, Ask>,
     /// The latest read of each usage-limit window, by [`Limit::key`].
     pub limits: BTreeMap<String, Limit>,
     /// Outward actions, by id (2.5).
-    pub actions: BTreeMap<factory_types::ActionId, Action>,
+    pub actions: BTreeMap<mork_types::ActionId, Action>,
     /// Test leases, by id (4.9), and the suite passes remembered (4.9.6).
-    pub leases: BTreeMap<factory_types::LeaseId, Lease>,
+    pub leases: BTreeMap<mork_types::LeaseId, Lease>,
     pub passes: Vec<Pass>,
     /// Jobs of no agent's turn owed and not yet recorded, by purpose key (2.2.2, M3.9): stored in the transaction that
     /// owes them, so a crash before the job is recorded loses none.
-    pub owed_work: BTreeMap<String, factory_types::work::Purpose>,
+    pub owed_work: BTreeMap<String, mork_types::work::Purpose>,
     /// The orchestrators' streams' next line's number, one sequence for all projects (fac-119, fac-244):
     /// its lines are stored, never loaded.
     pub orchestrator_next: u64,
     /// Each project's auto switch, by project, on or off (fac-233).
-    pub autos: BTreeMap<factory_types::ProjectId, factory_types::orchestrator::Auto>,
-    pub lookbacks:
-        BTreeMap<factory_types::ProjectId, BTreeMap<factory_types::lookback::Read, factory_types::lookback::Cursor>>,
-    /// The memories' files, by [`factory_types::memory::MemoryFile::key`] (fac-159).
-    pub memory_files: BTreeMap<String, factory_types::memory::MemoryFile>,
+    pub autos: BTreeMap<mork_types::ProjectId, mork_types::orchestrator::Auto>,
+    pub lookbacks: BTreeMap<mork_types::ProjectId, BTreeMap<mork_types::lookback::Read, mork_types::lookback::Cursor>>,
+    /// The memories' files, by [`mork_types::memory::MemoryFile::key`] (fac-159).
+    pub memory_files: BTreeMap<String, mork_types::memory::MemoryFile>,
     /// Each memory's cumulative counts, by its name.
-    pub memory_tallies: BTreeMap<String, factory_types::memory::Tally>,
+    pub memory_tallies: BTreeMap<String, mork_types::memory::Tally>,
     /// The boards' cards as last read: an index, read again from the files, never stored.
     pub board: BTreeMap<CardId, BoardCard>,
     /// What the store holds that wasn't loaded (fac-336): ended cards' records, filled at load.
@@ -64,16 +63,16 @@ pub struct State {
 /// The parts of the world `core` decides on that the engine reads again after a restart.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct World {
-    /// The token is Andrei's own account, or Bitbucket refuses it (3.7.2, 4.11.5): why. Stored
+    /// The token is the operator's own account, or Bitbucket refuses it (3.7.2, 4.11.5): why. Stored
     /// (M3.2), unlike the rest of the world.
     pub token_refused: Option<String>,
     /// The open PRs of each Bitbucket project, as the poller last read them; a project the poller
     /// hasn't looked at yet has none (4.16.1).
-    pub open_prs: BTreeMap<factory_types::ProjectId, Vec<factory_types::work::OpenPr>>,
+    pub open_prs: BTreeMap<mork_types::ProjectId, Vec<mork_types::work::OpenPr>>,
     /// Each project's checks folder, at the commit the engine last read (4.7.7).
-    pub checks_folders: BTreeMap<factory_types::ProjectId, String>,
+    pub checks_folders: BTreeMap<mork_types::ProjectId, String>,
     /// Each board's id prefix, from its `config.yml`: a board with no card yet has one (M5.27).
-    pub board_prefixes: BTreeMap<factory_types::ProjectId, String>,
+    pub board_prefixes: BTreeMap<mork_types::ProjectId, String>,
 }
 
 /// One change to the state. A transaction is a list of them (2.4).
@@ -89,7 +88,7 @@ pub enum Change {
     PutPlace(Place),
     PutJob(Box<Job>),
     AddMessage(Message),
-    PutNote(Box<factory_types::note::Note>),
+    PutNote(Box<mork_types::note::Note>),
     RemoveNote {
         id: u64,
     },
@@ -99,21 +98,21 @@ pub enum Change {
     PutAction(Box<Action>),
     PutLease(Lease),
     RemoveLease {
-        id: factory_types::LeaseId,
+        id: mork_types::LeaseId,
     },
     AddPass(Pass),
     /// A line of a project's orchestrator's stream (fac-119, fac-244), stored until its hook has read past it.
-    AddOrchestratorEvent(factory_types::orchestrator::OrchestratorEvent),
+    AddOrchestratorEvent(mork_types::orchestrator::OrchestratorEvent),
     /// A project's auto switch (fac-233).
-    PutAuto(factory_types::orchestrator::Auto),
-    PutLookback(factory_types::lookback::Cursor),
-    PutMemoryFile(Box<factory_types::memory::MemoryFile>),
+    PutAuto(mork_types::orchestrator::Auto),
+    PutLookback(mork_types::lookback::Cursor),
+    PutMemoryFile(Box<mork_types::memory::MemoryFile>),
     RemoveMemoryFile {
         key: String,
     },
-    PutMemoryTally(factory_types::memory::Tally),
+    PutMemoryTally(mork_types::memory::Tally),
     /// A job owed (`StartJob`), stored until it is recorded.
-    PutOwedWork(factory_types::work::Purpose),
+    PutOwedWork(mork_types::work::Purpose),
     RemoveOwedWork {
         key: String,
     },
@@ -121,18 +120,18 @@ pub enum Change {
     /// in memory only, never stored.
     SetBoard {
         cards: Vec<BoardCard>,
-        prefixes: BTreeMap<factory_types::ProjectId, String>,
+        prefixes: BTreeMap<mork_types::ProjectId, String>,
     },
     /// The token's verdict (3.7.2): stored, and read again at each start.
     SetTokenRefused(Option<String>),
     /// A project's open PRs, as the poller read them: in memory only.
     SetOpenPrs {
-        project: factory_types::ProjectId,
-        prs: Vec<factory_types::work::OpenPr>,
+        project: mork_types::ProjectId,
+        prs: Vec<mork_types::work::OpenPr>,
     },
     /// A project's checks folder's commit: in memory only, read again at start.
     SetChecksFolder {
-        project: factory_types::ProjectId,
+        project: mork_types::ProjectId,
         commit: String,
     },
 }

@@ -8,7 +8,7 @@ mod common;
 
 use common::door::{REMOTE_PW, SENTINELS, answers, ctl_turn, door_args, everything};
 use common::{CODEX_FOREMAN, Rig, reply};
-use factory_types::card::Mode;
+use mork_types::card::Mode;
 use serde_json::{Value, json};
 
 const SAVED_CLAUDE_TOKEN: &str = "SENTINEL-saved-claude-token-23";
@@ -19,7 +19,7 @@ fn run_calls(rig: &mut Rig, calls: &[Vec<String>]) -> Vec<Value> {
     rig.write_config(&rig.config(CODEX_FOREMAN));
     let c = rig.card("ex-1", Mode::Full);
     rig.put_cards(vec![c]);
-    common::builds::factory_repo(rig, 1);
+    common::builds::mork_repo(rig, 1);
     rig.scenario(json!([ctl_turn("ex-1/foreman", None, calls, reply("working", "Done", json!([]))),]));
     rig.start();
     rig.say("ex-1", "@foreman Call the door");
@@ -55,7 +55,7 @@ fn fac1_arguments_reach_the_target_as_literal_arguments() {
 
 fn plant_agy_login(home: &std::path::Path) -> std::path::PathBuf {
     // fac-657, fac-679: agy's sign-in in its real StoredToken shape with non-secret metadata.
-    let agy = home.join(".gemini/antigravity-cli");
+    let agy = home.join("agy");
     std::fs::create_dir_all(&agy).unwrap();
     let agy_login = json!({
         "token": {
@@ -77,11 +77,11 @@ fn plant_agy_login(home: &std::path::Path) -> std::path::PathBuf {
 fn fac1_no_credential_leaks_anywhere() {
     let mut rig = Rig::new();
     rig.door();
-    let accounts = rig.agent_home().join(".claude/accounts");
+    let accounts = rig.fhome().join("login-home/.claude/accounts");
     std::fs::create_dir_all(&accounts).unwrap();
     let saved_login = json!({"claudeAiOauth": {"accessToken": SAVED_CLAUDE_TOKEN}});
     std::fs::write(accounts.join("backup.json.bak"), saved_login.to_string()).unwrap();
-    let agy_token = plant_agy_login(&rig.agent_home());
+    let agy_token = plant_agy_login(&rig.fhome().join("logins"));
     let mut world = rig.door_world_now();
     world["mysql"] = json!([
         {"match": "'out'", "password": "out"},

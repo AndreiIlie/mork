@@ -1,8 +1,8 @@
 //! What a card's state says of how its run goes: who makes it, whether it is agreeing its specification or may write its
 //! clone, its mode's word, and whether its build started with nothing to clarify.
 
-use factory_types::card::{ApprovedVia, Card, Mode, Stage};
-use factory_types::reply::Role;
+use mork_types::card::{ApprovedVia, Card, Mode, Stage};
+use mork_types::reply::Role;
 
 /// Whether the card is agreeing its specification: a full card started, or at its brief.
 pub fn agreeing(card: &Card) -> bool {
@@ -33,7 +33,7 @@ pub fn mode_word(m: Mode) -> &'static str {
     }
 }
 
-/// Whether the card's build started with nothing to clarify, on no approval of Andrei's (fac-24).
+/// Whether the card's build started with nothing to clarify, on no approval of the operator's (fac-24).
 pub fn clear(c: &Card) -> bool {
     c.approval.as_ref().is_some_and(|a| a.via == ApprovedVia::Clear)
 }

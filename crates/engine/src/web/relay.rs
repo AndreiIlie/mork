@@ -1,15 +1,16 @@
-//! Full-duplex relay between one upgraded WebSocket and one `factory.sock` connection (fac-671).
+//! Full-duplex relay between one upgraded WebSocket and one `mork.sock` connection (fac-671).
 
 use std::io::{self, BufRead, BufReader, Cursor, Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 
-use factory_types::protocol::MAX_LINE;
+use mork_types::protocol::MAX_LINE;
 
 use super::frames::{self, Message, MessageReader, ReadError};
+use crate::lock::Lock;
 
 struct Writer {
     stream: TcpStream,
@@ -20,7 +21,7 @@ struct Writer {
 pub fn serve(stream: TcpStream, leftover: Vec<u8>, sock_path: PathBuf) {
     let _ = stream.set_read_timeout(None);
     let (Ok(writer_clone), Ok(tcp_ctrl)) = (stream.try_clone(), stream.try_clone()) else { return };
-    let writer = Arc::new(Mutex::new(Writer { stream: writer_clone, closed: false }));
+    let writer = Arc::new(Lock::new(Writer { stream: writer_clone, closed: false }));
     let tcp_ctrl = Arc::new(tcp_ctrl);
     let peer_closing = Arc::new(AtomicBool::new(false));
     let Ok(unix) = UnixStream::connect(&sock_path) else {
@@ -38,7 +39,7 @@ pub fn serve(stream: TcpStream, leftover: Vec<u8>, sock_path: PathBuf) {
     let _ = forward.join();
 }
 
-fn sock_to_ws(unix: UnixStream, writer: &Mutex<Writer>, tcp_ctrl: &TcpStream, peer_closing: &AtomicBool) {
+fn sock_to_ws(unix: UnixStream, writer: &Lock<Writer>, tcp_ctrl: &TcpStream, peer_closing: &AtomicBool) {
     let mut reader = BufReader::new(unix);
     let mut line = String::new();
     let mut tcp_failed = false;
@@ -69,7 +70,7 @@ fn ws_to_sock(
     stream: TcpStream,
     leftover: Vec<u8>,
     mut unix: UnixStream,
-    writer: &Mutex<Writer>,
+    writer: &Lock<Writer>,
     tcp_ctrl: &TcpStream,
     peer_closing: &AtomicBool,
 ) {
@@ -108,8 +109,8 @@ fn ws_to_sock(
     let _ = tcp_ctrl.shutdown(Shutdown::Both);
 }
 
-fn write_open(writer: &Mutex<Writer>, f: impl FnOnce(&mut TcpStream) -> io::Result<()>) -> io::Result<()> {
-    let mut guard = writer.lock().map_err(|_| io::Error::other("writer lock poisoned"))?;
+fn write_open(writer: &Lock<Writer>, f: impl FnOnce(&mut TcpStream) -> io::Result<()>) -> io::Result<()> {
+    let mut guard = writer.lock();
     if guard.closed {
         return Err(io::Error::from(io::ErrorKind::BrokenPipe));
     }
@@ -120,10 +121,9 @@ fn write_open(writer: &Mutex<Writer>, f: impl FnOnce(&mut TcpStream) -> io::Resu
     res
 }
 
-fn send_close(writer: &Mutex<Writer>, code: u16) {
-    if let Ok(mut guard) = writer.lock()
-        && !guard.closed
-    {
+fn send_close(writer: &Lock<Writer>, code: u16) {
+    let mut guard = writer.lock();
+    if !guard.closed {
         guard.closed = true;
         let _ = frames::write_close(&mut guard.stream, code);
     }

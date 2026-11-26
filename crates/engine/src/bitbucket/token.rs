@@ -1,5 +1,3 @@
-//! The Bitbucket token file (F-B0): `token=…`, then optional `user=…` and `approver=…`.
-
 /// What is wrong with the token file.
 #[derive(Debug)]
 pub enum TokenError {
@@ -72,7 +70,7 @@ impl Token {
     /// The `Authorization` header's value: basic with a `user`, else bearer (F-B0).
     pub fn header(&self) -> String {
         match &self.user {
-            Some(u) => format!("Basic {}", base64(format!("{u}:{}", self.token).as_bytes())),
+            Some(u) => format!("Basic {}", crate::encoding::base64(format!("{u}:{}", self.token).as_bytes())),
             None => format!("Bearer {}", self.token),
         }
     }
@@ -81,11 +79,11 @@ impl Token {
     /// `user`) goes as `Basic` with user `x-token-auth`; with a `user`, as the API's (M5.32).
     pub fn git_header(&self) -> String {
         let user = self.user.as_deref().unwrap_or("x-token-auth");
-        format!("Basic {}", base64(format!("{user}:{}", self.token).as_bytes()))
+        format!("Basic {}", crate::encoding::base64(format!("{user}:{}", self.token).as_bytes()))
     }
 }
 
-/// Reads `~/.config/factory/bitbucket-token` (1.3).
+/// Reads `~/.config/mork/bitbucket-token` (1.3).
 pub fn read() -> Result<Token, TokenError> {
     parse(&read_text()?)
 }
@@ -110,31 +108,14 @@ pub fn read_text() -> Result<String, TokenError> {
         return Ok(t);
     }
     let home = std::env::var_os("HOME").ok_or(TokenError::NoHome)?;
-    let path = std::path::Path::new(&home).join(".config/factory/bitbucket-token");
+    let path = std::path::Path::new(&home).join(".config/mork/bitbucket-token");
     std::fs::read_to_string(&path).map_err(|source| TokenError::Read { path: path.clone(), source })
 }
 
-/// Reads `~/.config/factory/merge-token`, Andrei's own in F-B0's form (fac-98): read by the call
+/// Reads `~/.config/mork/merge-token`, the operator's own in F-B0's form (fac-98): read by the call
 /// it serves alone, and never asked of Bitbucket whose it is.
 pub fn read_merge() -> Result<Token, TokenError> {
     let home = std::env::var_os("HOME").ok_or(TokenError::NoHome)?;
-    let path = std::path::Path::new(&home).join(".config/factory/merge-token");
+    let path = std::path::Path::new(&home).join(".config/mork/merge-token");
     parse(&std::fs::read_to_string(&path).map_err(|source| TokenError::Read { path: path.clone(), source })?)
-}
-
-pub(crate) fn base64(data: &[u8]) -> String {
-    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::new();
-    for chunk in data.chunks(3) {
-        let b = [chunk[0], chunk.get(1).copied().unwrap_or(0), chunk.get(2).copied().unwrap_or(0)];
-        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
-        for i in 0..4 {
-            if i <= chunk.len() {
-                out.push(char::from(T[((n >> (18 - 6 * i)) & 63) as usize]));
-            } else {
-                out.push('=');
-            }
-        }
-    }
-    out
 }

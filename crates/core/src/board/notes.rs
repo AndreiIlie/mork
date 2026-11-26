@@ -1,12 +1,12 @@
 //! The dated notes on top of a card's description (`<who> 14.10: …`): this writer indents a note's lines past its
-//! first; an earlier writer's multi-line note is told by the lines the factory recorded writing.
+//! first; an earlier writer's multi-line note is told by the lines Mork recorded writing.
 
-use factory_types::card::BoardCard;
-use factory_types::decisions;
+use mork_types::card::BoardCard;
+use mork_types::decisions;
 
 use crate::state::State;
 
-/// A note the factory wrote into a card's file, as its record says.
+/// A note Mork wrote into a card's file, as its record says.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Written {
     /// Its lines as written, the first one dated.
@@ -189,8 +189,19 @@ fn own_record<'a, S: AsRef<str>>(
 /// A card's description apart from its dated notes: the notes, newest first, and the text under them. `board`'s records
 /// tell where each note ends; its index may be empty before the board is read.
 pub(crate) fn apart(state: &State, board: Option<&BoardCard>, description: &str) -> (Vec<String>, String) {
+    let (notes, body) = apart_verbatim(state, board, description);
+    (notes, body.lines().collect::<Vec<_>>().join("\n").trim().to_owned())
+}
+
+/// Separates the dated notes while preserving the specification's original whitespace.
+pub(crate) fn apart_verbatim<'a>(
+    state: &State,
+    board: Option<&BoardCard>,
+    description: &'a str,
+) -> (Vec<String>, &'a str) {
     let written = board.map(|b| super::writes::written(state, &b.project, &b.file)).unwrap_or_default();
     let lines: Vec<&str> = description.lines().collect();
     let n = split(&lines, &written);
-    (n.notes, lines.get(n.end..).unwrap_or_default().join("\n").trim().to_owned())
+    let bytes: usize = description.split_inclusive('\n').take(n.end).map(str::len).sum();
+    (n.notes, &description[bytes..])
 }

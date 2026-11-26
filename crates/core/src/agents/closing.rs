@@ -1,12 +1,12 @@
 //! The closing turn (fac-287): a seat ending a session long enough to have learned something (fac-176) is asked first
-//! for any feedback it didn't file, about its project and about the factory, either of which may be nothing.
+//! for any feedback it didn't file, about its project and about Mork, either of which may be nothing.
 
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::config::Config;
-use factory_types::note::NoteWhat;
-use factory_types::state::{Agent, AgentStatus, Job, Owed, Retiring, Settlement};
-use factory_types::work::Purpose;
-use factory_types::{AgentKey, CardId};
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::config::Config;
+use mork_types::note::NoteWhat;
+use mork_types::state::{Agent, AgentStatus, Job, Owed, Retiring, Settlement};
+use mork_types::work::Purpose;
+use mork_types::{AgentKey, CardId};
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, JobEnd, SessionSeen};
@@ -314,19 +314,18 @@ pub(super) fn still_owed(state: &State, a: &mut Agent) {
 }
 
 // Its answers journalled, posted nowhere, and each feedback filed as a note under its project: the seat's own card's,
-// or the factory's (fac-593).
+// or Mork's (fac-593).
 fn answered(p: &mut Poster<'_>, a: &Agent, reply: &Value, ctx: Ctx<'_>) -> Result<(), String> {
-    let (feedback, factory) = super::lesson::check(reply)?;
+    let (feedback, mork) = super::lesson::check(reply, ctx.config.mork.project.is_some())?;
     let card = crate::messages::places::card_of(p.state, &a.place);
-    let said = json!({"agent": a.key, "feedback": feedback.is_some(), "factory_feedback": factory.is_some()});
+    let said = json!({"agent": a.key, "feedback": feedback.is_some(), "mork_feedback": mork.is_some()});
     p.journal("closing.answered", card.as_ref().map(CardId::as_str), said);
     let (project, card) = crate::memory::origin(p.state, a);
     if let Some(text) = feedback {
         crate::memory::put(p, project, card.clone(), Some(a.key.clone()), NoteWhat::Feedback { text });
     }
-    if let Some(text) = factory {
-        let project = Some(ctx.config.factory.project.clone());
-        crate::memory::put(p, project, card, Some(a.key.clone()), NoteWhat::Feedback { text });
+    if let (Some(text), Some(project)) = (mork, ctx.config.mork.project.clone()) {
+        crate::memory::put(p, Some(project), card, Some(a.key.clone()), NoteWhat::Feedback { text });
     }
     Ok(())
 }

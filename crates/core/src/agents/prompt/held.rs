@@ -3,8 +3,8 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::reply::Role;
-use factory_types::state::{Agent, Job};
+use mork_types::reply::Role;
+use mork_types::state::{Agent, Job};
 
 use crate::decide::SessionSeen;
 use crate::state::State;
@@ -57,7 +57,7 @@ impl<'a> Sections<'a> {
 
 // `codex exec`'s stream shows no compaction, so its seat holds nothing and reads everything every turn.
 fn tracks(job: &Job) -> bool {
-    job.spec.live.is_some() || job.spec.argv.first().is_some_and(|w| w == factory_types::config::Cli::Agy.as_str())
+    job.spec.live.is_some() || job.spec.argv.first().is_some_and(|w| w == mork_types::config::Cli::Agy.as_str())
 }
 
 /// A turn launched: one through `codex exec` leaves its session holding nothing a later turn may rely on.
@@ -70,9 +70,13 @@ pub(crate) fn launched(a: &mut Agent, job: &Job) {
 /// At settlement: a compacted session holds nothing it was sent before; a prompt its model answered is held.
 pub(crate) fn seen(a: &mut Agent, job: &Job, s: &SessionSeen) {
     if s.compacted {
+        a.needs_specification = true;
         a.held.clear();
-    } else if s.answered && tracks(job) {
-        a.held.extend(job.staged.clone());
+    } else if s.answered {
+        a.needs_specification = false;
+        if tracks(job) {
+            a.held.extend(job.staged.clone());
+        }
     }
 }
 
@@ -110,6 +114,9 @@ pub(crate) fn certain(state: &State, a: &Agent, first: &Job) -> BTreeMap<String,
 
 /// The sections a retried turn's prompt sent, as its earlier job staged them.
 pub(crate) fn retried(state: &State, a: &Agent, prompt: &str) -> BTreeMap<String, String> {
-    let ran = state.jobs.values().filter(|j| j.owner == a.key && !j.stdin.is_empty() && prompt.ends_with(&j.stdin));
+    let ran = state
+        .jobs
+        .values()
+        .filter(|j| j.owner == a.key && !j.request_text().is_empty() && prompt.ends_with(j.request_text()));
     ran.max_by_key(|j| j.spec.created_ms).map(|j| j.staged.clone()).unwrap_or_default()
 }

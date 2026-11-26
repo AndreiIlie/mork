@@ -1,8 +1,8 @@
-//! A card's visual mode (fac-258): Andrei's switch on a live full card, any time; an orchestrator's only
+//! A card's visual mode (fac-258): the operator's switch on a live full card, any time; an orchestrator's only
 //! as it starts one (`start --visual`).
 
-use factory_types::CardId;
-use factory_types::card::{Card, MockStep, Mode, Stage};
+use mork_types::CardId;
+use mork_types::card::{Card, MockStep, Mode, Stage};
 use serde_json::json;
 
 use crate::decide::{Ctx, Decision};
@@ -23,7 +23,7 @@ pub(super) fn toggle(state: &State, card: &CardId, on: bool, ctx: Ctx<'_>) -> De
     p.journal("visual", Some(id.as_str()), json!({"visual": on}));
     if c.visual != on {
         let (level, rule) = toggle_rule(c, on);
-        let text = format!("Andrei turned {id}'s visual mode {level}.\n{rule}");
+        let text = format!("The operator turned {id}'s visual mode {level}.\n{rule}");
         crate::messages::requests::tell_agent(&mut p, &id, super::facts::holder(c), "Visual mode changed", &text);
     }
     let was = c.visual;
@@ -35,7 +35,7 @@ pub(super) fn toggle(state: &State, card: &CardId, on: bool, ctx: Ctx<'_>) -> De
     } else if on && !was && at_brief(&c) && c.mock.is_none_or(|m| m.step == MockStep::Skipped) {
         super::baseline::turned_on(&mut p, c, ctx);
     } else if on && !was && at_brief(&c) && c.recap && p.all_asks().any(|a| super::brief::is_given_plan(a, &id)) {
-        // A visual card's plan is Andrei's alone: replace a given plan ask with a fresh ungiven one that notifies him.
+        // A visual card's plan is the operator's alone: replace a given plan ask with a fresh ungiven one that notifies him.
         let mut c = Card { recap: false, ..c };
         super::brief::offer(&mut p, &mut c, ctx);
         p.put_card(c);
@@ -56,14 +56,13 @@ fn toggle_rule(c: &Card, on: bool) -> (&'static str, String) {
                 .to_owned(),
         );
     }
-    let (seat, next) =
-        if c.no_planner { ("your", "you then change") } else { ("the foreman's", "the planner then changes") };
+    let (seat, next) = if c.no_planner { ("your", "you agree") } else { ("the foreman's", "the planner agrees") };
     (
         "on",
         format!(
-            "Before the plan's approve, {seat} baseline seat reproduces today's pages in the mock's folder, a waiting \
-             recap withdrawn; {next} the mock with Andrei beside the plan, and the plan's approve, Andrei's own, \
-             approves both. Nothing moves on a plan already approved."
+            "Before the plan's approve, {seat} baseline seat reproduces today's pages in the mock's folder, with any waiting \
+             recap withdrawn. Then {next} on the visual direction before editing the mock. The operator approves the \
+             plan and mock together. Nothing moves on a plan already approved."
         ),
     )
 }

@@ -1,12 +1,12 @@
-//! A card's PR (4.11.1, 4.11.6): its candidate pushed, the PR opened in Andrei's name, held while its wording is
+//! A card's PR (4.11.1, 4.11.6): its candidate pushed, the PR opened in the operator's name, held while its wording is
 //! incomplete (fac-296), and read. Every PR merges on his approval alone (fac-98, fac-111): published, it waits for his.
 
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::ask::AskKind;
-use factory_types::card::{Card, Landing, Mode, Stage};
-use factory_types::config::Config;
-use factory_types::work::{PrSeen, PrState};
-use factory_types::{CardId, Sha};
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::ask::AskKind;
+use mork_types::card::{Card, Landing, Mode, Stage};
+use mork_types::config::Config;
+use mork_types::work::{PrSeen, PrState};
+use mork_types::{CardId, Sha};
 use serde_json::Value;
 
 use super::landing::alarm;
@@ -17,10 +17,7 @@ use crate::state::State;
 
 /// A card's repository on Bitbucket, `workspace/slug`, or its project's name.
 pub fn repo_of(c: &Card, config: &Config) -> String {
-    match config.projects.get(&c.project).and_then(|p| p.bitbucket.as_ref()) {
-        Some(bb) => format!("{}/{}", bb.workspace, bb.slug),
-        None => c.project.to_string(),
-    }
+    config.projects.get(&c.project).and_then(|p| p.forge.repo_key()).unwrap_or_else(|| c.project.to_string())
 }
 
 // The most words a PR's title keeps of the card's.
@@ -75,7 +72,7 @@ pub fn pushed(p: &mut Poster<'_>, mut c: Card, commit: &Sha, config: &Config) {
     hold(p, &opening, config);
 }
 
-/// The PR opened, in Andrei's name: it waits for his approval.
+/// The PR opened, in the operator's name: it waits for his approval.
 pub fn pr_opened(p: &mut Poster<'_>, mut c: Card, v: &Value, ctx: Ctx<'_>) {
     let Some(pr) = v.get("pr").and_then(Value::as_u64) else { return };
     c.pr = Some(pr);
@@ -144,25 +141,26 @@ fn read(p: &mut Poster<'_>, mut c: Card, seen: &PrSeen, before_merge: bool, ctx:
     if !merged && (c.alarm || !matches!(c.stage, Stage::Ready | Stage::Merging)) {
         return;
     }
+    let forge = ctx.config.forge_label(&c.project);
     let pr = seen.pr;
     // What lands is the train's candidate, which is what was pushed (fac-68); merged by hand, the
     // card holds none any more, and what it pushed is what landed (fac-98).
     let hand = c.pushed.clone().filter(|_| c.landing == Some(Landing::HandMerged));
     let head = hand.or_else(|| super::order::commit_of(&c)).map(|h| h.0).unwrap_or_default();
-    // The PR's head is what the factory pushed last: a card back from the queue may have a newer
+    // The PR's head is what Mork pushed last: a card back from the queue may have a newer
     // head it hasn't pushed yet (fac-10).
     let ours = c.pushed.clone().map_or_else(|| head.clone(), |x| x.0);
     let same = seen.head.0 == ours;
     match seen.state {
-        PrState::Open if !same => alarm(p, c, &format!("PR {pr}'s head moved outside the factory")),
-        // A PR waiting out of the train merges on Andrei's approval alone (fac-98).
+        PrState::Open if !same => alarm(p, c, &format!("PR {pr}'s head moved outside Mork")),
+        // A PR waiting out of the train merges on the operator's approval alone (fac-98).
         PrState::Open if super::approval::waiting(&c) => super::approval::own(p, &c, seen, ctx),
         PrState::Open => {}
         // The merge call is under way, an approved one's too: its own result decides (4.11.2.5, R7).
         PrState::Merged if !before_merge && (matches!(c.landing, Some(Landing::Merge { .. })) || calling(p, &c.id)) => {
         }
         PrState::Merged => super::pr_merged::read(p, c, seen, &head, ctx),
-        PrState::Declined | PrState::Superseded => alarm(p, c, &format!("PR {pr} was declined on Bitbucket")),
+        PrState::Declined | PrState::Superseded => alarm(p, c, &format!("PR {pr} was declined on {forge}")),
     }
 }
 
@@ -187,7 +185,7 @@ fn unworded(state: &State, a: &Action, config: &Config) -> Option<String> {
 
 // A PR opening just made is held when its wording is incomplete, with what to write (fac-296);
 // nothing runs it before.
-fn hold(p: &mut Poster<'_>, id: &factory_types::ActionId, config: &Config) {
+fn hold(p: &mut Poster<'_>, id: &mork_types::ActionId, config: &Config) {
     let a = p
         .all_actions()
         .find(|a| &a.id == id && matches!(a.status, ActionStatus::Pending | ActionStatus::Held))
@@ -197,21 +195,15 @@ fn hold(p: &mut Poster<'_>, id: &factory_types::ActionId, config: &Config) {
     }
 }
 
-// The foreman writes the wording, so the hold goes to it, not to Andrei: no ask is raised.
+// The foreman writes the wording, so the hold goes to it, not to the operator: no ask is raised.
 fn held(p: &mut Poster<'_>, mut a: Action, why: &str) {
     a.status = ActionStatus::Held;
     a.words = Some(why.to_owned());
     let (id, card) = (a.id.clone(), a.what.card().cloned());
     p.put_action(a);
     if let Some(card) = card {
-        let text = format!("Opening the PR is held: {why}. Run it with `factory ctl action.retry {id}`.");
-        crate::messages::requests::ask_agent(
-            p,
-            &card,
-            factory_types::reply::Role::Foreman,
-            "Write the PR wording",
-            &text,
-        );
+        let text = format!("Opening the PR is held: {why}. Run it with `mork ctl action.retry {id}`.");
+        crate::messages::requests::ask_agent(p, &card, mork_types::reply::Role::Foreman, "Write the PR wording", &text);
     }
 }
 

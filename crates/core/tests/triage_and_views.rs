@@ -6,15 +6,15 @@
 mod common;
 
 use common::{Sim, reply};
-use factory_core::decide::{Event, JobEnd, SessionSeen};
-use factory_core::views::outside::Outside;
-use factory_core::views::place::place;
-use factory_core::views::screen::screen;
-use factory_types::ask::{AskKind, Color};
-use factory_types::card::{Landing, Stage};
-use factory_types::state::{MessageKind, Sender};
-use factory_types::view::{StageAt, SuiteProgress};
-use factory_types::work::{Checkout, FinalRun, Purpose};
+use mork_core::decide::{Event, JobEnd, SessionSeen};
+use mork_core::views::outside::Outside;
+use mork_core::views::place::place;
+use mork_core::views::screen::screen;
+use mork_types::ask::{AskKind, Color};
+use mork_types::card::{Landing, Stage};
+use mork_types::state::{MessageKind, Sender};
+use mork_types::view::{StageAt, SuiteProgress};
+use mork_types::work::{Checkout, FinalRun, Purpose};
 use serde_json::{Value, json};
 
 const CARD: &str = "web-1";
@@ -43,10 +43,10 @@ fn triage_validation_refuses_bad_input_and_wrong_sender() {
     assert!(s.card(CARD).triage.is_some());
     assert!(!s.owed(&format!("{CARD}/foreman")));
 
-    assert!(s.andrei(json!({"triage": {"card": CARD, "fix": ["1"]}})).is_err());
-    assert!(s.andrei(json!({"triage": {"card": CARD, "fix": ["1", "2"], "decline": ["2"]}})).is_err());
-    assert!(s.andrei(json!({"triage": {"card": CARD, "fix": ["1", "9"]}})).is_err());
-    assert!(s.andrei(json!({"triage": {"card": CARD, "fix": ["1", "abc"]}})).is_err());
+    assert!(s.operator(json!({"triage": {"card": CARD, "fix": ["1"]}})).is_err());
+    assert!(s.operator(json!({"triage": {"card": CARD, "fix": ["1", "2"], "decline": ["2"]}})).is_err());
+    assert!(s.operator(json!({"triage": {"card": CARD, "fix": ["1", "9"]}})).is_err());
+    assert!(s.operator(json!({"triage": {"card": CARD, "fix": ["1", "abc"]}})).is_err());
     assert!(
         s.cmd(Sender::Agent(format!("{CARD}/foreman").into()), json!({"triage": {"card": CARD, "fix": ["1", "2"]}}))
             .is_err()
@@ -59,7 +59,7 @@ fn triage_offers_pause_resume_and_give() {
     let mut s = Sim::new();
     to_failed_round(&mut s, 0, &[f("src/a.rs", 3, "First bug", "p1"), f("src/b.rs", 9, "Second bug", "p2")]);
     let ask_id = s.card(CARD).triage.unwrap().ask;
-    assert!(s.andrei(json!({"ack": {"ask": ask_id}})).is_err());
+    assert!(s.operator(json!({"ack": {"ask": ask_id}})).is_err());
     let sc = screen(&s.state, &Outside::default(), s.ctx());
     let hand = sc.hands.iter().find(|h| h.ask == ask_id).unwrap();
     assert_eq!(hand.kind, AskKind::Triage);
@@ -67,13 +67,13 @@ fn triage_offers_pause_resume_and_give() {
     assert!(labels.contains(&"Orchestrator answers") && labels.contains(&"Opinion from orchestrator"));
     assert!(!labels.contains(&"ack"));
 
-    s.andrei(json!({"stop": {"card": CARD}})).unwrap();
+    s.operator(json!({"stop": {"card": CARD}})).unwrap();
     assert!(s.card(CARD).triage.is_some(), "stop must keep triage open");
-    assert!(s.andrei(json!({"triage": {"card": CARD, "fix": ["1", "2"]}})).is_err());
-    s.andrei(json!({"resume": {"card": CARD}})).unwrap();
+    assert!(s.operator(json!({"triage": {"card": CARD, "fix": ["1", "2"]}})).is_err());
+    s.operator(json!({"resume": {"card": CARD}})).unwrap();
     assert!(s.card(CARD).triage.is_some(), "resume must keep triage open");
 
-    s.andrei(json!({"give": {"ask": ask_id}})).unwrap();
+    s.operator(json!({"give": {"ask": ask_id}})).unwrap();
     s.cmd(Sender::Orchestrator("web".into()), json!({"triage": {"card": CARD, "fix": ["1"], "foreman": ["2"]}}))
         .unwrap();
     assert!(s.card(CARD).triage.is_none());
@@ -86,7 +86,7 @@ fn triage_all_declined_with_passing_suite_restarts_verification_without_foreman(
     let rc = s.review_card(CARD);
     let reqs_before = s.engine_to(CARD, "foreman").len();
 
-    s.andrei(json!({"triage": {"card": CARD, "decline": ["1", "2"]}})).unwrap();
+    s.operator(json!({"triage": {"card": CARD, "decline": ["1", "2"]}})).unwrap();
     assert!(s.card(CARD).triage.is_none());
     let raised = &s.card(&rc).review.unwrap().raised;
     assert!(raised.iter().all(|r| r.resolved && r.declined));
@@ -106,7 +106,7 @@ fn suite_with_log(s: &mut Sim, card: &str, exit: i32, log_path: &str) {
         l => panic!("{card} isn't under test: {l:?}"),
     };
     let at = Checkout { head: Some(commit.clone()), tree, tracked_clean: true, clean: true };
-    let logs = [(factory_types::CardId::new(card), log_path.to_owned())].into_iter().collect();
+    let logs = [(mork_types::CardId::new(card), log_path.to_owned())].into_iter().collect();
     let run = FinalRun {
         head: commit,
         before: at.clone(),
@@ -141,12 +141,12 @@ fn triage_mixed_and_suite_failure_send_one_foreman_request() {
         ],
     );
     s.proofs_copied();
-    suite_with_log(&mut s, CARD, 1, ".git/factory/suite-logs/run-1.log");
+    suite_with_log(&mut s, CARD, 1, ".git/mork/suite-logs/run-1.log");
     assert!(s.card(CARD).triage.as_ref().unwrap().suite_failure.is_some());
     assert!(!s.owed(&format!("{CARD}/foreman")), "suite failure must wait for triage");
 
     let reqs_before = s.engine_to(CARD, "foreman").into_iter().filter(|m| m.kind == MessageKind::Request).count();
-    s.andrei(json!({"triage": {"card": CARD, "fix": ["1"], "decline": ["2"], "foreman": ["3"]}})).unwrap();
+    s.operator(json!({"triage": {"card": CARD, "fix": ["1"], "decline": ["2"], "foreman": ["3"]}})).unwrap();
     s.imported(CARD);
     let reqs: Vec<_> = s.engine_to(CARD, "foreman").into_iter().filter(|m| m.kind == MessageKind::Request).collect();
     assert_eq!(reqs.len(), reqs_before + 1, "mixed triage + suite failure must send exactly one request");
@@ -157,7 +157,7 @@ fn triage_mixed_and_suite_failure_send_one_foreman_request() {
     assert!(!last.text.contains("Skip this"), "declined finding must not be in the foreman's list: {}", last.text);
     assert!(last.text.contains("SUITE-OUTPUT exit 1"), "suite failure must travel in the same request: {}", last.text);
     assert!(
-        last.text.contains("The full log: .git/factory/suite-logs/run-1.log"),
+        last.text.contains("The full log: .git/mork/suite-logs/run-1.log"),
         "suite log pointer must travel in the same request: {}",
         last.text
     );
@@ -166,7 +166,7 @@ fn triage_mixed_and_suite_failure_send_one_foreman_request() {
     let mut s2 = Sim::new();
     to_failed_round(&mut s2, 1, &[f("src/a.rs", 3, "Nit", "p1")]);
     let reqs2_before = s2.engine_to(CARD, "foreman").into_iter().filter(|m| m.kind == MessageKind::Request).count();
-    s2.andrei(json!({"triage": {"card": CARD, "decline": ["1"]}})).unwrap();
+    s2.operator(json!({"triage": {"card": CARD, "decline": ["1"]}})).unwrap();
     s2.imported(CARD);
     let reqs2: Vec<_> = s2.engine_to(CARD, "foreman").into_iter().filter(|m| m.kind == MessageKind::Request).collect();
     assert_eq!(reqs2.len(), reqs2_before + 1);
@@ -184,8 +184,8 @@ fn triage_excludes_pre_resolved_from_record_and_reply() {
     let mut s = Sim::new();
     to_failed_round(&mut s, 0, &[f("src/a.rs", 3, "Bug 1", "p1"), f("src/b.rs", 9, "Bug 2", "p2")]);
     let rc = s.review_card(CARD);
-    s.andrei(json!({"resolve": {"card": rc, "n": 2}})).unwrap();
-    let ans = s.andrei(json!({"triage": {"card": CARD, "fix": ["1"], "decline": ["2"]}})).unwrap();
+    s.operator(json!({"resolve": {"card": rc, "n": 2}})).unwrap();
+    let ans = s.operator(json!({"triage": {"card": CARD, "fix": ["1"], "decline": ["2"]}})).unwrap();
     assert_eq!(ans["triage"]["fix"], json!([1]));
     assert_eq!(ans["triage"]["decline"], json!([]));
 }
@@ -195,7 +195,7 @@ fn triage_withdraws_on_built_brief_mock_and_close() {
     let mut s = Sim::new();
     to_failed_round(&mut s, 0, &[f("src/a.rs", 3, "Bug", "p1")]);
     let ask_id = s.card(CARD).triage.unwrap().ask;
-    s.andrei(json!({"say": {"place": CARD, "text": "rebuild"}})).unwrap();
+    s.operator(json!({"say": {"place": CARD, "text": "rebuild"}})).unwrap();
     s.built(CARD, "h2", "base1");
     assert!(s.card(CARD).triage.is_none());
     assert!(!s.state.asks[&ask_id].open);
@@ -203,14 +203,14 @@ fn triage_withdraws_on_built_brief_mock_and_close() {
     let mut s2 = Sim::new();
     to_failed_round(&mut s2, 0, &[f("src/a.rs", 3, "Bug", "p1")]);
     let ask2 = s2.card(CARD).triage.unwrap().ask;
-    s2.andrei(json!({"brief": {"card": CARD}})).unwrap();
+    s2.operator(json!({"brief": {"card": CARD}})).unwrap();
     assert!(s2.card(CARD).triage.is_none());
     assert!(!s2.state.asks[&ask2].open);
 
     let mut s3 = Sim::new();
     to_failed_round(&mut s3, 0, &[f("src/a.rs", 3, "Bug", "p1")]);
     let ask3 = s3.card(CARD).triage.unwrap().ask;
-    s3.andrei(json!({"close": {"card": CARD, "why": "not needed"}})).unwrap();
+    s3.operator(json!({"close": {"card": CARD, "why": "not needed"}})).unwrap();
     assert!(s3.card(CARD).triage.is_none());
     assert!(!s3.state.asks[&ask3].open);
 }
@@ -236,7 +236,7 @@ fn views_fold_branch_review_and_map_hands_to_parent() {
     let rpv = place(&s.state, &rc, None, &Outside::default(), s.ctx());
     assert_eq!(rpv.card.as_ref().unwrap().parent.as_ref().map(|c| c.as_str()), Some(CARD));
 
-    s.andrei(json!({"say": {"place": rc, "text": "ping"}})).unwrap();
+    s.operator(json!({"say": {"place": rc, "text": "ping"}})).unwrap();
     let mut ask_reply = reply("working", "Question");
     ask_reply["hand"]["ask"] = json!("Keep going?");
     s.turn(&format!("{rc}/foreman"), ask_reply);
@@ -259,7 +259,7 @@ fn views_expose_four_step_pipeline_rounds_and_triage() {
     assert_eq!(
         (v.kind, v.at, v.count.as_deref(), v.sub.as_deref()),
         (
-            factory_types::view::StageKind::Verify,
+            mork_types::view::StageKind::Verify,
             StageAt::Current,
             Some("Round 1"),
             Some("failed · 1 finding waits for you"),
@@ -290,7 +290,7 @@ fn views_expose_four_step_pipeline_rounds_and_triage() {
 
 #[test]
 fn timeline_splits_merging_into_verify_and_land_across_pause_and_reverify() {
-    use factory_core::views::timeline::{points, totals};
+    use mork_core::views::timeline::{points, totals};
     let rows = [
         (0, "card.stage", json!({"stage": "merging", "paused": false})),
         (100, "merge.tested", json!({})),
@@ -316,17 +316,17 @@ fn timeline_outside(s: &Sim) -> Outside {
         .collect();
     let from = rows.iter().rposition(|(_, k, _)| *k == "card.start").unwrap_or(0);
     let mut o = Outside::default();
-    o.timelines.insert(CARD.into(), factory_core::views::timeline::points(&rows[from..]).0);
+    o.timelines.insert(CARD.into(), mork_core::views::timeline::points(&rows[from..]).0);
     o
 }
 
-fn overview_labels(o: &factory_types::view::OverviewView) -> Vec<&str> {
+fn overview_labels(o: &mork_types::view::OverviewView) -> Vec<&str> {
     o.stages.iter().map(|st| st.label.as_str()).collect()
 }
 
 #[test]
 fn overview_stages_carry_a_failed_round_and_its_successor() {
-    use factory_types::view::OverviewStageAt;
+    use mork_types::view::OverviewStageAt;
 
     let mut s = Sim::new();
     to_failed_round(&mut s, 0, &[f("src/a.rs", 3, "Bug 1", "p1"), f("src/b.rs", 9, "Bug 2", "p2")]);
@@ -338,7 +338,7 @@ fn overview_stages_carry_a_failed_round_and_its_successor() {
     assert_eq!(ov.stages[2].summary, "2 to triage");
     assert!(place(&s.state, &format!("{CARD}/spec"), Some(100), &timeline_outside(&s), s.ctx()).overview.is_none());
 
-    s.andrei(json!({"triage": {"card": CARD, "fix": ["1"], "decline": ["2"]}})).unwrap();
+    s.operator(json!({"triage": {"card": CARD, "fix": ["1"], "decline": ["2"]}})).unwrap();
     s.imported(CARD);
     s.built(CARD, "h2", "base1");
     s.checks(CARD, 0, &[]);
@@ -371,7 +371,7 @@ fn overview_checks_failure_unasked_round_and_restarted_review_run() {
     s.round_ends(CARD, &[], &[f("src/a.rs", 3, "Bug 1", "p1")]);
     s.proofs_copied();
     s.suite(CARD, 0);
-    s.andrei(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
+    s.operator(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
     s.imported(CARD);
     s.built(CARD, "h3", "base1");
     s.checks(CARD, 0, &[]);
@@ -381,17 +381,17 @@ fn overview_checks_failure_unasked_round_and_restarted_review_run() {
     assert_eq!(overview_labels(&ov_unasked), vec!["Spec", "Build", "Verify · Round 1", "Verify · Round 2"]);
 
     // Stopping and resuming while R2 is unasked must not shift R2's start.
-    s.andrei(json!({"stop": {"card": CARD}})).unwrap();
-    s.andrei(json!({"resume": {"card": CARD}})).unwrap();
+    s.operator(json!({"stop": {"card": CARD}})).unwrap();
+    s.operator(json!({"resume": {"card": CARD}})).unwrap();
     let ov_paused = place(&s.state, CARD, Some(100), &timeline_outside(&s), s.ctx()).overview.unwrap();
     assert_eq!(ov_paused.stages[3].start_ms, ov_unasked.stages[3].start_ms);
 
-    s.andrei(json!({"close": {"card": CARD, "why": "redo"}})).unwrap();
+    s.operator(json!({"close": {"card": CARD, "why": "redo"}})).unwrap();
     for id in s.open_jobs(|p| matches!(p, Purpose::Bundle { .. })) {
         s.end_job(&id, json!({"branch": CARD, "bundle": false, "head": null, "clean": true, "dirty": []}));
     }
     s.settle_actions();
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
+    s.operator(json!({"start": {"card": CARD}})).unwrap();
     s.settle_actions();
     let ov_restart = place(&s.state, CARD, Some(100), &timeline_outside(&s), s.ctx()).overview.unwrap();
     assert_eq!(overview_labels(&ov_restart), vec!["Spec"]);
@@ -399,9 +399,9 @@ fn overview_checks_failure_unasked_round_and_restarted_review_run() {
 
 #[test]
 fn overview_pause_in_land_and_reopened_standalone_review_drop_prior_rounds() {
-    use factory_types::card::{Card, Mode};
-    use factory_types::review::{Review, Round, Verdict};
-    use factory_types::{CardId, Sha};
+    use mork_types::card::{Card, Mode};
+    use mork_types::review::{Review, Round, Verdict};
+    use mork_types::{CardId, Sha};
 
     let mut s = Sim::new();
     s.through_brief(CARD, "web");
@@ -411,8 +411,8 @@ fn overview_pause_in_land_and_reopened_standalone_review_drop_prior_rounds() {
     s.round_asked(CARD);
     s.round_ends(CARD, &[], &[]);
     s.suite(CARD, 0);
-    s.andrei(json!({"stop": {"card": CARD}})).unwrap();
-    s.andrei(json!({"resume": {"card": CARD}})).unwrap();
+    s.operator(json!({"stop": {"card": CARD}})).unwrap();
+    s.operator(json!({"resume": {"card": CARD}})).unwrap();
     let ov_land = place(&s.state, CARD, Some(100), &timeline_outside(&s), s.ctx()).overview.unwrap();
     assert_eq!(overview_labels(&ov_land), vec!["Spec", "Build", "Verify · Round 1", "Land"]);
 
@@ -423,6 +423,7 @@ fn overview_pause_in_land_and_reopened_standalone_review_drop_prior_rounds() {
     rc.first_seq = 50;
     rc.review = Some(Box::new(Review {
         rounds: vec![Round {
+            test_changes: Vec::new(),
             n: 1,
             head: None,
             commit: Sha::new("aaa"),
@@ -448,7 +449,7 @@ fn verify_step_names_the_orchestrator_when_triage_is_given() {
     let mut s = Sim::new();
     to_failed_round(&mut s, 0, &[f("src/a.rs", 3, "Race condition", "proof text")]);
     let ask = s.card(CARD).triage.unwrap().ask;
-    s.andrei(json!({"give": {"ask": ask}})).unwrap();
+    s.operator(json!({"give": {"ask": ask}})).unwrap();
     let pv = place(&s.state, CARD, None, &Outside::default(), s.ctx());
     let verify = &pv.card.as_ref().unwrap().pipeline[2];
     assert_eq!(verify.sub.as_deref(), Some("failed · 1 finding waits for orchestrator"));
@@ -465,7 +466,7 @@ fn overview_live_rows_keep_the_run_through_triage_and_show_the_foreman_fixing() 
     let rows = live(&s);
     assert_eq!(rows[..2], [("Checks".into(), "passed".into()), ("Suite".into(), "failed".into())], "{rows:?}");
 
-    s.andrei(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
+    s.operator(json!({"triage": {"card": CARD, "fix": ["1"]}})).unwrap();
     s.imported(CARD);
     s.turn_started(&format!("{CARD}/foreman"));
     assert_eq!(live(&s).iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(), vec!["foreman"]);
@@ -483,7 +484,7 @@ fn suite_row_counts_a_resumed_phases_newest_attempt_alone() {
     s.apply(Event::JobRunning { id: first.clone() });
     s.apply(Event::JobEnded { id: first.clone(), end: JobEnd::Cut { session: SessionSeen::default() } });
     s.settle_actions();
-    s.andrei(json!({"resume": {"card": CARD}})).unwrap();
+    s.operator(json!({"resume": {"card": CARD}})).unwrap();
     s.settle_actions();
     let retry = s.open_jobs(suite)[0].clone();
     assert_ne!(first, retry);
@@ -505,7 +506,7 @@ fn board_live_row_progress_tracks_steps_plan_suite_and_triage() {
 
     let mut s = Sim::new();
     s.board(CARD, "web");
-    s.andrei(json!({"start": {"card": CARD}})).unwrap();
+    s.operator(json!({"start": {"card": CARD}})).unwrap();
     s.settle_actions();
     assert_eq!(progress_of(&s, &Outside::default()), 0, "Spec has no within-step progress");
 

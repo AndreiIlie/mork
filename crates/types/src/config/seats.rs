@@ -123,7 +123,7 @@ impl Effort {
     /// Every supported level, lowest first.
     pub const ALL: [Self; 5] = [Self::Low, Self::Medium, Self::High, Self::Xhigh, Self::Max];
 
-    /// The levels any chooser but Andrei's own pick may choose (fac-558, fac-615): a configured or launched `max`
+    /// The levels any chooser but the operator's own pick may choose (fac-558, fac-615): a configured or launched `max`
     /// still runs.
     pub const OFFERED: [Self; 4] = [Self::Low, Self::Medium, Self::High, Self::Xhigh];
 
@@ -244,7 +244,7 @@ pub fn agy_bucket(model: &str) -> &'static str {
     if model.starts_with("gemini-") { "account" } else { AGY_3P_BUCKET }
 }
 
-/// Whether a model is one only Andrei's own pick may newly choose (fac-558, fac-615): a configured row or a launched
+/// Whether a model is one only the operator's own pick may newly choose (fac-558, fac-615): a configured row or a launched
 /// session naming Fable or Astra still runs.
 pub fn barred(model: &str) -> bool {
     let m = model.to_ascii_lowercase();
@@ -310,7 +310,7 @@ pub fn moved_to_codex(name: &str, at: Standing) -> bool {
 pub fn cli_of_model(model: &str) -> Option<Cli> {
     MODEL_CATALOG
         .iter()
-        .chain(ANDREI_MODELS)
+        .chain(OPERATOR_MODELS)
         .find(|c| c.1 == model)
         .map(|c| c.0)
         .or_else(|| CODEX_PRICES.iter().any(|(id, _)| *id == model).then_some(Cli::Codex))
@@ -349,8 +349,8 @@ pub const MODEL_CATALOG: &[(Cli, &str, &str)] = &[
     (Cli::Agy, OPUS, "opus 5.5"),
 ];
 
-/// Additional models offered to Andrei's own pick alone (fac-441, fac-615), and the labels configured seats take.
-pub const ANDREI_MODELS: &[(Cli, &str, &str)] =
+/// Additional models offered to the operator's own pick alone (fac-441, fac-615), and the labels configured seats take.
+pub const OPERATOR_MODELS: &[(Cli, &str, &str)] =
     &[(Cli::Claude, "claude-fable-5-2", "fable 5.2"), (Cli::Codex, ASTRA, "astra"), (Cli::Codex, "gpt-6-luna", "luna")];
 
 /// The seat name of a card's foreman, using the review policies on a review card.
@@ -371,7 +371,7 @@ impl Config {
         let chosen = phase.and_then(|p| p.model.as_ref()).or(o.model.as_ref());
         let on = phase.and_then(|p| p.cli).or(o.cli);
         let (cli, model, label, effort) = default_in(name, at, &o, on, chosen.is_some())?;
-        let catalog = || MODEL_CATALOG.iter().chain(ANDREI_MODELS);
+        let catalog = || MODEL_CATALOG.iter().chain(OPERATOR_MODELS);
         // A configured Fable row runs on Claude whatever the seat's default CLI; one its id can't place, an alias such
         // as `fable`, runs where it did before a review seat's default moved, keeping Claude's deny rules (fac-558).
         let unplaced = if chosen.is_some() && moved_to_codex(name, at) { Cli::Claude } else { cli };

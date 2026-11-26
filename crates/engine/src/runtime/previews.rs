@@ -1,14 +1,14 @@
-// Preview workers (fac-196) run once Andrei turned them on (fac-222) and end when he turns them off or the card is
+// Preview workers (fac-196) run once the operator turned them on (fac-222) and end when he turns them off or the card is
 // no longer live. Kept in memory, so an app's start starts again each he turned on.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use factory_core::decide::Event;
-use factory_core::lifecycle::preview::{self, Action};
-use factory_types::Command;
-use factory_types::protocol::{ErrorBody, ErrorCode};
-use factory_types::state::Sender;
-use factory_types::{AgentKey, CardId};
+use mork_core::decide::Event;
+use mork_core::lifecycle::preview::{self, Action};
+use mork_types::Command;
+use mork_types::protocol::{ErrorBody, ErrorCode};
+use mork_types::state::Sender;
+use mork_types::{AgentKey, CardId};
 use serde_json::{Value, json};
 
 use super::Engine;
@@ -59,7 +59,7 @@ impl Engine {
         self.previews.running.clear();
     }
 
-    /// `preview <card> [action]`, or `demo <card>` (`demo`): Andrei's call decided, the worker
+    /// `preview <card> [action]`, or `demo <card>` (`demo`): the operator's call decided, the worker
     /// started, restarted or stopped, and only then his call recorded.
     pub(super) fn preview_cmd(
         &mut self,
@@ -79,7 +79,7 @@ impl Engine {
         let d = self.decide(&Event::Command { from, cmd }, now);
         // A refusal, the buzz's among them, is committed with its journal before any worker moves.
         if !matches!(d.answer, Some(Ok(_))) {
-            return self.commit_decided(d, now, None).answer.unwrap_or_else(|| Ok(json!({})));
+            return self.commit_decided(d, now).answer.unwrap_or_else(|| Ok(json!({})));
         }
         let action = Action::parse(action.as_deref()).map_err(|e| ErrorBody::new(ErrorCode::Invalid, e))?;
         let id = CardId::new(card.as_str().to_lowercase());
@@ -101,7 +101,7 @@ impl Engine {
             self.previews.down.insert(id.clone());
             return Err(refused(e));
         }
-        let mut answer = self.commit_decided(d, now, None).answer.unwrap_or_else(|| Ok(json!({})))?;
+        let mut answer = self.commit_decided(d, now).answer.unwrap_or_else(|| Ok(json!({})))?;
         let running = self.previews.running.contains_key(&id);
         if let Some(body) = answer.get_mut(&name).and_then(Value::as_object_mut) {
             body.insert("running".into(), json!(running));
@@ -119,20 +119,20 @@ impl Engine {
         }
         let owner = AgentKey::new(format!("{id}/preview"));
         let now = clock::now_ms();
-        let job = factory_core::state::names::job_id(now, &owner, random::salt());
+        let job = mork_core::state::names::job_id(now, &owner, random::salt());
         let toolchains = self.ctx.project_toolchains(Some(c.project.as_str()));
         let mut env = self.ctx.env(&job, &owner, None, &toolchains, &self.opts.home.job(job.as_str()).join("io"));
         // No turn's: the agents' socket knows no job of it.
-        for k in ["FACTORY_JOB", "FACTORY_AGENT", "FACTORY_AGENT_SOCK"] {
+        for k in ["MORK_JOB", "MORK_AGENT", "MORK_AGENT_SOCK"] {
             env.remove(k);
         }
-        env.insert("FACTORY_CARD".into(), id.as_str().to_owned());
-        env.insert("FACTORY_PROJECT".into(), c.project.to_string());
-        env.insert("FACTORY_PORT".into(), port.to_string());
+        env.insert("MORK_CARD".into(), id.as_str().to_owned());
+        env.insert("MORK_PROJECT".into(), c.project.to_string());
+        env.insert("MORK_PORT".into(), port.to_string());
         let places = self.ctx.places(&clone, Vec::new(), Vec::new(), None, &toolchains)?;
         let cwd = clone.display().to_string();
         let argv = vec!["sh".into(), "-c".into(), command.to_owned()];
-        let spec = self.ctx.spec(&job, factory_types::job::JobKind::Check, &owner, argv, &cwd, &places, env, None, now);
+        let spec = self.ctx.spec(&job, mork_types::job::JobKind::Check, &owner, argv, &cwd, &places, env, None, now);
         let worker =
             worker::start(self.opts.home.root(), &spec, "preview", preview::LOG, command).map_err(|e| e.to_string())?;
         self.previews.down.remove(id);

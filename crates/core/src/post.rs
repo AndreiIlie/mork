@@ -9,11 +9,11 @@ pub use agent::new_agent;
 
 use std::collections::BTreeMap;
 
-use factory_types::action::Action;
-use factory_types::ask::{Ask, AskKind, Color};
-use factory_types::card::Card;
-use factory_types::state::{Agent, AgentStatus, Message, MessageKind, Owed, Place, Sender};
-use factory_types::{AgentKey, AskId, CardId};
+use mork_types::action::Action;
+use mork_types::ask::{Ask, AskKind, Color};
+use mork_types::card::Card;
+use mork_types::state::{Agent, AgentStatus, Message, MessageKind, Owed, Place, Sender};
+use mork_types::{AgentKey, AskId, CardId};
 use serde_json::json;
 
 use crate::decide::{Decision, Intent, Journal};
@@ -26,11 +26,11 @@ pub struct Poster<'a> {
     pub now: i64,
     pub(crate) next_seq: u64,
     messages: Vec<Message>,
-    places: BTreeMap<factory_types::PlaceId, Place>,
+    places: BTreeMap<mork_types::PlaceId, Place>,
     agents: BTreeMap<AgentKey, Agent>,
-    asks: BTreeMap<factory_types::AskId, Ask>,
+    asks: BTreeMap<mork_types::AskId, Ask>,
     cards: BTreeMap<CardId, Card>,
-    actions: BTreeMap<factory_types::ActionId, Action>,
+    actions: BTreeMap<mork_types::ActionId, Action>,
     pub intents: Vec<Intent>,
     pub journal: Vec<Journal>,
     removed: Vec<AgentKey>,
@@ -38,8 +38,9 @@ pub struct Poster<'a> {
     pub other: Vec<Change>,
     /// Whether a config allows desktop notices.
     pub notices: bool,
+    pub(crate) token_forge: &'static str,
     /// The job this decision settles: a stop decided in it leaves that one alone.
-    pub ending: Option<factory_types::JobId>,
+    pub ending: Option<mork_types::JobId>,
     /// A merge train is being kept true (fac-68): what it does keeps none again.
     pub train: bool,
 }
@@ -61,6 +62,7 @@ impl<'a> Poster<'a> {
             removed: Vec::new(),
             other: Vec::new(),
             notices: true,
+            token_forge: "forge",
             ending: None,
             train: false,
         }
@@ -69,7 +71,13 @@ impl<'a> Poster<'a> {
     /// A pending decision, with the config's word on notices.
     pub fn for_ctx(state: &'a State, ctx: crate::decide::Ctx<'_>) -> Self {
         let mut p = Self::new(state, ctx.now);
-        p.notices = ctx.config.factory.notifications;
+        p.token_forge = ctx
+            .config
+            .ordered_projects()
+            .filter_map(|n| ctx.config.projects.get(n))
+            .find(|p| p.forge.hosted())
+            .map_or("forge", |p| p.forge.label());
+        p.notices = ctx.config.mork.notifications;
         p
     }
 
@@ -169,11 +177,11 @@ impl<'a> Poster<'a> {
     fn place(&mut self, id: &str) -> &mut Place {
         let existing = self.state.places.get(id).cloned();
         self.places
-            .entry(factory_types::PlaceId::new(id))
+            .entry(mork_types::PlaceId::new(id))
             .or_insert_with(|| existing.unwrap_or(Place { id: id.into(), next_number: 1 }))
     }
 
-    /// Posts a message; returns its sequence number. Andrei's in main are numbered (3.3.5).
+    /// Posts a message; returns its sequence number. The operator's in main are numbered (3.3.5).
     pub fn post(
         &mut self,
         place: &str,
@@ -185,7 +193,7 @@ impl<'a> Poster<'a> {
     ) -> u64 {
         let seq = self.next_seq;
         self.next_seq += 1;
-        let number = if from == Sender::Andrei && place == crate::messages::places::MAIN {
+        let number = if from == Sender::Operator && place == crate::messages::places::MAIN {
             let p = self.place(place);
             let n = p.next_number;
             p.next_number += 1;
@@ -196,7 +204,7 @@ impl<'a> Poster<'a> {
         };
         // An engine message to an agent is a marker: its label never comes from its text, which
         // shows only unfolded under it (5.7.5, fac-384).
-        let marker = from == Sender::Engine && to.is_some_and(|t| t != "andrei");
+        let marker = from == Sender::Engine && to.is_some_and(|t| t != "operator");
         let headline = match (headline.is_empty(), marker) {
             (false, _) => headline,
             (true, true) => "a note from the engine",
@@ -241,7 +249,7 @@ impl<'a> Poster<'a> {
     }
 
     /// A request reaches an agent: it is owed a turn, and a failed or cut agent is retried
-    /// (1.4.10.1). A message from Andrei, or an orchestrator's for a given ask, answers its `answer` ask (3.5.5).
+    /// (1.4.10.1). A message from the operator, or an orchestrator's for a given ask, answers its `answer` ask (3.5.5).
     pub fn wake(&mut self, who: &Who, from: &Sender) {
         self.wake_for(who, from, None, false, false);
     }
@@ -300,8 +308,8 @@ impl<'a> Poster<'a> {
     }
 
     fn answered(&mut self, who: &Who, from: &Sender) {
-        if *from == Sender::Andrei || from.is_orchestrator() {
-            // Only Andrei's message closes an ask at will; an orchestrator's closes just those given to it (fac-288).
+        if *from == Sender::Operator || from.is_orchestrator() {
+            // Only the operator's message closes an ask at will; an orchestrator's closes just those given to it (fac-288).
             let only_given = from.is_orchestrator();
             let intent = self.messages.iter().rev().find(|m| m.from == *from).and_then(|m| m.intent);
             let mut given = crate::lifecycle::brief::close_given_plan(self, who, from, intent);
@@ -321,12 +329,8 @@ impl<'a> Poster<'a> {
     // the wake only its "Build it" request caused (fac-328).
     fn drop_ended_turns(&mut self) {
         let ended: Vec<CardId> = self.cards.values().filter(|c| !c.stage.is_live()).map(|c| c.id.clone()).collect();
-        let left: Vec<CardId> = self
-            .cards
-            .values()
-            .filter(|c| c.stage != factory_types::card::Stage::Build)
-            .map(|c| c.id.clone())
-            .collect();
+        let left: Vec<CardId> =
+            self.cards.values().filter(|c| c.stage != mork_types::card::Stage::Build).map(|c| c.id.clone()).collect();
         if ended.is_empty() && left.is_empty() {
             return;
         }
@@ -346,7 +350,7 @@ impl<'a> Poster<'a> {
         }
     }
 
-    // A message from Andrei answers its `blocked` and `error` asks, and its card's `stuck` for any of its
+    // A message from the operator answers its `blocked` and `error` asks, and its card's `stuck` for any of its
     // agents (M5.35); an orchestrator's, only those given to it. Returns the ids of those given to an orchestrator.
     fn close_by_message(&mut self, who: &Who, only_given: bool) -> Vec<AskId> {
         let card = crate::messages::places::card_of(self.state, &who.place);
@@ -392,7 +396,7 @@ impl<'a> Poster<'a> {
         self.close_answers(key, false, false)
     }
 
-    // An ask closed by Andrei's or the orchestrator's message is answered then; one replaced or withdrawn is not.
+    // An ask closed by the operator's or the orchestrator's message is answered then; one replaced or withdrawn is not.
     fn close_answers(&mut self, key: &AgentKey, only_given: bool, answered: bool) -> Vec<AskId> {
         let open: Vec<Ask> = self
             .state
@@ -421,7 +425,7 @@ impl<'a> Poster<'a> {
 
     pub fn ask(
         &mut self,
-        id: factory_types::AskId,
+        id: mork_types::AskId,
         place: &str,
         kind: AskKind,
         color: Color,

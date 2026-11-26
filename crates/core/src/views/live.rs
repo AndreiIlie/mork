@@ -1,12 +1,12 @@
 // The Overview's live rows under its current stage (fac-691): at Verify, its checks, its suite and its review round
 // with each working reviewer; at any other stage, each working seat of the card.
 
-use factory_types::card::{Card, Landing, Mode};
-use factory_types::reply::Role;
-use factory_types::review::{Review, Round, Verdict};
-use factory_types::state::{Agent, AgentStatus, Job};
-use factory_types::view::{LiveRow, SuiteProgress};
-use factory_types::work::Purpose;
+use mork_types::card::{Card, Landing, Mode};
+use mork_types::reply::Role;
+use mork_types::review::{Review, Round, Verdict};
+use mork_types::state::{Agent, AgentStatus, Job};
+use mork_types::view::{LiveRow, SuiteProgress};
+use mork_types::work::Purpose;
 
 use super::outside::Outside;
 use crate::messages::places;

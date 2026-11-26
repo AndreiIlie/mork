@@ -1,12 +1,12 @@
 //! Joins (4.12): the foreman merges the base's tip into its branch, asked by the engine, never
-//! Andrei, once the tip is in its clone; early joins when an overlapping card lands.
+//! The operator, once the tip is in its clone; early joins when an overlapping card lands.
 
-use factory_types::ask::AskKind;
-use factory_types::card::{Card, FixImport, Join, Stage};
-use factory_types::reply::Role;
-use factory_types::state::Job;
-use factory_types::work::Purpose;
-use factory_types::{CardId, Sha};
+use mork_types::ask::AskKind;
+use mork_types::card::{Card, FixImport, Join, Stage};
+use mork_types::reply::Role;
+use mork_types::state::Job;
+use mork_types::work::Purpose;
+use mork_types::{CardId, Sha};
 use serde_json::json;
 
 use crate::decide::{Ctx, Intent};

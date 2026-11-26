@@ -3,9 +3,9 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::config::{AGY_PRICES, CODEX_PRICES, Cli, Config};
-use factory_types::cost::{Selection, Tokens};
-use factory_types::state::{Agent, Job};
+use mork_types::config::{AGY_PRICES, CODEX_PRICES, Cli, Config};
+use mork_types::cost::{Selection, Tokens};
+use mork_types::state::{Agent, Job};
 use serde_json::{Value, json};
 
 use crate::decide::{JobEnd, SessionSeen};
@@ -28,7 +28,7 @@ pub fn stored_context<'a>(config: &Config, a: &'a Agent) -> Option<StoredContext
     // agy reports no window; ignore any stale Claude window kept across a CLI switch.
     let own = a.window.as_ref().filter(|_| cli != Some(Cli::Agy));
     let reported = own.map(|(_, w)| *w).filter(|w| *w > 0);
-    Some(StoredContext { used, window: config.factory.effective_window(reported), model: own.map(|(m, _)| m.as_str()) })
+    Some(StoredContext { used, window: config.mork.effective_window(reported), model: own.map(|(m, _)| m.as_str()) })
 }
 
 /// Records a job's cost once, with its share of the running token and dollar totals (fac-526).

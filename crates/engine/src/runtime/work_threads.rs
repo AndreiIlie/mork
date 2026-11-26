@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use factory_core::state::Change;
-use factory_types::action::{ActionStatus, ActionWhat};
-use factory_types::work::Purpose;
-use factory_types::{ActionId, CardId, JobId};
+use mork_core::state::Change;
+use mork_types::action::{ActionStatus, ActionWhat};
+use mork_types::work::Purpose;
+use mork_types::{ActionId, CardId, JobId, Sha};
 
 use super::work::Plan;
 use super::{Engine, Input};
@@ -26,8 +26,31 @@ struct Preparation {
 
 pub struct Prepared {
     purpose: Purpose,
-    result: Result<Plan, String>,
+    result: Result<Plan, PreparationError>,
     exports: Vec<PathBuf>,
+}
+
+enum PreparationError {
+    Failed(String),
+    Secret(String),
+}
+
+fn checks_range(purpose: &Purpose) -> Option<(&Sha, &Sha)> {
+    match purpose {
+        Purpose::Check { fork, head, .. } => Some((fork, head)),
+        Purpose::TrainRun { on, commit, checks: true, .. } => Some((on, commit)),
+        _ => None,
+    }
+}
+
+fn scan(ctx: &crate::jobs::context::Context, project: &str, base: &Sha, head: &Sha) -> Result<(), PreparationError> {
+    let secrets = crate::secrets::Secrets::gather(&ctx.home, &ctx.config, &ctx.telemetry);
+    let mirror = ctx.home.mirrors().join(project);
+    match crate::git::mirror::added_secret(&ctx.home, &mirror, base.as_str(), head.as_str(), &secrets) {
+        Ok(None) => Ok(()),
+        Ok(Some(hit)) => Err(PreparationError::Secret(hit)),
+        Err(why) => Err(PreparationError::Failed(why)),
+    }
 }
 
 pub(super) fn prepares(purpose: &Purpose) -> bool {
@@ -36,7 +59,7 @@ pub(super) fn prepares(purpose: &Purpose) -> bool {
         Purpose::Bundle { base_in, recover, refresh, .. } => {
             base_in.is_some() || recover.is_some() || refresh.is_some()
         }
-        _ => false,
+        _ => checks_range(purpose).is_some(),
     }
 }
 
@@ -72,6 +95,8 @@ impl Engine {
             Ok(work) => work,
             Err(why) => return self.work_refused(purpose, &why, crate::clock::now_ms()),
         };
+        let check = checks_range(purpose)
+            .map(|(base, head)| (base.clone(), head.clone(), self.ctx.clone(), self.plan_work(purpose)));
         let pending = Preparation { purpose: purpose.clone(), run: work.card.run, cancelled: false };
         self.pipe.work.preparing.insert(purpose.key(), pending);
         let lock = self.pipe.locks.of(&work.card.project);
@@ -79,7 +104,15 @@ impl Engine {
         std::thread::spawn(move || {
             let _held = lock.lock();
             let mut exports = Vec::new();
-            let result = work.prepare(&purpose, &mut exports);
+            let result = match check {
+                Some((base, head, ctx, plan)) => plan.map_err(PreparationError::Failed).and_then(|plan| {
+                    if work.project.checks.is_some() {
+                        scan(&ctx, &work.card.project, &base, &head)?;
+                    }
+                    Ok(plan)
+                }),
+                None => work.prepare(&purpose, &mut exports).map_err(PreparationError::Failed),
+            };
             let _ = tx.send(Input::WorkPrepared(Box::new(Prepared { purpose, result, exports })));
         });
     }
@@ -106,7 +139,11 @@ impl Engine {
                     self.drop_bundles(&exports);
                 }
             }
-            Err(why) => self.work_refused(&purpose, &why, now),
+            Err(PreparationError::Secret(hit)) => {
+                let end = super::work::finished(serde_json::json!({"secret_hit": hit}));
+                self.work_ends_at_once(&purpose, end, now);
+            }
+            Err(PreparationError::Failed(why)) => self.work_refused(&purpose, &why, now),
         }
     }
 

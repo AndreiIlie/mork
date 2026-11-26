@@ -36,10 +36,10 @@ fn job_dir(rig: &Rig) -> std::path::PathBuf {
     rig.fhome().join("jobs").join(j.id.as_str())
 }
 
-// The echo seat's `io/` folder, its `$FACTORY_IO` in every turn (fac-654).
+// The echo seat's `io/` folder, its `$MORK_IO` in every turn (fac-654).
 fn seat_io(rig: &Rig) -> std::path::PathBuf {
     let j = rig.jobs("main/echo").pop().unwrap();
-    j.spec.env.get("FACTORY_IO").map(std::path::PathBuf::from).unwrap()
+    j.spec.env.get("MORK_IO").map(std::path::PathBuf::from).unwrap()
 }
 
 fn probe_line(rig: &Rig) -> Option<Value> {
@@ -51,7 +51,7 @@ fn probe_line(rig: &Rig) -> Option<Value> {
 mod walled {
     use super::*;
 
-    // 1.10.9, 1.10.10: with `FACTORY_UNWALLED=1` a wall test skips, saying why; without it, it never
+    // 1.10.9, 1.10.10: with `MORK_UNWALLED=1` a wall test skips, saying why; without it, it never
     // does. In the train's walled phase its skip is recorded for the unwalled phase (fac-65).
     #[test]
     fn r1_10_10_wall_tests_skip_only_when_unwalled() {
@@ -60,9 +60,9 @@ mod walled {
             c.args([test, "--exact", "--nocapture", "--test-threads=1"]);
             c.env_remove(common::TRAIN_PHASE).env_remove(common::WALL_TESTS).envs(train.iter().copied());
             if unwalled {
-                c.env("FACTORY_UNWALLED", "1")
+                c.env("MORK_UNWALLED", "1")
             } else {
-                c.env_remove("FACTORY_UNWALLED")
+                c.env_remove("MORK_UNWALLED")
             };
             let out = c.output().unwrap();
             (
@@ -72,7 +72,7 @@ mod walled {
         };
         let run = |unwalled: bool, train: &[(&str, &str)]| run_one("walled::t1_33_what_a_wall_sees", unwalled, train);
         let (ok, text) = run(true, &[]);
-        assert!(ok && text.contains("skipped: T1.33") && text.contains("FACTORY_UNWALLED=1"), "{text}");
+        assert!(ok && text.contains("skipped: T1.33") && text.contains("MORK_UNWALLED=1"), "{text}");
         let record = std::env::temp_dir().join(format!("wall-tests-record-{}", std::process::id()));
         let file = record.display().to_string();
         let (ok, text) = run(true, &[(common::TRAIN_PHASE, "walled"), (common::WALL_TESTS, &file)]);
@@ -92,9 +92,9 @@ mod walled {
         }
         // T1.34's own skip, below ABI 6, starts no wall: it says why, and the walled phase records it.
         let t1_34 = "walled::t1_34_sockets_and_ports";
-        let (ok, text) = run_one(t1_34, false, &[("FACTORY_TEST_LANDLOCK_ABI", "5")]);
+        let (ok, text) = run_one(t1_34, false, &[("MORK_TEST_LANDLOCK_ABI", "5")]);
         assert!(ok && text.contains("skipped: T1.34: Landlock ABI 5 is below 6"), "{text}");
-        let below = [("FACTORY_TEST_LANDLOCK_ABI", "5"), (common::TRAIN_PHASE, "walled"), (common::WALL_TESTS, &file)];
+        let below = [("MORK_TEST_LANDLOCK_ABI", "5"), (common::TRAIN_PHASE, "walled"), (common::WALL_TESTS, &file)];
         let (ok, text) = run_one(t1_34, false, &below);
         let recorded = std::fs::read_to_string(&record).unwrap_or_default();
         let _ = std::fs::remove_file(&record);
@@ -104,6 +104,28 @@ mod walled {
         }
         let (ok, text) = run(false, &[]);
         assert!(ok && !text.contains("skipped:") && text.contains("1 passed"), "{text}");
+    }
+
+    #[test]
+    fn configured_ticket_token_is_masked_in_the_wall() {
+        if common::wall_test("configured tickets token") {
+            return;
+        }
+        let mut rig = Rig::new();
+        let token = rig.t.bin().join("ticket-token");
+        std::fs::write(&token, "sample-ticket-secret").unwrap();
+        let cfg = rig.config(&format!(
+            r#"[projects.mork.tickets]
+kind = "azure-devops"
+api = "https://example.invalid/api"
+page = "https://example.invalid/tickets/"
+token = "{}"
+"#,
+            token.display()
+        ));
+        rig.write_config(&cfg);
+        let result = probe(&mut rig, json!({"read": [&token]}));
+        assert_eq!(result["read"][token.display().to_string()], "READ ", "{result}");
     }
 
     const HIDDEN_NAMES: &[&str] = &[
@@ -145,11 +167,11 @@ mod walled {
         }
         let f = rig.fhome();
         let other = ["jobs/20200101-000000-other-0000/io", "io/20200101-000000-other-0000"];
-        for dir in ["mirrors/proj", "clones/other-card", "agent-home/.claude/accounts"].iter().chain(&other) {
+        for dir in ["mirrors/proj", "clones/other-card", "login-home/.claude/accounts"].iter().chain(&other) {
             std::fs::create_dir_all(f.join(dir)).unwrap();
         }
         std::fs::write(f.join("clones/other-card/visible"), "whole").unwrap();
-        std::fs::write(f.join("agent-home/.claude/accounts/saved"), "a dummy login").unwrap();
+        std::fs::write(f.join("login-home/.claude/accounts/saved"), "a dummy login").unwrap();
         std::fs::write(rig.t.root.join("public"), "whole").unwrap();
         secrets
     }
@@ -183,8 +205,8 @@ mod walled {
 
     fn crash_fixture(rig: &Rig) -> Option<CrashFixture> {
         let name = rig.t.root.file_name()?.to_str()?;
-        // No `.crash` suffix: the desktop's crash notifier would report it to Andrei.
-        let path = std::path::Path::new("/var/crash").join(format!("factory-test-{name}"));
+        // No `.crash` suffix: the desktop's crash notifier would report it to the operator.
+        let path = std::path::Path::new("/var/crash").join(format!("mork-test-{name}"));
         let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&path).ok()?;
         let fixture = CrashFixture(path);
         std::io::Write::write_all(&mut file, b"a dummy crash secret").ok()?;
@@ -211,10 +233,12 @@ mod walled {
             f.join("jobs/20200101-000000-other-0000"),
             f.join("io/20200101-000000-other-0000"),
             f.join("mirrors"),
-            f.join("factory.sock"),
+            f.join("mork.sock"),
             "/run/dbus/system_bus_socket".into(),
             bus.clone(),
-            f.join("agent-home/.claude/accounts/saved"),
+            f.join("login-home"),
+            f.join("agent-home"),
+            f.join("login-home/.claude/accounts/saved"),
         ];
         let mut read = secrets.to_vec();
         read.extend(HIDDEN_NAMES.iter().chain(PUBLIC_NAMES).map(|n| work.join("data").join(n)));
@@ -222,13 +246,12 @@ mod walled {
         read.extend(public.clone());
         let mut exists = hidden.to_vec();
         exists.push(work.join("data/ACCESS-private/hidden"));
-        let mut readonly =
-            vec![rig.t.root.clone(), work.clone(), f.join("clones/other-card"), f.join("agent-home/.claude/accounts")];
+        let mut readonly = vec![rig.t.root.clone(), work.clone(), f.join("clones/other-card")];
         if crash.is_some() {
             readonly.push("/var/crash".into());
         }
         let mut writable = readonly.to_vec();
-        writable.push(f.join("agent-home"));
+        writable.extend(["$HOME".into(), f.join("logins")]);
         let r = probe(
             &mut rig,
             json!({
@@ -247,24 +270,108 @@ mod walled {
         let sock = r["unix"][f.join("run/agent.sock").display().to_string()].as_str().unwrap();
         assert!(sock.starts_with("CONNECTED") && sock.contains("hello"), "{r}");
         assert!(!r["unix"][bus.display().to_string()].as_str().unwrap().starts_with("CONNECTED"), "{r}");
-        assert_eq!(r["writable"][f.join("agent-home").display().to_string()], "WROTE");
+        assert_eq!(r["writable"]["$HOME"], "WROTE");
+        assert_eq!(r["writable"][f.join("logins").display().to_string()], "WROTE");
         let r = probe(&mut rig, json!({"writable": ["$IO"]}));
         assert_eq!(r["writable"]["$IO"], "WROTE", "{r}");
-        assert!(seat_io(&rig).starts_with(f.join("io")), "its $FACTORY_IO is its seat's folder");
+        assert!(seat_io(&rig).starts_with(f.join("io")), "its $MORK_IO is its seat's folder");
+    }
+
+    #[test]
+    fn seat_homes_isolate_foreman_and_reviewer() {
+        if common::wall_test("seat homes") {
+            return;
+        }
+        use mork_types::card::{Mode, Stage};
+        let mut rig = Rig::new();
+        let cfg = rig.config("").replace("[mork]\n", "[mork]\ncaches = ['shared']\ncache_files = ['cache.lock']\n");
+        rig.write_config(&cfg);
+        let mut card = rig.card("ex-1", Mode::Review);
+        card.stage = Stage::Review;
+        rig.put_cards(vec![card]);
+        let work = rig.fhome().join("work/ex-1");
+        let lock = r#"stat -c '%d:%i' "$HOME/cache.lock" > "$MORK_IO/lock-id""#;
+        let first = r#"echo private > "$HOME/marker" && echo "$HOME" > "$HOME/shared/foreman""#;
+        let hidden = r#"test ! -e "$(cat "$HOME/shared/foreman")/marker""#;
+        let spec = json!({"read":["$HOME/shared/foreman"],"exec":[["sh","-c",hidden]],
+            "exists":[work,rig.fhome().join("agent-home"),rig.fhome().join("login-home")],
+            "writable":["$HOME",rig.fhome().join("logins")]});
+        rig.scenario(json!([
+            {"agent":"ex-1/foreman","steps":[{"do":"sh","script":first},{"do":"sh","script":lock},
+             {"do":"probe","spec":{"writable":[work]}},
+             {"do":"ctl","args":["spawn","ex-1","reviewer","--topic","Homes","Inspect the home."]},{"do":"hang"}]},
+            {"agent":"ex-1/reviewer-1","steps":[{"do":"sh","script":lock},{"do":"probe","spec":spec},{"do":"hang"}]}
+        ]));
+        rig.start();
+        rig.say("ex-1", "Go.");
+        let seen = |key| {
+            let job = rig.jobs(key).into_iter().next()?;
+            let probe = rig.out_lines(&job).into_iter().find(|v| v["type"] == "probe")?;
+            Some((job, probe))
+        };
+        wait_until("reviewer home probe", LONG, || seen("ex-1/reviewer-1").is_some());
+        let (foreman, a) = seen("ex-1/foreman").unwrap();
+        let (reviewer, b) = seen("ex-1/reviewer-1").unwrap();
+        assert_eq!(a["writable"][work.display().to_string()], "WROTE");
+        assert!(b["exists"].as_object().unwrap().values().all(|v| v == false), "{b}");
+        assert!(b["writable"].as_object().unwrap().values().all(|v| v == "WROTE"), "{b}");
+        let first = &foreman.spec.env["HOME"];
+        assert_ne!(first, &reviewer.spec.env["HOME"]);
+        assert!(std::path::Path::new(first).join("marker").is_file());
+        assert_eq!(std::fs::read_to_string(rig.fhome().join("caches/shared/foreman")).unwrap().trim(), first);
+        assert!(b["read"]["$HOME/shared/foreman"].as_str().unwrap().starts_with("READ /"), "{b}");
+        assert_eq!(b["exec"][0]["code"], 0, "{b}");
+        let lock_id = |job: &mork_types::state::Job| {
+            std::fs::read_to_string(std::path::Path::new(&job.spec.env["MORK_IO"]).join("lock-id")).unwrap()
+        };
+        let id = lock_id(&foreman);
+        assert!(id.contains(':'));
+        assert_eq!(id, lock_id(&reviewer));
+        rig.send(json!({"stop":{"card":"ex-1"}}));
+        rig.wait_settled(LONG);
+    }
+
+    #[test]
+    fn checks_wall_hides_cli_logins() {
+        if common::wall_test("check job logins") {
+            return;
+        }
+        use mork_types::card::{Mode, Stage};
+        let mut rig = Rig::new();
+        let head = mork_types::Sha::new(common::builds::mork_repo(&rig, 1).remove(0));
+        let repo = rig.t.root.join("mork-repo");
+        // An owed check has already had its submitted commit taken into the project's mirror.
+        common::builds::git(&rig.fhome(), &["clone", "--bare", repo.to_str().unwrap(), "mirrors/mork"]);
+        rig.write_config(
+            &rig.config(&format!("checks = {{ command = 'fake-checks', folder = {:?} }}", repo.display().to_string())),
+        );
+        let mut card = rig.card("ex-1", Mode::Full);
+        card.stage = Stage::Checks;
+        card.head = Some(head.clone());
+        let purpose = mork_types::work::Purpose::Check { card: card.id.clone(), head: head.clone(), fork: head };
+        rig.put_cards(vec![card]);
+        rig.put(vec![mork_core::state::Change::PutOwedWork(purpose)]);
+        let logins = rig.fhome().join("logins");
+        std::fs::create_dir_all(&logins).unwrap();
+        rig.scenario(json!([{"fake":"fake-checks","steps":[{"do":"probe","spec":{"exists":[logins,rig.fhome().join("login-home")],"writable":["$HOME"]}},{"do":"exit","code":1}]}]));
+        rig.start();
+        let seen = || {
+            let job = rig.jobs("ex-1/check").into_iter().next()?;
+            rig.out_lines(&job).into_iter().find(|v| v["type"] == "probe")
+        };
+        wait_until("the check job's wall probe", LONG, || seen().is_some());
+        let report = seen().unwrap();
+        assert!(report["exists"].as_object().unwrap().values().all(|v| v == false), "{report}");
+        assert_eq!(report["writable"]["$HOME"], "WROTE", "{report}");
     }
 
     // The train's HOME is the shared agent home, so its advertised browser path takes precedence.
     fn installed_browsers() -> std::path::PathBuf {
         let home = std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
-        let mut at: Vec<_> = std::env::var_os(factory_engine::jobs::wall::BROWSERS_ENV)
-            .map(std::path::PathBuf::from)
-            .into_iter()
-            .collect();
-        at.extend(factory_engine::paths::Home::from_env().iter().map(|h| h.browsers()));
-        at.extend([
-            home.join(".cache/ms-playwright"),
-            home.join(".local/share/factory/agent-home/.cache/ms-playwright"),
-        ]);
+        let mut at: Vec<_> =
+            std::env::var_os(mork_engine::jobs::wall::BROWSERS_ENV).map(std::path::PathBuf::from).into_iter().collect();
+        at.extend(mork_engine::paths::Home::from_env().iter().map(|h| h.browsers()));
+        at.extend([home.join(".cache/ms-playwright"), home.join(".local/share/mork/agent-home/.cache/ms-playwright")]);
         at.iter().find(|p| p.is_dir()).cloned().unwrap_or_else(|| panic!("no installed browsers, looked in {at:?}"))
     }
 
@@ -276,7 +383,7 @@ mod walled {
             return;
         }
         let mut rig = Rig::new();
-        let home = factory_engine::paths::Home::new(rig.fhome());
+        let home = mork_engine::paths::Home::new(rig.fhome());
         let installed = home.browsers();
         assert!(!installed.starts_with(home.agent_home()), "the browsers are in the writable agent home");
         let source = installed_browsers();
@@ -316,10 +423,10 @@ mod walled {
         for ro in [&installed, &shell_dir, &root] {
             assert_ne!(r["writable"][path(ro)], "WROTE", "{} is writable: {r}", ro.display());
         }
-        assert_eq!(r["writable"][path(&home.agent_home())], "WROTE", "{r}");
+        assert_ne!(r["writable"][path(&home.agent_home())], "WROTE", "{r}");
         assert_eq!(r["writable"]["/tmp"], "WROTE", "{r}");
         let keys = r["env_keys"].as_array().unwrap();
-        assert!(keys.iter().any(|k| k == factory_engine::jobs::wall::BROWSERS_ENV), "no browsers variable: {r}");
+        assert!(keys.iter().any(|k| k == mork_engine::jobs::wall::BROWSERS_ENV), "no browsers variable: {r}");
         assert_eq!(r["exec"][0]["code"], 0, "the browser didn't render: {r}");
         let png = std::fs::read(seat_io(&rig).join("shot.png")).expect("no screenshot in the seat's io/");
         assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n", "not a PNG");
@@ -337,7 +444,7 @@ mod walled {
         let work = listed_folder(&mut rig);
         let f = rig.fhome();
         std::fs::create_dir_all(f.join("clones/other-card")).unwrap();
-        rig.put_cards(vec![rig.card("ex-1", factory_types::card::Mode::Full)]);
+        rig.put_cards(vec![rig.card("ex-1", mork_types::card::Mode::Full)]);
         let clone = f.join("clones/ex-1");
         let roots = [work.join("data"), std::path::PathBuf::from("/data")];
         let read: Vec<_> =
@@ -373,7 +480,7 @@ mod walled {
         if common::wall_test("T1.33") {
             return;
         }
-        handoff_wall(factory_types::card::Mode::Report, "ex-1/foreman");
+        handoff_wall(mork_types::card::Mode::Report, "ex-1/foreman");
     }
 
     #[test]
@@ -381,28 +488,28 @@ mod walled {
         if common::wall_test("T1.33 planner") {
             return;
         }
-        handoff_wall(factory_types::card::Mode::Full, "ex-1/planner");
+        handoff_wall(mork_types::card::Mode::Full, "ex-1/planner");
     }
 
-    fn handoff_wall(mode: factory_types::card::Mode, agent: &str) {
+    fn handoff_wall(mode: mork_types::card::Mode, agent: &str) {
         let mut rig = Rig::new();
         let clone = rig.fhome().join("clones/ex-1");
         std::fs::create_dir_all(clone.join(".git")).unwrap();
         std::fs::write(clone.join("source"), "the source").unwrap();
         let mut card = rig.card("ex-1", mode);
-        if mode == factory_types::card::Mode::Full {
-            card.stage = factory_types::card::Stage::Brief;
+        if mode == mork_types::card::Mode::Full {
+            card.stage = mork_types::card::Stage::Brief;
             card.approval = None;
         }
         rig.put_cards(vec![card]);
         let at = |rel: &str| clone.join(rel).display().to_string();
         let spec = json!({
             "read": [at("source")],
-            "writable": [at(".git/factory/handoff"), at(""), at(".git"), at(".git/factory")],
+            "writable": [at(".git/mork/handoff"), at(""), at(".git"), at(".git/mork")],
         });
         rig.scenario(json!([{"agent": agent, "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]}]));
         rig.start();
-        // A full card's planner hears Andrei in its spec room, a report card's foreman in its room (fac-633).
+        // A full card's planner hears the operator in its spec room, a report card's foreman in its room (fac-633).
         rig.say(if agent.ends_with("/planner") { "ex-1/spec" } else { "ex-1" }, "Go.");
         let line = || {
             let job = rig.jobs(agent).into_iter().next()?;
@@ -411,8 +518,8 @@ mod walled {
         wait_until("the probe", LONG, || line().is_some());
         let r = line().unwrap();
         assert_eq!(r["read"][at("source")], "READ the source", "{r}");
-        assert_eq!(r["writable"][at(".git/factory/handoff")], "WROTE", "{r}");
-        for rel in ["", ".git", ".git/factory"] {
+        assert_eq!(r["writable"][at(".git/mork/handoff")], "WROTE", "{r}");
+        for rel in ["", ".git", ".git/mork"] {
             assert_ne!(r["writable"][at(rel)], "WROTE", "{rel:?} is writable: {r}");
         }
         rig.send(json!({"stop": {"card": "ex-1"}}));
@@ -426,24 +533,24 @@ mod walled {
         if common::wall_test("T1.33 mock") {
             return;
         }
-        for stage in [factory_types::card::Stage::Brief, factory_types::card::Stage::Build] {
+        for stage in [mork_types::card::Stage::Brief, mork_types::card::Stage::Build] {
             planner_mock_wall(stage);
         }
     }
 
-    fn planner_mock_wall(stage: factory_types::card::Stage) {
+    fn planner_mock_wall(stage: mork_types::card::Stage) {
         let mut rig = Rig::new();
         let clone = rig.fhome().join("clones/ex-1");
-        std::fs::create_dir_all(clone.join(".git/factory-mock-host")).unwrap();
-        let mut card = rig.card("ex-1", factory_types::card::Mode::Full);
+        std::fs::create_dir_all(clone.join(".git/mork-mock-host")).unwrap();
+        let mut card = rig.card("ex-1", mork_types::card::Mode::Full);
         card.visual = true;
-        if stage == factory_types::card::Stage::Brief {
+        if stage == mork_types::card::Stage::Brief {
             card.stage = stage;
             card.approval = None;
         }
-        card.mock = Some(factory_types::card::Mock {
-            step: factory_types::card::MockStep::Open,
-            ..factory_types::card::Mock::default()
+        card.mock = Some(mork_types::card::Mock {
+            step: mork_types::card::MockStep::Open,
+            ..mork_types::card::Mock::default()
         });
         rig.put_cards(vec![card]);
         std::fs::write(clone.join("source"), "the source").unwrap();
@@ -451,11 +558,11 @@ mod walled {
         let spec = json!({
             "read": [at("source")],
             "writable": [
-                at(".git/factory/handoff"),
-                at(".git/factory-mock"),
+                at(".git/mork/handoff"),
+                at(".git/mork-mock"),
                 at(""),
                 at(".git"),
-                at(".git/factory-mock-host"),
+                at(".git/mork-mock-host"),
             ],
         });
         rig.scenario(json!([{"agent": "ex-1/planner", "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]}]));
@@ -469,10 +576,10 @@ mod walled {
         wait_until("the planner's wall probe", LONG, || line().is_some());
         let r = line().unwrap();
         assert_eq!(r["read"][at("source")], "READ the source", "{stage:?}: {r}");
-        for rel in [".git/factory/handoff", ".git/factory-mock"] {
+        for rel in [".git/mork/handoff", ".git/mork-mock"] {
             assert_eq!(r["writable"][at(rel)], "WROTE", "{stage:?}, {rel:?}: {r}");
         }
-        for rel in ["", ".git", ".git/factory-mock-host"] {
+        for rel in ["", ".git", ".git/mork-mock-host"] {
             assert_eq!(r["writable"][at(rel)], "EROFS", "{stage:?}, {rel:?}: {r}");
         }
         rig.send(json!({"stop": {"card": "ex-1"}}));
@@ -488,21 +595,21 @@ mod walled {
         }
         let mut rig = Rig::new();
         let clone = rig.fhome().join("clones/ex-1");
-        std::fs::create_dir_all(clone.join(".git/factory/handoff")).unwrap();
-        let mut card = rig.card("ex-1", factory_types::card::Mode::Full);
+        std::fs::create_dir_all(clone.join(".git/mork/handoff")).unwrap();
+        let mut card = rig.card("ex-1", mork_types::card::Mode::Full);
         card.visual = true;
-        card.stage = factory_types::card::Stage::Brief;
+        card.stage = mork_types::card::Stage::Brief;
         card.approval = None;
-        card.mock = Some(factory_types::card::Mock {
-            step: factory_types::card::MockStep::Baseline,
-            ..factory_types::card::Mock::default()
+        card.mock = Some(mork_types::card::Mock {
+            step: mork_types::card::MockStep::Baseline,
+            ..mork_types::card::Mock::default()
         });
         rig.put_cards(vec![card]);
         std::fs::write(clone.join("source"), "the source").unwrap();
         let at = |rel: &str| clone.join(rel).display().to_string();
         let spec = json!({
             "read": [at("source")],
-            "writable": [at(".git/factory-mock"), at(""), at(".git"), at(".git/factory/handoff")],
+            "writable": [at(".git/mork-mock"), at(""), at(".git"), at(".git/mork/handoff")],
         });
         let spawn = json!({"do": "ctl", "args": ["spawn", "ex-1", "baseline", "Reproduce today's pages."]});
         rig.scenario(json!([
@@ -518,8 +625,8 @@ mod walled {
         wait_until("the baseline seat's wall probe", LONG, || line().is_some());
         let r = line().unwrap();
         assert_eq!(r["read"][at("source")], "READ the source", "{r}");
-        assert_eq!(r["writable"][at(".git/factory-mock")], "WROTE", "{r}");
-        for rel in ["", ".git", ".git/factory/handoff"] {
+        assert_eq!(r["writable"][at(".git/mork-mock")], "WROTE", "{r}");
+        for rel in ["", ".git", ".git/mork/handoff"] {
             assert_eq!(r["writable"][at(rel)], "EROFS", "{rel:?}: {r}");
         }
         rig.send(json!({"stop": {"card": "ex-1"}}));
@@ -534,40 +641,39 @@ mod walled {
         use std::os::unix::fs::PermissionsExt;
         let mut rig = Rig::new();
         let clone = rig.fhome().join("clones/ex-1");
-        std::fs::create_dir_all(clone.join(".git/factory-mock")).unwrap();
-        let mut card = rig.card("ex-1", factory_types::card::Mode::Full);
-        card.mock = Some(factory_types::card::Mock {
-            step: factory_types::card::MockStep::Approved,
+        std::fs::create_dir_all(clone.join(".git/mork-mock")).unwrap();
+        let mut card = rig.card("ex-1", mork_types::card::Mode::Full);
+        card.mock = Some(mork_types::card::Mock {
+            step: mork_types::card::MockStep::Approved,
             // The fake host probes its wall without binding a port.
             port: Some(1),
-            ..factory_types::card::Mock::default()
+            ..mork_types::card::Mock::default()
         });
         rig.put_cards(vec![card]);
         std::fs::write(clone.join("source"), "the source").unwrap();
         let at = |rel: &str| clone.join(rel).display().to_string();
         let spec = json!({
             "read": [at("source")],
-            "writable": [at(".git/factory-mock-host"), at(""), at(".git"), at(".git/factory-mock")],
+            "writable": [at(".git/mork-mock-host"), at(""), at(".git"), at(".git/mork-mock")],
         });
         let vite = rig.t.bin().join("vite");
         let bin = vite.join("node_modules/.bin/vite");
         std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
-        let script = format!("#!/bin/sh\nexec probe {}\n", factory_engine::jobs::door_ssh::quoted(&spec.to_string()));
+        let script = format!("#!/bin/sh\nexec probe {}\n", mork_engine::jobs::door_ssh::quoted(&spec.to_string()));
         std::fs::write(&bin, script).unwrap();
         std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
-        let cfg =
-            rig.config("").replace("[factory]\n", &format!("[factory]\nvite = {:?}\n", vite.display().to_string()));
+        let cfg = rig.config("").replace("[mork]\n", &format!("[mork]\nvite = {:?}\n", vite.display().to_string()));
         rig.write_config(&cfg);
         rig.start();
         let line = || {
-            let log = std::fs::read_to_string(clone.join(factory_core::lifecycle::mock::LOG)).ok()?;
+            let log = std::fs::read_to_string(clone.join(mork_core::lifecycle::mock::LOG)).ok()?;
             log.lines().filter_map(|s| serde_json::from_str::<Value>(s).ok()).find(|v| v["type"] == "probe")
         };
         wait_until("the mock host's wall probe", LONG, || line().is_some());
         let r = line().unwrap();
         assert_eq!(r["read"][at("source")], "READ the source", "{r}");
-        assert_eq!(r["writable"][at(".git/factory-mock-host")], "WROTE", "{r}");
-        for rel in ["", ".git", ".git/factory-mock"] {
+        assert_eq!(r["writable"][at(".git/mork-mock-host")], "WROTE", "{r}");
+        for rel in ["", ".git", ".git/mork-mock"] {
             assert_eq!(r["writable"][at(rel)], "EROFS", "{rel:?}: {r}");
         }
     }
@@ -578,7 +684,7 @@ mod walled {
         // T1.34 and T1.38 share the process: a per-call number keeps their abstract names apart (fac-627).
         static CALLS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let tag = format!("factory-test-{}-{n}", std::process::id());
+        let tag = format!("mork-test-{}-{n}", std::process::id());
         let stream_name = format!("{tag}-stream");
         let dgram_name = format!("{tag}-dgram");
         let s = UnixListener::bind_addr(&SocketAddr::from_abstract_name(stream_name.as_bytes()).unwrap()).unwrap();
@@ -590,7 +696,7 @@ mod walled {
     // A turn reaches a loopback port on no list, as a test's own server (fac-93), and no abstract
     // socket outside. Below ABI 6 (the kernel's, or the test override's) T1.34 skips, saying why.
     fn sockets_and_ports(abi_override: Option<&str>) -> Result<(), String> {
-        let abi = abi_override.and_then(|a| a.parse::<i64>().ok()).unwrap_or(factory_sys::landlock_abi().0);
+        let abi = abi_override.and_then(|a| a.parse::<i64>().ok()).unwrap_or(mork_sys::landlock_abi().0);
         if abi < 6 {
             return Err(format!("T1.34: Landlock ABI {abi} is below 6; it runs at the live check on Ubuntu"));
         }
@@ -610,7 +716,7 @@ mod walled {
             return;
         }
         // The ABI as the engine reads it, its test override included (1.10.6): its skip is checked with no wall.
-        let abi = std::env::var("FACTORY_TEST_LANDLOCK_ABI").ok();
+        let abi = std::env::var("MORK_TEST_LANDLOCK_ABI").ok();
         if let Err(why) = sockets_and_ports(abi.as_deref()) {
             common::say_skipped(&why);
         }
@@ -624,7 +730,7 @@ mod walled {
         let mut rig = Rig::new();
         let leak = rig.t.root.join("leak-me");
         std::fs::write(&leak, "a dummy secret").unwrap();
-        rig.set_env("FACTORY_TEST_LEAK_FD", &leak.display().to_string());
+        rig.set_env("MORK_TEST_LEAK_FD", &leak.display().to_string());
         rig.scenario(
             json!([{"fake": "claude", "steps": [{"do": "init"}, {"do": "probe", "spec": {}}, {"do": "hang"}]}]),
         );
@@ -633,7 +739,7 @@ mod walled {
         wait_until("the probe", LONG, || !rig.jobs("main/echo").is_empty() && probe_line(&rig).is_some());
         let r = probe_line(&rig).unwrap();
         // The leak is real: the supervisor holds the file open while the job runs.
-        let dir = factory_engine::jobs::folder::JobDir::new(job_dir(&rig));
+        let dir = mork_engine::jobs::folder::JobDir::new(job_dir(&rig));
         let sup = dir.claim().unwrap().unwrap().pid;
         let held: Vec<String> = std::fs::read_dir(format!("/proc/{sup}/fd"))
             .unwrap()
@@ -660,11 +766,117 @@ mod walled {
     }
 
     #[test]
+    fn wall_syscall_filter() {
+        if common::wall_test("seccomp") {
+            return;
+        }
+        let mut rig = Rig::new();
+        let source = rig.t.bin().join("wall-canary.c");
+        std::fs::write(
+            &source,
+            r#"
+#include <errno.h>
+#include <stdio.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+int main(void) {
+    long pid = syscall(SYS_getpid);
+    if (pid <= 0 || pid != getpid()) return 1;
+    const long denied[] = {
+        SYS_io_uring_setup, SYS_userfaultfd, SYS_ptrace,
+#ifdef __x86_64__
+        __X32_SYSCALL_BIT | SYS_getpid,
+#endif
+    };
+    for (unsigned i = 0; i < sizeof(denied) / sizeof(denied[0]); ++i) {
+        errno = 0;
+        long rc = syscall(denied[i], -1L, 0L, 0L, 0L);
+        if (rc != -1 || errno != EPERM) {
+            fprintf(stderr, "syscall %ld returned %ld, errno %d\n", denied[i], rc, errno);
+            return 1;
+        }
+    }
+    return 0;
+}
+"#,
+        )
+        .unwrap();
+        let mut commands = vec![json!(["cc", source, "-o", "/tmp/wall-canary"])];
+        #[cfg(target_arch = "x86_64")]
+        if let Some(binary) = i386_canary(&rig) {
+            commands.push(json!([binary]));
+        }
+        commands.push(json!(["/tmp/wall-canary"]));
+        let result = probe(&mut rig, json!({"exec": commands}));
+        for (i, command) in commands.iter().enumerate() {
+            assert_eq!(result["exec"][i]["code"], 0, "{command}: {}", result["exec"][i]);
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn i386_canary(rig: &Rig) -> Option<std::path::PathBuf> {
+        // A static fixture needs no i386 libc or loader, even on hosts with only native toolchains.
+        let binary = rig.t.bin().join("i386-canary");
+        let source = binary.with_extension("s");
+        std::fs::write(
+            &source,
+            r#"
+.global _start
+_start:
+    cmpl $1, (%esp)
+    jne success
+    mov $20, %eax        # i386 getpid
+    int $0x80
+    test %eax, %eax
+    jle failed
+    mov $-1, %ebx        # invalid entries, flags or ptrace request
+    xor %ecx, %ecx
+    xor %edx, %edx
+    xor %esi, %esi
+.macro denied nr
+    mov $\nr, %eax
+    int $0x80
+    cmp $-1, %eax        # raw -EPERM
+    jne failed
+.endm
+    denied 425           # io_uring_setup
+    denied 374           # userfaultfd
+    denied 26            # ptrace
+success:
+    xor %ebx, %ebx
+    jmp exit
+failed:
+    mov $1, %ebx
+exit:
+    mov $1, %eax         # i386 exit
+    int $0x80
+"#,
+        )
+        .unwrap();
+        let built = std::process::Command::new("cc")
+            .args(["-m32", "-nostdlib", "-static", "-o"])
+            .arg(&binary)
+            .arg(&source)
+            .status()
+            .unwrap();
+        assert!(built.success(), "could not build the static i386 canary");
+        // Only an unsupported executable format outside the wall excuses the i386 assertions inside.
+        match std::process::Command::new(&binary).arg("check-format").status() {
+            Err(e) if e.raw_os_error() == Some(8) => None,
+            status => {
+                assert!(status.unwrap().success(), "i386 format check failed");
+                Some(binary)
+            }
+        }
+    }
+
+    #[test]
     fn t1_38_fail_closed() {
         if common::wall_test("T1.38") {
             return;
         }
-        for (k, v) in [("FACTORY_TEST_BWRAP", "/nonexistent/bwrap"), ("FACTORY_TEST_LANDLOCK_ABI", "5")] {
+        for (k, v) in [("MORK_TEST_BWRAP", "/nonexistent/bwrap"), ("MORK_TEST_LANDLOCK_ABI", "5")] {
             let mut rig = Rig::new();
             rig.set_env(k, v);
             rig.start();
@@ -672,7 +884,7 @@ mod walled {
             wait_until("the agent to show why", LONG, || {
                 rig.store().load().unwrap().agents.values().any(|a| {
                     matches!(&a.status,
-                    factory_types::state::AgentStatus::Error { words } if words.contains("no wall"))
+                    mork_types::state::AgentStatus::Error { words } if words.contains("no wall"))
                 })
             });
             assert!(rig.runs("claude").is_empty(), "{k}: a turn ran");
@@ -682,8 +894,8 @@ mod walled {
         assert!(sockets_and_ports(Some("5")).is_err_and(|w| w.contains("below 6")));
         let (stream, _dgram, _tcp, _keep) = outside_listeners();
         let mut rig = Rig::new();
-        rig.set_env("FACTORY_TEST_WALL", "partial");
-        rig.set_env("FACTORY_TEST_LANDLOCK_ABI", "5");
+        rig.set_env("MORK_TEST_WALL", "partial");
+        rig.set_env("MORK_TEST_LANDLOCK_ABI", "5");
         let state = rig.fhome().join("state.db");
         let r = probe(&mut rig, json!({"exists": [state.display().to_string()], "abstract_stream": [stream]}));
         assert_eq!(r["exists"][state.display().to_string()], false, "{r}");
@@ -748,7 +960,7 @@ mod walled {
         let turns = rig.jobs("main/echo");
         let seat = rig.fhome().join("io").join(turns[0].id.as_str()).display().to_string();
         for j in &turns {
-            assert_eq!(j.spec.env.get("FACTORY_IO"), Some(&seat), "{} had another folder", j.id);
+            assert_eq!(j.spec.env.get("MORK_IO"), Some(&seat), "{} had another folder", j.id);
         }
     }
 
@@ -764,12 +976,12 @@ mod walled {
         std::fs::write(&fake, "#!/bin/sh\necho \"{\\\"child-pid\\\": $$}\" >&3\nexec sleep 30\n").unwrap();
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-        rig.set_env("FACTORY_TEST_BWRAP", &fake.display().to_string());
+        rig.set_env("MORK_TEST_BWRAP", &fake.display().to_string());
         let mut bystander = std::process::Command::new("sleep").arg("300").spawn().unwrap();
         rig.start();
         rig.echo("go");
         wait_until("the turn to fail", LONG, || rig.jobs("main/echo").first().is_some_and(|j| j.settled.is_some()));
-        let dir = factory_engine::jobs::folder::JobDir::new(job_dir(&rig));
+        let dir = mork_engine::jobs::folder::JobDir::new(job_dir(&rig));
         let exit = dir.exit().unwrap().unwrap();
         assert!(exit.error.as_deref().is_some_and(|e| e.contains("didn't form")), "{exit:?}");
         assert!(exit.left.is_empty(), "{exit:?}");
@@ -823,7 +1035,7 @@ mod walled {
         let planted = rig.t.bin().join("planted.sock");
         let _planted = std::os::unix::net::UnixListener::bind(&planted).unwrap();
         // The resolver's file is there when the host has it; its folder's sockets never are.
-        let resolver = factory_engine::jobs::wall::RESOLVER;
+        let resolver = mork_engine::jobs::wall::RESOLVER;
         let resolver_sockets =
             ["/run/systemd/resolve/io.systemd.Resolve", "/run/systemd/resolve/io.systemd.Resolve.Monitor"];
         let mut exists = vec![resolver.to_owned()];
@@ -844,14 +1056,17 @@ mod walled {
     }
 
     #[test]
-    fn t1_53_factory_login() {
+    fn t1_53_mork_login() {
         if common::wall_test("T1.53") {
             return;
         }
         let rig = Rig::new();
         rig.scenario(json!([{"fake": "claude", "steps": [
-            {"do": "show-env"}, {"do": "write-file", "path": ".claude-login.json", "text": "{\"logged\":true}"}]}]));
-        // `script` gives the login a terminal, as Andrei's would be.
+            {"do": "show-env"}, {"do": "probe", "spec":{"exists":["$HOME/.claude/accounts/saved"],"writable":["$HOME/.claude/accounts"]}}, {"do": "write-file", "path": ".claude-login.json", "text": "{\"logged\":true}"}]}]));
+        let saved = rig.fhome().join("login-home/.claude/accounts");
+        std::fs::create_dir_all(&saved).unwrap();
+        std::fs::write(saved.join("saved"), "dummy account").unwrap();
+        // `script` gives the login a terminal, as the operator's would be.
         let cmdline = format!("{} login claude", common::exe().display());
         let status = std::process::Command::new("script")
             .args(["-qec", &cmdline, "/dev/null"])
@@ -866,15 +1081,21 @@ mod walled {
             .filter_map(|l| serde_json::from_str::<serde_json::Value>(l.trim()).ok())
             .find(|v| v["type"] == "fake-env")
             .unwrap_or_else(|| panic!("no fake-env line: {shown}"));
-        assert_eq!(env["env"]["HOME"], rig.agent_home().display().to_string(), "{env}");
+        assert_eq!(env["env"]["HOME"], rig.fhome().join("login-home").display().to_string(), "{env}");
+        let mask = shown
+            .lines()
+            .filter_map(|l| serde_json::from_str::<Value>(l.trim()).ok())
+            .find(|v| v["type"] == "probe")
+            .unwrap();
+        assert_eq!(mask["exists"]["$HOME/.claude/accounts/saved"], false);
+        assert_eq!(mask["writable"]["$HOME/.claude/accounts"], "EROFS");
         assert!(env["stdin"].as_str().unwrap().starts_with("/dev/pts/"), "no terminal attached: {env}");
         let runs = rig.runs("claude");
         assert_eq!(runs.len(), 1);
-        assert_eq!(runs[0]["cwd"], rig.agent_home().display().to_string());
-        // It ran walled, with the agent home as its home, on the terminal.
+        assert_eq!(runs[0]["cwd"], rig.fhome().join("login-home").display().to_string());
         let login: Vec<_> = rig.processes().into_iter().filter(|p| p["kind"] == "login").collect();
         assert!(!login.is_empty() && login.iter().all(|p| p["walled"] == true), "{login:?}");
-        assert!(rig.agent_home().join(".claude-login.json").exists(), "the login isn't in the agent home");
+        assert!(rig.fhome().join("login-home/.claude-login.json").exists(), "the login is missing from the login home");
         assert!(!rig.t.home().join(".claude-login.json").exists());
         let found = std::process::Command::new("find")
             .args([&rig.t.root.display().to_string(), "-name", ".claude-login.json"])
@@ -887,7 +1108,7 @@ mod walled {
     // fac-657: agy's sign-in runs as the others do, with no session bus by address or socket, so agy keeps its token
     // as a file there.
     #[test]
-    fn t1_53_factory_login_agy() {
+    fn t1_53_mork_login_agy() {
         if common::wall_test("T1.53, agy") {
             return;
         }
@@ -915,7 +1136,7 @@ mod walled {
         let probe = line("probe");
         let reached = probe["unix"][bus.display().to_string()].as_str().unwrap_or_else(|| panic!("{probe}"));
         assert!(!reached.starts_with("CONNECTED"), "the login's wall reached the host bus: {probe}");
-        assert_eq!(env["env"]["HOME"], rig.agent_home().display().to_string(), "{env}");
+        assert_eq!(env["env"]["HOME"], rig.fhome().join("login-home").display().to_string(), "{env}");
         assert!(env["env"].get("DBUS_SESSION_BUS_ADDRESS").is_none(), "{env}");
         assert_eq!(env["env"]["AGY_CLI_DISABLE_AUTO_UPDATE"], "true", "{env}");
         assert!(env["stdin"].as_str().unwrap().starts_with("/dev/pts/"), "no terminal attached: {env}");
@@ -924,11 +1145,11 @@ mod walled {
         assert_eq!(runs[0]["argv"], json!(["agy", "acp", "--login"]), "{runs:?}");
         let login: Vec<_> = rig.processes().into_iter().filter(|p| p["kind"] == "login").collect();
         assert!(!login.is_empty() && login.iter().all(|p| p["walled"] == true), "{login:?}");
-        assert!(rig.agent_home().join(token).exists(), "the token isn't in the agent home");
+        assert!(rig.fhome().join("logins/agy/antigravity-oauth-token").exists(), "the shared token is missing");
         assert!(!rig.t.home().join(token).exists());
     }
 
-    // fac-657: an agy seat's wall: Factory's skills read-only where agy reads them, its state folders writable, and
+    // fac-657: an agy seat's wall: Mork's skills read-only where agy reads them, its state folders writable, and
     // no session bus, by address or socket.
     #[test]
     fn t1_33_an_agy_seats_wall() {
@@ -940,19 +1161,20 @@ mod walled {
         let bus = rig.t.xdg().join("bus");
         let _bus = std::os::unix::net::UnixListener::bind(&bus).unwrap();
         rig.set_env("DBUS_SESSION_BUS_ADDRESS", &format!("unix:path={}", bus.display()));
-        let gemini = rig.agent_home().join(".gemini");
-        let (skills, config, state) =
-            (gemini.join("config/skills"), gemini.join("config"), gemini.join("antigravity-cli"));
-        std::fs::create_dir_all(&state).unwrap();
+        let gemini = std::path::PathBuf::from("$HOME/.gemini");
+        let state = gemini.join("antigravity-cli");
+        let skills = std::path::PathBuf::from("$HOME/.agents/skills");
         let skill = skills.join("testing-in-a-slot/SKILL.md");
-        let spec = json!({"exists": [skill], "writable": [skills, config, state], "unix": [bus]});
+        let old_skill = gemini.join("config/skills/testing-in-a-slot/SKILL.md");
+        let spec = json!({"exists": [skill, old_skill], "writable": [skills, state], "unix": [bus],
+            "exec": [["mkdir", "-p", gemini.join("config/write-probe")]]});
         let r = probe_on(&mut rig, "agy", spec);
         assert!(!rig.runs("agy").is_empty(), "no agy turn ran: {r}");
         assert_eq!(r["exists"][skill.display().to_string()], true, "agy finds no skills: {r}");
+        assert_eq!(r["exists"][old_skill.display().to_string()], false, "{r}");
         assert_eq!(r["writable"][skills.display().to_string()], "EROFS", "{r}");
-        for path in [&config, &state] {
-            assert_eq!(r["writable"][path.display().to_string()], "WROTE", "{r}");
-        }
+        assert_eq!(r["writable"][state.display().to_string()], "WROTE", "{r}");
+        assert_eq!(r["exec"][0]["code"], 0, "agy cannot write its config: {r}");
         assert!(!r["unix"][bus.display().to_string()].as_str().unwrap().starts_with("CONNECTED"), "{r}");
         assert!(!r["env_keys"].as_array().unwrap().iter().any(|k| k == "DBUS_SESSION_BUS_ADDRESS"), "{r}");
     }
@@ -963,14 +1185,14 @@ mod walled {
     fn an_unwalled_agy_turn_is_refused_at_launch() {
         let mut rig = Rig::new();
         rig.write_config(&rig.config(AGY_ECHO));
-        rig.set_env("FACTORY_UNWALLED", "1");
+        rig.set_env("MORK_UNWALLED", "1");
         rig.start();
         rig.echo("go");
         let mut words = String::new();
         wait_until("the agent to show why", LONG, || {
             let state = rig.store().load().unwrap();
-            let status = state.agents.get(&factory_types::AgentKey::new("main/echo")).map(|a| a.status.clone());
-            let Some(factory_types::state::AgentStatus::Error { words: w }) = status else { return false };
+            let status = state.agents.get(&mork_types::AgentKey::new("main/echo")).map(|a| a.status.clone());
+            let Some(mork_types::state::AgentStatus::Error { words: w }) = status else { return false };
             words = w;
             true
         });
@@ -980,7 +1202,7 @@ mod walled {
     }
 
     // fac-671: a walled turn can connect to the bridge's loopback port, cannot see or read web.key,
-    // is refused `factory web`, and gets 401 on an unauthenticated WebSocket upgrade.
+    // is refused `mork web`, and gets 401 on an unauthenticated WebSocket upgrade.
     #[test]
     fn fac671_web_bridge_key_is_hidden_and_unauthenticated_upgrade_is_401() {
         if common::wall_test("fac-671 web bridge") {
@@ -988,7 +1210,7 @@ mod walled {
         }
         use std::os::unix::fs::PermissionsExt;
         let mut rig = Rig::new();
-        let cfg = rig.config("").replace("[factory]\n", "[factory]\nweb_port = 0\n");
+        let cfg = rig.config("").replace("[mork]\n", "[mork]\nweb_port = 0\n");
         rig.write_config(&cfg);
         rig.start();
 
@@ -1000,7 +1222,7 @@ mod walled {
         };
         wait_until("web bridge bound address in app.log", LONG, || bound().is_some());
         let addr = bound().unwrap();
-        let key = factory_engine::web::key::read(&key_path).unwrap();
+        let key = mork_engine::web::key::read(&key_path).unwrap();
         assert_eq!(std::fs::metadata(&key_path).unwrap().permissions().mode() & 0o777, 0o600);
         assert!(!std::fs::read_to_string(&log_path).unwrap().contains(&key), "web.key leaked to app.log");
 
@@ -1011,7 +1233,7 @@ mod walled {
             "exists": [key_path.display().to_string()],
             "read": [key_path.display().to_string()],
             "search_hex": key_hex_bytes,
-            "search_roots": [rig.agent_home().display().to_string(), rig.fhome().join("run").display().to_string()],
+            "search_roots": ["$HOME", rig.fhome().join("logins").display().to_string(), rig.fhome().join("run").display().to_string()],
             "tcp": [&addr],
             "tcp_send": [{"addr": &addr, "send": upgrade}],
             "exec": [[common::exe().display().to_string(), "web"]],
@@ -1022,12 +1244,12 @@ mod walled {
         assert_eq!(r["found"], json!([]), "key bytes found inside wall: {r}");
         assert_eq!(r["tcp"][&addr], "CONNECTED", "{r}");
         assert_eq!(r["tcp_send"][0], "HTTP/1.1 401 Unauthorized", "{r}");
-        assert_ne!(r["exec"][0]["code"], 0, "factory web succeeded inside wall: {r}");
+        assert_ne!(r["exec"][0]["code"], 0, "mork web succeeded inside wall: {r}");
         assert!(r["exec"][0]["err"].as_str().unwrap().contains("refused inside a wall"), "{r}");
     }
 }
 
-// Production-only (1.10.8): `FACTORY_UNWALLED` and `FACTORY_TEST_WALL` are ignored. A build is
+// Production-only (1.10.8): `MORK_UNWALLED` and `MORK_TEST_WALL` are ignored. A build is
 // a walled job of a production build: it still runs fully walled.
 #[cfg(not(feature = "faults"))]
 #[test]
@@ -1036,7 +1258,7 @@ fn t1_38_fail_closed_production_ignores_test_settings() {
         return;
     }
     let mut rig = Rig::new();
-    let repo = rig.t.root.join("factory-repo");
+    let repo = rig.t.root.join("mork-repo");
     let git = |args: &[&str]| {
         let o = std::process::Command::new("git").args(args).current_dir(&repo).output().unwrap();
         assert!(o.status.success(), "{o:?}");
@@ -1047,8 +1269,8 @@ fn t1_38_fail_closed_production_ignores_test_settings() {
     git(&["add", "."]);
     git(&["-c", "user.name=T", "-c", "user.email=t@e", "commit", "-qm", "c"]);
     let commit = git(&["rev-parse", "HEAD"]);
-    rig.set_env("FACTORY_UNWALLED", "1");
-    rig.set_env("FACTORY_TEST_WALL", "partial");
+    rig.set_env("MORK_UNWALLED", "1");
+    rig.set_env("MORK_TEST_WALL", "partial");
     let out = rig.command(&["build", &commit]).output().unwrap();
     // A production binary reports its own commit, whatever the fake cargo's script sets, so
     // the build is refused at install (M1.2); what this test checks is that it ran walled.

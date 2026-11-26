@@ -3,12 +3,14 @@
 
 mod landlock;
 mod proc;
+mod seccomp;
 
 pub use landlock::{LandlockAbi, Restriction, abi as landlock_abi, restrict_self};
 pub use proc::{
     ForkOutcome, close_fds_from, fork, install_term_flag, kill, prepare_guard_spawn, prepare_wall_spawn,
     redirect_stdio, set_child_subreaper, set_no_new_privs, setsid, term_requested, try_reap,
 };
+pub use seccomp::install_wall_filter;
 
 use std::io;
 use std::os::fd::AsRawFd;
@@ -130,8 +132,12 @@ pub fn create_no_follow(path: &std::path::Path) -> io::Result<std::fs::File> {
 /// Opens `rel` beneath `dir` for reading, following no symlink and never leaving `dir`: a file
 /// an agent put in its `io/` is read as itself, never as a link's target (M2.1). A FIFO doesn't block.
 pub fn open_beneath(dir: &std::path::Path, rel: &std::path::Path) -> io::Result<std::fs::File> {
-    let base = dir_of(dir)?;
-    openat2(&base, rel, libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC, 0, BENEATH)
+    open_file_beneath(&dir_of(dir)?, rel)
+}
+
+/// Reads beneath the caller's open directory without following links or waiting on a FIFO.
+pub fn open_file_beneath(dir: &std::fs::File, rel: &std::path::Path) -> io::Result<std::fs::File> {
+    openat2(dir, rel, libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC, 0, BENEATH)
 }
 
 /// Opens the absolute `path` for reading, following no symlink at any component: a configured
@@ -144,14 +150,14 @@ pub fn open_no_symlinks(path: &std::path::Path) -> io::Result<std::fs::File> {
 /// FIFO's open not blocking.
 pub fn open_beneath_no_symlinks(dir: &std::path::Path, rel: &std::path::Path) -> io::Result<std::fs::File> {
     let base = from_root(dir, libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)?;
-    openat2(&base, rel, libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC, 0, BENEATH)
+    open_file_beneath(&base, rel)
 }
 
 /// Opens `rel` beneath `dir` for appending, `0600` when created, following no symlink: a log a
 /// wall replaced with a link is never written through (R9).
 pub fn append_beneath(dir: &std::path::Path, rel: &std::path::Path) -> io::Result<std::fs::File> {
     let base = dir_of(dir)?;
-    let flags = libc::O_WRONLY | libc::O_APPEND | libc::O_CREAT | libc::O_NOFOLLOW | libc::O_CLOEXEC;
+    let flags = libc::O_WRONLY | libc::O_APPEND | libc::O_CREAT | libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC;
     openat2(&base, rel, flags, 0o600, BENEATH)
 }
 
@@ -291,4 +297,22 @@ struct OpenHow {
     flags: u64,
     mode: u64,
     resolve: u64,
+}
+
+/// Installs a link in an opened parent beneath the root. Existing links to the target are kept.
+pub fn link_beneath(root: &std::path::Path, rel: &std::path::Path, target: &std::path::Path) -> io::Result<()> {
+    use std::path::Path;
+    let parent = rel.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let dir = open_dir_beneath(&dir_of(root)?, parent)?;
+    let name = rel.file_name().ok_or_else(|| io::Error::other("missing link name"))?;
+    let path = Path::new("/proc/self/fd").join(dir.as_raw_fd().to_string()).join(name);
+    match std::os::unix::fs::symlink(target, &path) {
+        Err(e)
+            if e.kind() == io::ErrorKind::AlreadyExists
+                && std::fs::read_link(&path).ok().as_deref() == Some(target) =>
+        {
+            Ok(())
+        }
+        result => result,
+    }
 }

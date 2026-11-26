@@ -176,7 +176,7 @@ fn mysql_read(input: &str, script: &str, options: &str, force: bool) -> i32 {
     let profiling = r["profiling"] != false;
     let on = profiling
         && r["prepare_error"].is_null()
-        && before.iter().any(|s| matches!(*s, "SET profiling = 1" | "EXECUTE factory_on"));
+        && before.iter().any(|s| matches!(*s, "SET profiling = 1" | "EXECUTE mork_on"));
     if let Some(e) = r["err"].as_str() {
         r["err"] = json!(e.replace("{line}", &mysql_line(script, &query).to_string()));
     }
@@ -195,11 +195,11 @@ fn mysql_line(script: &str, statement: &str) -> usize {
 
 // Batch mode aborts before the read on a setup error unless --force was actually passed.
 fn mysql_optional_error(statement: &str, r: &Value, script: &str) -> bool {
-    let error = if statement.starts_with("PREPARE factory_") {
+    let error = if statement.starts_with("PREPARE mork_") {
         r["prepare_error"].as_str()
-    } else if statement.starts_with("EXECUTE factory_") && r["prepare_error"].is_string() {
+    } else if statement.starts_with("EXECUTE mork_") && r["prepare_error"].is_string() {
         Some("ERROR 1243 (HY000): Unknown prepared statement handler")
-    } else if matches!(statement, "SHOW PROFILES" | "EXECUTE factory_show") {
+    } else if matches!(statement, "SHOW PROFILES" | "EXECUTE mork_show") {
         r["collect_error"].as_str().or_else(|| {
             (statement == "SHOW PROFILES" && r["profiling"] == false)
                 .then_some("ERROR 1289 (HY000): The 'SHOW PROFILES' feature is disabled")
@@ -222,10 +222,10 @@ fn trailer(after: &[&str], mut profile: Vec<(String, f64)>, on: bool, r: &Value,
             if !force {
                 return 1;
             }
-        } else if let Some(end) = s.strip_prefix("SELECT '").and_then(|x| x.strip_suffix("' AS factory_end")) {
-            print!("factory_end\n{end}\n");
+        } else if let Some(end) = s.strip_prefix("SELECT '").and_then(|x| x.strip_suffix("' AS mork_end")) {
+            print!("mork_end\n{end}\n");
             profile.push(((*s).to_owned(), 0.00002));
-        } else if on && matches!(*s, "SHOW PROFILES" | "EXECUTE factory_show") {
+        } else if on && matches!(*s, "SHOW PROFILES" | "EXECUTE mork_show") {
             println!("Query_ID\tDuration\tQuery");
             for (n, (q, secs)) in profile.iter().enumerate() {
                 println!("{}\t{secs:.8}\t{}", n + 1, q.get(..300).unwrap_or(q));
@@ -242,15 +242,15 @@ fn framed(text: &str) -> (Vec<&str>, String, Vec<&str>) {
     let own = |s: &&&str| {
         [
             "SET SESSION sql_select_limit",
-            "SET @factory_",
-            "PREPARE factory_",
-            "EXECUTE factory_",
+            "SET @mork_",
+            "PREPARE mork_",
+            "EXECUTE mork_",
             "SET profiling",
             "SHOW PROFILES",
         ]
         .iter()
         .any(|p| s.starts_with(p))
-            || s.ends_with("' AS factory_end")
+            || s.ends_with("' AS mork_end")
     };
     let lead = lines.iter().take_while(own).count();
     let tail = lines[lead..].iter().rev().take_while(own).count();

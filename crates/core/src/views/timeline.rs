@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use factory_types::card::Stage;
+use mork_types::card::Stage;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mark {
@@ -18,7 +18,7 @@ pub enum Mark {
     Planning,
     /// The plan was approved.
     Planned,
-    /// A mock opened at build: Andrei's reopen, or an older build's after the plan's approve.
+    /// A mock opened at build: the operator's reopen, or an older build's after the plan's approve.
     Mocking,
     /// The mock ended or was deferred by the flow conversion.
     Mocked,
@@ -209,8 +209,8 @@ pub fn points(rows: &[(i64, &str, &serde_json::Value)]) -> (Vec<Point>, u64) {
 }
 
 /// Current-run cost and token sums by seat; older lines contribute dollars alone (fac-526).
-pub fn seat_costs(rows: &[(i64, &str, &serde_json::Value)]) -> Vec<factory_types::about::SeatCost> {
-    let mut sums = BTreeMap::<String, (u64, bool, factory_types::cost::Tokens)>::new();
+pub fn seat_costs(rows: &[(i64, &str, &serde_json::Value)]) -> Vec<mork_types::about::SeatCost> {
+    let mut sums = BTreeMap::<String, (u64, bool, mork_types::cost::Tokens)>::new();
     for (_, kind, data) in rows {
         if *kind != "cost" {
             continue;
@@ -223,8 +223,8 @@ pub fn seat_costs(rows: &[(i64, &str, &serde_json::Value)]) -> Vec<factory_types
         *tokens = tokens.saturating_add(share);
     }
     sums.into_iter()
-        .map(|(agent, (micros, unknown, tokens))| factory_types::about::SeatCost {
-            agent: factory_types::AgentKey::new(agent),
+        .map(|(agent, (micros, unknown, tokens))| mork_types::about::SeatCost {
+            agent: mork_types::AgentKey::new(agent),
             cost_cents: micros.div_ceil(10_000),
             unknown,
             tokens,

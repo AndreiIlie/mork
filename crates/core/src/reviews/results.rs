@@ -1,10 +1,10 @@
-//! A review run's result (fac-269): reported to Andrei, a colleague's PR result posted as its comments, ours only clean
-//! (fac-375), and the card closed once they are posted; nothing but Andrei's approval merges a PR.
+//! A review run's result (fac-269): reported to the operator, a colleague's PR result posted as its comments, ours only clean
+//! (fac-375), and the card closed once they are posted; nothing but the operator's approval merges a PR.
 
-use factory_types::CardId;
-use factory_types::action::{Action, ActionStatus, ActionWhat};
-use factory_types::card::{Card, Stage};
-use factory_types::work::Failing;
+use mork_types::CardId;
+use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::card::{Card, Stage};
+use mork_types::work::Failing;
 
 use crate::decide::Ctx;
 use crate::post::Poster;
@@ -22,7 +22,7 @@ pub fn report(p: &mut Poster<'_>, card: Card, clean: bool, unmet: Option<String>
         None => Some(branch(&card, clean, unmet.as_deref())),
     };
     if let Some(text) = text {
-        super::cards::to_andrei(p, &card.id, &text);
+        super::cards::to_operator(p, &card.id, &text);
     }
     done_once_posted(p, &card.id, ctx);
 }
@@ -70,11 +70,12 @@ fn posted(
         }
         (false, None) => format!("The review has no findings: PR {pr} gets one comment saying so."),
     };
-    Some(format!("{text} Only your approval on Bitbucket merges it, once its run passed on the head you approved."))
+    let forge = ctx.config.forge_label(&card.project);
+    Some(format!("{text} Only your approval on {forge} merges it, once its run passed on the head you approved."))
 }
 
 // A review of our own PR, an older build's or of a head no verification passed: its findings and its failed suite go
-// to our card's foreman alone, Andrei told nothing; the PR gets only a clean result (fac-375).
+// to our card's foreman alone, the operator told nothing; the PR gets only a clean result (fac-375).
 fn ours(p: &mut Poster<'_>, card: &Card, pr: u64, failed: bool, ctx: Ctx<'_>) -> Option<String> {
     if failed {
         return None;
@@ -114,10 +115,10 @@ pub fn done_once_posted(p: &mut Poster<'_>, id: &CardId, ctx: Ctx<'_>) {
         return;
     }
     let project = c.project.clone();
-    // Our PR's ending is no news of Andrei's: its results went to our card's foreman (fac-375).
+    // Our PR's ending is no news of the operator's: its results went to our card's foreman (fac-375).
     if !c.pr.is_some_and(|n| crate::queue::approval::owner(p.state, c.project.as_str(), n).is_some()) {
         let threads = super::threads::notice(p, &c);
-        super::cards::to_andrei(
+        super::cards::to_operator(
             p,
             id,
             &format!("The review is complete and its results are posted: the review card ends.{threads}"),

@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use factory_types::door_plan::Ran;
+use mork_types::door_plan::Ran;
 
 use super::bounded;
 
@@ -29,13 +29,13 @@ pub const PROFILE_ROOM: usize = 1024;
 const PROFILE: &str = "Query_ID\tDuration\tQuery\n";
 
 // Profiling, where the server has it: one without it runs the query all the same, unprofiled.
-const PROFILING: &str = "SET @factory_on = IF(@@have_profiling = 'YES', 'SET profiling = 1', 'DO 0'), \
-                         @factory_show = IF(@@have_profiling = 'YES', 'SHOW PROFILES', 'DO 0');\n\
-                         PREPARE factory_on FROM @factory_on;\nPREPARE factory_show FROM @factory_show;\n\
-                         EXECUTE factory_on;\n";
+const PROFILING: &str = "SET @mork_on = IF(@@have_profiling = 'YES', 'SET profiling = 1', 'DO 0'), \
+                         @mork_show = IF(@@have_profiling = 'YES', 'SHOW PROFILES', 'DO 0');\n\
+                         PREPARE mork_on FROM @mork_on;\nPREPARE mork_show FROM @mork_show;\n\
+                         EXECUTE mork_on;\n";
 
 // The column of the one-row result that ends the query's output.
-const END: &str = "factory_end";
+const END: &str = "mork_end";
 
 /// The client's option file: the login, and the server at a forward's socket or at its address.
 pub fn options(user: &str, password: &str, at: &super::door_services::At<'_>) -> String {
@@ -72,7 +72,7 @@ pub fn command(
         format!("--database={database}"),
         "--connect-timeout=10".into(),
     ];
-    let stdin = format!("{FIRST}{PROFILING}{query};\n{};\nEXECUTE factory_show;\n", boundary(end));
+    let stdin = format!("{FIRST}{PROFILING}{query};\n{};\nEXECUTE mork_show;\n", boundary(end));
     (argv, stdin.into_bytes())
 }
 
@@ -84,7 +84,7 @@ fn initialize(rows: Option<u64>, timeout_ms: u64) -> String {
         mode = format!("REPLACE({mode}, ',{name},', ',')");
     }
     let verify = "SET SESSION sql_mode = IF(FIND_IN_SET('NO_BACKSLASH_ESCAPES', @@SESSION.sql_mode) \
-                  OR FIND_IN_SET('ANSI_QUOTES', @@SESSION.sql_mode), 'factory_unsupported_lexical_mode', @@SESSION.sql_mode)";
+                  OR FIND_IN_SET('ANSI_QUOTES', @@SESSION.sql_mode), 'mork_unsupported_lexical_mode', @@SESSION.sql_mode)";
     let cap = rows.map_or(String::new(), |n| format!("; SET SESSION sql_select_limit = {}", n.saturating_add(1)));
     format!(
         "{READ_ONLY}; SET SESSION max_execution_time = {timeout_ms}; \
@@ -147,7 +147,7 @@ fn optional_error(diagnostic: &str, script: &str) -> bool {
     }
     let Some(index) = line.parse::<usize>().ok().and_then(|n| n.checked_sub(1)) else { return false };
     let Some(statement) = script.lines().nth(index) else { return false };
-    PROFILING.lines().chain(std::iter::once("EXECUTE factory_show;")).any(|s| s == statement)
+    PROFILING.lines().chain(std::iter::once("EXECUTE mork_show;")).any(|s| s == statement)
 }
 
 /// The session's id, once the client has printed its whole line: a part of it would name another.

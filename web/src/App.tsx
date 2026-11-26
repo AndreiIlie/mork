@@ -41,8 +41,8 @@ function useNow(state: BridgeState): number {
 function phaseWords(state: BridgeState): string | null {
   if (state.recovering !== null) return state.recovering.charAt(0).toUpperCase() + state.recovering.slice(1);
   const phase = state.screen?.top.phase;
-  if (phase?.is === "recovering") return phase.doing === "" ? "The factory is recovering" : `The factory is recovering: ${phase.doing}`;
-  if (phase?.is === "reloading") return `The factory is reloading to ${phase.short}`;
+  if (phase?.is === "recovering") return phase.doing === "" ? "Mork is recovering" : `Mork is recovering: ${phase.doing}`;
+  if (phase?.is === "reloading") return `Mork is reloading to ${phase.short}`;
   return null;
 }
 
@@ -64,10 +64,10 @@ function Waiting({ state }: { state: BridgeState }) {
         <p className="mt-2 text-copy-14 text-gray-900">
           {disconnected ? (
             <>
-              Open the link <span className="font-mono text-gray-1000">factory web</span> prints.
+              Open the link <span className="font-mono text-gray-1000">mork web</span> prints.
             </>
           ) : (
-            "Waiting for the factory to send its board."
+            "Waiting for Mork to send its board."
           )}
         </p>
       </div>
@@ -131,7 +131,7 @@ export function App() {
       />
       <div className="flex min-w-0 flex-1 flex-col">
         {state.link === "reconnecting" && (
-          <Banner>Reconnecting… showing the last board the factory sent; its buttons wait.</Banner>
+          <Banner>Reconnecting… showing the last board Mork sent; its buttons wait.</Banner>
         )}
         {phase !== null && <Banner>{phase}</Banner>}
         <div className="flex min-h-0 flex-1">{page}</div>

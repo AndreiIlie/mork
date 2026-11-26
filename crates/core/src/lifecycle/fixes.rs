@@ -1,10 +1,10 @@
 //! Fix requests: every round goes to the card's foreman at once and is counted; from the third on, the card's room and
 //! main are told which round it is. No round is held.
 
-use factory_types::card::{Card, Stage};
-use factory_types::reply::{Finding, Role};
-use factory_types::state::{MessageKind, Sender};
-use factory_types::work::CheckRun;
+use mork_types::card::{Card, Stage};
+use mork_types::reply::{Finding, Role};
+use mork_types::state::{MessageKind, Sender};
+use mork_types::work::CheckRun;
 use serde_json::Value;
 
 use crate::messages::requests::ask_agent;
@@ -14,7 +14,7 @@ use crate::post::Poster;
 const NOTICE_FROM: u32 = 3;
 
 /// A fix request: one round, sent to the card's foreman; from the third, said in the room and in main,
-/// to Andrei, waking nobody.
+/// to the operator, waking nobody.
 pub fn send_back(p: &mut Poster<'_>, mut card: Card, text: &str) {
     card.stage = Stage::Build;
     card.revisions += 1;
@@ -24,7 +24,7 @@ pub fn send_back(p: &mut Poster<'_>, mut card: Card, text: &str) {
     if n >= NOTICE_FROM {
         let words = format!("{id} is in its {} round", ordinal(n));
         for place in [id.as_str(), crate::messages::places::MAIN] {
-            p.post(place, Sender::Engine, Some("andrei"), MessageKind::Engine, "", &words);
+            p.post(place, Sender::Engine, Some("operator"), MessageKind::Engine, "", &words);
         }
     }
 }

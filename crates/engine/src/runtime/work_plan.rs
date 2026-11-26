@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use factory_types::card::{Card, Mode};
-use factory_types::config::ProjectConfig;
-use factory_types::job::JobKind;
-use factory_types::work::Purpose;
-use factory_types::{CardId, Sha};
+use mork_types::card::{Card, Mode};
+use mork_types::config::ProjectConfig;
+use mork_types::job::JobKind;
+use mork_types::work::Purpose;
+use mork_types::{CardId, Sha};
 
 use super::Engine;
 use super::work::{Plan, fresh_dir, json_of, plan};
@@ -85,7 +85,7 @@ impl Worktree {
         };
         let d = dir.display().to_string();
         let mut pl = plan(
-            &Purpose::Clone { card: card.clone(), at: factory_types::Sha::new(at), branch: branch.to_owned() },
+            &Purpose::Clone { card: card.clone(), at: mork_types::Sha::new(at), branch: branch.to_owned() },
             JobKind::Bundle,
             self.argv.clone(),
             &d,
@@ -118,10 +118,10 @@ impl Worktree {
     fn previous_round_in(&self, pl: &mut Plan, exports: &mut Vec<PathBuf>) -> Result<PreviousRound, String> {
         let c = &self.card;
         let Some(round) = c.review.as_deref().and_then(|r| r.open()) else { return Ok(PreviousRound::default()) };
-        let Some(before) = factory_core::reviews::rounds::previous(c, round.n) else {
+        let Some(before) = mork_core::reviews::rounds::previous(c, round.n) else {
             return Ok(PreviousRound::default());
         };
-        let into = factory_core::reviews::rounds::round_ref(before.n);
+        let into = mork_core::reviews::rounds::round_ref(before.n);
         let bundle = Some(self.bundle_in(pl, exports, "previous", &before.commit, into.clone())?);
         if before.base == round.base {
             return Ok(PreviousRound { bundle, ..PreviousRound::default() });
@@ -133,10 +133,10 @@ impl Worktree {
         );
         let mut extra = Vec::new();
         if !has_prev && !mirror::is_ancestor(&self.home, &m, before.base.as_str(), round.commit.as_str()) {
-            extra.push(self.bundle_in(pl, exports, "prev-base", &before.base, "refs/factory/prev-base".into())?);
+            extra.push(self.bundle_in(pl, exports, "prev-base", &before.base, "refs/mork/prev-base".into())?);
         }
         if !has_curr && !mirror::is_ancestor(&self.home, &m, round.base.as_str(), before.commit.as_str()) {
-            extra.push(self.bundle_in(pl, exports, "new-base", &round.base, "refs/factory/new-base".into())?);
+            extra.push(self.bundle_in(pl, exports, "new-base", &round.base, "refs/mork/new-base".into())?);
         }
         // Without the new base inside the candidate, projecting onto it hides branch edits (fac-628).
         if !has_curr {
@@ -150,7 +150,7 @@ impl Worktree {
             prev_base: before.base.0.clone(),
             prev_ref: into,
             new_base: round.base.0.clone(),
-            into: factory_core::reviews::rounds::rebased_round_ref(before.n),
+            into: mork_core::reviews::rounds::rebased_round_ref(before.n),
         });
         Ok(PreviousRound { bundle, extra, rebase })
     }
@@ -177,7 +177,7 @@ impl Worktree {
             None => None,
         };
         let fork_in = match recover {
-            Some(fork) => Some(self.bundle_in(&mut pl, exports, "fork", fork, "refs/factory/fork".into())?),
+            Some(fork) => Some(self.bundle_in(&mut pl, exports, "fork", fork, "refs/mork/fork".into())?),
             None => None,
         };
         let local_base = base_in.as_ref().and_then(|_| local_base(c, c.branch.as_deref().unwrap_or_default(), &p.base));
@@ -213,10 +213,10 @@ impl Worktree {
         fresh_dir(&dir)?;
         let d = dir.display().to_string();
         let mut pl = plan(purpose, JobKind::Bundle, self.argv.clone(), &d, &c.project).rw(d);
-        let head_in = self.bundle_in(&mut pl, exports, "head", head, "refs/factory/head".into())?;
-        let on_in = self.bundle_in(&mut pl, exports, "on", on, "refs/factory/on".into())?;
+        let head_in = self.bundle_in(&mut pl, exports, "head", head, "refs/mork/head".into())?;
+        let on_in = self.bundle_in(&mut pl, exports, "on", on, "refs/mork/on".into())?;
         let pushed_in = match pushed {
-            Some(x) => Some(self.bundle_in(&mut pl, exports, "pushed", x, "refs/factory/pushed".into())?),
+            Some(x) => Some(self.bundle_in(&mut pl, exports, "pushed", x, "refs/mork/pushed".into())?),
             None => None,
         };
         let branch = c.branch.clone().unwrap_or_else(|| card.as_str().to_owned());

@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The memory of no project: how the factory and Andrei work.
+/// The memory of no project: how Mork and the operator work.
 pub const GENERAL: &str = "general";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ pub struct Tally {
     pub written: u64,
     pub read: u64,
     pub deleted: u64,
-    /// When Andrei last sent the memory to review (fac-610); none until a send.
+    /// When the operator last sent the memory to review (fac-610); none until a send.
     #[serde(default)]
     pub reviewed_ms: Option<i64>,
 }

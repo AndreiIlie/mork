@@ -1,18 +1,18 @@
 //! A gate round's verdict (fac-95) counts only from a turn given the round's request and asked about its commit; any
 //! other is stale. A pass approves the files reviewed; a fail's findings go to the reviewed card's foreman for fixes.
 
-use factory_types::card::{Card, Mode, Stage};
-use factory_types::ids::{CardId, Sha};
-use factory_types::reply::{Finding, Outcome, Reply, Role};
-use factory_types::review::{Proofs, Raised, Round, Verdict};
-use factory_types::state::Job;
+use mork_types::card::{Card, Mode, Stage};
+use mork_types::ids::{CardId, Sha};
+use mork_types::reply::{Finding, Outcome, Reply, Role};
+use mork_types::review::{Proofs, Raised, Round, Verdict};
+use mork_types::state::Job;
 use serde_json::json;
 
 use crate::decide::{Ctx, Intent};
 use crate::post::Poster;
 
 /// Where a review clone's reviewers save their executable proofs, in its `.git` (fac-263).
-pub const PROOFS: &str = ".git/factory/proofs/";
+pub const PROOFS: &str = ".git/mork/proofs/";
 
 /// Where a round's own proofs are kept in the review clone, numbered as its verdict's findings (fac-377).
 pub fn proofs_round(round: u32) -> String {
@@ -20,11 +20,11 @@ pub fn proofs_round(round: u32) -> String {
 }
 
 /// What an executable proof is, told to every seat that writes or reruns one (fac-276).
-pub const PROOF_RULE: &str = "An executable proof checks the correct behaviour, so it fails on the buggy commit and passes once the finding is fixed: the same file then verifies the fix, rerun in a later round. It reaches the code through its working folder, never an absolute path to a clone, which a later round replaces. Each round's proofs stay in its own `.git/factory/proofs/round-<n>/` folder through the rounds.";
+pub const PROOF_RULE: &str = "An executable proof checks the correct behaviour, so it fails on the buggy commit and passes once the finding is fixed: the same file then verifies the fix, rerun in a later round. It reaches the code through its working folder, never an absolute path to a clone, which a later round replaces. Each round's proofs stay in its own `.git/mork/proofs/round-<n>/` folder through the rounds.";
 
 /// Where a failed round's proofs are copied in the clone of the card that fixes it.
 pub fn proofs_copy(round: u32) -> String {
-    format!(".git/factory/review-proofs/round-{round}/")
+    format!(".git/mork/review-proofs/round-{round}/")
 }
 
 /// The review card's foreman's verdict, `review-pass` or `review-fail`.
@@ -79,7 +79,7 @@ pub fn verdict(p: &mut Poster<'_>, mut rc: Card, r: &Reply, job: &Job, ctx: Ctx<
     crate::queue::members::say(p, &card.id, &format!("review round {} passed", open.n), &text);
     // What was asked while it ran is reviewed now, as far as it passed none of it.
     if let Some(n) = next {
-        super::gate::ask(p, &card, &n.commit, &n.base, &n.contents(), ctx);
+        super::gate::ask(p, &card, &n.commit, &n.base, &n.contents(), n.test_changes, ctx);
     }
     // Its verification completes if its suite ended too (fac-375).
     crate::queue::runs::reviewed(p, &card.id, ctx);
@@ -91,7 +91,7 @@ pub fn verdict(p: &mut Poster<'_>, mut rc: Card, r: &Reply, job: &Job, ctx: Ctx<
 fn failed(p: &mut Poster<'_>, rc: &Card, card: Card, round: &Round, (next, said): (Option<Round>, &str), ctx: Ctx<'_>) {
     if super::gate::entry(rc) {
         if let Some(n) = next {
-            super::gate::ask(p, &card, &n.commit, &n.base, &n.contents(), ctx);
+            super::gate::ask(p, &card, &n.commit, &n.base, &n.contents(), n.test_changes, ctx);
         }
         return crate::queue::runs::reviewed(p, &rc.id, ctx);
     }
@@ -255,7 +255,7 @@ fn premature(p: &mut Poster<'_>, rc: &Card, round: &Round) {
     let ns: Vec<u32> = open.iter().map(|f| f.n).collect();
     p.journal("review.premature", Some(rc.id.as_str()), json!({"n": round.n, "open": ns}));
     let mut text = format!(
-        "That pass counts for nothing: round {} can't pass while a finding waits for its raiser to verify its fix. Each reviewer verifies its own and resolves each one fixed, `factory ctl resolve {} <n>`, or one a standing decision of Andrei's on the card rules out, with `--declined`, in a turn of this round; yours you verify and resolve yourself. Then give your verdict again, failing with what isn't fixed:",
+        "That pass counts for nothing: round {} can't pass while a finding waits for its raiser to verify its fix. Each reviewer verifies its own and resolves each one fixed, `mork ctl resolve {} <n>`, or one a standing decision of the operator's on the card rules out, with `--declined`, in a turn of this round; yours you verify and resolve yourself. Then give your verdict again, failing with what isn't fixed:",
         round.n, rc.id
     );
     for f in open {
@@ -299,7 +299,7 @@ fn back(p: &mut Poster<'_>, c: Card, rc: &Card, round: &Round, said: &str, ctx: 
         round.commit.short()
     );
     // Under verification, its suite still ends first and both results go back together (fac-375).
-    if crate::queue::runs::hold_round(p, &c, factory_types::landing::HeldRound::Text { text: text.clone() }, ctx) {
+    if crate::queue::runs::hold_round(p, &c, mork_types::landing::HeldRound::Text { text: text.clone() }, ctx) {
         return;
     }
     if c.stage == Stage::Merging && c.landing.is_some() && !crate::queue::order::landing(&c) {

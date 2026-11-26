@@ -4,9 +4,9 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use factory_core::agents::turns::TurnPlan;
-use factory_types::JobId;
-use factory_types::config::Cli;
+use mork_core::agents::turns::TurnPlan;
+use mork_types::JobId;
+use mork_types::config::Cli;
 
 use super::Engine;
 use crate::cli;
@@ -62,9 +62,9 @@ impl Engine {
         (copies, shown, Some(self.io_of(plan.request.as_ref().unwrap_or(&old.id))))
     }
 
-    // The folder job `id`'s `FACTORY_IO` named: its seat's for a turn (fac-654), else its own `io/`.
+    // The folder job `id`'s `MORK_IO` named: its seat's for a turn (fac-654), else its own `io/`.
     fn io_of(&self, id: &JobId) -> PathBuf {
         let dir = folder::JobDir::new(self.opts.home.job(id.as_str()));
-        self.state.jobs.get(id).map_or_else(|| dir.io(), |j| dir.factory_io(&j.spec))
+        self.state.jobs.get(id).map_or_else(|| dir.io(), |j| dir.mork_io(&j.spec))
     }
 }

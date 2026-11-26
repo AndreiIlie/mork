@@ -2,11 +2,11 @@
 
 use std::time::Duration;
 
-use factory_core::state::State;
-use factory_engine::jobs::folder::JobDir;
-use factory_types::AgentKey;
-use factory_types::job::WallMode;
-use factory_types::state::{Job, JobStatus, Settlement};
+use mork_core::state::State;
+use mork_engine::jobs::folder::JobDir;
+use mork_types::AgentKey;
+use mork_types::job::WallMode;
+use mork_types::state::{Job, JobStatus, Settlement};
 use serde_json::json;
 
 use super::Report;
@@ -46,7 +46,7 @@ pub fn run(s: &mut Scratch, report: &mut Report) {
     report.check("both carry on with no app", carry_on(s, &first));
     let again = s.start();
     let up = again.is_ok();
-    report.check("the factory starts again", again);
+    report.check("Mork starts again", again);
     if !up || interrupted() {
         return;
     }
@@ -63,7 +63,7 @@ pub fn run(s: &mut Scratch, report: &mut Report) {
 }
 
 pub(super) fn wait<T>(what: &str, limit: Duration, mut f: impl FnMut() -> Option<T>) -> Result<T, String> {
-    let start = factory_engine::clock::instant();
+    let start = mork_engine::clock::instant();
     loop {
         if let Some(v) = f() {
             return Ok(v);
@@ -71,10 +71,10 @@ pub(super) fn wait<T>(what: &str, limit: Duration, mut f: impl FnMut() -> Option
         if interrupted() {
             return Err(format!("interrupted waiting for {what}"));
         }
-        if factory_engine::clock::elapsed(start) > limit {
+        if mork_engine::clock::elapsed(start) > limit {
             return Err(format!("no {what} in {}s", limit.as_secs()));
         }
-        factory_engine::clock::sleep(Duration::from_millis(300));
+        mork_engine::clock::sleep(Duration::from_millis(300));
     }
 }
 
@@ -105,7 +105,7 @@ fn on_claude(s: &Scratch) -> Result<(), String> {
     s.ask(&json!({"start": {"card": CLAUDE.place, "mode": "report"}}))?;
     let made = |st: &State| st.agents.contains_key(&AgentKey::new(CLAUDE.key));
     wait(&format!("{} made", CLAUDE.key), TURN, || s.state().filter(made))?;
-    let pick = json!({"agent": CLAUDE.key, "cli": "claude", "model": factory_types::config::OPUS, "effort": "high"});
+    let pick = json!({"agent": CLAUDE.key, "cli": "claude", "model": mork_types::config::OPUS, "effort": "high"});
     s.ask(&json!({"pick": pick}))?;
     let first = next_turn(s, CLAUDE.key, 0)?;
     let idle = |st: State| {
@@ -131,7 +131,7 @@ fn start(s: &Scratch) -> Result<Vec<Job>, String> {
         }
     }
     // Into their work: the CLIs have started their commands, and both still run.
-    factory_engine::clock::sleep(Duration::from_secs(5));
+    mork_engine::clock::sleep(Duration::from_secs(5));
     for j in &jobs {
         if s.state().and_then(|st| st.jobs.get(&j.id).map(|x| x.status.clone())) != Some(JobStatus::Running) {
             return Err(format!("{} ended before the app was killed: a minute's work was asked", j.id));
@@ -207,7 +207,7 @@ impl Watch {
     fn new(s: &Scratch, place: &str) -> Result<Self, String> {
         use std::io::Write;
         let mut stream =
-            std::os::unix::net::UnixStream::connect(s.home.factory_sock()).map_err(|e| format!("watch: {e}"))?;
+            std::os::unix::net::UnixStream::connect(s.home.mork_sock()).map_err(|e| format!("watch: {e}"))?;
         stream.set_read_timeout(Some(Duration::from_secs(1))).map_err(|e| e.to_string())?;
         let watch = json!({"id": 1, "cmd": {"watch": {"places": [place], "full": true}}});
         stream.write_all(format!("{watch}\n").as_bytes()).map_err(|e| format!("watch: {e}"))?;
@@ -217,7 +217,7 @@ impl Watch {
     fn steps(&mut self, agent: &str) -> Result<Option<Vec<serde_json::Value>>, String> {
         use std::io::BufRead;
         match self.0.read_line(&mut self.1) {
-            Ok(0) => return Err("the factory closed the watch".into()),
+            Ok(0) => return Err("Mork closed the watch".into()),
             Ok(_) if self.1.ends_with('\n') => {}
             Ok(_) | Err(_) => return Ok(None),
         }
@@ -236,17 +236,17 @@ impl Watch {
 fn turn_in_tool(s: &Scratch, leg: &Leg, text: &str) -> Result<Job, String> {
     let agent = leg.key;
     let mut watch = Watch::new(s, leg.place)?;
-    let start = factory_engine::clock::instant();
+    let start = mork_engine::clock::instant();
     let before = loop {
         if let Some(steps) = watch.steps(agent)? {
             break steps;
         }
-        if factory_engine::clock::elapsed(start) > Duration::from_secs(30) || interrupted() {
+        if mork_engine::clock::elapsed(start) > Duration::from_secs(30) || interrupted() {
             return Err(format!("{}'s view never came", leg.place));
         }
     };
     let j = turn(s, leg, text)?;
-    while factory_engine::clock::elapsed(start) < TURN && !interrupted() {
+    while mork_engine::clock::elapsed(start) < TURN && !interrupted() {
         if watch.steps(agent)?.is_some_and(|steps| !steps.is_empty() && steps != before) {
             return Ok(j);
         }
