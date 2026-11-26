@@ -53,7 +53,7 @@ Nothing reviews a review card in turn.
    For a returning reviewer, apply any permitted effort change with `pick` before sending its task.
    Quote a topic of several words so it passes whole (`--topic 'correctness and tests'`, `--topic 'money, permissions or data integrity'`).
    The room list shows it beside the reviewer.
-   Name the topic first, then what the specification asks, including later decisions from "Under review".
+   Name the topic first, then what the specification asks, including applicable defaults from the approved plan and later decisions from "Under review".
    Give the reviewer the whole change against the base.
    Give the correctness reviewer every test change flagged for this round, including on a repeat round.
    If it joins in a later round, also give it the comparisons from step 2 to trace the merged base's effects.
@@ -77,6 +77,7 @@ Nothing reviews a review card in turn.
    Put deliberate-misuse or what-if concerns ("a seat could deliberately...", "what if...") in a note in your message.
    They never block a merge or landing.
    The card's words, a recorded decision and a tradeoff the approved plan states deliberately are settled, no finding.
+   Accept an in-scope, convention-following default stated in the approved plan. A missing separate ask or decision note for that default is never a finding.
    An unforeseen consequence, regression or broken edge case the plan introduces is a finding, even where the plan's text leads to it.
    A claim without proof can be dropped or returned to the reviewer for proof.
    If you dispute what a reviewer's proof shows, disagree about whether the discrepancy blocks, or intend to drop or downgrade a proved finding, get one reply before deciding.
