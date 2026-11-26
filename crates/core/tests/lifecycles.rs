@@ -107,10 +107,10 @@ fn a_local_card_lands_through_the_merge_queue() {
 
 fn assert_pr_landing_status(s: &Sim, expected: &str) {
     let view = mork_core::views::place::place(&s.state, PR, None, &Default::default(), s.ctx());
-    let pipeline = view.card.unwrap().pipeline;
-    let overview = view.overview.unwrap().stages;
-    assert_eq!(pipeline.last().unwrap().sub.as_deref(), Some(expected));
-    assert_eq!(overview.last().unwrap().summary, expected);
+    let land = view.card.as_ref().and_then(|c| c.pipeline.last());
+    assert_eq!(land.and_then(|step| step.sub.as_deref()), Some(expected));
+    let summary = view.overview.as_ref().and_then(|o| o.stages.last());
+    assert_eq!(summary.map(|stage| stage.summary.as_str()), Some(expected));
 }
 
 #[test]
