@@ -443,6 +443,12 @@ export interface RoundView {
   verdict: string;
   commit: string;
   findings: FindingView[];
+  reviewers?: Record<string, ReviewerCounts>;
+}
+
+export interface ReviewerCounts {
+  reported: number;
+  kept?: number;
 }
 
 export interface TriageFindingView {

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { RoomStream, type ChatAsks } from "./RoomStream";
 import { SeatModelPanel, useSeatModel } from "./SeatModel";
 import { sendCommand } from "./bridge";
-import { coldMinutes, thousands } from "./format";
+import { coldMinutes } from "./format";
+import { ContextRing } from "./ContextRing";
 import { Cold } from "./icons";
 import type { AgentLight, AgentRow, Color, PlaceView } from "./types";
 import { Button } from "./ui/Button";
@@ -95,11 +96,7 @@ export function SeatChat({
         {room !== "" && <span className="text-label-12 text-gray-900">{room}</span>}
         {seat !== undefined && (
           <span className="ml-auto flex items-center gap-3 font-mono text-label-12 tabular-nums text-gray-900">
-            {seat.context !== null && (
-              <span>
-                ctx {thousands(seat.context[0])}/{thousands(seat.context[1])}
-              </span>
-            )}
+            <ContextRing context={seat.context} />
             {cache.cold !== null ? (
               <Cold minutes={cache.cold} />
             ) : (
