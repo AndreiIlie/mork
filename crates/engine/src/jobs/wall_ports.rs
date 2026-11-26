@@ -61,6 +61,18 @@ mod tests {
 
     use super::*;
 
+    // A concurrent test's fork can retain a copy of a just-closed descriptor until exec.
+    fn wait_for_release(mut available: impl FnMut() -> io::Result<bool>) -> io::Result<()> {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !available()? {
+            if std::time::Instant::now() >= deadline {
+                return Err(io::Error::new(io::ErrorKind::TimedOut, "reservation lock still held"));
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        Ok(())
+    }
+
     #[test]
     fn wall_ports_follow_new_service_reservations() -> Result<(), Box<dyn std::error::Error>> {
         let tmp = mork_fakes::TestHome::new();
@@ -82,14 +94,14 @@ mod tests {
         let mut ssh = input.try_clone()?;
         drop(input);
         assert_eq!(ssh.read(&mut [0])?, 0);
-        writer.try_lock()?;
+        wait_for_release(|| mork_sys::try_lock_exclusive(&writer))?;
         writer.unlock()?;
         assert!(start(&home, &config)?.is_empty());
         assert!(permit(&file, 4321)?.is_none());
         assert!(permit(&file, 4322)?.is_some());
         assert!(tunnel_input(&home, 4321).is_err());
         drop(ssh);
-        assert!(permit(&file, 4321)?.is_some());
+        wait_for_release(|| Ok(permit(&file, 4321)?.is_some()))?;
         Ok(())
     }
 }
