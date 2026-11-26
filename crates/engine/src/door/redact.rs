@@ -190,6 +190,9 @@ fn surrogate(hi: u32, chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> O
     }
     let rest: String = chars.clone().take(6).collect();
     let lo = rest.strip_prefix("\\u").and_then(|h| u32::from_str_radix(h, 16).ok())?;
+    if !(0xDC00..=0xDFFF).contains(&lo) {
+        return None;
+    }
     for _ in 0..6 {
         chars.next();
     }
@@ -199,6 +202,45 @@ fn surrogate(hi: u32, chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> O
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn seeded_utf16_escapes_match_the_lossy_utf16_decoder() {
+        for seed in 0..128 {
+            eprintln!("Unicode escape seed {seed}");
+            let mut rng = fastrand::Rng::with_seed(seed);
+            let high = rng.u16(0xd800..=0xdbff);
+            let next = if rng.bool() { rng.u16(0xdc00..=0xdfff) } else { rng.u16(..) };
+            let escaped = format!(r"\u{high:04x}\u{next:04x}");
+            assert_eq!(unescape_json(&escaped), String::from_utf16_lossy(&[high, next]), "seed {seed}");
+        }
+    }
+
+    #[test]
+    fn seeded_secrets_are_masked_in_keys_values_text_and_cut_tails() {
+        for seed in 0..128 {
+            eprintln!("redaction seed {seed}");
+            let mut rng = fastrand::Rng::with_seed(seed);
+            let middle: String =
+                (0..rng.usize(1..9)).map(|_| rng.choice(['λ', '雪', '"', '\\', '\t']).unwrap()).collect();
+            let secret = format!("fixture{middle}{}", rng.u16(..));
+            let mut r = Redactor::default();
+            r.add(&secret);
+            let doc = serde_json::json!({(secret.clone()): [secret], "public": 7});
+            let wire = doc.to_string().replace("fixture", r"\u0066ixture");
+            let expected = serde_json::json!({(MASK): [MASK], "public": 7});
+            assert_eq!(serde_json::from_str::<Value>(&r.mask_json(&wire)).unwrap(), expected, "seed {seed}");
+            let mut text = wire;
+            for _ in 0..rng.usize(1..=3) {
+                text = serde_json::to_string(&text).unwrap();
+            }
+            let masked = decoded_fully(&r.mask_text(&text, false));
+            assert!(masked.contains(MASK) && !masked.contains("fixture"), "seed {seed}");
+            for (cut, _) in secret.char_indices().filter(|(i, _)| *i >= TAIL) {
+                let partial = format!("public {}", &secret[..cut]);
+                assert_eq!(r.mask_text(&partial, true), format!("public {MASK}"), "seed {seed}, cut {cut}");
+            }
+        }
+    }
 
     // fac-1: door secrets of any length, in every written form, at any cut.
     #[test]
