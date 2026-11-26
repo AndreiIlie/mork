@@ -390,6 +390,19 @@ mod tests {
     }
 
     #[test]
+    fn fresh_context_percent_accepts_whole_percentages_including_zero() -> Result<(), ConfigError> {
+        let config = |setting: &str| parse(&format!("[mork]\n{setting}\n[git]\nauthor = \"A <a@b>\"\n"));
+        assert_eq!(config("")?.mork.fresh_context_percent, 70);
+        for value in [0, 25, 100] {
+            assert_eq!(config(&format!("fresh_context_percent = {value}"))?.mork.fresh_context_percent, value);
+        }
+        for bad in ["-1", "101", "70.5"] {
+            assert!(config(&format!("fresh_context_percent = {bad}")).is_err());
+        }
+        Ok(())
+    }
+
+    #[test]
     fn optional_mork_project_and_internals_hide_defaults() -> Result<(), ConfigError> {
         let no_project = "[mork]\n[git]\nauthor = \"A <a@b>\"\n";
         let cfg = parse(no_project)?;
