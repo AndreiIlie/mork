@@ -145,11 +145,9 @@ pub enum Event {
     },
     /// Who the Bitbucket token is (3.7.2): `None` when it may act, else why not.
     TokenRead {
+        project: mork_types::ProjectId,
         refused: Option<String>,
     },
-    /// Bitbucket accepted the token without saying who it is (`GET /user` answered, not 401): a
-    /// refusal for a 401 is over (3.7.2).
-    TokenAccepted,
     /// Master's tip, read in the operator's checkout, isn't `current`: the pin, else the build running (fac-19).
     MasterSeen {
         tip: mork_types::Sha,
@@ -332,8 +330,7 @@ fn route(state: &State, event: &Event, ctx: Ctx<'_>) -> Decision {
         Event::ActionFound { id, found } => actions::found(state, id, found, ctx),
         Event::PrRead { card, seen, before_merge } => crate::queue::pr::pr_read(state, card, seen, *before_merge, ctx),
         Event::OpenPrsRead { project, prs } => crate::reviews::watch::open_prs(state, project, prs, ctx),
-        Event::TokenRead { refused } => token::token(state, refused.as_deref(), ctx),
-        Event::TokenAccepted => token::token(state, None, ctx),
+        Event::TokenRead { project, refused } => token::token(state, project, refused.as_deref(), ctx),
         Event::ChecksFolderSeen { project, commit } => Decision {
             changes: vec![Change::SetChecksFolder { project: project.clone(), commit: commit.clone() }],
             ..Decision::default()

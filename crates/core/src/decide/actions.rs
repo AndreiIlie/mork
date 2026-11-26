@@ -255,7 +255,7 @@ fn failure(p: &mut Poster<'_>, mut a: Action, f: &ActionFailure, ctx: Ctx<'_>) {
                 _ => hold(p, a, "refused as not a fast-forward, with origin's branch where Mork left it"),
             }
         }
-        (ActionFailure::Token { words }, _) => token_failure(p, a, words),
+        (ActionFailure::Token { words }, _) => token_failure(p, a, words, ctx),
         // A read cut in flight isn't held: it fails, and asking again runs it anew.
         (ActionFailure::Gone { words }, _) if door::reads::read(&a) => door::reads::cut(p, a, words, None, ctx),
         (ActionFailure::Unstopped { words, session }, _) if door::reads::read(&a) => {

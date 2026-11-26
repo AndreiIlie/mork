@@ -21,6 +21,15 @@ struct Inner {
 #[derive(Debug, Default, Clone)]
 pub struct Verdict(Arc<Lock<Inner>>);
 
+#[derive(Debug, Default, Clone)]
+pub struct Verdicts(Arc<Lock<std::collections::BTreeMap<mork_types::ProjectId, Verdict>>>);
+
+impl Verdicts {
+    pub fn of(&self, project: &mork_types::ProjectId) -> Verdict {
+        self.0.lock().entry(project.clone()).or_default().clone()
+    }
+}
+
 impl Verdict {
     /// The state's verdict, followed when it changes.
     pub fn follow(&self, refused: Option<&String>) {
@@ -52,6 +61,7 @@ impl Verdict {
         repo: &dyn ForgeRead,
         text: &str,
         label: &str,
+        project: &mork_types::ProjectId,
         tx: &Sender<Input>,
     ) -> Result<Option<String>, String> {
         let hash = crate::files::sha256_hex(text.as_bytes());
@@ -67,12 +77,12 @@ impl Verdict {
         match repo.identity() {
             Ok(Identity::Known(refused)) => {
                 self.asked(text, refused.clone());
-                send(Event::TokenRead { refused: refused.clone() });
+                send(Event::TokenRead { project: project.clone(), refused: refused.clone() });
                 Ok(refused)
             }
             Ok(Identity::Unknown) => {
                 self.unsaid(text);
-                send(Event::TokenAccepted);
+                send(Event::TokenRead { project: project.clone(), refused: None });
                 Ok(self.0.lock().refused.clone())
             }
             Err(e) => Err(format!("the token file changed, and {label} couldn't be asked whose it is: {e}")),

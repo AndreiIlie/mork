@@ -110,7 +110,7 @@ impl Engine {
             branches,
             same_done,
             now: clock::now_ms(),
-            verdict: self.pipe.verdict.clone(),
+            verdict: self.pipe.verdict.of(&project),
             readers: self.pipe.readers.clone(),
             tx: self.tx.clone(),
             project,
@@ -152,11 +152,12 @@ impl Engine {
         if what.is_some_and(board_write) {
             return self.run_action_now(id);
         }
-        let bitbucket =
-            self.state.actions.get(id).is_some_and(|a| super::act_run::reaches_forge(&self.ctx.config, &a.what));
-        if bitbucket && !self.pipe.token_asked {
-            self.pipe.token_wait.push(id.into());
-            return;
+        if let Some(action) = self.state.actions.get(id).filter(|a| super::act_run::reaches_forge(&self.ctx.config, &a.what)) {
+            let project = project_of(self, &action.what);
+            if !self.pipe.token_asked.contains(&project) {
+                self.pipe.token_wait.entry(project).or_default().push(id.into());
+                return;
+            }
         }
         if self.queue_door(id) {
             return;
@@ -275,9 +276,9 @@ impl Engine {
 
     /// Bitbucket was asked who the token is: what waited for it runs, under the verdict now in
     /// the state (its guard, 2.5.8).
-    pub(super) fn token_asked(&mut self) {
-        self.pipe.token_asked = true;
-        for id in std::mem::take(&mut self.pipe.token_wait) {
+    pub(super) fn token_asked(&mut self, project: mork_types::ProjectId) {
+        self.pipe.token_asked.insert(project.clone());
+        for id in self.pipe.token_wait.remove(&project).unwrap_or_default() {
             if self.state.actions.get(id.as_str()).is_some_and(|a| a.status == ActionStatus::Pending) {
                 self.run_action(id.as_str());
             }

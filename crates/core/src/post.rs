@@ -38,7 +38,6 @@ pub struct Poster<'a> {
     pub other: Vec<Change>,
     /// Whether a config allows desktop notices.
     pub notices: bool,
-    pub(crate) token_forge: &'static str,
     /// The job this decision settles: a stop decided in it leaves that one alone.
     pub ending: Option<mork_types::JobId>,
     /// A merge train is being kept true (fac-68): what it does keeps none again.
@@ -62,7 +61,6 @@ impl<'a> Poster<'a> {
             removed: Vec::new(),
             other: Vec::new(),
             notices: true,
-            token_forge: "forge",
             ending: None,
             train: false,
         }
@@ -71,12 +69,6 @@ impl<'a> Poster<'a> {
     /// A pending decision, with the config's word on notices.
     pub fn for_ctx(state: &'a State, ctx: crate::decide::Ctx<'_>) -> Self {
         let mut p = Self::new(state, ctx.now);
-        p.token_forge = ctx
-            .config
-            .ordered_projects()
-            .filter_map(|n| ctx.config.projects.get(n))
-            .find(|p| p.forge.hosted())
-            .map_or("forge", |p| p.forge.label());
         p.notices = ctx.config.mork.notifications;
         p
     }

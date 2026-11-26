@@ -65,7 +65,7 @@ fn timed_fetches(p: &mut Poster<'_>, ctx: Ctx<'_>) {
     projects.extend(idle.map(|(project, _)| project.clone()));
     for project in projects {
         let on_hosted_forge = ctx.config.projects.get(&project).is_some_and(|pc| pc.forge.hosted());
-        if on_hosted_forge && p.state.world.token_refused.is_some() {
+        if on_hosted_forge && p.state.world.token_refused.contains_key(&project) {
             continue;
         }
         let fetches: Vec<&Action> = p

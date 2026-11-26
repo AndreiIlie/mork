@@ -244,7 +244,7 @@ pub enum Input {
         end: Box<mork_core::decide::JobEnd>,
     },
     /// The poller asked Bitbucket who the token is, whatever it answered (3.7.2).
-    TokenAsked,
+    TokenAsked(mork_types::ProjectId),
     /// The views' reads of the world, made on their thread.
     Outside(Box<outside::Reads>),
     /// The machine's load, sampled on its own thread.
@@ -302,7 +302,9 @@ impl Engine {
         if d.changes.iter().any(|c| matches!(c, mork_core::state::Change::AddOrchestratorEvent(_))) {
             self.hooks_send();
         }
-        self.pipe.verdict.follow(self.state.world.token_refused.as_ref());
+        for (project, cfg) in &self.ctx.config.projects {
+            if cfg.forge.hosted() { self.pipe.verdict.of(project).follow(self.state.world.token_refused.get(project)); }
+        }
         for intent in &d.intents {
             self.carry_out(intent);
         }
@@ -357,7 +359,7 @@ impl Engine {
                 Ok(Input::ReviewThreads { job, end }) => self.review_threads_read(&job, *end),
                 Ok(Input::WorkPrepared(p)) => self.work_prepared(*p),
                 Ok(Input::CandidateRead { job, end }) => self.candidate_read(&job, *end),
-                Ok(Input::TokenAsked) => self.token_asked(),
+                Ok(Input::TokenAsked(project)) => self.token_asked(project),
                 Ok(Input::Outside(r)) => self.outside_read(*r),
                 Ok(Input::Resources(r)) => self.resources_read(r),
                 Ok(Input::DoorKilled(k)) => self.door_killed(*k),

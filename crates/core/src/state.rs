@@ -65,7 +65,7 @@ pub struct State {
 pub struct World {
     /// The token is the operator's own account, or Bitbucket refuses it (3.7.2, 4.11.5): why. Stored
     /// (M3.2), unlike the rest of the world.
-    pub token_refused: Option<String>,
+    pub token_refused: BTreeMap<mork_types::ProjectId, String>,
     /// The open PRs of each Bitbucket project, as the poller last read them; a project the poller
     /// hasn't looked at yet has none (4.16.1).
     pub open_prs: BTreeMap<mork_types::ProjectId, Vec<mork_types::work::OpenPr>>,
@@ -123,7 +123,7 @@ pub enum Change {
         prefixes: BTreeMap<mork_types::ProjectId, String>,
     },
     /// The token's verdict (3.7.2): stored, and read again at each start.
-    SetTokenRefused(Option<String>),
+    SetTokenRefused(mork_types::ProjectId, Option<String>),
     /// A project's open PRs, as the poller read them: in memory only.
     SetOpenPrs {
         project: mork_types::ProjectId,
@@ -192,7 +192,7 @@ impl State {
                 self.apply_memory(c);
             }
             Change::SetBoard { .. }
-            | Change::SetTokenRefused(_)
+            | Change::SetTokenRefused(..)
             | Change::SetOpenPrs { .. }
             | Change::SetChecksFolder { .. } => self.apply_world(c),
         }
@@ -231,8 +231,8 @@ impl State {
         if let Change::SetBoard { cards, prefixes } = c {
             self.board = cards.iter().map(|c| (c.id.clone(), c.clone())).collect();
             self.world.board_prefixes = prefixes.clone();
-        } else if let Change::SetTokenRefused(r) = c {
-            self.world.token_refused = r.clone();
+        } else if let Change::SetTokenRefused(project, reason) = c {
+            if let Some(r) = reason { self.world.token_refused.insert(project.clone(), r.clone()); } else { self.world.token_refused.remove(project); }
         } else if let Change::SetOpenPrs { project, prs } = c {
             self.world.open_prs.insert(project.clone(), prs.clone());
         } else if let Change::SetChecksFolder { project, commit } = c {

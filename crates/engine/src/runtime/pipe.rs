@@ -38,10 +38,10 @@ pub struct Pipe {
     pub(super) masks: Lock<Option<(Instant, crate::secrets::Secrets)>>,
     /// The token's identity was asked of Bitbucket since this start (3.7.2, M3.2): until then,
     /// actions that reach Bitbucket wait here.
-    pub token_asked: bool,
-    pub token_wait: Vec<mork_types::ActionId>,
+    pub token_asked: std::collections::BTreeSet<mork_types::ProjectId>,
+    pub token_wait: std::collections::BTreeMap<mork_types::ProjectId, Vec<mork_types::ActionId>>,
     /// The token's verdict, as the action threads read it before each call (M4.5).
-    pub verdict: super::verdict::Verdict,
+    pub verdict: super::verdict::Verdicts,
     /// Actions whose call is on its thread, until their answer is applied: a reload waits for
     /// them, up to 10 s (1.8.6.3, M5.17).
     pub in_flight: std::collections::BTreeSet<mork_types::ActionId>,
@@ -254,61 +254,47 @@ fn poll_now(
     home: &crate::paths::Home,
     projects: &[(mork_types::ProjectId, mork_types::config::ProjectConfig)],
     reads: Reads<'_>,
-    verdict: &super::verdict::Verdict,
+    verdicts: &super::verdict::Verdicts,
 ) {
-    let Some((_, first)) = projects.first() else { return };
-    let Ok(credential) = forge::Credential::read(&first.forge) else {
-        let _ = tx.send(Input::TokenAsked);
-        return;
-    };
-    credential.pinned(|| poll_projects(locks, tx, home, projects, reads, verdict, credential.text()));
-}
-
-fn poll_projects(
-    locks: &super::actions::Locks,
-    tx: &std::sync::mpsc::Sender<Input>,
-    home: &crate::paths::Home,
-    projects: &[(mork_types::ProjectId, mork_types::config::ProjectConfig)],
-    (reads, owned, tickets, readers): Reads<'_>,
-    verdict: &super::verdict::Verdict,
-    text: &str,
-) {
-    let send = |e: Event| {
-        let _ = tx.send(Input::Event(Box::new(e)));
-    };
-    let mut identity_read = false;
+    let (reads, owned, tickets, readers) = reads;
+    let send = |e: Event| { let _ = tx.send(Input::Event(Box::new(e))); };
     for (name, p) in projects {
-        let Ok(repo) = readers.read(&p.forge) else { continue };
-        if !identity_read {
-            identity_read = true;
-            // `GET /user` that gives nothing usable accepts it (3.7.2): no PR opens with it to tell
-            // its author, every one opening in the operator's name (fac-111).
+        let asked = || { let _ = tx.send(Input::TokenAsked(name.clone())); };
+        let lock = locks.of(name);
+        let held = lock.lock();
+        let credential = match forge::Credential::read(&p.forge) {
+            Ok(c) => c,
+            Err(mork_types::work::ActionFailure::Token { words }) => {
+                send(Event::TokenRead { project: name.clone(), refused: Some(words) });
+                asked();
+                continue;
+            }
+            Err(_) => { asked(); continue; }
+        };
+        credential.pinned(|| {
+            let Ok(repo) = readers.read(&p.forge) else { asked(); return };
+            let verdict = verdicts.of(name);
             match repo.identity() {
                 Ok(Identity::Known(refused)) => {
-                    verdict.asked(text, refused.clone());
-                    send(Event::TokenRead { refused })
+                    verdict.asked(credential.text(), refused.clone());
+                    send(Event::TokenRead { project: name.clone(), refused });
                 }
                 Ok(Identity::Unknown) => {
-                    verdict.unsaid(text);
-                    send(Event::TokenAccepted)
+                    verdict.unsaid(credential.text());
+                    send(Event::TokenRead { project: name.clone(), refused: None });
                 }
                 Err(_) => {}
             }
-            let _ = tx.send(Input::TokenAsked);
-        }
-        if let Ok(prs) = repo.open_prs() {
-            let prs = tickets.attach(name, p, prs);
-            open_read((locks, readers), home, (name, p), prs, owned, &send);
-        }
-        for (card, _, pr) in reads.iter().filter(|(_, proj, _)| proj == name) {
-            if let Some(e) = pr_event((locks, readers), home, card, name, p, *pr, false) {
-                send(e);
+            asked();
+            drop(held);
+            if let Ok(prs) = repo.open_prs() {
+                let prs = tickets.attach(name, p, prs);
+                open_read((locks, readers), home, (name, p), prs, owned, &send);
             }
-        }
-    }
-    // No repository could be asked (the token unreadable): its calls fail on their own, held.
-    if !identity_read {
-        let _ = tx.send(Input::TokenAsked);
+            for (card, _, pr) in reads.iter().filter(|(_, proj, _)| proj == name) {
+                if let Some(e) = pr_event((locks, readers), home, card, name, p, *pr, false) { send(e); }
+            }
+        });
     }
 }
 

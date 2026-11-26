@@ -90,11 +90,10 @@ impl Poster<'_> {
         let id = self.next_action_id();
         // The key stays unique in the state: one an earlier action had is made this one's own.
         let key = if taken { format!("{base}@{id}") } else { base };
-        let held = what
-            .forge()
-            .then(|| self.state.world.token_refused.clone())
-            .flatten()
-            .map(|w| format!("{}{w}", crate::decide::token::hold_prefix(self.token_forge)));
+        let held = self.token_project(&what).and_then(|project| {
+            let reason = self.state.world.token_refused.get(&project)?;
+            Some(format!("{}{reason}", crate::decide::token::hold_prefix(&project)))
+        });
         let unwritten = crate::board::retry::proof(&what);
         let a = Action {
             id: id.clone(),
@@ -117,6 +116,14 @@ impl Poster<'_> {
         }
         self.actions.insert(id.clone(), a);
         id
+    }
+
+    pub(crate) fn token_project(&self, what: &ActionWhat) -> Option<mork_types::ProjectId> {
+        match what {
+            ActionWhat::Fetch { project, .. } | ActionWhat::OpenPr { project, .. } => Some(project.clone()),
+            w if w.forge() => Some(self.card(w.card()?)?.project),
+            _ => None,
+        }
     }
 
     /// A new action's id: one above every id there is, stored or not loaded (fac-336), since a count

@@ -114,7 +114,7 @@ fn guard(c: &Call) -> Result<Option<crate::forge::Credential>, ActionFailure> {
     let forge = c.project(c.project.as_str())?.forge;
     let credential = crate::forge::Credential::read(&forge)?;
     let reader = credential.pinned(|| c.readers.read(&forge))?;
-    match c.verdict.now(reader.as_ref(), credential.text(), forge.label(), &c.tx) {
+    match c.verdict.now(reader.as_ref(), credential.text(), forge.label(), &c.project, &c.tx) {
         Ok(None) => Ok(Some(credential)),
         Ok(Some(words)) | Err(words) => Err(ActionFailure::Token { words }),
     }

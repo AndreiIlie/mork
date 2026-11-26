@@ -309,7 +309,10 @@ fn load_entity(s: &mut State, kind: &str, data: &str) -> Result<()> {
             let c: mork_types::lookback::Cursor = serde_json::from_str(data)?;
             s.lookbacks.entry(c.project.clone()).or_default().insert(c.read, c);
         }
-        "token" => s.world.token_refused = serde_json::from_str(data)?,
+        "forge-token" => {
+            let (project, why) = serde_json::from_str(data)?;
+            s.world.token_refused.insert(project, why);
+        }
         "memory-file" | "memory-tally" => memory::load(s, kind, data)?,
         "owed-work" => {
             let v: serde_json::Value = serde_json::from_str(data)?;
@@ -371,7 +374,10 @@ fn write_change(tx: &rusqlite::Transaction<'_>, c: &Change) -> Result<()> {
             memory::write(tx, c)?;
         }
         // The token's verdict outlives a restart (3.7.2, M3.2).
-        Change::SetTokenRefused(r) => put_entity(tx, "token", "verdict", &serde_json::to_string(r)?)?,
+        Change::SetTokenRefused(project, Some(r)) => put_entity(tx, "forge-token", project, &serde_json::to_string(&(project,r))?)?,
+        Change::SetTokenRefused(project, None) => {
+            tx.execute("DELETE FROM entities WHERE kind = 'forge-token' AND id = ?1", params![project.as_str()])?;
+        }
         Change::SetBoard { .. } | Change::SetOpenPrs { .. } | Change::SetChecksFolder { .. } => {}
         Change::AddOrchestratorEvent(e) => orchestrators::add(tx, e)?,
         Change::PutNote(_) | Change::RemoveNote { .. } => notes::write(tx, c)?,

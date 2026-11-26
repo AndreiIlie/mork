@@ -1,7 +1,7 @@
 //! The Bitbucket token's identity (3.7.2): a refusal holds every Bitbucket action, and its recovery runs again only
 //! what it held.
 
-use mork_types::action::{Action, ActionStatus, ActionWhat};
+use mork_types::action::{Action, ActionStatus};
 use mork_types::ask::{AskKind, Color};
 use serde_json::json;
 
@@ -12,38 +12,39 @@ use crate::messages::places::MAIN;
 use crate::post::Poster;
 use crate::state::{Change, State};
 
-pub(super) fn token_failure(p: &mut Poster<'_>, a: Action, words: &str) {
-    p.other.push(Change::SetTokenRefused(Some(words.to_owned())));
-    p.journal("token", None, json!({"refused": words}));
-    raise_token(p, words);
-    hold(p, a, &format!("{}{words}", hold_prefix(p.token_forge)));
+pub(super) fn token_failure(p: &mut Poster<'_>, a: Action, words: &str, ctx: Ctx<'_>) {
+    let Some(project) = p.token_project(&a.what) else { return hold(p, a, words) };
+    record(p, &project, Some(words), ctx);
+    hold(p, a, &format!("{}{words}", hold_prefix(&project)));
 }
 
-fn raise_token(p: &mut Poster<'_>, why: &str) {
-    let text = format!("{}{why}. Fix the token file; the engine reads it again.", hold_prefix(p.token_forge));
-    asks::raise(p, Raise::new(MAIN, AskKind::Token, Color::Red, text));
+fn record(p: &mut Poster<'_>, project: &mork_types::ProjectId, why: Option<&str>, ctx: Ctx<'_>) {
+    if p.state.world.token_refused.get(project).map(String::as_str) == why { return }
+    let prefix = hold_prefix(project);
+    let open: Vec<_> = p.all_asks().filter(|a| a.open && a.kind == AskKind::Token && a.text.starts_with(&prefix))
+        .map(|a| a.id.clone()).collect();
+    for id in open { asks::close_one(p, &id); }
+    if let Some(words) = why {
+        let forge = ctx.config.forge_label(project);
+        let text = format!("{prefix}{forge}: {words}. Fix the token file; the engine reads it again.");
+        asks::raise(p, Raise::new(MAIN, AskKind::Token, Color::Red, text));
+    }
+    p.other.push(Change::SetTokenRefused(project.clone(), why.map(str::to_owned)));
+    p.journal("token", None, json!({"project": project, "refused": why}));
 }
 
-/// The token's identity, read (3.7.2): the operator's own, or refused, holds every Bitbucket action.
-/// The verdict is stored, and changes only when a read differs from it.
-pub fn token(state: &State, refused: Option<&str>, ctx: Ctx<'_>) -> Decision {
-    if state.world.token_refused.as_deref() == refused {
+pub fn token(state: &State, project: &mork_types::ProjectId, refused: Option<&str>, ctx: Ctx<'_>) -> Decision {
+    if state.world.token_refused.get(project).map(String::as_str) == refused {
         return Decision::default();
     }
     let mut p = Poster::for_ctx(state, ctx);
-    p.other.push(Change::SetTokenRefused(refused.map(str::to_owned)));
-    p.journal("token", None, json!({"refused": refused}));
-    match refused {
-        Some(why) => raise_token(&mut p, why),
-        None => {
-            asks::close(&mut p, MAIN, &[AskKind::Token]);
-            // Only what the token held runs again: an action held for another reason (a
-            // merge Bitbucket refused, a PR declined) waits for its own answer (R1).
-            let prefix = hold_prefix(p.token_forge);
+    record(&mut p, project, refused, ctx);
+    if refused.is_none() {
+            let prefix = hold_prefix(project);
             let held: Vec<Action> = state
                 .actions
                 .values()
-                .filter(|a| a.status == ActionStatus::Held && is_forge(&a.what))
+                .filter(|a| a.status == ActionStatus::Held && p.token_project(&a.what).as_ref() == Some(project))
                 .filter(|a| a.words.as_deref().is_some_and(|w| w.starts_with(&prefix)))
                 .cloned()
                 .collect();
@@ -55,7 +56,6 @@ pub fn token(state: &State, refused: Option<&str>, ctx: Ctx<'_>) -> Decision {
                 p.put_action(a);
                 p.intent(Intent::RunAction { id });
             }
-        }
     }
     let mut d = Decision::default();
     p.finish(&mut d);
@@ -63,19 +63,7 @@ pub fn token(state: &State, refused: Option<&str>, ctx: Ctx<'_>) -> Decision {
 }
 
 /// How the words of an action the token held begin: what the token's recovery runs again.
-pub(crate) fn hold_prefix(forge: &str) -> String {
-    format!("the {forge} token can't act: ")
+pub(crate) fn hold_prefix(project: &str) -> String {
+    format!("The token for project `{project}` cannot act: ")
 }
 
-fn is_forge(w: &ActionWhat) -> bool {
-    matches!(
-        w,
-        ActionWhat::Fetch { .. }
-            | ActionWhat::Push { .. }
-            | ActionWhat::OpenPr { .. }
-            | ActionWhat::Comment { .. }
-            | ActionWhat::ReplyComment { .. }
-            | ActionWhat::ResolveComment { .. }
-            | ActionWhat::Merge { .. }
-    )
-}
