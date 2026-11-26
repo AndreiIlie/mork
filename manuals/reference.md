@@ -99,6 +99,14 @@ In `mork.toml`, `[mork] context_cap` sets the shared auto-compaction context cap
 Valid values are `0` (disables the cap, omitting `--autocompact` on Claude and `AGY_CLI_AUTO_COMPACT_OVERRIDE` on agy) or `100000` through `1000000` inclusive.
 When active, the cap is passed to Claude via `--autocompact` and to agy via `AGY_CLI_AUTO_COMPACT_OVERRIDE`, and is used as the effective context window denominator (`min(model_window, context_cap)` on Claude, `context_cap` on agy) in seat indicators, `/usage` contexts and prompt `Context size` lines.
 
+### fresh_context_percent
+
+In `mork.toml`, `[mork] fresh_context_percent` accepts whole percentages from `0` through `100` and defaults to `70`.
+A full card’s foreman starts a fresh session when it takes a fix or “Join the base” request and its stored usage exceeds that percentage of the effective window shown under “Context size”.
+At 70% of 200,000 tokens, 140,000 keeps the current session and 140,001 starts a fresh one.
+Zero disables the percentage trigger. Reported compaction independently triggers a fresh session at the next such request, even after intervening turns.
+Claude and agy support the percentage check when both usage and window are known. Claude, agy and walled Codex report compaction.
+
 ### caches and cache_files
 
 In `[mork]`, `caches` lists directories and `cache_files` lists individual files to share read-write across seat walls.

@@ -141,6 +141,12 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
             message: format!("`context_cap` must be 0 or between {CONTEXT_CAP_MIN} and {CONTEXT_CAP_MAX}"),
         });
     }
+    if config.mork.fresh_context_percent > 100 {
+        return Err(ConfigError::Value {
+            line: key_line(text, Some("mork"), "fresh_context_percent"),
+            message: "`fresh_context_percent` must be a whole percentage from 0 to 100".into(),
+        });
+    }
     crate::config_checks::caches(text, &mut config.mork)?;
     slice(text, &config.slice)?;
     crate::config_checks::check(text, &config)?;
