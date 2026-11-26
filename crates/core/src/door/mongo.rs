@@ -137,6 +137,29 @@ mod tests {
     }
 
     #[test]
+    fn seeded_filters_distinguish_operators_from_literal_keys() {
+        for seed in 0..128 {
+            eprintln!("Mongo seed {seed}");
+            let mut rng = fastrand::Rng::with_seed(seed);
+            let key =
+                rng.choice(["$where", "$function", "$accumulator", "$_internalJsEmit", "$_internalJsReduce"]).unwrap();
+            let label = format!("field{}", rng.u16(..));
+            let data = json!({(key): rng.i32(..)});
+            let mut refused = json!({"$expr": data});
+            let mut allowed =
+                if rng.bool() { json!({"$expr": {"$literal": data}}) } else { json!({(label.clone()): {"$eq": data}}) };
+            for _ in 0..rng.usize(1..=4) {
+                let op = rng.choice(["$and", "$or", "$nor"]).unwrap();
+                let sibling = json!({(label.clone()): rng.i16(..)});
+                refused = json!({(op): [sibling, refused]});
+                allowed = json!({(op): [sibling, allowed]});
+            }
+            assert!(filter(&obj(refused)).is_err(), "seed {seed}");
+            assert!(filter(&obj(allowed)).is_ok(), "seed {seed}");
+        }
+    }
+
+    #[test]
     fn code_is_refused_but_server_operators_and_literals_are_read() {
         for f in [
             json!({"$where": "this.a == 1"}),

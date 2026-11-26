@@ -352,6 +352,38 @@ mod tests {
     }
 
     #[test]
+    fn seeded_ctes_and_version_comments_obey_the_read_gate() {
+        for seed in 0..128 {
+            eprintln!("SQL seed {seed}");
+            let mut rng = fastrand::Rng::with_seed(seed);
+            let version = rng.u32(40_000..110_000);
+            let guard = if rng.bool() { "/*!" } else { "/*M!" };
+            let hex = format!("0x{:04X}", rng.u16(..));
+            let gap = rng.choice([" ", "\t", " /* 水 */ ", "\n"]).unwrap();
+            let cte = format!("WITH q AS (SELECT {hex} AS n)");
+            let select = format!("SELECT{gap}n FROM q");
+            let query = format!("{cte}{gap}{select} {guard}{version} ORDER BY n */;");
+            let read_query = read(&query).unwrap();
+            assert!(read(&read_query.text()).is_ok(), "seed {seed}");
+            for denied in [
+                format!("{cte}{gap}UPDATE q SET n = {hex}"),
+                format!("{cte}{gap}{select} {guard}{version} FOR UPDATE */"),
+                format!("{query}{gap}SELECT {hex}"),
+            ] {
+                assert!(read(&denied).is_err(), "seed {seed}: {denied}");
+            }
+
+            let cut = rng.usize(..query.len());
+            let prefix = &query[..query.floor_char_boundary(cut)];
+            if let Ok(partial) = read(prefix) {
+                let _ = partial.text();
+                let _ = partial.capped(20);
+                let _ = partial.timed(1000);
+            }
+        }
+    }
+
+    #[test]
     fn a_plain_explain_plans_a_locking_read_only() {
         for q in [
             "EXPLAIN SELECT a FROM t FOR UPDATE",

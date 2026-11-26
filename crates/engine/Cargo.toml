@@ -26,6 +26,7 @@ percent-encoding.workspace = true
 httparse.workspace = true
 
 [dev-dependencies]
+fastrand.workspace = true
 mork-fakes.workspace = true
 
 [lints]

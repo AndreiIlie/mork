@@ -234,6 +234,48 @@ mod tests {
         tokens(q).unwrap().into_iter().map(|t| t.tok).collect()
     }
 
+    #[test]
+    fn seeded_tokens_keep_their_utf8_spans() {
+        let atoms = [
+            ("SELECT", Tok::Word("SELECT".into())),
+            ("'λ; it''s'", Tok::Str("λ; it's".into())),
+            ("`a``b`", Tok::Quoted("a`b".into())),
+            ("0xFA", Tok::Word("0xFA".into())),
+            ("1.25e-3", Tok::Num("1.25e-3".into())),
+            ("/*!80000 + 2 */", Tok::Exec("/*!80000 + 2 */".into())),
+            (",", Tok::Sym(",")),
+        ];
+        for seed in 0..128 {
+            eprintln!("lexer seed {seed}");
+            let mut rng = fastrand::Rng::with_seed(seed);
+            let mut query = String::new();
+            let mut expected = Vec::new();
+            for _ in 0..rng.usize(1..24) {
+                query.push_str(rng.choice([" ", "\t", "/*雪*/", "-- comment\n"]).unwrap());
+                let (raw, tok) = rng.choice(&atoms).unwrap();
+                let start = query.len();
+                query.push_str(raw);
+                expected.push(Token { tok: tok.clone(), at: start..query.len(), spaced: true });
+            }
+            query.push(';');
+            assert_eq!(tokens(&query).unwrap(), expected, "seed {seed}");
+
+            let boundaries: Vec<_> = query.char_indices().map(|(at, _)| at).collect();
+            let start = boundaries[rng.usize(..boundaries.len())];
+            query.truncate(start);
+            for _ in 0..rng.usize(1..20) {
+                query.push(rng.choice(['\'', '"', '\\', '\0', ';', '/', '*', '雪']).unwrap());
+            }
+            if let Ok(parsed) = tokens(&query) {
+                let mut end = 0;
+                for t in parsed {
+                    assert!(end <= t.at.start && !t.at.is_empty() && query.get(t.at.clone()).is_some(), "seed {seed}");
+                    end = t.at.end;
+                }
+            }
+        }
+    }
+
     // Unclosed literals or a NUL could hide a statement boundary from the client or the gate.
     #[test]
     fn fac124_no_word_hides_from_the_gate() {

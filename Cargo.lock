@@ -1664,6 +1664,7 @@ dependencies = [
 name = "mork-core"
 version = "0.1.0"
 dependencies = [
+ "fastrand",
  "mork-types",
  "serde",
  "serde_json",
@@ -1674,6 +1675,7 @@ name = "mork-engine"
 version = "0.1.0"
 dependencies = [
  "arboard",
+ "fastrand",
  "httparse",
  "image",
  "mork-core",
