@@ -19,7 +19,7 @@ pub enum Tok {
     Str(String),
     /// An optimizer hint `/*+ … */`, kept whole: the server reads it, never as a statement.
     Hint(String),
-    /// Version-gated SQL, retained for the read gate to inspect.
+    /// Unnumbered executable SQL, retained for the read gate to inspect.
     Exec(String),
     /// An operator or a punctuation mark.
     Sym(&'static str),
@@ -119,13 +119,16 @@ fn token(q: &str, i: usize) -> Result<(Tok, usize), String> {
         let at = i + 3 + end + 2;
         return Ok((Tok::Hint(q[i..at].to_owned()), at));
     }
-    if q[i..].starts_with("/*!") || q[i..].starts_with("/*M!") {
-        let end = q[i + 2..].find("*/").ok_or("an executable comment isn't closed")?;
-        // A server skipping a newer version's comment closes one nested `/*` first.
-        if q[i + 2..i + 2 + end].contains("/*") {
+    let rest = &q[i..];
+    if let Some(body) = rest.strip_prefix("/*!").or_else(|| rest.strip_prefix("/*M!")) {
+        if body.as_bytes().first().is_some_and(u8::is_ascii_digit) {
+            return Err("versioned executable comments aren't read".into());
+        }
+        let (sql, tail) = body.split_once("*/").ok_or("an executable comment isn't closed")?;
+        if sql.contains("/*") {
             return Err("a comment inside an executable comment isn't read: the server may end it later".into());
         }
-        let at = i + 2 + end + 2;
+        let at = q.len() - tail.len();
         return Ok((Tok::Exec(q[i..at].to_owned()), at));
     }
     let c = q[i..].chars().next().unwrap_or(' ');
@@ -287,7 +290,7 @@ mod tests {
             ("`a``b`", Tok::Quoted("a`b".into())),
             ("0xFA", Tok::Word("0xFA".into())),
             ("1.25e-3", Tok::Num("1.25e-3".into())),
-            ("/*!80000 + 2 */", Tok::Exec("/*!80000 + 2 */".into())),
+            ("/*! + 2 */", Tok::Exec("/*! + 2 */".into())),
             (",", Tok::Sym(",")),
         ];
         for seed in 0..128 {
@@ -341,6 +344,8 @@ mod tests {
         for q in [
             "SELECT /*+ BKA(t) ", // an unclosed hint
             "SELECT /*! 1 ",      // an unclosed executable comment
+            "SELECT /*!40101 1 */",
+            "SELECT /*M!100000 1 */",
             "SELECT 1 /* open",
             "SELECT 1 \\! ls", // a bare backslash: a client command
             "SELECT 'a\0b'",   // a NUL: a C client's string end
@@ -356,8 +361,8 @@ mod tests {
             "an optimizer hint is one token, kept whole"
         );
         assert_eq!(
-            toks("SELECT /*!40101 INTO OUTFILE '/x' */ 1")[1],
-            Tok::Exec("/*!40101 INTO OUTFILE '/x' */".into()),
+            toks("SELECT /*! 1 */")[1],
+            Tok::Exec("/*! 1 */".into()),
             "an executable comment is one token, its body left for the gate to read"
         );
         assert_eq!(toks("SELECT 'C:\\path', 'a\nb\tc'")[1], Tok::Str("C:path".into()));
