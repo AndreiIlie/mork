@@ -195,12 +195,11 @@ fn fac1_generic_commands_never_bypass_the_door() {
     // act-1 is the card's project's fetch; the call is act-2.
     let act = |cmd: &str| vec![cmd.to_owned(), "act-2".to_owned(), "--note".to_owned(), "seen".to_owned()];
     let drop = vec!["action.drop".to_owned(), "act-2".to_owned()];
-    rig.scenario(json!([ctl_turn(
-        "ex-1/foreman",
-        Some("Run misc"),
-        &[call, drop, act("action.done")],
-        reply("working", "Asked", json!([]))
-    ),]));
+    let calls = [call, drop, act("action.done")];
+    rig.scenario(json!([
+        ctl_turn("ex-1/foreman", Some("Run misc"), &calls, reply("working", "Asked", json!([]))),
+        later(),
+    ]));
     rig.start();
     rig.say("ex-1", "@foreman Run misc");
     rig.wait_turns("ex-1/foreman", 1);
@@ -219,5 +218,5 @@ fn fac1_generic_commands_never_bypass_the_door() {
     let st = rig.state();
     assert!(st.asks.values().all(|x| !x.open || x.kind != AskKind::Door), "its ask closed");
     assert_eq!(mork_core::door::status_of(&st.actions["act-2"]), "not allowed");
-    let _: Value = json!(null);
+    rig.wait_turns("ex-1/foreman", 2);
 }
