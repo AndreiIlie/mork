@@ -169,7 +169,14 @@ pub(super) fn bounded_turn(t: &mut TurnView, steps: usize, budget: usize) {
     let gone = t.steps.len().saturating_sub(steps);
     let mut cut = gone > 0;
     t.steps.drain(..gone);
-    t.steps.iter_mut().for_each(|s| s.words = cut_to(&s.words, STEP_MAX).0);
+    for s in &mut t.steps {
+        s.words = cut_to(&s.words, STEP_MAX).0;
+        if let Some(c) = &mut s.command {
+            let (text, cut) = crate::cli::turn::cut_to(&c.text, DETAIL_MAX);
+            c.text = text;
+            c.cut |= cut;
+        }
+    }
     for d in t.steps.iter_mut().flat_map(|s| s.details.iter_mut()).chain(t.after.iter_mut()) {
         let (text, c) = cut_to(&d.text, DETAIL_MAX);
         (d.text, d.cut) = (text, d.cut || c);
@@ -179,9 +186,26 @@ pub(super) fn bounded_turn(t: &mut TurnView, steps: usize, budget: usize) {
     let thinking = Some(mork_types::seen::DetailKind::Thinking);
     cut |= evict_slice(&mut t.steps[..split], None, &mut size, budget, thinking);
     cut |= evict_slice(&mut t.steps[..split], None, &mut size, budget, None);
+    cut |= evict_commands(&mut t.steps[..split], &mut size, budget);
     cut |= evict_slice(&mut t.steps[split..], Some(&mut t.after), &mut size, budget, thinking);
     cut |= evict_slice(&mut t.steps[split..], Some(&mut t.after), &mut size, budget, None);
+    cut |= evict_commands(&mut t.steps[split..], &mut size, budget);
     t.cut |= cut;
+}
+
+fn evict_commands(steps: &mut [mork_types::seen::StepView], size: &mut usize, budget: usize) -> bool {
+    let mut cut = false;
+    for command in steps.iter_mut().filter_map(|s| s.command.as_mut()) {
+        if *size <= budget {
+            break;
+        }
+        let before = size_of(command);
+        command.text.clear();
+        command.cut = true;
+        *size = size.saturating_sub(before).saturating_add(size_of(command));
+        cut = true;
+    }
+    cut
 }
 
 fn evict_slice(

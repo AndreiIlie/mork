@@ -24,6 +24,7 @@ ureq.workspace = true
 pulldown-cmark.workspace = true
 percent-encoding.workspace = true
 httparse.workspace = true
+shlex.workspace = true
 
 [dev-dependencies]
 mork-fakes.workspace = true

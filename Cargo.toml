@@ -39,6 +39,7 @@ png = "0.18"
 pulldown-cmark = { version = "0.13", default-features = false }
 percent-encoding = "2"
 httparse = "1"
+shlex = "2"
 
 [workspace.lints.rust]
 unused_must_use = "deny"

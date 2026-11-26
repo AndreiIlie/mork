@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use mork_types::JobId;
-use mork_types::seen::{Detail, DetailKind, ReadPoint, StepView, TurnView};
+use mork_types::seen::{CommandView, Detail, DetailKind, ReadPoint, StepView, TurnView};
 
 use super::{Step, StreamState};
 use crate::files::sha256_hex;
@@ -29,10 +29,10 @@ pub fn detail(st: &mut StreamState, key: &str, thread: Option<&str>, kind: Detai
 }
 
 /// A step of `thread`, with what waited for it there, started when the line in hand was read.
-pub fn step(st: &mut StreamState, thread: Option<&str>, id: &str, words: String) {
+pub fn step(st: &mut StreamState, thread: Option<&str>, id: &str, words: String, command: Option<CommandView>) {
     let thread = thread.map(str::to_owned);
     let details = st.pending.remove(&thread).unwrap_or_default();
-    st.steps.push(Step { id: id.to_owned(), words, details, thread, start_ms: st.at, end_ms: None });
+    st.steps.push(Step { id: id.to_owned(), words, command, details, thread, start_ms: st.at, end_ms: None });
 }
 
 /// The step `id` ended when the line in hand was read; its first end holds.
@@ -79,6 +79,7 @@ pub fn turn_of(st: &StreamState, job: &JobId) -> TurnView {
         .map(|s| StepView {
             id: s.id.clone(),
             words: s.words.clone(),
+            command: s.command.clone(),
             details: s.details.clone(),
             start_ms: s.start_ms,
             end_ms: s.end_ms,
@@ -167,7 +168,7 @@ fn gap(free: Option<i64>, until: Option<i64>) -> Option<i64> {
     (ms >= THOUGHT_MIN_MS).then_some(ms)
 }
 
-fn cut_to(text: &str, max: usize) -> (String, bool) {
+pub(crate) fn cut_to(text: &str, max: usize) -> (String, bool) {
     if text.len() <= max {
         return (text.to_owned(), false);
     }

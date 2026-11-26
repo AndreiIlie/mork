@@ -216,17 +216,22 @@ fn step(st: &mut StreamState, u: &Value, conversation: String) {
     }
     let id = format!("{conversation}\0{index}");
     let tool = field("tool_name").or_else(|| u.pointer("/tool_info/name").and_then(Value::as_str)).unwrap_or("tool");
-    let command = u.pointer("/tool_info/parameters/CommandLine").and_then(Value::as_str).map(str::trim);
+    let raw = u.pointer("/tool_info/parameters/CommandLine").and_then(Value::as_str).filter(|c| !c.trim().is_empty());
     let file = file_words(st, tool, u);
-    let said = command.and_then(|c| super::said::words(st.seat.as_deref(), c));
-    let words = said.or_else(|| command.and_then(|c| c.lines().next()).map(str::to_owned));
-    let detailed = command.is_some() || file.is_some();
-    let words: String = words.or(file).unwrap_or_else(|| tool.to_owned()).chars().take(100).collect();
+    let detailed = raw.is_some() || file.is_some();
+    let (words, command) = match raw {
+        Some(c) => super::command::display(st.seat.as_deref(), c, None),
+        None => (file.unwrap_or_else(|| tool.to_owned()), None),
+    };
+    let words = words.chars().take(100).collect();
     match st.steps.iter_mut().find(|s| s.id == id) {
         // Its end may say what its start didn't, as its command or its file.
-        Some(s) if detailed => s.words = words,
+        Some(s) if detailed => {
+            s.words = words;
+            s.command = command;
+        }
         Some(_) => {}
-        None => turn::step(st, None, &id, words),
+        None => turn::step(st, None, &id, words, command),
     }
     if field("state") == Some("DONE") {
         turn::ended(st, &id);
