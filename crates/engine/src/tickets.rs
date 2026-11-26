@@ -33,9 +33,12 @@ impl Cache {
     /// tickets couldn't be read has none until a later poll reads them. Read only for projects with `tickets`.
     pub fn attach(&self, project: &str, config: &ProjectConfig, mut prs: Vec<OpenPr>) -> Vec<OpenPr> {
         let Some(tickets_cfg) = &config.tickets else { return prs };
-        let Some(reader) = reader(tickets_cfg) else { return prs };
         let mut seen = self.0.lock();
         seen.retain(|(p, n), _| p != project || prs.iter().any(|x| !x.fork && x.pr == *n));
+        if prs.iter().all(|pr| pr.fork) {
+            return prs;
+        }
+        let Some(reader) = reader(tickets_cfg) else { return prs };
         let mut down = false;
         for pr in prs.iter_mut().filter(|pr| !pr.fork) {
             let numbers =
