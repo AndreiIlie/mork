@@ -109,6 +109,7 @@ fn fac1_no_credential_leaks_anywhere() {
     let all = serde_json::to_string(&a).unwrap();
     assert!(all.contains("‹secret›"), "the leaks were masked, not lost: {all}");
     assert_eq!(a[1]["door"]["status"], "failed");
+    assert_eq!(a[2]["door"]["status"], "done", "{}", a[2]);
     assert_eq!(a[3]["door"]["status"], "failed");
     assert_eq!(a[5]["door"]["text"], "connected with ‹secret›");
     assert_eq!(a[6]["door"]["text"], "personal note with ‹secret› and ‹secret› and ‹secret› and ‹secret›", "{}", a[6]);
