@@ -220,6 +220,12 @@ impl Engine {
             }
             ports.extend(card.port);
             ports.extend(card.mock.and_then(|m| m.port));
+            if card.stage.is_live()
+                && let Some(id) = mork_core::reviews::gate::reviewed_card_id(&self.state, card)
+                && let Some(subject) = self.state.cards.get(id)
+            {
+                ports.extend(mork_core::lifecycle::mock::approved_port(subject, config));
+            }
         }
         mork_types::job::Net { domains, host_ports: ports.difference(&self.reserved_ports).copied().collect() }
     }
