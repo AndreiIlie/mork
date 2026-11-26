@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NewCard, StartStrip } from "./BoardForms";
 import { ownHands } from "./alerts";
 import { RaisedHands } from "./Hands";
 import { cardTarget, coldMinutes, dollars, duration, plural, shortAge, workingSeats } from "./format";
@@ -8,6 +9,7 @@ import { PageLink, cardPath } from "./route";
 import type {
   BoardGroup,
   BoardRow,
+  PlaceView,
   BoardView,
   HandView,
   LookbackRead,
@@ -202,7 +204,14 @@ function LookBack({
   );
 }
 
-function AreaRows({ group }: { group: BoardGroup }) {
+
+interface StartSelection {
+  id: string | null;
+  view?: PlaceView;
+  select: (id: string | null) => void;
+}
+
+function AreaRows({ group, startable, start, live }: { group: BoardGroup; startable: boolean; start: StartSelection; live: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -213,26 +222,40 @@ function AreaRows({ group }: { group: BoardGroup }) {
       </Row>
       {open &&
         group.cards.map((r: BoardRow) => (
-          // An unrun backlog card has no room to open.
-          <Row key={r.id} indent={1} to={r.ran ? cardPath(cardTarget(r)) : undefined}>
-            <span title={r.id} className="min-w-[76px] max-w-[220px] shrink-0 truncate font-mono text-label-13 text-gray-900">
-              {r.id}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-label-14 text-gray-1000">{r.title}</span>
-            {r.status !== undefined && <span className={`shrink-0 ${MONO} text-gray-700`}>{r.status}</span>}
-          </Row>
+          <div key={r.id}>
+            <Row
+              indent={1}
+              to={r.ran ? cardPath(cardTarget(r)) : undefined}
+              actions={
+                startable && !r.room ? (
+                  <Button tier="secondary" size="sm" pressed={start.id === r.id} disabled={!live} onClick={() => start.select(start.id === r.id ? null : r.id)}>
+                    Start
+                  </Button>
+                ) : undefined
+              }
+            >
+              <span title={r.id} className="min-w-[76px] max-w-[220px] shrink-0 truncate font-mono text-label-13 text-gray-900">
+                {r.id}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-label-14 text-gray-1000">{r.title}</span>
+              {r.status !== undefined && <span className={`shrink-0 ${MONO} text-gray-700`}>{r.status}</span>}
+            </Row>
+            {start.id === r.id && <StartStrip card={r} view={start.view} live={live} onDone={() => start.select(null)} />}
+          </div>
         ))}
     </>
   );
 }
 
 function ProjectBacklog({
+  start,
   board,
   lookback,
   nowMs,
   live,
 }: {
   board: BoardView;
+  start: StartSelection;
   lookback: ProjectView | undefined;
   nowMs: number;
   live: boolean;
@@ -247,8 +270,13 @@ function ProjectBacklog({
         <span className={`${MONO} text-gray-700`}>
           {backlog} backlog · {board.done.count} {board.done.name.toLowerCase()}
         </span>
-        {lookback !== undefined && lookback.rows.length > 0 && (
-          <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="flex items-center gap-2">
+            <span className="text-label-12 text-gray-700">Auto delegation</span>
+            <Segmented height={26} options={["Off", "On"] as const} value={board.auto ? "On" : "Off"} disabled={(v) => !live || !!pending[board.project] || (v === "On") === board.auto}
+              onChange={(v) => press(board.project, { label: "Auto delegation", command: { auto: { project: board.project, off: v === "Off" } } })} />
+          </span>
+          {lookback !== undefined && lookback.rows.length > 0 && (
             <LookBack
               project={board.project}
               rows={lookback.rows}
@@ -257,14 +285,20 @@ function ProjectBacklog({
               pending={pending[board.project] ?? null}
               onPress={(label, read) => press(board.project, { label, command: { lookback: { project: board.project, read } } })}
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
       <RefusalLine refusal={refusals[board.project] ?? null} className="mb-2" />
       {groups.length > 0 ? (
         <List>
           {groups.map((g) => (
-            <AreaRows key={g.name} group={g} />
+            <AreaRows
+              key={g.name}
+              group={g}
+              start={start}
+              live={live}
+              startable={board.areas.includes(g)}
+            />
           ))}
         </List>
       ) : (
@@ -286,7 +320,7 @@ function cardIds(boards: BoardView[]): Set<string> {
 }
 
 /** The workspace at `/`: figures strip, raised hands, active cards, merge queues, and project backlogs. */
-export function Board({ screen, burn, nowMs, live }: { screen: Screen; burn: RecentBurn | null; nowMs: number; live: boolean }) {
+export function Board({ screen, views, burn, nowMs, live }: { screen: Screen; views: Record<string, PlaceView>; burn: RecentBurn | null; nowMs: number; live: boolean }) {
   const [chosen, setChosen] = useState(ALL);
   const filter = screen.boards.some((b) => b.project === chosen) ? chosen : ALL;
   const boards = filter === ALL ? screen.boards : screen.boards.filter((b) => b.project === filter);
@@ -294,6 +328,8 @@ export function Board({ screen, burn, nowMs, live }: { screen: Screen; burn: Rec
   const waiting = ownHands(screen.hands);
   const hands = filter === ALL ? waiting : waiting.filter((h) => h.card === null || ids.has(h.card));
   const queues = boards.filter((b) => b.merge.slot !== null || b.merge.in_line > 0);
+  const [starting, setStarting] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   return (
     <main className="flex min-w-0 flex-1 flex-col">
@@ -302,16 +338,29 @@ export function Board({ screen, burn, nowMs, live }: { screen: Screen; burn: Rec
         title="Board"
         right={
           screen.boards.length > 0 && (
-            <Segmented
-              options={[ALL, ...screen.boards.map((b) => b.project)]}
-              value={filter}
-              onChange={setChosen}
-              label={(key) => (key === ALL ? "All projects" : key)}
-            />
+            <>
+              <Segmented
+                options={[ALL, ...screen.boards.map((b) => b.project)]}
+                value={filter}
+                onChange={(v) => { setChosen(v); setStarting(null); }}
+                label={(key) => (key === ALL ? "All projects" : key)}
+              />
+              <Button tier="primary" size="md" disabled={!live} pressed={creating} onClick={() => setCreating((v) => !v)}>
+                New card
+              </Button>
+            </>
           )
         }
       />
       <PageScroll>
+        {creating && (
+          <NewCard
+            live={live}
+            projects={screen.boards.map((b) => b.project)}
+            project={filter === ALL ? (screen.boards[0]?.project ?? "") : filter}
+            onDone={() => setCreating(false)}
+          />
+        )}
         <KpiStrip items={kpis(screen, boards, hands, burn, nowMs, filter !== ALL)} />
         {hands.length > 0 && <RaisedHands hands={hands} nowMs={nowMs} live={live} />}
         <ActiveCards boards={boards} screen={screen} />
@@ -329,6 +378,7 @@ export function Board({ screen, burn, nowMs, live }: { screen: Screen; burn: Rec
             <ProjectBacklog
               key={b.project}
               board={b}
+              start={{ id: starting, select: setStarting, view: starting ? views[starting] : undefined }}
               lookback={screen.projects?.find((p) => p.project === b.project)}
               nowMs={nowMs}
               live={live}
