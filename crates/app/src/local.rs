@@ -190,8 +190,8 @@ pub fn doctor(home: &Home) -> i32 {
                 })
                 .collect();
             // Online, `status` names only the jobs still of use; the state names every one (M5.30).
-            let state = doctor::read_state(home);
-            let store = Store::open_read_only(&home.state_db()).ok();
+            let store = Store::open_read_only(&home.state_db()).inspect_err(|e| found.push(e.to_string())).ok();
+            let state = store.as_ref().and_then(|s| doctor::read_state(home, s, &mut found));
             for (id, settled) in store.as_ref().and_then(doctor::every_job).unwrap_or_default() {
                 seen.entry(id).or_insert(settled);
             }
