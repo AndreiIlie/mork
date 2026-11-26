@@ -23,7 +23,9 @@ It holds `state.db` (read it, never write it), `jobs/`, `clones/<card>/`, `mirro
 - **Claude accounts:** the active login is `logins/claude/.credentials.json` with `login-home/.claude.json`; saved accounts are `login-home/.claude/accounts/<name>.credentials.json` and `<name>.claude.json`, each named in `[claude_accounts]`.
   Switching accounts is the operator's call (`claude.account <name>`, or a pool's header in the window's Usage section): never switch, nor offer to.
   Ask him to sign in again only when a login hits its hard expiry.
-  A new sign-in or renewal runs in a temporary folder (`HOME=<folder> claude auth login`); copy its `.credentials.json` (mode 600) and `.claude.json`'s `oauthAccount` and `userID` into the saved account's files, then delete the folder.
+  A new sign-in or renewal runs in a temporary folder (`HOME=<folder> claude auth login`).
+  Copy `<folder>/.claude/.credentials.json` to the saved account's `<name>.credentials.json` with mode 600.
+  Copy `oauthAccount` and `userID` from `<folder>/.claude.json` into the saved account's `<name>.claude.json`, then delete the temporary folder.
 - **Seat CLIs:** `claude`, `codex` and `agy`.
   After a CLI upgrade, run a turn of a seat on it and check that it ends and `mork ctl usage` still reads its pool.
 - **Machine load:** every job runs in `mork_work.slice`, its CPU and IO weights and `memory_high` set in `[slice]`.
@@ -41,7 +43,8 @@ It holds `state.db` (read it, never write it), `jobs/`, `clones/<card>/`, `mirro
 - Mork builds its base branch's new tip by itself and pins it; `build <commit>` builds one by hand, into `builds/<commit>/`.
   Every pin and every completed reload points `~/.local/bin/mork` at its build.
 - The running build is the `runs <commit>` of the last start line in `logs/app.log` (`tail -10`), never the `~/.local/bin/mork` link, which follows the pin.
-- To apply a config change or a new build, with `[mork] project` set: `mork ctl --as orchestrator:<project> reload [--target <commit>]`, then wait until commands stop answering `reloading`, and start `wakes` again.
+- With `[mork] project` set, apply a config change or a new build with `mork ctl --as orchestrator:<project> reload [--target <commit>]`, then wait until commands stop answering `reloading`.
+  With `orchestrator_waits = true`, a pending `wakes` reconnects automatically after reload. Start the next wait after it prints its batch and exits.
 - When a card changing `web/` lands and `[mork] web_assets` names the operator's checkout's `web/dist`, rebuild it there with `cargo xtask web`.
 
 ## Notes, manuals and disk

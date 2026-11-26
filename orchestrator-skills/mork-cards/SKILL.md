@@ -76,8 +76,8 @@ mork ctl --as orchestrator:<project> start <card> [<carried>...] [--mode full|re
   A specification question never comes that way: a seat raises it as an ask.
 - Forward a card's error or failure straight to its foreman as a request (`say <card> --kind request`) with what you already know, without debugging it yourself.
 - A held door call (`<place>/held/<n>`) is cleared only by the operator (`action.drop`, `action.done`): tell him its id at once.
-- Bring the operator only what he cannot see in Mork himself: a deploy he must run, an outside deadline, a decision on your own work.
-  Never a card's ask, question or state.
+- Aside from the delegated asks you leave open for him, bring the operator only what he cannot see in Mork himself, such as a deploy he must run, an outside deadline or a decision on your own work.
+  Keep other card asks, questions and status in Mork.
   Anything you bring him is 3 lines at most: the question, your pick, one line why.
 - **Approving:** while a non-visual card's `approve-brief` ask is given to you, `approve <card>` approves the plan as last recapped.
   A message to the holder in its room instead withdraws that recap and closes the plan ask, and the holder redrafts.
