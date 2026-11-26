@@ -166,6 +166,9 @@ fn push(c: &Call, card: &CardId, branch: &str, commit: &Sha) -> Result<Value, Ac
 fn merge(c: &Call, pr: u64, (head, base): (&Sha, &Sha), dest: Option<&str>) -> Result<Value, ActionFailure> {
     let k = c.card()?;
     let p = c.project(&k.project)?;
+    if !p.forge.merges_on_approval() {
+        return Err(ActionFailure::Guard { words: "This project uses manual PR merges".into(), pr: None });
+    }
     let repo = c.readers.read(&p.forge)?;
     let into = dest.unwrap_or(&p.base);
     let seen = repo.observe(pr)?;

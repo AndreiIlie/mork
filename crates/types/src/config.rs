@@ -163,11 +163,19 @@ pub enum BoardConfig {
     Markdown { path: String },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MergeMode {
+    #[default]
+    Manual,
+    Approval,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ForgeConfig {
     Local { backup: Option<String> },
-    Bitbucket { workspace: String, slug: String, review_tag: Option<String> },
+    Bitbucket { workspace: String, slug: String, review_tag: Option<String>, #[serde(default)] merge: MergeMode },
 }
 
 impl Default for ForgeConfig {
@@ -177,6 +185,10 @@ impl Default for ForgeConfig {
 }
 
 impl ForgeConfig {
+    pub fn merges_on_approval(&self) -> bool {
+        matches!(self, Self::Bitbucket { merge: MergeMode::Approval, .. })
+    }
+
     pub fn hosted(&self) -> bool {
         !matches!(self, Self::Local { .. })
     }

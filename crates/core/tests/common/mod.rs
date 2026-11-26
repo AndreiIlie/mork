@@ -39,7 +39,7 @@ pub fn config() -> Config {
             "web": {"repo": "/r/web", "board": {"kind": "markdown", "path": "/b/web"}, "test": "npm test",
                     "checks": {"command": "checks", "folder": "/c/web"}},
             "ex": {"repo": "/r/ex", "board": {"kind": "markdown", "path": "/b/ex"}, "test": "npm test",
-                   "forge": {"kind": "bitbucket", "workspace": "ws", "slug": "ex"},
+                   "forge": {"kind": "bitbucket", "workspace": "ws", "slug": "ex", "merge": "approval"},
                    "checks": {"command": "checks", "folder": "/c/ex"}}
         }
     });

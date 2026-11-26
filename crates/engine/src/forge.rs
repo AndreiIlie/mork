@@ -64,7 +64,7 @@ impl Readers {
     pub(crate) fn read(&self, config: &ForgeConfig) -> Result<Box<dyn ForgeRead>> {
         match config {
             ForgeConfig::Local { .. } => Err(local()),
-            ForgeConfig::Bitbucket { workspace, slug, review_tag } => {
+            ForgeConfig::Bitbucket { workspace, slug, review_tag, .. } => {
                 Ok(Box::new(bitbucket::Reader::new(workspace, slug, review_tag.clone(), self.fulls.clone())?))
             }
         }
