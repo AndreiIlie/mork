@@ -82,10 +82,8 @@ fn rustfmt() -> Command {
     fmt
 }
 
-const CLIPPY_PASSES: [(&str, &[&str]); 2] = [
-    ("clippy", &["--workspace", "--all-targets", "--all-features"]),
-    ("production clippy", &xtask::suite::PRODUCTION),
-];
+const CLIPPY_PASSES: [(&str, &[&str]); 2] =
+    [("clippy", &["--workspace", "--all-targets", "--all-features"]), ("production clippy", &xtask::suite::PRODUCTION)];
 
 fn clippy(targets: &[&str], json: bool) -> Command {
     let mut cmd = cargo();
