@@ -3,16 +3,18 @@
 
 use mork_types::about::Summary;
 use mork_types::card::Card;
+use mork_types::config::{Config, MODEL_CATALOG, OPERATOR_MODELS};
 use mork_types::reply::Role;
 use mork_types::seen::AgentList;
 use mork_types::state::{Agent, AgentStatus};
-use mork_types::view::{AgentRow, CacheState, PlaceKind, PlaceView};
+use mork_types::view::{AgentRow, CacheState, ModelChoice, PlaceKind, PlaceView};
 use mork_types::{CardId, JobId, PlaceId};
 
 use super::conversation::conversation;
 use super::header::header;
 use super::outside::Outside;
 use super::status::{agent_light, doing};
+use crate::agents::models;
 use crate::decide::Ctx;
 use crate::state::State;
 
@@ -108,7 +110,13 @@ fn lists(state: &State, place: &str, outside: &Outside) -> Vec<AgentList> {
 
 // An agent's row but its steps and turn, which only its own place's rows show.
 fn row(state: &State, a: &Agent, outside: &Outside, ctx: Ctx<'_>) -> AgentRow {
-    let setting = crate::agents::models::setting(state, ctx.config, a);
+    let mut setting = models::setting(state, ctx.config, a);
+    let mut pending = models::pending(state, ctx.config, a);
+    let mut choices = models::choices_for(state, ctx.config, a, models::By::Operator);
+    let settings = setting.iter_mut().chain(&mut pending).map(|s| &mut s.model);
+    for choice in choices.iter_mut().chain(settings) {
+        set_display_label(ctx.config, choice);
+    }
     AgentRow {
         parent: a.parent.clone(),
         agent: a.key.clone(),
@@ -122,12 +130,28 @@ fn row(state: &State, a: &Agent, outside: &Outside, ctx: Ctx<'_>) -> AgentRow {
         }),
         steps: Vec::new(),
         setting,
-        pending: crate::agents::models::pending(state, ctx.config, a),
-        choices: crate::agents::models::choices_for(state, ctx.config, a, crate::agents::models::By::Operator),
-        efforts: crate::agents::models::efforts_for(state, ctx.config, a, crate::agents::models::By::Operator),
+        pending,
+        choices,
+        efforts: models::efforts_for(state, ctx.config, a, models::By::Operator),
         turn: None,
         cache: cache_state(ctx.config, a),
     }
+}
+
+// Pick aliases depend on the chooser. The same model needs one label throughout the room.
+fn set_display_label(config: &Config, choice: &mut ModelChoice) {
+    let mut catalog = MODEL_CATALOG.iter().chain(OPERATOR_MODELS);
+    if let Some((_, _, label)) = catalog.find(|(_, model, _)| *model == choice.model) {
+        choice.label = (*label).to_owned();
+        if let Some(initial) = choice.label.get_mut(..1) {
+            initial.make_ascii_uppercase();
+        }
+        return;
+    }
+    let mut picks =
+        config.picks.iter().flat_map(|p| [&p.researcher, &p.reviewer.inside, &p.reviewer.outside]).flatten();
+    let configured = picks.find(|p| p.cli == choice.cli && p.model == choice.model && !p.label.is_empty());
+    choice.label.clone_from(configured.map_or(&choice.model, |p| &p.label));
 }
 
 fn cache_state(config: &mork_types::config::Config, a: &Agent) -> Option<CacheState> {

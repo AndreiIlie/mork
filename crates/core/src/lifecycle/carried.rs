@@ -90,6 +90,14 @@ fn unsettled(s: ActionStatus) -> bool {
     matches!(s, ActionStatus::Pending | ActionStatus::Started | ActionStatus::Held)
 }
 
+/// A full restart keeps its original group for unlanded work, otherwise only members that can still join.
+pub(crate) fn restart_carries(state: &State, id: &CardId, ctx: Ctx<'_>) -> Vec<CardId> {
+    let Some(prior) = state.cards.get(id).filter(|c| c.stage == Stage::Closed) else { return Vec::new() };
+    let required = unlanded(state, prior);
+    let p = Poster::for_ctx(state, ctx);
+    prior.carries.iter().map(|k| &k.id).filter(|k| required || joins(&p, id, k, &[], ctx).is_ok()).cloned().collect()
+}
+
 /// The cards a start carries, with their words as their boards hold them, or why one of them can't join.
 pub(super) fn members(
     p: &Poster<'_>,
@@ -122,7 +130,14 @@ pub(super) fn members(
     let mut out: Vec<Carried> = Vec::new();
     for k in carries {
         let joined = joins(p, id, k, &out, ctx);
-        out.push(joined.map_err(|e| before.as_ref().map_or(e.clone(), |b| format!("{e}; {id} goes on {}", with(b))))?);
+        let bc = joined.map_err(|e| before.as_ref().map_or(e.clone(), |b| format!("{e}; {id} goes on {}", with(b))))?;
+        out.push(Carried {
+            id: k.clone(),
+            title: bc.title.clone(),
+            description: bc.description.clone(),
+            acceptance: bc.acceptance.clone(),
+            file: bc.file.clone(),
+        });
     }
     Ok(out)
 }
@@ -145,7 +160,13 @@ fn with(cards: &[&CardId]) -> String {
 }
 
 // One carried card read from its board, or why it can't join the run: each refusal makes nothing.
-fn joins(p: &Poster<'_>, run: &CardId, k: &CardId, so_far: &[Carried], ctx: Ctx<'_>) -> Result<Carried, String> {
+fn joins<'s>(
+    p: &Poster<'s>,
+    run: &CardId,
+    k: &CardId,
+    so_far: &[Carried],
+    ctx: Ctx<'_>,
+) -> Result<&'s BoardCard, String> {
     let bc = super::start::runnable(p, k, ctx)?;
     if k == run || so_far.iter().any(|c| c.id == *k) {
         return Err(format!("{k} is named twice"));
@@ -160,13 +181,7 @@ fn joins(p: &Poster<'_>, run: &CardId, k: &CardId, so_far: &[Carried], ctx: Ctx<
     if let Some(why) = taken(p.state, k, Some(run)) {
         return Err(why);
     }
-    Ok(Carried {
-        id: k.clone(),
-        title: bc.title.clone(),
-        description: bc.description.clone(),
-        acceptance: bc.acceptance.clone(),
-        file: bc.file.clone(),
-    })
+    Ok(bc)
 }
 
 /// Writes a status to a card's board on its run's behalf: the run's own card, or one it carries, whose write is

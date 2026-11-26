@@ -379,6 +379,17 @@ pub struct RoundView {
     pub verdict: String,
     #[serde(default)]
     pub findings: Vec<FindingView>,
+    /// Counts for seats with a recorded reviewer verdict in this round.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub reviewers: BTreeMap<String, ReviewerCounts>,
+}
+
+/// One reviewer's reported findings and those credited to it by the round's verdict.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewerCounts {
+    pub reported: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kept: Option<usize>,
 }
 
 /// One finding in an open triage ask inside the Card Room, with its proof (fac-680).

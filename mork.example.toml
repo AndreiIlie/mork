@@ -34,15 +34,15 @@ effort = "high"
 
 [seats.foreman]
 report = { cli = "codex", model = "gpt-6.2-sol", effort = "high" }
-work = { cli = "claude", model = "claude-sonnet-4-5", effort = "high" }
+work = { cli = "claude", model = "claude-sonnet-5-5", effort = "high" }
 
 [seats.researcher]
 work = { cli = "codex", model = "gpt-6.2-sol", effort = "high" }
 
 [seats.review-foreman]
-work = { cli = "claude", model = "claude-opus-4-5", effort = "high" }
-inside = { cli = "claude", model = "claude-opus-4-5", effort = "high" }
-outside = { cli = "claude", model = "claude-opus-4-5", effort = "high" }
+work = { cli = "claude", model = "claude-opus-5-5", effort = "high" }
+inside = { cli = "claude", model = "claude-opus-5-5", effort = "high" }
+outside = { cli = "claude", model = "claude-opus-5-5", effort = "high" }
 
 [seats.reviewer]
 work = { cli = "codex", model = "gpt-6.2-sol", effort = "high" }

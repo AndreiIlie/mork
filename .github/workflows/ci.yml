@@ -43,5 +43,4 @@ jobs:
       - name: Run workspace test suite
         env:
           MORK_UNWALLED: "1"
-          MORK_TEST_PORTS: "42000-42099"
         run: cargo xtask test
