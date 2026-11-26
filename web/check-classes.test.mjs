@@ -28,7 +28,8 @@ export const Total = () => <p title="Durations are rounded to whole minutes">{"T
 export const Text = () => <div className="before:content-['rounded-full']" />;
 const re = /[.,;:!?'"”’]$/;
 const prose = "Values are rounded to whole minutes.";
-export const AfterRe = () => <div className={prose ? "rounded" : "-ml-2"} />;`,
+export const AfterRe = () => <div className={prose ? "rounded" : "-ml-2"} />;
+export const caption = "The total is rounded to whole minutes.";`,
   'src/Wrapped.tsx': `export const Wrapped = () => (
   <div className="
     flex rounded-[13px]

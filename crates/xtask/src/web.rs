@@ -47,16 +47,22 @@ fn combined(out: &Output) -> String {
     format!("{stdout}\n{stderr}").trim().to_owned()
 }
 
-/// Returns located class findings, or an error when the web checker could not report them.
-pub fn check_classes(web: &Path) -> Result<Vec<TscError>, String> {
+fn class_script(web: &Path, args: &[&str]) -> Result<Output, String> {
     let out = Command::new("node")
-        .arg("check-classes.mjs")
+        .args(args)
         .current_dir(web)
         .output()
         .map_err(|e| format!("couldn't run web class check: {e}"))?;
     if !out.status.success() {
-        return Err(format!("web class check failed ({})\n{}", out.status, combined(&out)));
+        return Err(format!("node {} failed ({})\n{}", args.join(" "), out.status, combined(&out)));
     }
+    Ok(out)
+}
+
+/// Tests the class checker and returns its located findings for the web sources.
+pub fn check_classes(web: &Path) -> Result<Vec<TscError>, String> {
+    class_script(web, &["--test", "check-classes.test.mjs"])?;
+    let out = class_script(web, &["check-classes.mjs"])?;
     serde_json::from_slice(&out.stdout).map_err(|e| format!("invalid web class findings: {e}"))
 }
 
