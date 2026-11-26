@@ -47,6 +47,7 @@ fn check_skills(text: &str, config: &Config) -> Result<(), ConfigError> {
 }
 
 fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError> {
+    let mut headers = BTreeMap::new();
     for (name, header) in &config.claude_accounts {
         let valid_name = !name.is_empty()
             && name != "."
@@ -62,6 +63,18 @@ fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError>
             return Err(ConfigError::Value {
                 line: key_line(text, Some("claude_accounts"), name),
                 message: format!("Claude account `{name}` must have a non-empty header"),
+            });
+        }
+        if matches!(header.as_str(), "codex" | "agy gemini" | "agy 3p") {
+            return Err(ConfigError::Value {
+                line: key_line(text, Some("claude_accounts"), name),
+                message: format!("Claude account `{name}` uses the built-in pool header `{header}`"),
+            });
+        }
+        if let Some(other) = headers.insert(header, name) {
+            return Err(ConfigError::Value {
+                line: key_line(text, Some("claude_accounts"), name),
+                message: format!("Claude accounts `{other}` and `{name}` share the pool header `{header}`"),
             });
         }
     }

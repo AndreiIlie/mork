@@ -163,6 +163,7 @@ Projects with `tickets` parse ticket numbers from card notes and PRs, format PR 
 ### claude_accounts
 
 In `mork.toml`, `[claude_accounts]` maps each saved account's name (`[A-Za-z0-9._-]`, not `.` or `..`, matching `<name>.claude.json` and `<name>.credentials.json` under `login-home/.claude/accounts/`) to its non-empty usage pool header.
+Each saved account needs a distinct header. The built-in pools reserve `codex`, `agy gemini` and `agy 3p`. Saved accounts may use `claude max` or `claude team`.
 Without `[claude_accounts]`, no saved accounts are read and `claude.account` refuses every name as unknown.
 
 ### tunnels

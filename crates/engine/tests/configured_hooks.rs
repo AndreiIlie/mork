@@ -93,6 +93,19 @@ url = "http://localhost:4001"
     assert_eq!(c.tunnels["staging"].port, 4001);
 }
 
+#[test]
+fn saved_claude_headers_distinguish_accounts_and_builtin_pools() {
+    for reserved in ["codex", "agy gemini", "agy 3p"] {
+        let err = parse_with(&format!("[claude_accounts]\nwork = \"{reserved}\"")).unwrap_err();
+        assert!(err.to_string().contains(reserved));
+    }
+    let duplicate = parse_with("[claude_accounts]\npersonal = \"Shared\"\nwork = \"Shared\"").unwrap_err().to_string();
+    for word in ["personal", "work", "Shared"] {
+        assert!(duplicate.contains(word));
+    }
+    assert!(parse_with("[claude_accounts]\npersonal = \"claude max\"\nwork = \"claude team\"").is_ok());
+}
+
 const VALUE_CASES: &[(&str, usize, &str)] = &[
     ("[mork]\nproject = \"mork\"\nskills = \"relative/path\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n", 3, "skills"),
     ("[mork]\nproject = \"mork\"\nskills = \"/srv/../skills\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n", 3, "skills"),
