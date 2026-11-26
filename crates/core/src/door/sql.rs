@@ -15,24 +15,21 @@ pub(super) const SCHEMA_REFUSED: &str = "refused: reading information_schema or 
 // Reserved words can be identifiers after a period; INSERT and REPLACE are function names before `(`.
 const WRITES: &[&str] = &["INSERT", "UPDATE", "DELETE", "REPLACE"];
 
-/// A query past the read gate, parsed once: its tokens, every view its executable comments give,
-/// and its optimizer hints, which no view holds.
+/// A query past the read gate, with its original tokens and the SQL each dialect executes.
 pub struct Read<'q> {
     query: &'q str,
     toks: Vec<Token>,
     views: Vec<Vec<Token>>,
-    hints: Vec<Token>,
 }
 
 /// Reads `query`, or says why it isn't a read: one statement that leads as a read, with no write,
 /// INTO, lock (but under a plain EXPLAIN) or (inside an executable comment) hidden statement of any of these.
 pub fn read(query: &str) -> Result<Read<'_>, String> {
     let toks = tokens(query)?;
-    let scan = Scan::new(query, &toks)?;
-    for t in &scan.hints {
-        hint(&query[t.at.clone()], query[..t.at.start].chars().count())?;
+    let mut views = vec![view(query, &toks, false)?];
+    if toks.iter().any(|t| matches!(&t.tok, Tok::Exec(whole) if whole.starts_with("/*M!"))) {
+        views.push(view(query, &toks, true)?);
     }
-    let views: Vec<Vec<Token>> = scan.views().collect();
     for parts in &views {
         let Some(first) = parts.first() else { continue };
         let leads = first.tok == Tok::Sym("(")
@@ -56,7 +53,7 @@ pub fn read(query: &str) -> Result<Read<'_>, String> {
     if views.iter().all(Vec::is_empty) {
         return Err("the query is empty".into());
     }
-    Ok(Read { query, toks, views, hints: scan.hints })
+    Ok(Read { query, toks, views })
 }
 
 impl Read<'_> {
@@ -96,7 +93,7 @@ impl Read<'_> {
         }
         if offsets.iter().chain(&inner).any(|at| subs.contains_key(at)) {
             return Err(
-                "a version-gated LIMIT changes its count into an offset or inner limit; keep its clause together"
+                "a MariaDB executable comment changes a LIMIT count into an offset or inner limit; keep its clause together"
                     .into(),
             );
         }
@@ -108,8 +105,10 @@ impl Read<'_> {
 
     /// Whether the query's hints keep its server's time limit, the call's `timeout_ms` (fac-183).
     pub fn timed(&self, timeout_ms: u64) -> Result<(), String> {
-        for t in &self.hints {
-            hint_time(&self.query[t.at.clone()], self.query[..t.at.start].chars().count(), timeout_ms)?;
+        for t in &self.toks {
+            if let Tok::Hint(whole) = &t.tok {
+                hint_time(whole, self.query[..t.at.start].chars().count(), timeout_ms)?;
+            }
         }
         Ok(())
     }
@@ -251,68 +250,80 @@ fn schema(parts: &[Token], n: usize) -> Result<(), String> {
     Ok(())
 }
 
-// Executable guards must not hide a write or a LIMIT from the read gate. A hint stands outside
-// every view: the server reads it as no SQL, so it may not split a lock, a schema or a LIMIT.
-struct Scan {
-    parts: Vec<(Token, Option<(bool, u64)>)>,
-    versions: std::collections::BTreeSet<u64>,
-    hints: Vec<Token>,
+// An unnumbered /*! body runs on either server; only MariaDB reads a /*M! body.
+fn view(query: &str, toks: &[Token], maria: bool) -> Result<Vec<Token>, String> {
+    let mut parts = Vec::with_capacity(toks.len());
+    for (n, t) in toks.iter().enumerate() {
+        if let Tok::Hint(whole) = &t.tok {
+            if !after_select(toks, n, &parts) {
+                return Err("an optimizer hint is only read immediately after SELECT".into());
+            }
+            hint(whole, query[..t.at.start].chars().count())?;
+            continue;
+        }
+        let Tok::Exec(whole) = &t.tok else {
+            parts.push(t.clone());
+            continue;
+        };
+        let maria_only = whole.starts_with("/*M!");
+        if maria_only && !maria {
+            continue;
+        }
+        let start = if maria_only { 4 } else { 3 };
+        let at = t.at.start + start;
+        for mut inner in executed(&whole[start..whole.len() - 2], query[..at].chars().count())? {
+            if matches!(inner.tok, Tok::Exec(_) | Tok::Sym(";")) {
+                return Err("a statement delimiter or nested executable comment isn't read".into());
+            }
+            inner.at = inner.at.start + at..inner.at.end + at;
+            parts.push(inner);
+        }
+    }
+    Ok(parts)
 }
 
-impl Scan {
-    fn new(query: &str, toks: &[Token]) -> Result<Self, String> {
-        let mut scan = Self { parts: Vec::new(), versions: [0].into(), hints: Vec::new() };
-        for t in toks {
-            let Tok::Exec(whole) = &t.tok else {
-                if matches!(t.tok, Tok::Hint(_)) {
-                    scan.hints.push(t.clone());
-                } else {
-                    scan.parts.push((t.clone(), None));
-                }
-                continue;
-            };
-            let maria = whole.starts_with("/*M!");
-            let start = if maria { 4 } else { 3 };
-            let body = &whole[start..whole.len() - 2];
-            let skip = body.bytes().take_while(u8::is_ascii_digit).count();
-            // Both servers read 5 digits, or 6 before a space, as the version; other runs of digits
-            // they split differently, or read as SQL that a capped LIMIT count could run into.
-            let spaced = body.as_bytes().get(skip).is_some_and(|b| matches!(b, b' ' | b'\t' | b'\n' | b'\r'));
-            if !(skip == 0 || skip == 5 || (skip == 6 && spaced)) {
-                return Err("an executable comment's version is 5 digits, or 6 before a space".into());
-            }
-            let version = body[..skip].parse::<u64>().unwrap_or(0);
-            scan.versions.insert(version);
-            let offset = query[..t.at.start + start + skip].chars().count();
-            for mut inner in executed(&body[skip..], offset)? {
-                if matches!(inner.tok, Tok::Exec(_) | Tok::Sym(";")) {
-                    return Err("a statement delimiter or nested executable comment isn't read".into());
-                }
-                inner.at = (inner.at.start + t.at.start + start + skip)..(inner.at.end + t.at.start + start + skip);
-                scan.parts.push((inner, Some((maria, version))));
-            }
-        }
-        Ok(scan)
-    }
+fn word(t: &Token, k: &str) -> bool {
+    matches!(&t.tok, Tok::Word(w) if w.eq_ignore_ascii_case(k))
+}
 
-    // Guards change only at version thresholds, so all possible streams take linear-many views.
-    fn views(&self) -> impl Iterator<Item = Vec<Token>> + '_ {
-        [false, true].into_iter().flat_map(move |maria| {
-            self.versions.iter().map(move |&version| {
-                self.parts
-                    .iter()
-                    .filter(|(_, guard)| {
-                        guard.is_none_or(|(only_maria, minimum)| {
-                            (!only_maria || maria)
-                                && minimum <= version
-                                && !(maria && !only_maria && (50700..=99999).contains(&minimum))
-                        })
-                    })
-                    .map(|(t, _)| t.clone())
-                    .collect()
-            })
-        })
+fn set_op(t: &Token) -> bool {
+    ["UNION", "INTERSECT", "EXCEPT"].iter().any(|k| word(t, k))
+}
+
+// A hint is read only right after a SELECT keyword, never after `@select`, `t.select` or a stray word.
+fn after_select(toks: &[Token], n: usize, parts: &[Token]) -> bool {
+    if !toks[..n].last().is_some_and(|t| word(t, "SELECT")) {
+        return false;
     }
+    let Some((_, before)) = parts.split_last() else { return false };
+    match before {
+        [] => true,
+        [.., Token { tok: Tok::Sym("(" | ")"), .. }] => true,
+        [.., t] if set_op(t) => true,
+        [.., op, m] if set_op(op) && (word(m, "ALL") || word(m, "DISTINCT")) => true,
+        _ => explain_prefix(before),
+    }
+}
+
+fn explain_prefix(mut rest: &[Token]) -> bool {
+    if !rest.first().is_some_and(|t| ["EXPLAIN", "DESCRIBE", "DESC"].iter().any(|k| word(t, k))) {
+        return false;
+    }
+    rest = &rest[1..];
+    while !rest.is_empty() {
+        if ["ANALYZE", "EXTENDED", "PARTITIONS"].iter().any(|k| word(&rest[0], k)) {
+            rest = &rest[1..];
+        } else if let [f, eq, val, tail @ ..] = rest
+            && word(f, "FORMAT")
+            && eq.tok == Tok::Sym("=")
+            && matches!(val.tok, Tok::Word(_) | Tok::Str(_))
+        {
+            rest = tail;
+        } else {
+            return false;
+        }
+    }
+    true
 }
 
 fn hint(whole: &str, offset: usize) -> Result<(), String> {
@@ -366,6 +377,13 @@ mod tests {
         }
     }
 
+    fn refuses_with(cases: &[(&str, &str)]) {
+        for (q, needle) in cases {
+            let err = read(q).err().unwrap_or_else(|| panic!("read: {q}"));
+            assert!(err.contains(needle), "query: {q}\nerror: {err}\nexpected: {needle}");
+        }
+    }
+
     #[test]
     fn seeded_ctes_and_version_comments_obey_the_read_gate() {
         for seed in 0..128 {
@@ -377,12 +395,14 @@ mod tests {
             let gap = rng.choice([" ", "\t", " /* 水 */ ", "\n"]).unwrap();
             let cte = format!("WITH q AS (SELECT {hex} AS n)");
             let select = format!("SELECT{gap}n FROM q");
-            let query = format!("{cte}{gap}{select} {guard}{version} ORDER BY n */;");
+            let query = format!("{cte}{gap}{select} {guard} ORDER BY n */;");
             let read_query = read(&query).unwrap();
             assert!(read(&read_query.text()).is_ok(), "seed {seed}");
             for denied in [
                 format!("{cte}{gap}UPDATE q SET n = {hex}"),
                 format!("{cte}{gap}{select} {guard}{version} FOR UPDATE */"),
+                format!("{cte}{gap}{select} {guard}{version} ORDER BY n */"),
+                format!("{cte}{gap}{select} {guard} FOR UPDATE */"),
                 format!("{query}{gap}SELECT {hex}"),
             ] {
                 assert!(read(&denied).is_err(), "seed {seed}: {denied}");
@@ -422,31 +442,107 @@ mod tests {
             r#"SELECT /*+ SET_VAR(optimizer_switch = '\') SET_VAR(sql_select_limit = 9) SET_VAR(a = 'a) # ') */ 1"#,
             r#"SELECT /*+ SET_VAR(optimizer_switch = "\") SET_VAR(sql_mode = '') SET_VAR(a = "a) -- ") */ 1"#,
             "SELECT /*+ BKA(t) -- note\n */ 1",
-            // fac-748 review r4: only a version both servers read the same way passes.
+            // fac-748 review r4: servers disagree on where the version ends.
             "SELECT /*!0. */ INTO OUTFILE '/tmp/x'",
             "SELECT /*!000000. */ INTO OUTFILE '/tmp/x'",
             "SELECT a FROM t LIMIT /*!00000999999 */",
             "SELECT a FROM t LIMIT /*!9999 */",
             "/*!99999999999999999999 SELECT */ DROP TABLE users",
             "SELECT a FROM t FOR /*!99999999999999999999 x */ SHARE",
-        ]);
-        for q in [
+            "SELECT a FROM t LIMIT /*!000000 , 999999 */",
             "SELECT 1 /*!50000 + 1 */",
             "SELECT 1 /*!100000 + 1 */",
             "SELECT 1 /*M!100000\t+ 1 */",
+            "SELECT 1 /*!50000 # a note\n + 1 */",
+            "SELECT a FROM t LIMIT 0 /*+ */ , 999999",
+        ]);
+        for q in [
             "SELECT 1 /*! + 1 */",
+            "SELECT 1 /*M! + 1 */",
+            "SELECT /*! 1 */",
+            "SELECT 1 /*! # a note\n + 1 */",
+            "SELECT '/*!40101 */', `/*M!100000 */`, '/*+ */'",
+            "SELECT REPLACE(a, 'x', 'y'), INSERT(a, 1, 2, 'z') FROM t",
         ] {
             assert!(read(q).is_ok(), "refused: {q}");
         }
-        for q in ["SELECT 1 /*!50000 # a note\n + 1 */", "SELECT REPLACE(a, 'x', 'y'), INSERT(a, 1, 2, 'z') FROM t"] {
-            assert!(read(q).is_ok(), "refused: {q}");
-        }
-        for q in ["SELECT a FROM t WHERE x = 1.5LIMIT 999999", "SELECT a FROM t LIMIT 0 /*+ */ , 999999"] {
-            assert!(!read(q).unwrap().capped(20).unwrap().contains("999999"), "uncapped: {q}");
-        }
-        assert!(read("SELECT 1 /*+ SET_VAR(sql_mode = '') */").is_err());
+        assert!(!read("SELECT a FROM t WHERE x = 1.5LIMIT 999999").unwrap().capped(20).unwrap().contains("999999"));
+        assert!(read("SELECT /*+ SET_VAR(sql_mode = '') */ 1").is_err());
         assert!(read("SELECT /*+ SET_VAR(optimizer_switch = 'a#b--c') MAX_EXECUTION_TIME(500) */ 1").is_ok());
         assert!(read("SELECT /*+ MAX_EXECUTION_TIME(0) */ 1").unwrap().timed(1000).is_err());
+    }
+
+    #[test]
+    fn unnumbered_executable_comments_keep_body_and_explain_checks() {
+        refuses_with(&[
+            // Unclosed line comments in unnumbered executable comments still fail in lex::executed.
+            ("SELECT /*! # */ '\n1 */ INTO OUTFILE \"/tmp/x\" -- '", "line comment"),
+            ("SELECT a FROM t /*! -- */ '\n*/ FOR UPDATE -- '", "line comment"),
+            ("SELECT 1 /*M! # */ , '\n*/ INTO @v -- '", "line comment"),
+            ("SELECT 1 /*M! -- */ '\n*/ FOR UPDATE -- '", "line comment"),
+            // Nested `/*` and overlapping `/*/` in unnumbered executable comments fail in lex::token.
+            ("SELECT 1 /*! '/*' */ '*/ INTO OUTFILE \"/x\" -- '", "comment inside an executable comment"),
+            ("SELECT 1 /*M! '/*' */ '*/ INTO OUTFILE \"/x\" -- '", "comment inside an executable comment"),
+            ("SELECT 1 /*! /*! 2 */ */", "comment inside an executable comment"),
+            ("SELECT 1 /*!/*/ 1 '*/ INTO OUTFILE \"/tmp/x\" */ -- '", "comment inside an executable comment"),
+            ("SELECT 1 /*! /*/ 1 '*/ INTO OUTFILE \"/tmp/x\" */ -- '", "comment inside an executable comment"),
+            ("SELECT a FROM t /*M!/*/ 1 '*/ FOR UPDATE */ -- '", "comment inside an executable comment"),
+            ("SELECT a FROM t /*M! /*/ 1 '*/ LIMIT 999999 */ -- '", "comment inside an executable comment"),
+            // Statement delimiters inside unnumbered executable comments fail in view().
+            ("SELECT 1 /*! ; */", "statement delimiter"),
+            ("SELECT 1 /*M! ; DROP TABLE t */", "statement delimiter"),
+            // Writes, ANALYZE and locks inside unnumbered executable comments stay refused.
+            ("/*! EXPLAIN */ DELETE FROM t", "`DELETE` writes"),
+            ("EXPLAIN /*! ANALYZE */ SELECT a FROM t FOR UPDATE", "locking read"),
+            ("EXPLAIN /*M! ANALYZE */ SELECT a FROM t FOR SHARE", "locking read"),
+            ("/*M! EXPLAIN */ SELECT a FROM t FOR UPDATE", "locking read"),
+            ("SELECT 1 /*! FOR UPDATE */", "locking read"),
+            ("SELECT 1 /*M! FOR UPDATE */", "locking read"),
+        ]);
+        for q in ["SELECT 1 /*! / */ 2", "SELECT 1 /*M! # a note\n + 1 */", "/*! EXPLAIN */ SELECT a FROM t FOR UPDATE"]
+        {
+            assert!(read(q).is_ok(), "refused: {q}");
+        }
+    }
+
+    #[test]
+    fn hints_follow_the_select_keyword_in_each_query_block() {
+        for q in [
+            "sElEcT /*+ BKA(t) */ a FROM t",
+            "EXPLAIN SELECT /*+ BKA(t) */ a FROM t",
+            "EXPLAIN ANALYZE SELECT /*+ BKA(t) */ a FROM t",
+            "EXPLAIN FORMAT=JSON SELECT /*+ BKA(t) */ a FROM t",
+            "EXPLAIN FORMAT='TREE' SELECT /*+ BKA(t) */ a FROM t",
+            "DESCRIBE SELECT /*+ BKA(t) */ a FROM t",
+            "WITH q AS (SELECT /*+ BKA(t) */ a FROM t) SELECT /*+ BKA(q) */ a FROM q",
+            "SELECT (SELECT /*+ MAX_EXECUTION_TIME(100) */ 1)",
+            "SELECT 1 UNION SELECT /*+ BKA(t) */ 2",
+            "SELECT 1 UNION ALL SELECT /*+ BKA(t) */ 2",
+        ] {
+            let read = read(q).unwrap();
+            assert_eq!(read.text(), q);
+            assert!(read.timed(100).is_ok(), "{q}");
+        }
+        refuses(&[
+            "/*+ BKA(t) */ SELECT a FROM t",
+            "EXPLAIN /*+ BKA(t) */ SELECT a FROM t",
+            "SELECT /*+ BKA(t) */ /*+ BKA(t) */ a FROM t",
+            "SELECT a FROM t /*+ BKA(t) */",
+            "SELECT t.select /*+ BKA(t) */ FROM t",
+            "SELECT `select` /*+ BKA(t) */ FROM t",
+            "SELECT @select /*+ BKA(t) */",
+            "SELECT @@select /*+ BKA(t) */",
+            "SELECT a FROM t WHERE @select /*+ BKA(t) */ = 1",
+            "SELECT @select /*+ MAX_EXECUTION_TIME(100) */ FROM t",
+            "SELECT @@global.select /*+ BKA(t) */",
+            "SELECT select /*+ BKA(t) */",
+            "SELECT DISTINCT select /*+ BKA(t) */",
+            "EXPLAIN SELECT @select /*+ BKA(t) */",
+            "EXPLAIN t.select /*+ BKA(t) */",
+            "SELECT /*M! @ */ select /*+ BKA(t) */",
+            "/*! SELECT */ /*+ BKA(t) */ a FROM t",
+            "SELECT /*M! DISTINCT */ /*+ BKA(t) */ a FROM t",
+        ]);
     }
 
     #[test]
