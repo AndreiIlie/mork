@@ -29,9 +29,9 @@ impl Redactor {
             return;
         }
         let json = serde_json::to_string(v).unwrap_or_default();
-        let json = json.trim_matches('"').to_owned();
+        let json = json.strip_prefix('"').and_then(|s| s.strip_suffix('"')).unwrap_or(v);
         let tsv = v.replace('\\', "\\\\").replace('\t', "\\t").replace('\n', "\\n");
-        for form in [v.to_owned(), json, tsv] {
+        for form in [v.to_owned(), json.to_owned(), tsv] {
             if !self.values.contains(&form) {
                 self.values.push(form);
             }
@@ -228,6 +228,14 @@ fn surrogate(hi: u32, chars: &mut std::str::Chars<'_>) -> Option<char> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn json_escaped_secret_keeps_its_trailing_quotes() {
+        let mut r = Redactor::default();
+        r.add("fixture\"\"");
+        assert_eq!(r.mask(r#"before fixture\"\" after"#), format!("before {MASK} after"));
+        assert_eq!(r.mask(r#"fixture\"\"#), r#"fixture\"\"#);
+    }
 
     #[test]
     fn seeded_utf16_escapes_match_the_lossy_utf16_decoder() {
