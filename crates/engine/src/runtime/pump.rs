@@ -221,10 +221,7 @@ impl Engine {
             ports.extend(card.port);
             ports.extend(card.mock.and_then(|m| m.port));
         }
-        for port in config.tunnels.values().map(|t| t.port).chain(self.bound_web_port) {
-            ports.remove(&port);
-        }
-        mork_types::job::Net { domains, host_ports: ports.into_iter().collect() }
+        mork_types::job::Net { domains, host_ports: ports.difference(&self.reserved_ports).copied().collect() }
     }
 
     // The seat's folder read-write; agy reads its schema by path, so that one file of the job's is read-only (fac-654).

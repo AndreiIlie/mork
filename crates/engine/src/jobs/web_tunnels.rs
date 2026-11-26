@@ -155,17 +155,14 @@ struct Tunnel {
 
 impl Tunnel {
     fn open(home: &Home, name: &str, cfg: &TunnelConfig) -> Result<Self, String> {
-        Self::open_using(home, name, |socket| argv(cfg, socket))
-    }
-
-    fn open_using(home: &Home, name: &str, args: impl FnOnce(&Path) -> Vec<String>) -> Result<Self, String> {
+        let input = super::wall_ports::tunnel_input(home, cfg.port).map_err(|e| format!("tunnel reservation: {e}"))?;
         let scratch = Scratch::make(&home.run_dir().join("web-tunnels"), name)?;
         let errors = scratch.secret("ssh.err", "")?;
-        let args = args(&scratch.socket());
+        let args = argv(cfg, &scratch.socket());
         proclog::record(home.root(), "web-tunnel", &args, "", false);
         let mut cmd = launch::guard(&args);
         launch::without_git_env(&mut cmd);
-        cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(File::create(&errors).map_err(|e| e.to_string())?);
+        cmd.stdin(Stdio::from(input)).stdout(Stdio::null()).stderr(File::create(&errors).map_err(|e| e.to_string())?);
         let child = cmd.spawn().map_err(|e| format!("SSH didn't start: {e}"))?;
         Ok(Self { child, scratch, errors, started: clock::instant(), ready: false })
     }

@@ -99,7 +99,7 @@ impl Fixture {
         let state = store.load().unwrap();
         // Recovery needs the store and job files. The app's listeners and event loop never start.
         Engine {
-            bound_web_port: None,
+            reserved_ports: Default::default(),
             opts,
             ctx,
             store,

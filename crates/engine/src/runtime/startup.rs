@@ -218,7 +218,7 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
     let shared = Shared::new(opts.commit.clone(), opts.dirty, opts.home.root().display().to_string());
     let (tx, rx) = channel();
     let (mork, agent) = open_sockets(&opts, &shared, &tx, sock_fds)?;
-    let bound_web_port =
+    let reserved_ports =
         jobs::wall_ports::start(&opts.home, &config).map_err(|e| format!("wall service ports: {e}"))?;
     let sampled = tx.clone();
     std::thread::spawn(move || crate::resources::watch(|r| sampled.send(Input::Resources(r)).is_ok()));
@@ -238,7 +238,7 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
     let (ctx, fallback) = context(&opts, config, choosing, skills);
     let wakes = super::wakes::Wakes::open(&opts.home);
     let engine = Engine {
-        bound_web_port,
+        reserved_ports,
         opts,
         ctx,
         store,
