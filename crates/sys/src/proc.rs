@@ -104,13 +104,13 @@ pub fn term_requested() -> bool {
 /// The child never outlives the caller (SIGKILL on parent death); every descriptor above the
 /// kept ones is closed; `own_group` is the unwalled path's group (1.4.4.1).
 pub fn prepare_wall_spawn(cmd: &mut std::process::Command, keep: Option<i32>, own_group: bool) {
-    prepare_spawn(cmd, keep, own_group, libc::SIGKILL);
+    prepare_spawn(cmd, keep, None, own_group, libc::SIGKILL);
 }
 
 /// Guard for a short command (M3.34): SIGTERM on caller death kills its whole group; a subreaper
 /// (M4.6), so a descendant that left the group by `setsid` is still ended.
 pub fn prepare_guard_spawn(cmd: &mut std::process::Command) {
-    prepare_spawn(cmd, None, true, libc::SIGTERM);
+    prepare_spawn(cmd, None, None, true, libc::SIGTERM);
     // SAFETY: prctl with integers, in the child between fork and exec: async-signal-safe. The
     // attribute is kept across exec.
     unsafe {
@@ -123,7 +123,12 @@ pub fn prepare_guard_spawn(cmd: &mut std::process::Command) {
     }
 }
 
-fn prepare_spawn(cmd: &mut std::process::Command, keep: Option<i32>, own_group: bool, death: i32) {
+/// Preserves both the bwrap status pipe and the wall's bootstrap socket until exec.
+pub fn prepare_bridge_spawn(cmd: &mut std::process::Command, status: i32, bridge: i32) {
+    prepare_spawn(cmd, Some(status), Some(bridge), false, libc::SIGKILL);
+}
+
+fn prepare_spawn(cmd: &mut std::process::Command, keep: Option<i32>, bridge: Option<i32>, own_group: bool, death: i32) {
     let parent = std::process::id().cast_signed();
     let hook = move || -> io::Result<()> {
         // SAFETY: prctl, getppid, _exit and dup2 with integers, in the child between fork and
@@ -137,17 +142,25 @@ fn prepare_spawn(cmd: &mut std::process::Command, keep: Option<i32>, own_group: 
             if libc::getppid() != parent {
                 libc::_exit(1);
             }
+            // Preserve the bridge source before descriptor 3 can be overwritten.
+            let bridge_copy = bridge.map(|fd| libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 5));
+            if bridge_copy == Some(-1) {
+                return Err(io::Error::last_os_error());
+            }
             if let Some(fd) = keep {
                 let r = if fd == 3 { libc::fcntl(3, libc::F_SETFD, 0) } else { libc::dup2(fd, 3) };
                 if r == -1 {
                     return Err(io::Error::last_os_error());
                 }
             }
+            if let Some(fd) = bridge_copy && libc::dup2(fd, crate::wall_bridge::BRIDGE_FD) < 0 {
+                return Err(io::Error::last_os_error());
+            }
             if own_group && libc::setpgid(0, 0) != 0 {
                 return Err(io::Error::last_os_error());
             }
         }
-        let first = if keep.is_some() { 4 } else { 3 };
+        let first = 3 + i32::from(keep.is_some()) + i32::from(bridge.is_some());
         close_fds_from(first)
     };
     // SAFETY: the hook calls only async-signal-safe functions (prctl, getppid, _exit, dup2,

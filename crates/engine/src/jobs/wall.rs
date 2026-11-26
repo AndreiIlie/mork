@@ -63,6 +63,9 @@ fn argv_with(spec: &JobSpec, new_session: bool, status: bool) -> Vec<String> {
         }
         a.push((*f).to_owned());
     }
+    if spec.net.is_some() {
+        a.push("--unshare-net".into());
+    }
     for m in &spec.mounts {
         push_mount(&mut a, m);
     }
@@ -80,9 +83,14 @@ fn argv_with(spec: &JobSpec, new_session: bool, status: bool) -> Vec<String> {
     if spec.wall == WallMode::Partial {
         a.push("--partial".into());
     }
+    if let Some(net) = &spec.net {
+        a.push("--bridge".into());
+        a.extend(net.host_ports.iter().map(u16::to_string));
+    } else {
     match &spec.ports {
         Some(ports) => a.extend(ports.iter().map(u16::to_string)),
         None => a.push("--any-port".into()),
+    }
     }
     a.push("--".into());
     a.extend(spec.argv.iter().cloned());

@@ -4,6 +4,8 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::fs::OpenOptionsExt;
+use std::os::fd::{AsRawFd, OwnedFd};
+use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
@@ -61,7 +63,7 @@ fn own(job: &JobDir) -> io::Result<()> {
         Ok(s) => s,
         Err(e) => return record_exit(job, None, false, Vec::new(), Some(e.to_string())),
     };
-    let Started { mut child, run, _status } = started;
+    let Started { mut child, run, _status, _proxy } = started;
     if let Some(f) = feed.as_mut() {
         f.attach(child.stdin.take());
     }
@@ -89,6 +91,7 @@ fn own(job: &JobDir) -> io::Result<()> {
         left,
         error: None,
     };
+    drop(_proxy);
     files::write_json(&job.exit_path(), &exit)
 }
 
@@ -111,6 +114,7 @@ struct Started {
     run: RunInfo,
     // bwrap's status pipe, kept open until it exits: it writes the exit code there last.
     _status: Option<BufReader<io::PipeReader>>,
+    _proxy: Option<Proxy>,
 }
 
 fn start(job: &JobDir, spec: &JobSpec) -> io::Result<Started> {
@@ -145,14 +149,43 @@ fn start(job: &JobDir, spec: &JobSpec) -> io::Result<Started> {
     if let Some(home) = job.dir.parent().and_then(Path::parent) {
         proclog::record(home, spec.kind.as_str(), &argv, &spec.cwd, walled);
     }
-    if walled { start_walled(job, cmd) } else { start_unwalled(job, cmd) }
+    if !walled {
+        return start_unwalled(job, cmd);
+    }
+    let bridge = spec.net.as_ref().map(|_| Proxy::start(job, spec)).transpose()?;
+    start_walled(job, cmd, bridge)
 }
 
-fn start_walled(job: &JobDir, mut cmd: Command) -> io::Result<Started> {
+struct Proxy(Child);
+
+impl Proxy {
+    fn start(job: &JobDir, spec: &JobSpec) -> io::Result<(Self, UnixStream)> {
+        let (host, wall) = UnixStream::pair()?;
+        let argv = vec![spec.mork_bin.clone(), "wall-proxy".into(), job.dir.display().to_string()];
+        let argv = slice::wrap(spec.launch, argv, &[]);
+        let mut cmd = Command::new(&argv[0]);
+        cmd.args(&argv[1..]).stdin(Stdio::from(OwnedFd::from(host)));
+        mork_sys::prepare_wall_spawn(&mut cmd, None, false);
+        Ok((Self(cmd.spawn()?), wall))
+    }
+}
+
+impl Drop for Proxy {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+fn start_walled(job: &JobDir, mut cmd: Command, bridge: Option<(Proxy, UnixStream)>) -> io::Result<Started> {
     let (reader, writer) = io::pipe()?;
-    use std::os::fd::AsRawFd;
-    mork_sys::prepare_wall_spawn(&mut cmd, Some(writer.as_raw_fd()), false);
+    if let Some((_, socket)) = &bridge {
+        mork_sys::prepare_bridge_spawn(&mut cmd, writer.as_raw_fd(), socket.as_raw_fd());
+    } else {
+        mork_sys::prepare_wall_spawn(&mut cmd, Some(writer.as_raw_fd()), false);
+    }
     let mut child = cmd.spawn()?;
+    let proxy = bridge.map(|(proxy, _)| proxy);
     drop(writer);
     let mut status = BufReader::new(reader);
     let mut line = String::new();
@@ -188,7 +221,7 @@ fn start_walled(job: &JobDir, mut cmd: Command) -> io::Result<Started> {
         pgid: None,
     };
     files::write_json(&job.run_path(), &run)?;
-    Ok(Started { child, run, _status: Some(status) })
+    Ok(Started { child, run, _status: Some(status), _proxy: proxy })
 }
 
 fn start_unwalled(job: &JobDir, mut cmd: Command) -> io::Result<Started> {
@@ -208,7 +241,7 @@ fn start_unwalled(job: &JobDir, mut cmd: Command) -> io::Result<Started> {
         pgid: Some(pid),
     };
     files::write_json(&job.run_path(), &run)?;
-    Ok(Started { child, run, _status: None })
+    Ok(Started { child, run, _status: None, _proxy: None })
 }
 
 fn append(p: &Path) -> io::Result<File> {

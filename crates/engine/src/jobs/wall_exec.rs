@@ -22,6 +22,7 @@ pub fn landlock_abi() -> i64 {
 pub enum WallExecError {
     /// No `--` before the command.
     NoSeparator,
+    Bridge(std::io::Error),
     /// Nothing after `--`.
     NoCommand,
     /// A port that isn't a number from 0 to 65535.
@@ -43,6 +44,7 @@ pub enum WallExecError {
 impl std::fmt::Display for WallExecError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Bridge(e) => write!(f, "wall-exec: network bridge failed: {e}"),
             Self::NoSeparator => write!(f, "wall-exec: no `--` before the command"),
             Self::NoCommand => write!(f, "wall-exec: no command"),
             Self::BadPort(p) => write!(f, "wall-exec: bad port {p:?}"),
@@ -63,6 +65,7 @@ impl std::error::Error for WallExecError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Args {
     pub partial: bool,
+    pub bridge: bool,
     /// `None`: `--any-port`.
     pub ports: Option<Vec<u16>>,
     pub argv: Vec<String>,
@@ -78,16 +81,19 @@ pub fn parse(args: &[String]) -> Result<Args, WallExecError> {
     }
     let (mut partial, mut any) = (false, false);
     let mut ports = Vec::new();
+    let mut bridge = false;
     for a in head {
         if a == "--partial" {
             partial = true;
+        } else if a == "--bridge" {
+            bridge = true;
         } else if a == "--any-port" {
             any = true;
         } else {
             ports.push(a.parse::<u16>().map_err(|_| WallExecError::BadPort(a.clone()))?);
         }
     }
-    Ok(Args { partial, ports: (!any).then_some(ports), argv })
+    Ok(Args { partial, bridge, ports: (!any).then_some(ports), argv })
 }
 
 /// Sets the domain and execs. Returns only on failure, with the reason.
@@ -99,6 +105,10 @@ pub fn run(args: &[String]) -> WallExecError {
     if a.partial && !faults::TEST_SETTINGS {
         return WallExecError::PartialRefused;
     }
+    let mut cmd = Command::new(&a.argv[0]);
+    if a.bridge && let Err(e) = bridge(&mut cmd, a.ports.as_deref().unwrap_or_default()) {
+        return WallExecError::Bridge(e);
+    }
     if let Err(e) = mork_sys::set_no_new_privs() {
         return WallExecError::NoNewPrivs(e);
     }
@@ -107,7 +117,7 @@ pub fn run(args: &[String]) -> WallExecError {
         return WallExecError::AbiTooLow(abi);
     }
     let restriction =
-        mork_sys::Restriction { tcp_connect: a.ports.clone().filter(|_| abi >= 4), scope: abi >= MIN_ABI };
+        mork_sys::Restriction { tcp_connect: a.ports.filter(|_| abi >= 4 && !a.bridge), scope: abi >= MIN_ABI };
     if let Err(e) = mork_sys::restrict_self(&restriction) {
         return WallExecError::Landlock(e);
     }
@@ -117,6 +127,26 @@ pub fn run(args: &[String]) -> WallExecError {
     let Some((program, rest)) = a.argv.split_first() else { return WallExecError::NoCommand };
     // bwrap's `--chdir` sets `PWD`; the wall's environment is only what Mork sets
     // (1.4.11.4).
-    let err = Command::new(program).args(rest).env_remove("PWD").exec();
+    let err = cmd.args(rest).env_remove("PWD").exec();
     WallExecError::Exec { program: program.clone(), err }
+}
+
+fn bridge(cmd: &mut Command, ports: &[u16]) -> std::io::Result<()> {
+    use std::net::{Ipv4Addr, Shutdown, TcpListener};
+    let pair = mork_sys::wall_bridge::inherited_bridge()?;
+    for port in ports {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, *port))?;
+        mork_sys::wall_bridge::send_listener(&pair, &listener, 1)?;
+    }
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
+    let url = format!("http://{}", listener.local_addr()?);
+    mork_sys::wall_bridge::send_listener(&pair, &listener, 0)?;
+    pair.shutdown(Shutdown::Write)?;
+    for name in ["HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy"] {
+        cmd.env(name, &url);
+    }
+    for name in ["NO_PROXY", "no_proxy"] {
+        cmd.env(name, "localhost,127.0.0.1,::1,.localhost");
+    }
+    Ok(())
 }
