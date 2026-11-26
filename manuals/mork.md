@@ -21,6 +21,7 @@ A plan's proof list sets the minimum, and a small regression test for changed be
 If you think more is needed, say so in one line and wait.
 
 A card's specification is the operator's idea and what he explicitly settled, plus decisions settled on his delegation by the card's project's orchestrator answering given asks.
+Nothing is approved by sitting in a recap, a brief, a finding or a note.
 Plan approval also settles in-scope defaults that follow established practice and are stated in the recap.
 An inferred requirement outside that scope cannot support a finding.
 Raise a proposed addition in your flagged hand before doing work that depends on it.
@@ -291,6 +292,7 @@ From a card's rooms or any of its DMs, a seat may name its card's own orchestrat
 Routine progress raises no ask: the board shows it.
 Raise anything beyond the approved brief and any public content a seat chooses (product or policy wording) in a flagged hand message, given automatically to the orchestrator on a delegated card.
 At brief the planner or no-planner foreman puts in-scope wording that follows established practice in the recap for `approve` instead.
+Silence is no consent.
 The engine's messages and its automatic actions are outside this rule.
 A visual card's recap at brief is its plan and its mock together, its approve ask carrying the mock's link.
 While the operator has an approved mock reopened, the planner's clear `brief-ready` in the spec room (or the foreman's in the card's room on a no-planner card) offers the mock to him, its hand's message carrying the link and asking nothing.
