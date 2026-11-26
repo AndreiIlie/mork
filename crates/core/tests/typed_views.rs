@@ -129,6 +129,18 @@ fn room(s: &Sim, id: &str) -> mork_types::view::PlaceView {
 }
 
 #[test]
+fn only_the_room_summary_normalizes_the_description() {
+    let mut s = start_no_planner();
+    let mut board = s.state.board[CARD].clone();
+    s.state.cards.get_mut(CARD).unwrap().description = "First line.\n  Second line.".into();
+    let body = "\r\n  First line.\r\n  Second line.  \r\n";
+    board.description = format!("operator 01.01: A note.\r\n{body}");
+    s.apply(mork_core::decide::Event::BoardsRead { cards: vec![board], prefixes: Default::default() });
+    assert!(s.messages(CARD).iter().any(|m| m.headline.ends_with("card changed") && m.text.contains(body)));
+    assert_eq!(room(&s, CARD).summaries[0].text, "First line.\n  Second line.");
+}
+
+#[test]
 fn room_controls_parent_and_standing_decisions_follow_the_card() {
     let mut s = start_no_planner();
     s.config.projects.get_mut("web").unwrap().preview = Some("serve".into());

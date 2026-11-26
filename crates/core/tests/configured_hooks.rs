@@ -16,7 +16,7 @@ use mork_types::action::{ActionStatus, ActionWhat};
 use mork_types::config::TicketsConfig;
 use mork_types::door::{Op, SqlSelect};
 use mork_types::door_config::{Limits, LimitsLowered, Login, Sql, TARGETS_VERSION, Target, TargetsFile, Transport};
-use mork_types::work::OpenPr;
+use mork_types::work::{ActionFailure, OpenPr};
 use mork_types::{CardId, Sha};
 use serde_json::json;
 
@@ -156,7 +156,6 @@ fn tickets_config_holds_unworded_open_pr_and_formats_configured_page_url() {
     let held = sim.state.actions.values().find(|a| matches!(a.what, ActionWhat::OpenPr { .. })).unwrap().clone();
     assert_eq!(held.status, ActionStatus::Held);
     assert!(held.words.as_deref().is_some_and(|e| e.contains("PR wording")), "{:?}", held.words);
-    assert!(pr::held_words("refused").contains("on a project with tickets configured"));
 
     // Adding PR wording and retrying OpenPr formats the title and configured page URL.
     sim.state.board.get_mut(&CardId::new("ex-1")).unwrap().description =
@@ -175,6 +174,14 @@ fn tickets_config_holds_unworded_open_pr_and_formats_configured_page_url() {
         }
         other => panic!("expected OpenPr, got {other:?}"),
     }
+    let refused = Err(ActionFailure::Internals { words: "refused".into() });
+    sim.returned(&retried.id, refused.clone());
+    assert!(sim.state.actions[&retried.id].words.as_ref().unwrap().contains("card.change --note"));
+
+    sim.state.board.get_mut("ex-1").unwrap().description = "The description.".into();
+    sim.operator(json!({"action.retry": {"action": retried.id}})).unwrap();
+    sim.returned(&retried.id, refused);
+    assert!(sim.state.actions[&retried.id].words.as_ref().unwrap().contains("board title with card.change --title"));
 }
 
 fn sql_target(database: &str, schema_hint: Option<&str>) -> Target {

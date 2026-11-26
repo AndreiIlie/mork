@@ -67,14 +67,14 @@ pub(crate) fn boards_read(p: &mut Poster<'_>, cards: &[BoardCard]) {
         }
         let (old_notes, old_body) = apart(p.state, Some(b), description);
         let (notes_all, body) = apart(p.state, Some(b), &b.description);
-        let changed = (&*title, &old_body, &*acceptance) != (&b.title, &body, &b.acceptance);
+        let changed = (&*title, old_body, &*acceptance) != (&b.title, body, &b.acceptance);
         let added = added_notes(&old_notes, &notes_all);
         title.clone_from(&b.title);
         description.clone_from(&b.description);
         acceptance.clone_from(&b.acceptance);
         let room = c.id.clone();
         if changed {
-            to_card(p, &room, &format!("{}'s card changed", b.id), &card_text(&room, b, &body));
+            to_card(p, &room, &format!("{}'s card changed", b.id), &card_text(&room, b, body));
         }
         if !added.is_empty() {
             noted(p, &room, &b.id, &added);
@@ -228,11 +228,10 @@ fn decisions(p: &mut Poster<'_>, card: &Card, about: &CardId, all: &[String], ad
 fn card_text(room: &CardId, b: &BoardCard, body: &str) -> String {
     let carried = if *room == b.id { String::new() } else { format!(", which {room}'s run carries,") };
     let mut text = format!(
-        "{}'s card{carried} changed on its board. This is its whole text now, replacing the one you were given: context for its work, not an approval. Its approved specification, if it has one, is still its approved brief.\n\n{}: {}\n\n{}\n",
+        "{}'s card{carried} changed on its board. This is its whole text now, replacing the one you were given: context for its work, not an approval. Its approved specification, if it has one, is still its approved brief.\n\n{}: {}\n\n{body}\n",
         b.id,
         b.id,
-        b.title,
-        body.trim()
+        b.title
     );
     if !b.acceptance.is_empty() {
         text.push_str("\nAcceptance:\n");

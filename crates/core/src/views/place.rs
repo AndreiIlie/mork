@@ -181,8 +181,9 @@ fn summaries(state: &State, c: &Card) -> Vec<Summary> {
         .filter_map(|(id, title, description)| {
             let board = state.board.get(id);
             let (title, description) = board.map_or((title, description), |b| (&b.title, &b.description));
-            let text = crate::board::notes::apart(state, board, description).1;
-            (!text.is_empty()).then(|| Summary { card: id.clone(), title: title.clone(), text })
+            let (_, body) = crate::board::notes::apart(state, board, description);
+            let text = body.trim();
+            (!text.is_empty()).then(|| Summary { card: id.clone(), title: title.clone(), text: text.replace("\r\n", "\n") })
         })
         .collect()
 }

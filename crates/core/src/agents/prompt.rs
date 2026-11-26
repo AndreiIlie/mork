@@ -296,9 +296,9 @@ fn card_text(state: &State, c: &Card, blind: bool, out: &mut String) -> Vec<Stri
     let (description, acceptance) = board.map_or((&c.description, &c.acceptance), |b| (&b.description, &b.acceptance));
     let title = board.map_or(&c.title, |b| &b.title);
     let (notes, text) = if blind {
-        crate::board::notes::apart_verbatim(state, board, description)
+        crate::board::notes::apart(state, board, description)
     } else {
-        (Vec::new(), description.trim())
+        (Vec::new(), description.as_str())
     };
     let _ = write!(out, "\n## The card\n\n{}: {title}\n\n{}\n", c.id, text);
     carried::accepts(acceptance, out);
