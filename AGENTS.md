@@ -26,7 +26,7 @@ A card changes only what its agreed specification asks; this says, of each path,
 
 ```
 cargo build --workspace
-cargo xtask web            # install web/ when needed, typecheck, and build web/dist
+cargo xtask web            # install web/ when needed, test and run the class checker, typecheck, and build web/dist
 cargo xtask check          # rustfmt, the comment rules, clippy -D warnings (all features, then the suite's production test targets without faults), the audits (1.12.8), and web/
 cargo xtask checks --base <b> --json <report> # the same checks, with located findings and advisory changes to existing Rust tests and assertions against base
 cargo xtask test           # verification's and the merge queue's alone (fac-65, fac-375): the suite once with `faults`, its test binaries side by side, each pass's test count printed first and each test's result as it lands (fac-697), timed (T6.8), the build without it and its production-only tests, then the hygiene step; with MORK_TRAIN_PHASE=walled its skipped wall tests are recorded, and =unwalled runs them alone, timed within 3 minutes
