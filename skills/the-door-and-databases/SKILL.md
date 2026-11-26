@@ -40,7 +40,9 @@ JSON
 )"
 ```
 
-   Every target takes any read its login may run, as written, with no table list, except `information_schema` and the `sys` schema: one `SELECT`, `WITH`, `TABLE`, `VALUES`, `SHOW`, `DESCRIBE` or `EXPLAIN`, escaped and multiline strings, optimizer hints and executable comments included.
+   Every target takes any read its login may run, as written, with no table list, except `information_schema` and the `sys` schema: one `SELECT`, `WITH`, `TABLE`, `VALUES`, `SHOW`, `DESCRIBE` or `EXPLAIN`, including escaped and multiline strings.
+   The door refuses executable comments with a digit immediately after `/*!` or `/*M!` and checks unnumbered executable comments as SQL.
+   An optimizer hint (`/*+ ... */`) is allowed only immediately after `SELECT` in any query block, including inside `EXPLAIN`, CTEs and subqueries.
    A write under `EXPLAIN` stays unmeasured.
    When a target sets `schema_hint`, `door.help <target>` and any schema refusal show where its schema is documented and what to inspect instead.
    The session is read-only on the server.

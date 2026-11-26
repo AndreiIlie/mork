@@ -200,7 +200,8 @@ pub const OPS: &[OpSpec] = &[
                 run as written in a read-only session: \
                 SELECT, WITH, TABLE, VALUES, SHOW, DESCRIBE or EXPLAIN; no write, INTO, locking read \
                 (but under an EXPLAIN without ANALYZE) or second statement, in the query or an \
-                executable comment. A LIMIT over max_rows is \
+                unnumbered executable comment. Versioned executable comments are refused. Optimizer hints are \
+                allowed only immediately after SELECT in any query block. A LIMIT over max_rows is \
                 lowered to it; rows past max_rows are cut",
         params: &[req(
             "query",
