@@ -1,4 +1,4 @@
-//! Shell labels shared by the CLI streams. A protected message has no inspectable command.
+// The same masking decision covers the visible label and the inspectable command.
 
 use std::borrow::Cow;
 use std::path::Path;
