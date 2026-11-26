@@ -129,6 +129,33 @@ fn room(s: &Sim, id: &str) -> mork_types::view::PlaceView {
 }
 
 #[test]
+fn room_model_labels_follow_the_model_across_defaults_picks_and_picker_options() {
+    use mork_types::config::{OPUS, SeatOverride};
+
+    let mut s = start_no_planner();
+    s.config.seats.insert("foreman".into(), SeatOverride { model: Some(OPUS.into()), ..Default::default() });
+    s.config.picks = serde_json::from_value(json!({"researcher": [
+        {"cli":"claude", "model":OPUS, "label":"Opus", "efforts":["high"]},
+        {"cli":"codex", "model":"custom-id", "label":"Custom name", "efforts":["high"]}
+    ]}))
+    .unwrap();
+    s.state.agents.get_mut(FOREMAN).unwrap().choice = None;
+    s.operator(json!({"pick":{"agent":FOREMAN, "model":"gpt-6.2-astra"}})).unwrap();
+    let foreman = || room(&s, CARD).sessions.into_iter().find(|a| a.agent == FOREMAN).unwrap();
+    let row = foreman();
+    assert_eq!(row.label, "Opus 5.5");
+    assert_eq!(row.setting.unwrap().model.label, "Opus 5.5");
+    assert_eq!(row.pending.unwrap().model.label, "Astra");
+    for (model, label) in [(OPUS, "Opus 5.5"), ("gpt-6.2-astra", "Astra"), ("custom-id", "Custom name")] {
+        assert_eq!(row.choices.iter().find(|c| c.model == model).unwrap().label, label);
+    }
+    let a = s.state.agents.get_mut(FOREMAN).unwrap();
+    a.choice = a.pending.take();
+    let row = room(&s, CARD).sessions.into_iter().find(|a| a.agent == FOREMAN).unwrap();
+    assert_eq!(row.label, "Astra");
+}
+
+#[test]
 fn room_controls_parent_and_standing_decisions_follow_the_card() {
     let mut s = start_no_planner();
     s.config.projects.get_mut("web").unwrap().preview = Some("serve".into());
