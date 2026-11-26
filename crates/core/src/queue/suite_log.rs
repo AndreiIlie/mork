@@ -3,6 +3,8 @@
 
 use mork_types::work::Failing;
 
+use super::failing::{XTASK, live_result};
+
 // A run with many failures must still fit a foreman's message: the full log has the rest.
 const BLOCK: usize = 20;
 const MOST: usize = 120;
@@ -36,18 +38,16 @@ fn failures(whole: &str) -> Vec<String> {
     let mut i = 0;
     while let Some(&l) = lines.get(i) {
         i += 1;
-        if let Some(said) = l.strip_prefix("xtask: ") {
+        if let Some(said) = l.strip_prefix(XTASK) {
             // A test's result told as it landed is told again under its binary's verdict (fac-697).
-            if said.split_once(": test ").is_some_and(|(_, t)| t.contains(" ... ")) {
+            if live_result(said).is_some() {
                 continue;
             }
             in_failed = said.contains("FAILED");
             if in_failed {
                 kept.push(l.to_owned());
                 let what = said.split(": FAILED").next().unwrap_or(said);
-                if let Some(s) =
-                    start.filter(|s| lines.get(*s).is_some_and(|x| x.strip_prefix("xtask: ") == Some(what)))
-                {
+                if let Some(s) = start.filter(|s| lines.get(*s).is_some_and(|x| x.strip_prefix(XTASK) == Some(what))) {
                     kept.extend(errors(lines.get(s + 1..i - 1).unwrap_or_default()));
                 }
             }
@@ -73,7 +73,7 @@ fn block(rest: &[&str]) -> (Vec<String>, usize) {
     let end = rest
         .iter()
         .position(|l| {
-            l.starts_with("---- ") || *l == "failures:" || l.starts_with("test result:") || l.starts_with("xtask: ")
+            l.starts_with("---- ") || *l == "failures:" || l.starts_with("test result:") || l.starts_with(XTASK)
         })
         .unwrap_or(rest.len());
     let said =
@@ -105,7 +105,7 @@ fn under(rest: &[&str]) -> (Vec<String>, usize) {
 }
 
 fn ends(l: &str) -> bool {
-    l.starts_with("xtask: ") || l.starts_with("test ")
+    l.starts_with(XTASK) || l.starts_with("test ")
 }
 
 fn cap(mut lines: Vec<String>) -> Vec<String> {

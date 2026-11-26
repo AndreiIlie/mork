@@ -170,10 +170,14 @@ fn calling(p: &Poster<'_>, id: &CardId) -> bool {
 }
 
 /// Why a PR the leak or internals check refused is held: its title's words.
-pub fn held_words(words: &str) -> String {
-    format!(
-        "{words}: on a project with tickets configured, change the card's `PR wording` note with card.change --note; otherwise change its board title with card.change --title; then /action.retry"
-    )
+pub(crate) fn held_words(state: &State, card: &CardId, config: &Config, words: &str) -> String {
+    let ticketed = state.cards.get(card).is_some_and(|c| !crate::board::tickets::of(state, c, config).is_empty());
+    let edit = if ticketed {
+        "change the card's `PR wording` note with card.change --note"
+    } else {
+        "change its board title with card.change --title"
+    };
+    format!("{words}: {edit}, then /action.retry")
 }
 
 // Why a PR opening can't go yet: its card's `PR wording` note is missing or incomplete (fac-296).

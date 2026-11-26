@@ -186,19 +186,8 @@ fn own_record<'a, S: AsRef<str>>(
     own.copied()
 }
 
-/// A card's description apart from its dated notes: the notes, newest first, and the text under them. `board`'s records
-/// tell where each note ends; its index may be empty before the board is read.
-pub(crate) fn apart(state: &State, board: Option<&BoardCard>, description: &str) -> (Vec<String>, String) {
-    let (notes, body) = apart_verbatim(state, board, description);
-    (notes, body.lines().collect::<Vec<_>>().join("\n").trim().to_owned())
-}
-
 /// Separates the dated notes while preserving the specification's original whitespace.
-pub(crate) fn apart_verbatim<'a>(
-    state: &State,
-    board: Option<&BoardCard>,
-    description: &'a str,
-) -> (Vec<String>, &'a str) {
+pub(crate) fn apart<'a>(state: &State, board: Option<&BoardCard>, description: &'a str) -> (Vec<String>, &'a str) {
     let written = board.map(|b| super::writes::written(state, &b.project, &b.file)).unwrap_or_default();
     let lines: Vec<&str> = description.lines().collect();
     let n = split(&lines, &written);

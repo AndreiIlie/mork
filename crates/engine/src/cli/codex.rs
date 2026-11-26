@@ -111,8 +111,7 @@ pub(super) fn commentary(st: &mut StreamState, line: &str) {
     }
 }
 
-// As Claude's (fac-206): a command the command, a file change its files, a search its query; any
-// other item, or one missing what they say of it, its tool's name.
+// A tool item can arrive without a command. Its event fields then supply the step label.
 fn step_words(it: &Value, folder: &str, home: &str) -> String {
     let field = |k: &str| it.get(k).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
     let kind = field("type").unwrap_or("");
