@@ -60,6 +60,7 @@ fn echo_spec(t: &TestHome, id: &str) -> (JobSpec, PathBuf) {
         browsers: None,
         run_dir: run_dir.display().to_string(),
         read_only: vec![bin_dir.clone(), t.bin().display().to_string()],
+        peer_clones: Vec::new(),
         read_write: vec![io.display().to_string()],
         credentials: None,
         skills: None,
