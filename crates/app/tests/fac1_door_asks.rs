@@ -116,6 +116,8 @@ fn fac1_once_runs_once_and_no_refuses() {
     assert!(rig.send(json!({"door.no": {"ask": outside}})).get("ok").is_some());
     let told_no = || news(&rig, "ex-1", "foreman").iter().any(|m| m.text.contains("The operator said no"));
     wait_until("the no's news", LONG, told_no);
+    // Settling the refusal first gives the parallel call's result a turn of its own.
+    rig.wait_turns("ex-1/foreman", 3);
     let parallel = ask_of(&rig, "parallel ran");
     let mut c1 = Client::connect(&rig.fhome().join("mork.sock"));
     let mut c2 = Client::connect(&rig.fhome().join("mork.sock"));
@@ -127,6 +129,7 @@ fn fac1_once_runs_once_and_no_refuses() {
     wait_until("the parallel call's run", LONG, || remote_commands(&rig, "parallel ran") == 1);
     rig.wait_loop();
     rig.wait_actions_done();
+    rig.wait_turns("ex-1/foreman", 4);
     assert_eq!(remote_commands(&rig, "parallel ran"), 1, "it ran once");
 }
 
