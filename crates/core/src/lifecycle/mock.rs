@@ -78,8 +78,12 @@ pub(crate) fn starting(p: &mut Poster<'_>, a: &Agent) {
 
 /// The mock's link, while a Vite host is set and the card has its port.
 pub(crate) fn link(c: &Card, config: &Config) -> Option<String> {
+    port(c, config).map(|port| super::preview::url(&c.id, port))
+}
+
+fn port(c: &Card, config: &Config) -> Option<u16> {
     config.mork.vite.as_ref()?;
-    c.mock.and_then(|m| m.port).map(|port| super::preview::url(&c.id, port))
+    c.mock?.port
 }
 
 /// Every live card whose mock host should run, with its port: from its step's opening until the card
@@ -293,10 +297,15 @@ pub fn line(state: &State, a: &Agent, config: &Config) -> Option<String> {
     ))
 }
 
+/// The mock port advertised to reviewers while the visual card is live and its mock approved.
+pub fn approved_port(c: &Card, config: &Config) -> Option<u16> {
+    port(c, config).filter(|_| c.stage.is_live() && c.visual && c.mock.is_some_and(|m| m.step == MockStep::Approved))
+}
+
 /// The mock's line in a review round's request, beside the specification its reviewers read.
 pub fn for_review(c: &Card, config: &Config) -> String {
-    let approved = c.visual && c.mock.is_some_and(|m| m.step == MockStep::Approved);
-    let Some(link) = link(c, config).filter(|_| approved) else { return String::new() };
+    let Some(port) = approved_port(c, config) else { return String::new() };
+    let link = super::preview::url(&c.id, port);
     format!(
         "\n\n{} is a visual card: its approved mock is served at {link}. Review the change against the specification and that mock. Judge the mock from a screenshot of that link rendered in the wall's headless Chromium, never from its source files: its own script may draw the approved state when the page runs. For the browser's launch, see \"Headless Chromium\" in the `visual-mocks` skill. Pass the link and this rule to each reviewer whose topic the mock bears on.",
         c.id
