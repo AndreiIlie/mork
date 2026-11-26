@@ -122,8 +122,8 @@ impl Store {
             return Err(wrong);
         }
         configure(&conn)?;
+        let tx = conn.transaction()?;
         if version < schema::NEWEST {
-            let tx = conn.transaction()?;
             if version == 0 {
                 schema::create(&tx)?;
                 set_meta_in(&tx, "created_by", build)?;
@@ -132,9 +132,10 @@ impl Store {
             }
             set_meta_in(&tx, "migrated_by", build)?;
             tx.pragma_update(None, "user_version", schema::NEWEST)?;
-            tx.commit()?;
             version = schema::NEWEST;
         }
+        tx.execute_batch(schema::STARTUP_INDEXES)?;
+        tx.commit()?;
         Ok(Self { conn, path: path.to_owned(), version })
     }
 
