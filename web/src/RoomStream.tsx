@@ -214,6 +214,7 @@ function FoldedRow({
 
 interface MessageRowProps {
   m: MessageView;
+  reviewForeman?: string;
   tzOffsetMin: number;
   nowMs: number;
   live: boolean;
@@ -222,12 +223,13 @@ interface MessageRowProps {
   run?: MessageView[];
 }
 
-function MessageRow({ m, tzOffsetMin, nowMs, live, hand, triage, run }: MessageRowProps) {
+function MessageRow({ m, reviewForeman, tzOffsetMin, nowMs, live, hand, triage, run }: MessageRowProps) {
+  const recipient = reviewForeman && (m.to === "foreman" || m.to === reviewForeman) ? "review foreman" : m.to;
   const times = run?.length ?? 1;
   if (m.kind === "marker") {
     return (
       <FoldedRow
-        label={m.to !== null ? `engine → ${m.to}` : "engine"}
+        label={m.to !== null ? `engine → ${recipient}` : "engine"}
         preview={times > 1 ? `${firstLine(m.headline)} ×${times}` : firstLine(m.headline)}
         body={
           run !== undefined
@@ -245,7 +247,7 @@ function MessageRow({ m, tzOffsetMin, nowMs, live, hand, triage, run }: MessageR
   if (m.kind === "agent" && m.hand === null && m.to !== null && m.to !== "operator") {
     return (
       <FoldedRow
-        label={`${authorName(m.from)} → ${m.to}`}
+        label={`${authorName(m.from)} → ${recipient}`}
         preview={firstLine(m.headline !== "" ? m.headline : m.text)}
         body={m.text !== "" ? m.text : m.headline}
         expandable
@@ -272,7 +274,7 @@ function MessageRow({ m, tzOffsetMin, nowMs, live, hand, triage, run }: MessageR
       <span className={`text-label-13 font-medium ${engine ? "text-gray-900" : "text-gray-1000"}`}>
         {authorName(m.from)}
       </span>
-      {m.from.is === "agent" && m.from.label !== m.from.role && (
+      {m.from.is === "agent" && m.from.label !== m.from.role && m.from.label !== "review foreman" && (
         <span className="text-label-12 text-gray-900">{m.from.role}</span>
       )}
       {hand !== undefined && <AskLabel hand={hand} nowMs={nowMs} />}
@@ -371,6 +373,7 @@ export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, l
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const keepRef = useRef(false);
   const { messages, earlier, turns, loading, error, loadEarlier, prependHeightRef } = useStreamHistory(view, live);
+  const reviewForeman = view.card?.mode === "review" ? `${view.card.id}/foreman` : undefined;
   const entries = interleaveEntries(messages, turns);
   const running = turns.filter((t) => t.running);
 
@@ -390,7 +393,7 @@ export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, l
   const loaded = new Set(messages.map((m) => m.seq));
   const pinned = (view.pinned ?? []).filter((m) => bySeq.has(m.seq) && !loaded.has(m.seq));
   const row = (m: MessageView, run?: MessageView[]) => (
-    <MessageRow key={m.seq} m={m} run={run} tzOffsetMin={tzOffsetMin} nowMs={nowMs}
+    <MessageRow reviewForeman={reviewForeman} key={m.seq} m={m} run={run} tzOffsetMin={tzOffsetMin} nowMs={nowMs}
       hand={bySeq.get(m.seq)} triage={triage} live={live} />
   );
 
@@ -441,12 +444,12 @@ export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, l
               entry.kind === "message" ? (
                 row(entry.m, entry.run)
               ) : (
-                <EndedTurnRow key={`t:${entry.t.turn.job}`} turn={entry.t} tzOffsetMin={tzOffsetMin} nowMs={nowMs} />
+                <EndedTurnRow reviewForeman={reviewForeman} key={`t:${entry.t.turn.job}`} turn={entry.t} tzOffsetMin={tzOffsetMin} nowMs={nowMs} />
               ),
             )
           )}
           {running.map((t) => (
-            <ActivityTracker key={t.turn.job} turn={t} nowMs={nowMs} />
+            <ActivityTracker reviewForeman={reviewForeman} key={t.turn.job} turn={t} nowMs={nowMs} />
           ))}
         </div>
       </PinnedScroll>
