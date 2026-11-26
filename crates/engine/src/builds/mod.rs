@@ -343,6 +343,24 @@ pub fn check_target(
     }
 }
 
+/// Checks the live config with the installed build that will read it after exec.
+pub fn check_target_config(home: &Home, commit: &str) -> Result<(), BuildError> {
+    let bin = binary(home, commit);
+    let program = bin.to_str().ok_or_else(|| BuildError::Bad("the target build's path isn't UTF-8".into()))?;
+    // Startup resolves a relative MORK_CONFIG from the engine's working directory.
+    let output = launch::short(home.root(), &[program, "--check-config"], Path::new("."), Duration::from_secs(5))
+        .map_err(io("the target build's config check couldn't run"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let why = format!("the target build's config check failed ({})", output.status);
+    match stderr.trim() {
+        "" => Err(BuildError::Bad(why)),
+        detail => Err(BuildError::Bad(format!("{why}: {detail}"))),
+    }
+}
+
 fn backups(home: &Home) -> String {
     let Ok(rd) = std::fs::read_dir(home.backups()) else { return "none".into() };
     let mut all: Vec<_> = rd

@@ -129,13 +129,53 @@ fn room(s: &Sim, id: &str) -> mork_types::view::PlaceView {
 }
 
 #[test]
+fn only_the_room_summary_normalizes_the_description() {
+    let mut s = start_no_planner();
+    let mut board = s.state.board[CARD].clone();
+    s.state.cards.get_mut(CARD).unwrap().description = "First line.\n  Second line.".into();
+    let body = "\r\n  First line.\r\n  Second line.  \r\n";
+    board.description = format!("operator 01.01: A note.\r\n{body}");
+    s.apply(mork_core::decide::Event::BoardsRead { cards: vec![board], prefixes: Default::default() });
+    assert!(s.messages(CARD).iter().any(|m| m.headline.ends_with("card changed") && m.text.contains(body)));
+    assert_eq!(room(&s, CARD).summaries[0].text, "First line.\n  Second line.");
+}
+
+#[test]
+fn room_model_labels_follow_the_model_across_defaults_picks_and_picker_options() {
+    use mork_types::config::{OPUS, SeatOverride};
+
+    let mut s = start_no_planner();
+    s.config.seats.insert("foreman".into(), SeatOverride { model: Some(OPUS.into()), ..Default::default() });
+    s.config.picks = serde_json::from_value(json!({"researcher": [
+        {"cli":"claude", "model":OPUS, "label":"Opus", "efforts":["high"]},
+        {"cli":"codex", "model":"custom-id", "label":"Custom name", "efforts":["high"]}
+    ]}))
+    .unwrap();
+    s.state.agents.get_mut(FOREMAN).unwrap().choice = None;
+    s.operator(json!({"pick":{"agent":FOREMAN, "model":"gpt-6.2-astra"}})).unwrap();
+    let foreman = || room(&s, CARD).sessions.into_iter().find(|a| a.agent == FOREMAN).unwrap();
+    let row = foreman();
+    assert_eq!(row.label, "Opus 5.5");
+    assert_eq!(row.setting.unwrap().model.label, "Opus 5.5");
+    assert_eq!(row.pending.unwrap().model.label, "Astra");
+    for (model, label) in [(OPUS, "Opus 5.5"), ("gpt-6.2-astra", "Astra"), ("custom-id", "Custom name")] {
+        assert_eq!(row.choices.iter().find(|c| c.model == model).unwrap().label, label);
+    }
+    let a = s.state.agents.get_mut(FOREMAN).unwrap();
+    a.choice = a.pending.take();
+    let row = room(&s, CARD).sessions.into_iter().find(|a| a.agent == FOREMAN).unwrap();
+    assert_eq!(row.label, "Astra");
+}
+
+#[test]
 fn room_controls_parent_and_standing_decisions_follow_the_card() {
     let mut s = start_no_planner();
     s.config.projects.get_mut("web").unwrap().preview = Some("serve".into());
     let card = s.state.cards.get_mut(CARD).unwrap();
     card.preview = true;
     let port = card.port.unwrap();
-    s.state.board.get_mut(CARD).unwrap().description = "operator 01.01: Decision: Keep both rooms.\n\nWords.".into();
+    s.state.board.get_mut(CARD).unwrap().description =
+        "operator 02.01: Decision: Keep both rooms.\noperator 01.01: Decision: Show the preview.\n\nWords.".into();
     let mut child = s.state.agents[FOREMAN].clone();
     child.key = "web-1/researcher-1".into();
     child.role = mork_types::reply::Role::Researcher;
@@ -145,7 +185,7 @@ fn room_controls_parent_and_standing_decisions_follow_the_card() {
     let view = room(&s, CARD);
     let row = view.sessions.iter().find(|a| a.agent == "web-1/researcher-1").unwrap();
     assert_eq!(row.parent.as_ref().unwrap().as_str(), FOREMAN);
-    assert_eq!(view.decisions, ["Keep both rooms."]);
+    assert_eq!(view.decisions, ["Show the preview.", "Keep both rooms."]);
     let about = view.card.unwrap().about;
     assert_eq!(about.actions, ["close"]);
     let preview = about.preview.unwrap();
@@ -153,12 +193,15 @@ fn room_controls_parent_and_standing_decisions_follow_the_card() {
     assert_eq!(preview.url, format!("http://web-1.localhost:{port}/"));
 }
 
-fn board_with_two_cards() -> Sim {
+fn board_with_cards(ids: &[&str]) -> Sim {
     let mut s = Sim::new();
-    s.board("web-2", "web");
-    let carried = s.state.board["web-2"].clone();
+    let mut others = std::collections::BTreeMap::new();
+    for id in ids {
+        s.board(id, "web");
+        others.append(&mut s.state.board);
+    }
     s.board(CARD, "web");
-    s.state.board.insert(carried.id.clone(), carried);
+    s.state.board.append(&mut others);
     s
 }
 
@@ -167,7 +210,7 @@ fn first_run_and_restart_offer_only_the_modes_and_defaults_the_engine_applies() 
     use mork_core::decide::Event;
     use mork_core::state::unloaded::{Records, wanted};
     use mork_types::card::{Card, Carried, Mode};
-    let mut s = board_with_two_cards();
+    let mut s = board_with_cards(&["web-2"]);
     s.operator(json!({"auto":{"project":"web"}})).unwrap();
     let fresh = room(&s, CARD);
     assert!(fresh.card.is_none());
@@ -202,19 +245,40 @@ fn first_run_and_restart_offer_only_the_modes_and_defaults_the_engine_applies() 
     assert_eq!(start.carries, [mork_types::CardId::new("web-2")]);
 }
 
-#[test]
-fn report_restart_is_available_when_a_formerly_carried_card_is_running() {
-    let mut s = board_with_two_cards();
-    s.operator(json!({"start": {"card": CARD, "carries": ["web-2"]}})).unwrap();
-    s.operator(json!({"close": {"card": CARD, "why": "Restart separately"}})).unwrap();
+fn close_run_without_work(s: &mut Sim, carries: &[&str]) -> Result<(), mork_types::protocol::ErrorBody> {
+    s.operator(json!({"start": {"card": CARD, "carries": carries}}))?;
+    s.operator(json!({"close": {"card": CARD, "why": "Restart separately"}}))?;
     for id in s.open_jobs(|p| matches!(p, Purpose::Bundle { .. })) {
         s.end_job(&id, json!({"branch": CARD, "bundle": false, "head": null, "clean": true, "dirty": []}));
     }
     s.settle_actions();
-    s.operator(json!({"start": {"card": "web-2"}})).unwrap();
+    Ok(())
+}
 
-    let start = room(&s, CARD).start.expect("the report start is available");
-    assert!(!start.modes.full && start.modes.report);
+#[test]
+fn restart_carries_only_available_members_after_a_run_closed_without_work() {
+    let mut s = board_with_cards(&["web-2", "web-3", "web-4", "web-5"]);
+    close_run_without_work(&mut s, &["web-5", "web-2", "web-4", "web-3"]).unwrap();
+    s.operator(json!({"start": {"card": "web-2"}})).unwrap();
+    s.state.board.get_mut("web-3").unwrap().status = "Done".into();
+
+    let view = room(&s, CARD);
+    let start = view.start.unwrap();
+    assert!(start.modes.full && start.modes.report);
+    assert_eq!(start.carries, [mork_types::CardId::new("web-5"), mork_types::CardId::new("web-4")]);
+    let offer = view.offers.iter().find(|o| o.label == "start").unwrap();
+    s.operator(serde_json::to_value(&offer.command).unwrap()).unwrap();
+    assert_eq!(s.card(CARD).carries.into_iter().map(|k| k.id).collect::<Vec<_>>(), start.carries);
+}
+
+#[test]
+fn report_restart_is_available_when_a_formerly_carried_card_is_running() {
+    let mut s = board_with_cards(&["web-2"]);
+    close_run_without_work(&mut s, &["web-2"]).unwrap();
+    s.operator(json!({"start": {"card": "web-2"}})).unwrap();
+    let start = room(&s, CARD).start.unwrap();
+    assert!(start.carries.is_empty());
+    assert!(start.modes.full && start.modes.report);
     s.operator(json!({"start": {"card": CARD, "mode": "report"}})).unwrap();
     assert!(s.card(CARD).carries.is_empty());
 }

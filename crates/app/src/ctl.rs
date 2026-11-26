@@ -186,7 +186,7 @@ fn help(spec: &CommandSpec) -> i32 {
 }
 
 fn search(args: &[String], mut out: impl Write) -> std::io::Result<()> {
-    if args == ["--help"] {
+    if args.iter().any(|a| a == "--help") {
         return write!(out, "{}", manuals::command_help("search").unwrap_or_default());
     }
     let query = args.iter().filter(|a| *a != "--json").map(String::as_str).collect::<Vec<_>>().join(" ");
@@ -357,6 +357,8 @@ mod tests {
     #[test]
     fn search_signature_match_uses_summary_and_all_words_are_required() {
         let help = search_text(&["--help"]);
+        assert_eq!(search_text(&["merge", "--help", "--json"]), help);
+        assert_eq!(search_text(&["--help", "merge"]), help);
         let (signature, body) = help.split_once("\n\n").unwrap();
         let summary = body.lines().next().unwrap();
         assert_eq!(search_text(&["<QUERY>"]), format!("{signature}\n  {summary}\n"));

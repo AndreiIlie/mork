@@ -186,6 +186,7 @@ Each result shows the exact signature and a short matching passage, in manual or
 A match in the signature or opening line shows the opening summary.
 With `--json`, the same results form an array of objects with `signature` and `snippet` strings.
 With no matches, plain text prints nothing and JSON prints `[]`.
+An exact `--help` argument anywhere after `search` prints this entry.
 Search runs locally, including inside a wall.
 
 Example: `mork ctl search merge queue --json`
@@ -501,6 +502,9 @@ Example: `mork ctl pin 3f2a9c1`
 ### reload
 
 Switches the running mork to another build without stopping it: the given `target`, or the pin.
+
+Before the hold, the target build reads and validates the live `mork.toml` using its startup parser.
+If the file fails validation or the check cannot run, including on older builds that lack it, `reload` returns the error and the current build keeps running.
 
 After a short hold, and up to 10 s more for outward work in flight, the engine executes the target build in its place.
 The new build keeps the sockets and takes over running turns.
@@ -1778,7 +1782,7 @@ Runs a command of your own in a test slot, never the configured suite: `mork tes
 Give the program and each argument as separate words, never the whole command as one quoted string (`"npx jest a.test.js"` is looked up as one program's name and not found), the program directly after `--run`, with no `--` before it; arguments after it pass through unchanged, a `--` among them included.
 `{io}` in an argument becomes your seat's `io/` folder, the one `MORK_IO` names.
 
-When `[mork] project` is configured, on that project it runs under its test settings: `env` with `MORK_UNWALLED=1` and `MORK_TEST_PORTS` the project's first port range, and the app's `faults` added to a `cargo test` that builds the app and names no features of its own.
+When `[mork] project` is configured, on that project it runs under its test settings: `env` with `MORK_UNWALLED=1`, and the app's `faults` added to a `cargo test` that builds the app and names no features of its own.
 Its stdin and output pass through (a heredoc reaches the command), and it exits with the command's code; nothing is remembered: only verification's and the merge queue's passes are.
 
 Example: `mork test --run cargo test -p mork-core --test fac14_review`
@@ -1789,7 +1793,7 @@ Runs one wall-test file outside every wall, with its tests' walls enabled: `mork
 Only the foreman of a full card of the configured `[mork] project` may use it.
 When `[mork] project` is unset, or for any other project's seat, review or report card's seat, researcher or other seat, `--walls` is refused before taking a slot.
 
-The engine runs `cargo test -p mork-app --test <file> --features mork-app/faults` in the card's clone as it stands, uncommitted changes included, with `MORK_UNWALLED` unset and `MORK_TEST_PORTS` the project's first port range.
+The engine runs `cargo test -p mork-app --test <file> --features mork-app/faults` in the card's clone as it stands, uncommitted changes included, with `MORK_UNWALLED` unset.
 `--no-default-features` before the file replaces the `faults` feature with the production build.
 The file is a nonempty plain test-file name: ASCII letters, digits, underscores and hyphens, with no leading hyphen, path, extension or wildcard.
 The optional filter is at most one nonempty word, with no leading hyphen, whitespace or control character.

@@ -79,6 +79,15 @@
   height: 6px;
 }
 
+.context-ring {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  mask: radial-gradient(closest-side, transparent 4.25px, black 4.75px);
+}
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }

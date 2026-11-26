@@ -8,6 +8,34 @@ use mork_types::work::Failing;
 /// What a Rust binary that failed without naming a failing test, killed or crashed, is listed as.
 pub const NO_TEST: &str = "(the binary failed, naming no failing test)";
 
+pub const XTASK: &str = "xtask: ";
+
+/// The name and verdict from an xtask per-test update, before the binary repeats its output.
+pub fn live_result(said: &str) -> Option<(&str, &str)> {
+    said.split_once(": test ")?.1.rsplit_once(" ... ")
+}
+
+pub enum JestMarker<'a> {
+    Pass(&'a str),
+    Fail(&'a str),
+    Summary,
+    Totals,
+}
+
+/// Recognizes Jest's file headers and the two markers around its repeated failure list.
+pub fn jest_marker(line: &str) -> Option<JestMarker<'_>> {
+    let line = line.trim();
+    if let Some(rest) = line.strip_prefix("PASS ") {
+        Some(JestMarker::Pass(rest))
+    } else if let Some(rest) = line.strip_prefix("FAIL ") {
+        Some(JestMarker::Fail(rest))
+    } else if line == "Summary of all failing tests" {
+        Some(JestMarker::Summary)
+    } else {
+        line.starts_with("Test Suites: ").then_some(JestMarker::Totals)
+    }
+}
+
 /// The failing tests `whole` names, each once, by file; none when no reader recognises it.
 /// `packages` gives each Rust package's folder in the repository, for its binaries' files.
 pub fn read(whole: &str, packages: &BTreeMap<String, String>) -> Option<Vec<Failing>> {
@@ -59,8 +87,11 @@ fn xtask(whole: &str, packages: &BTreeMap<String, String>) -> Option<Vec<Failing
     let mut seen = false;
     let (mut out, mut file, mut named) = (Vec::new(), None::<String>, false);
     for l in whole.lines() {
-        if let Some(said) = l.strip_prefix("xtask: ") {
+        if let Some(said) = l.strip_prefix(XTASK) {
             seen = true;
+            if live_result(said).is_some() {
+                continue;
+            }
             if let Some(f) = file.take().filter(|_| !named) {
                 out.push(Failing { file: f, test: NO_TEST.to_owned() });
             }
@@ -108,19 +139,23 @@ fn jest(whole: &str) -> Option<Vec<Failing>> {
     let mut seen = false;
     let (mut out, mut file) = (Vec::new(), None::<String>);
     for l in whole.lines() {
-        let t = l.trim();
-        if t.starts_with("Test Suites: ") {
-            seen = true;
-            file = None;
-        } else if let Some(rest) = t.strip_prefix("FAIL ") {
-            seen = true;
-            file = path(rest);
-        } else if t.starts_with("PASS ") || t == "Summary of all failing tests" {
-            file = None;
-        } else if let (Some(f), Some(test)) = (&file, l.strip_prefix("  ● "))
-            && test != "Console"
-        {
-            out.push(Failing { file: f.clone(), test: test.trim_end().to_owned() });
+        match jest_marker(l) {
+            Some(JestMarker::Totals) => {
+                seen = true;
+                file = None;
+            }
+            Some(JestMarker::Fail(rest)) => {
+                seen = true;
+                file = path(rest);
+            }
+            Some(JestMarker::Pass(_) | JestMarker::Summary) => file = None,
+            None => {
+                if let (Some(f), Some(test)) = (&file, l.strip_prefix("  ● "))
+                    && test != "Console"
+                {
+                    out.push(Failing { file: f.clone(), test: test.trim_end().to_owned() });
+                }
+            }
         }
     }
     seen.then_some(out)

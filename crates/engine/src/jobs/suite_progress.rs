@@ -5,7 +5,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
-use mork_core::queue::failing::{path, unstyled};
+use mork_core::queue::failing::{JestMarker, XTASK, jest_marker, live_result, path, unstyled};
 use mork_types::view::SuiteProgress;
 
 /// A suite run's output file as read so far.
@@ -74,12 +74,12 @@ impl Reader {
     /// Reads one line of the suite's output.
     pub fn line(&mut self, line: &str) {
         let plain = unstyled(line);
-        if let Some(said) = plain.strip_prefix("xtask: ") {
+        if let Some(said) = plain.strip_prefix(XTASK) {
             if self.format.get_or_insert(Format::Xtask) == &Format::Xtask {
                 self.xtask(said);
             }
         } else if self.format != Some(Format::Xtask) && !self.summary {
-            self.jest(plain.trim());
+            self.jest(&plain);
         }
     }
 
@@ -92,7 +92,7 @@ impl Reader {
     // A pass's count, `<what>: <k> test binaries, <n> tests, <m> at a time`, and each test's
     // result, `<binary>: test <name> ... <result>`. The binaries' own output, printed whole, is not read.
     fn xtask(&mut self, said: &str) {
-        if let Some((name, result)) = said.split_once(": test ").and_then(|(_, t)| t.rsplit_once(" ... ")) {
+        if let Some((name, result)) = live_result(said) {
             let passed = result == "ok" || result == "ignored" || result.starts_with("ignored, ");
             if passed || result == "FAILED" {
                 self.ended(name, passed);
@@ -113,14 +113,14 @@ impl Reader {
 
     // Jest heads each test file as it ends `PASS <path>` or `FAIL <path>`.
     fn jest(&mut self, line: &str) {
-        if line == "Summary of all failing tests" || line.starts_with("Test Suites: ") {
-            self.summary = true;
-            return;
-        }
-        let (rest, passed) = match (line.strip_prefix("PASS "), line.strip_prefix("FAIL ")) {
-            (Some(rest), _) => (rest, true),
-            (_, Some(rest)) => (rest, false),
-            _ => return,
+        let (rest, passed) = match jest_marker(line) {
+            Some(JestMarker::Pass(rest)) => (rest, true),
+            Some(JestMarker::Fail(rest)) => (rest, false),
+            Some(JestMarker::Summary | JestMarker::Totals) => {
+                self.summary = true;
+                return;
+            }
+            None => return,
         };
         let Some(file) = path(rest) else { return };
         self.format = Some(Format::Jest);

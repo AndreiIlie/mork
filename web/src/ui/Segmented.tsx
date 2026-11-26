@@ -18,8 +18,8 @@ export function Segmented<T extends string>({ options, value, onChange, label, h
           aria-pressed={o === value}
           disabled={disabled?.(o)}
           onClick={() => onChange(o)}
-          className={`h-full cursor-pointer px-3 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${height === 26 ? "text-label-12" : "text-label-13"} ${
-            o === value ? "bg-gray-200 font-medium text-gray-1000" : "text-gray-900 hover:text-gray-1000"
+          className={`h-full cursor-pointer px-3 transition-colors disabled:cursor-not-allowed ${height === 26 ? "text-label-12" : "text-label-13"} ${
+            o === value ? "bg-gray-200 font-medium text-gray-1000" : "text-gray-900 hover:text-gray-1000 disabled:opacity-50"
           }`}
         >
           {label !== undefined ? label(o) : o}

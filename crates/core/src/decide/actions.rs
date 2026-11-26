@@ -237,8 +237,8 @@ fn failure(p: &mut Poster<'_>, mut a: Action, f: &ActionFailure, ctx: Ctx<'_>) {
             p.journal("action.refused", None, json!({"id": a.id, "words": words}));
             p.put_action(a);
         }
-        (ActionFailure::Leak { words } | ActionFailure::Internals { words }, ActionWhat::OpenPr { .. }) => {
-            let why = crate::queue::pr::held_words(words);
+        (ActionFailure::Leak { words } | ActionFailure::Internals { words }, ActionWhat::OpenPr { card, .. }) => {
+            let why = crate::queue::pr::held_words(p.state, card, ctx.config, words);
             hold(p, a, &why);
         }
         (ActionFailure::NotFastForward { at }, ActionWhat::Push { card, .. }) => {

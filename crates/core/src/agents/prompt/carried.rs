@@ -22,9 +22,9 @@ pub(super) fn carried(state: &State, c: &Card, blind: bool, out: &mut String) {
         let (title, description, acceptance) =
             board.map_or((&k.title, &k.description, &k.acceptance), |b| (&b.title, &b.description, &b.acceptance));
         let (notes, text) = if blind {
-            crate::board::notes::apart_verbatim(state, board, description)
+            crate::board::notes::apart(state, board, description)
         } else {
-            (Vec::new(), description.trim())
+            (Vec::new(), description.as_str())
         };
         let _ = write!(out, "\n## A card this run carries\n\n{}: {title}\n\n{}\n", k.id, text);
         accepts(acceptance, out);

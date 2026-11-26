@@ -71,8 +71,7 @@ interface Folded {
   before: number;
 }
 
-// Consecutive steps with the same words read as one row, counted, their thinking summed above it and their own
-// durations summed on it, never the thinking between them.
+// A repeated label can hide different commands. Fold only matching, uncut commands with no new details.
 function foldRepeats(steps: StepView[]): Folded[] {
   const out: Folded[] = [];
   for (const st of steps) {

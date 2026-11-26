@@ -310,6 +310,26 @@ mod tests {
                                [projects.\"example.com\"]\nrepo = \"/repo\"\nboard = { kind = \"markdown\", path = \"/board\" }\ntest = \"true\"\n";
 
     #[test]
+    fn example_seat_models_belong_to_their_cli_catalog() -> Result<(), ConfigError> {
+        use mork_types::config::{MODEL_CATALOG, OPERATOR_MODELS, SeatPhase, Standing};
+
+        let config = parse(include_str!("../../../mork.example.toml"))?;
+        let common = Standing { phase: SeatPhase::Spec, review: None };
+        for (name, row) in &config.seats {
+            for at in std::iter::once(common).chain(Standing::ALL) {
+                let Some(model) = row.at(at).and_then(|r| r.model.as_ref()).or(row.model.as_ref()) else { continue };
+                assert!(
+                    config.seat_in(name, at).is_some_and(|seat| {
+                        MODEL_CATALOG.iter().chain(OPERATOR_MODELS).any(|&(cli, id, _)| cli == seat.cli && id == model)
+                    }),
+                    "example seat {name} at {at:?}: {model} is absent from its CLI catalog"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn project_git_author_falls_back_to_global() -> Result<(), ConfigError> {
         let config = parse(&format!(
             "{WAKE_PROJECT}\n[projects.work]\nrepo = '/work'\nboard = {{ kind = 'markdown', path = '/board' }}\n\

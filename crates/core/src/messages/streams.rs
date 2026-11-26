@@ -219,27 +219,6 @@ fn on_stream(m: &Message) -> bool {
     m.to.as_deref().is_some_and(|t| matches!(t, "operator" | "orchestrator") || t.starts_with(ORCHESTRATOR))
 }
 
-/// Whose stream a line of `what` goes on (fac-244), the decision's `changes` applied: its card's project,
-/// or with none Mork's own when configured.
-pub fn project_of(
-    state: &State,
-    changes: &[Change],
-    what: &OrchestratorWhat,
-    mork: Option<&ProjectId>,
-) -> Option<ProjectId> {
-    let (card, place, owner) = match what {
-        OrchestratorWhat::Message { place, card, from, .. } => (card.as_ref(), place.as_str(), from.split('/').next()),
-        OrchestratorWhat::AskOpened(a) | OrchestratorWhat::AskClosed(a) | OrchestratorWhat::Given(a) => {
-            (a.card.as_ref(), a.place.as_str(), None)
-        }
-        OrchestratorWhat::Opinion { ask, .. } => (ask.card.as_ref(), ask.place.as_str(), None),
-        OrchestratorWhat::Review { target, .. } => {
-            return target.as_deref().filter(|t| *t != GENERAL).map(ProjectId::new).or_else(|| mork.cloned());
-        }
-    };
-    placed(state, changes, card, place, owner).or_else(|| mork.cloned())
-}
-
 /// The project of the card `owner` names, as the state has it.
 pub(crate) fn owner_project(state: &State, owner: &str) -> Option<ProjectId> {
     placed(state, &[], None, "", Some(owner))
