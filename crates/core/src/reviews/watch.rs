@@ -1,5 +1,5 @@
-//! Which PRs review themselves (fac-98, fac-111): every PR into a repository's base, its results authorizing no
-//! merge; the poller's open PRs are verified on first sight or a new head, our own verified head never again (fac-375).
+//! Eligible open PRs into the base or with a matching review tag are verified on first sight or a new head.
+//! GitHub fork PRs and our own already verified heads are excluded (fac-375).
 
 use mork_types::CardId;
 use mork_types::ask::AskKind;
@@ -13,14 +13,12 @@ use crate::messages::asks;
 use crate::post::Poster;
 use crate::state::{Change, State};
 
-/// Whether a card's repository has PRs: on Bitbucket, where every one merges on the operator's approval
-/// alone (fac-111).
+/// Whether the card's project publishes pull requests.
 pub fn prs(c: &Card, ctx: Ctx<'_>) -> bool {
     ctx.config.projects.get(&c.project).is_some_and(|p| p.forge.hosted())
 }
 
-/// Whether a project's PRs into `dest` are watched: on any repository with PRs, those into its
-/// base (master), each reviewed by itself and merged on the operator's approval (fac-111).
+/// Whether the destination alone qualifies an eligible PR for automatic review.
 pub fn watched(p: &ProjectConfig, dest: &str) -> bool {
     p.forge.hosted() && dest == p.base
 }

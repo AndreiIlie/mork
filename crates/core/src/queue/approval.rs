@@ -1,5 +1,5 @@
-//! Our PRs wait outside the merge queue for the operator's current-head approval, asked once verified; PRs merge only on it,
-//! with his credential (fac-98, fac-111, fac-375). Conflicts never retry: ours joins, others stay held for him.
+//! Published PRs wait outside the merge queue. On approval projects the operator's approval of the verified head
+//! triggers the merge (fac-98, fac-111, fac-375). A conflict sends our card to a join and holds a colleague's PR.
 
 use mork_types::action::{Action, ActionStatus, ActionWhat};
 use mork_types::ask::{AskKind, Color};
@@ -222,12 +222,12 @@ pub fn conflicted(p: &mut Poster<'_>, mut a: Action, f: &ActionFailure, ctx: Ctx
     join(p, c, &why, tip, ctx);
 }
 
-// Our card's PR waiting for the operator's approval.
+// A review card cannot own the published PR's landing.
 fn waits(c: &Card) -> bool {
     c.mode != Mode::Review && waiting(c)
 }
 
-/// Our card's PR waiting for approval conflicts with master's `tip`, as its merge or its entry's
+/// Our card's published PR conflicts with master's `tip`, as its merge or its entry's
 /// candidate found (fac-111): the card goes to its join, its joined head updating the same PR.
 pub fn join(p: &mut Poster<'_>, mut c: Card, why: &str, tip: Sha, ctx: Ctx<'_>) {
     if !waits(&c) {
@@ -244,8 +244,8 @@ pub fn join(p: &mut Poster<'_>, mut c: Card, why: &str, tip: Sha, ctx: Ctx<'_>) 
     super::train::maintain(p, project.as_str(), ctx);
 }
 
-/// Leaves a published PR waiting for the operator's approval, with its link: verified before it was published, it says so in
-/// one comment and asks his approval at once (fac-375); an older build's waits for its PR entry's review (fac-98).
+/// Asks the operator to merge or approve a verified PR when it is published (fac-375).
+/// An older build's unverified head waits for the PR's review (fac-98).
 pub fn wait(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
     let (Some(Landing::Published { tree, base, commit, verified }), Some(pr)) = (c.landing.clone(), c.pr) else {
         return;
@@ -294,8 +294,7 @@ pub fn reverified(p: &mut Poster<'_>, mut c: Card, k: Candidate, head: Sha) {
     super::members::say(p, &id, "verified again: its PR merges on approval", &text);
 }
 
-/// Asks the operator's approval once the review of our published head is clean; a verdict on another head sends no
-/// notice, as approval merges that head (fac-132).
+/// Asks the operator to merge or approve once the clean review matches the published head (fac-132).
 pub fn notify_reviewed(p: &mut Poster<'_>, review: &Card, ctx: Ctx<'_>) {
     let Some(pr) = review.pr else { return };
     let Some(done) = review.review.as_ref().and_then(|r| r.finished.as_ref()).filter(|f| f.clean && !f.failed) else {
@@ -364,7 +363,7 @@ pub fn approval_read(p: &mut Poster<'_>, c: &mut Card, seen: &PrSeen, ctx: Ctx<'
     }
 }
 
-/// Whether a card's PR waits for the operator's approval, out of the merge train: still read by the
+/// Whether a card's PR waits for the operator outside the merge train: still read by the
 /// poller, and a new head takes it back through its gates.
 pub fn waiting(c: &Card) -> bool {
     matches!(c.landing, Some(Landing::Approval { .. }))

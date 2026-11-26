@@ -5,8 +5,9 @@ description: "Use when you are a review card's foreman: a round of our card's br
 
 # Review cards
 
-A review card is its foreman's to review: our card's branch (`branch-<project>-<branch>`), a pull request (`pr-<project>-<n>`, every one into a repository's base by itself, ours only at a head no verification passed) or a colleague's branch (`branch-<project>-<branch>`).
-A project with `forge.review_tag` configured also reviews any PR whose title contains that tag, into any destination.
+A review card is its foreman's to review: our card's branch (`branch-<project>-<branch>`), a pull request (`pr-<project>-<n>`, each eligible one into a repository's base by itself, ours only at a head no verification passed) or a colleague's branch (`branch-<project>-<branch>`).
+A project with `forge.review_tag` configured also reviews eligible PRs whose titles contain that tag, into any destination.
+On GitHub only PRs from branches in the project's own repository are eligible.
 The engine makes our card's branch card with its first round at the implementing card's delegation level and ends it when the card lands or closes, on a repository with PRs too, before its PR is published.
 Every review runs in its candidate's verification: its destination (a branch's base) merged in, the checks, then your round and the whole suite side by side, the results returned once both ended.
 Nothing reviews a review card in turn.
@@ -72,7 +73,7 @@ Nothing reviews a review card in turn.
    When nothing is disputed, proceed directly to the verdict.
    Begin each kept finding's summary with the name of the reviewer that raised it (`[reviewer-1] …`), none for your own: that reviewer verifies its fix in a later round.
    A finding raised again by its number keeps that `#<n>` after the name (`[reviewer-1] #5 …`), or at the start of your own: it stays that open finding, at its new place and in its new words.
-   An executable proof is written only where reading the source doesn't settle a finding; those, your reviewers' and your own, are saved in your clone under `.git/mork/proofs/`, their path kept out of the proof text, which Bitbucket may show.
+   An executable proof is written only where reading the source doesn't settle a finding; those, your reviewers' and your own, are saved in your clone under `.git/mork/proofs/`, their path kept out of the proof text, which the forge may show.
    For your verdict, put each kept finding's proofs in `.git/mork/proofs/round-<n>/`, <n> this round's number, named by the finding's number in that verdict (`1-overflow.sh` proves finding 1); a finding raised again gets its proof there too, copied from the earlier round's folder under its new number.
    A failed round's own folder alone is copied into our card's clone for its fix at `.git/mork/review-proofs/round-<n>/`, a file whose name starts with `<i>-` proving finding <i>, and the fix request says whether it was copied, none were saved, or the copy failed.
    The review clone's whole `.git/mork/` is kept through the later rounds by each replacement clone: your working files there, and each earlier round's proofs folder for rechecks.

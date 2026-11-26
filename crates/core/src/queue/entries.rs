@@ -1,5 +1,5 @@
 //! PR and branch entries reuse their review cards through merge, checks, then review and suite side by side (fac-111,
-//! fac-375), off the merge queue. They only report: a PR merges on the operator's approval alone, a branch never.
+//! fac-375), off the merge queue. Completing verification reports the result and does not authorize a merge.
 
 use mork_types::Sha;
 use mork_types::action::ActionWhat;
@@ -131,7 +131,7 @@ pub fn conflicted(p: &mut Poster<'_>, mut c: Card, k: Candidate, purpose: &Purpo
     c.stage = Stage::Review;
     p.put_card(c.clone());
     p.journal("entry.conflict", Some(c.id.as_str()), json!({"head": c.head, "on": k.on, "files": m.conflicts}));
-    // Our PR's conflict goes to its card's foreman alone, as a join; nothing on Bitbucket (fac-375).
+    // Our PR's conflict goes to its card's foreman alone, as a join (fac-375).
     let ours = c.pr.and_then(|n| super::approval::owner(p.state, c.project.as_str(), n)).cloned();
     if let Some(ours) = ours.and_then(|o| p.card(&o.id)) {
         super::approval::join(p, ours, &why, k.on.clone(), ctx);

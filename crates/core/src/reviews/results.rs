@@ -1,5 +1,5 @@
 //! A review run's result (fac-269): reported to the operator, a colleague's PR result posted as its comments, ours only clean
-//! (fac-375), and the card closed once they are posted; nothing but the operator's approval merges a PR.
+//! (fac-375), and the card closed once they are posted. A review verdict alone never merges a PR.
 
 use mork_types::CardId;
 use mork_types::action::{Action, ActionStatus, ActionWhat};

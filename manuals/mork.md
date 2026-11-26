@@ -141,9 +141,9 @@ The same scan runs on an integration candidate when its checks run.
 A match stops checks before review and reports the kind of secret, file, line and commit.
 Once the checks pass, or when none are configured, verification starts.
 Its review card's round and its whole suite run side by side on its candidate.
-Once verified, it enters the merge queue, which lands only what its review card approved, or, on a repository with PRs, it is published for the operator's approval), **report** (a report from a read-only clone, ended by `done`, which also closes it as done on its board), or **review** (a review card: our card's branch, a pull request, or a colleague's branch).
+Once verified, it enters the merge queue, which lands only what its review card approved, or, on a repository with PRs, it is published for the operator to merge on the forge by default or to approve when the project uses approval merging), **report** (a report from a read-only clone, ended by `done`, which also closes it as done on its board), or **review** (a review card: our card's branch, a pull request, or a colleague's branch).
 
-A full card's stages are `starting`, `brief`, `build`, `checks`, `ready`, `merging` (verifying, in the merge queue, or a published PR waiting for the operator's approval out of it), and `done`.
+A full card's stages are `starting`, `brief`, `build`, `checks`, `ready`, `merging` (verifying, in the merge queue, or waiting outside the queue for a published PR to merge), and `done`.
 Review cards have a `review` stage, report cards have a `report` stage, and a card closed early is `closed`.
 Failed checks or a failed suite without findings send the foreman the proven findings or failure at once.
 When our card's review card fails a round with findings and delegation is off, the engine wakes no foreman: it raises a `triage` ask in the card's room listing the findings with a desktop notice.

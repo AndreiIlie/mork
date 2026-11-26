@@ -3,6 +3,7 @@
 
 use mork_types::ask::AskKind;
 use mork_types::card::{Card, Landing, MockStep, Mode, Stage};
+use mork_types::config::Config;
 use mork_types::reply::Role;
 use mork_types::view::{AgentLight, StageAt, StageKind, StageMark};
 
@@ -79,7 +80,13 @@ pub(super) fn stage_times(mode: Mode, totals: &Totals) -> Vec<(String, i64)> {
         .collect()
 }
 
-pub(super) fn build_pipeline(state: &State, card: &Card, points: &[Point], outside: &Outside) -> Vec<StageMark> {
+pub(super) fn build_pipeline(
+    state: &State,
+    card: &Card,
+    points: &[Point],
+    outside: &Outside,
+    config: &Config,
+) -> Vec<StageMark> {
     let own = steps_for(card.mode);
     let current = current_step(state, card).and_then(|s| own.iter().position(|&x| x == s));
     let ended = !card.stage.is_live();
@@ -94,7 +101,7 @@ pub(super) fn build_pipeline(state: &State, card: &Card, points: &[Point], outsi
                 _ => StageAt::ToCome,
             };
             let count = (at != StageAt::ToCome).then(|| step_count(state, card, step)).flatten();
-            let sub = (at == StageAt::Current).then(|| step_sub(state, card, step, outside)).flatten();
+            let sub = (at == StageAt::Current).then(|| step_sub(state, card, step, outside, config)).flatten();
             StageMark {
                 kind: step.kind(),
                 label: step.label().to_owned(),
@@ -210,11 +217,11 @@ fn step_count(state: &State, card: &Card, step: Step) -> Option<String> {
     }
 }
 
-fn step_sub(state: &State, card: &Card, step: Step, outside: &Outside) -> Option<String> {
+fn step_sub(state: &State, card: &Card, step: Step, outside: &Outside, config: &Config) -> Option<String> {
     match step {
         Step::Spec => mock_active(card).then(|| "Mock".to_owned()),
         Step::Verify => verify_sub(state, card, outside),
-        Step::Land => land_sub(state, card),
+        Step::Land => land_sub(state, card, config),
         Step::Review => review_sub(state, card, outside),
         Step::Build | Step::Report | Step::Done => None,
     }
@@ -283,7 +290,7 @@ fn land_held(state: &State, card: &Card) -> bool {
         })
 }
 
-pub(super) fn land_sub(state: &State, card: &Card) -> Option<String> {
+pub(super) fn land_sub(state: &State, card: &Card, config: &Config) -> Option<String> {
     if land_held(state, card)
         && matches!(card.landing, Some(Landing::Published { .. } | Landing::Approval { .. } | Landing::Merge { .. }))
     {
@@ -293,13 +300,16 @@ pub(super) fn land_sub(state: &State, card: &Card) -> Option<String> {
         Some(Landing::Published { .. }) => {
             Some(card.pr.map_or_else(|| "published".to_owned(), |n| format!("PR #{n} published")))
         }
-        Some(Landing::Approval { .. }) if card.gates.approved.is_some() => {
-            Some(card.pr.map_or_else(|| "merging".to_owned(), |n| format!("PR #{n} merging")))
+        Some(Landing::Approval { .. }) => {
+            let status = if !config.projects.get(&card.project).is_some_and(|p| p.forge.merges_on_approval()) {
+                "waits for your merge"
+            } else if card.gates.approved.is_some() {
+                "merging"
+            } else {
+                "waits for your approval"
+            };
+            Some(card.pr.map_or_else(|| status.to_owned(), |n| format!("PR #{n} {status}")))
         }
-        Some(Landing::Approval { .. }) => Some(
-            card.pr
-                .map_or_else(|| "waits for your approval".to_owned(), |n| format!("PR #{n} waits for your approval")),
-        ),
         Some(Landing::Merge { .. }) => {
             Some(card.pr.map_or_else(|| "merging".to_owned(), |n| format!("PR #{n} merging")))
         }

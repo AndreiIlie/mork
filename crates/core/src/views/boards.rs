@@ -87,7 +87,7 @@ fn group(name: String, cards: Vec<BoardRow>) -> BoardGroup {
 
 /// Cards currently waiting or landing in `project`'s merge queue, in queue order (fac-680).
 pub(super) fn queue_cards<'a>(state: &'a State, project: &ProjectId) -> Vec<&'a Card> {
-    // The queue's cards, verified: one still verified is out of it, as a company PR waiting for approval (fac-98).
+    // A card still in verification and a published PR waiting for the operator are outside the queue (fac-98).
     let in_train = |c: &&Card| {
         c.project == *project
             && c.stage == Stage::Merging

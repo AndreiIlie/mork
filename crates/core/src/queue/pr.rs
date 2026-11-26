@@ -1,5 +1,5 @@
-//! A card's PR (4.11.1, 4.11.6): its candidate pushed, the PR opened in the operator's name, held while its wording is
-//! incomplete (fac-296), and read. Every PR merges on his approval alone (fac-98, fac-111): published, it waits for his.
+//! A card's PR is held while its wording is incomplete (fac-296). After publication the forge's
+//! merge setting determines whether the operator merges by hand or approves the verified head.
 
 use mork_types::action::{Action, ActionStatus, ActionWhat};
 use mork_types::ask::AskKind;
@@ -72,7 +72,7 @@ pub fn pushed(p: &mut Poster<'_>, mut c: Card, commit: &Sha, config: &Config) {
     hold(p, &opening, config);
 }
 
-/// The PR opened, in the operator's name: it waits for his approval.
+/// Records the published PR so the poller can observe its merge.
 pub fn pr_opened(p: &mut Poster<'_>, mut c: Card, v: &Value, ctx: Ctx<'_>) {
     let Some(pr) = v.get("pr").and_then(Value::as_u64) else { return };
     c.pr = Some(pr);
@@ -153,7 +153,6 @@ fn read(p: &mut Poster<'_>, mut c: Card, seen: &PrSeen, before_merge: bool, ctx:
     let same = seen.head.0 == ours;
     match seen.state {
         PrState::Open if !same => alarm(p, c, &format!("PR {pr}'s head moved outside Mork")),
-        // A PR waiting out of the train merges on the operator's approval alone (fac-98).
         PrState::Open if super::approval::waiting(&c) => super::approval::own(p, &c, seen, ctx),
         PrState::Open => {}
         // The merge call is under way, an approved one's too: its own result decides (4.11.2.5, R7).

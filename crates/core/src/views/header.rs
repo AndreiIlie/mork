@@ -24,7 +24,7 @@ pub(super) fn header(state: &State, card: &Card, outside: &Outside, ctx: Ctx<'_>
         mode: card.mode,
         stage: card.stage,
         paused: card.paused,
-        pipeline: build_pipeline(state, card, points, outside),
+        pipeline: build_pipeline(state, card, points, outside, ctx.config),
         times,
         facts: facts(card, outside, ctx),
         cost_cents: outside.card_costs.get(&card.id).copied().filter(|_| ended),

@@ -23,7 +23,7 @@ pub enum Landing {
     Review(Candidate),
     /// Verified: in the merge queue, landing at its turn (fac-375).
     Passed(Candidate),
-    /// Tested on Bitbucket: `commit` pushed, its PR opened. An older build's lands the card's head.
+    /// The verified `commit` was pushed and its PR opened. An older build's lands the card's head.
     /// `verified`: its round and suite passed on `commit` and `base` before it was published (fac-375).
     Published {
         tree: Option<String>,
@@ -33,8 +33,8 @@ pub enum Landing {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         verified: bool,
     },
-    /// A PR published, waiting out of the train for the operator's approval, never merged before it (fac-98, fac-111).
-    /// An older build's, not `verified`, merges on its PR entry's run instead (fac-375).
+    /// A published PR awaiting the operator's manual merge or approval outside the train (fac-98, fac-111).
+    /// For approval merging an older build's unverified head needs its PR entry's run (fac-375).
     Approval {
         tree: Option<String>,
         base: crate::ids::Sha,

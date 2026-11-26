@@ -14,13 +14,13 @@ use crate::post::Poster;
 use crate::state::State;
 
 // Whether a card holds its project's landing: at the train's front, publishing or merging, with
-// no alarm raised. A company PR waiting for the operator's approval holds none (fac-98).
+// no alarm raised. A published PR waiting for the operator holds none (fac-98).
 fn holds_slot(c: &Card) -> bool {
     c.stage == Stage::Merging && !c.alarm && landing(c) && !crate::queue::approval::waiting(c)
 }
 
 // Whether landing holds a card's turns; a landing held for the operator releases them until retry.
-// A PR waiting for approval holds them only while its approved merge is pending or started (fac-98).
+// A published PR holds them only while its merge action is pending or started (fac-98).
 fn holds_turns(state: &State, c: &Card) -> bool {
     let mut mine = state.actions.values().filter(|a| a.what.card() == Some(&c.id) && landing_action(&a.what));
     if crate::queue::approval::waiting(c) {

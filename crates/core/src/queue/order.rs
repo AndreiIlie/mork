@@ -1,5 +1,5 @@
 //! Where a card stands in its merge queue (fac-68, fac-375): its place, its candidate, what is before it, and the
-//! commit it lands. Only the front lands; a company PR waiting for the operator's approval is out of the queue (fac-98).
+//! commit it lands. A published PR waits for the operator outside the queue (fac-98).
 
 use mork_types::Sha;
 use mork_types::card::{Candidate, Card, Landing, Stage};
@@ -35,7 +35,7 @@ pub fn place(c: &Card) -> i64 {
 }
 
 /// A project's train, in its order: its live cards merging, an alarmed one and a company PR
-/// waiting for approval aside (fac-98).
+/// waiting for the operator aside (fac-98).
 pub fn cards(p: &Poster<'_>, project: &str) -> Vec<Card> {
     let mut all: Vec<Card> = p.state.cards.keys().filter_map(|id| p.card(id)).chain(p.all_new_cards()).collect();
     all.retain(|c| c.project == project && member(c));
@@ -64,7 +64,7 @@ pub fn in_queue(c: &Card) -> bool {
 }
 
 /// How many cards of its merge queue are before this one; all of them before one still verified, and none before a
-/// company PR waiting for approval, out of it (fac-98).
+/// published PR waiting for the operator outside it (fac-98).
 pub fn ahead(p: &Poster<'_>, c: &Card) -> usize {
     if crate::queue::approval::waiting(c) {
         return 0;

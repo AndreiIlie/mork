@@ -10,9 +10,11 @@ With the default `merge = "manual"`, the operator merges on the forge and Mork l
 To have Mork merge on the operator’s approval of the verified head, set `merge = "approval"` in the project’s forge table.
 Existing Bitbucket projects also need this setting to keep merging on approval.
 
-Bitbucket uses the review bot’s token to push, read and comment.
+Only the engine reads either forge's tokens.
+Bitbucket uses the review bot’s token to push, read, comment and resolve threads.
 The operator’s token opens pull requests and calls approved merges.
 Its approver is named in the review bot’s token file.
+Mork leaves the operator off the reviewer list of a Bitbucket PR he authors, and he can approve it himself.
 
 GitHub uses the project’s one token to push, open pull requests, comment, resolve threads and merge.
 Manual merging allows the operator’s own token.
@@ -23,6 +25,7 @@ GitHub’s repository setting controls branch deletion.
 Our card's candidate, its branch with master's tip merged in, is made once its head's checks pass or when none are configured.
 Before publication, the candidate's checks run if needed, then its review round and its whole suite run side by side on that commit.
 Its findings and a failed suite go back to its foreman alone, in one fix request once both ended.
+The forge receives nothing from a failed pre-publication verification.
 Once both passed, its verified head is recorded, then published: pushed, and its pull request opened by the configured account, its title the card's board title in a few words, with no card id, its description empty; on a project with `tickets.kind` set to `azure-devops`, a card whose notes list its tickets (`Azure DevOps 4123, 4124`) has them first in the title, then the foreman's summary of under 10 words, never cropped (`#4123 #4124 Duplicate window and saved notice in the add form`), a new branch starting with the first number and the title's words the push accepts (one never published is renamed so before its push, its clone keeping the old name), and its description holds one line a ticket: its Azure DevOps page and the foreman's note of about 15 words.
 The foreman writes both before publication as a card note (`card.change --note`) whose first line is `PR wording`, then `Title: <summary>`, then one `<ticket number>: <note>` line a ticket; the newest such note counts, the tickets are the `Azure DevOps` note's numbers, then those of each card the run carries, then any the wording note adds; the wording note has a line for each, carried cards' tickets included, and the branch takes its number and words from the run's own card alone.
 When wording is needed, the engine first requests it at the start of verification.
@@ -45,7 +48,7 @@ Merged by hand on the forge, it lands.
 **2. The review.**
 GitHub lists fork pull requests in `prs` and excludes them from review, verification and merging.
 Every eligible open pull request into the base gets its review card by itself (`pr-<project>-<n>`), a colleague's or the operator's own; our card's only at a head no verification passed.
-On a project with `forge.review_tag` configured, any pull request whose title contains that tag gets this same review whatever its destination; untagged non-base pull requests do not.
+On a project with `forge.review_tag` configured, an eligible pull request whose title contains that tag gets this same review whatever its destination; untagged non-base pull requests do not.
 Eligible pull requests are verified off the merge queue on its destination's tip, its destination merged into its head: its checks, taking no test slot, then its round and its whole suite side by side, only the suite waiting for a test slot.
 A failed round still owes its suite, and the results are posted once both ended.
 Its foreman reviews it as the "Review cards" skill says.
@@ -89,6 +92,8 @@ When `[internals] hide` is on in `mork.toml`, it also checks its word list, mark
 A finding names the line, what is wrong and its proof, briefly.
 
 **The operator's words for the rest:** `mork ctl review <project> <n>` and `review.merge` both post findings or “No findings.” at completion and close after posting; `post` requests any findings not yet posted.
-`review.merge` keeps its pull request available for his approval into its destination after closure; title eligibility alone adds no approval-merge eligibility.
+On approval projects, `review.merge` keeps the verified head eligible to merge into its destination on his approval after the review closes.
+A title tag alone grants review only.
+On manual projects, the operator merges the PR on the forge.
 `review.branch` reviews a branch against the base, with no pull request to post on.
 A merge the forge or the read refuses is held for him.

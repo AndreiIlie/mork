@@ -105,6 +105,14 @@ fn a_local_card_lands_through_the_merge_queue() {
     lands_locally(&mut s, LOCAL, &[]);
 }
 
+fn assert_pr_landing_status(s: &Sim, expected: &str) {
+    let view = mork_core::views::place::place(&s.state, PR, None, &Default::default(), s.ctx());
+    let pipeline = view.card.unwrap().pipeline;
+    let overview = view.overview.unwrap().stages;
+    assert_eq!(pipeline.last().unwrap().sub.as_deref(), Some(expected));
+    assert_eq!(overview.last().unwrap().summary, expected);
+}
+
 #[test]
 fn a_published_pr_merges_on_its_approval() {
     let mut s = Sim::new();
@@ -120,6 +128,7 @@ fn a_published_pr_merges_on_its_approval() {
     assert_eq!(s.stage(PR), Stage::Merging);
     assert!(matches!(s.card(PR).landing, Some(Landing::Approval { verified: true, .. })));
     assert_eq!(s.card(PR).pr, Some(7));
+    assert_pr_landing_status(&s, "PR #7 waits for your approval");
     let comment = s.action_of(|w| matches!(w, ActionWhat::Comment { .. }));
     s.returned(&comment.id, Ok(json!({})));
     let unapproved = s.pr_read(PR, false);
@@ -149,6 +158,7 @@ fn manual_pr_lands_after_the_operator_merges_it() {
     s.suite(PR, 0);
     assert!(!merge_asked(&s.pr_read(PR, true)));
     assert!(s.state.asks.values().any(|a| a.open && a.text.contains("review and merge my PR on GitHub")));
+    assert_pr_landing_status(&s, "PR #7 waits for your merge");
     let c = s.card(PR);
     let seen = mork_types::work::PrSeen {
         pr: 7,

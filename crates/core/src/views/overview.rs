@@ -1,6 +1,7 @@
 // Per-card Overview stage spine built in `core` for the web Card Room (fac-684); it carries no messages (fac-719).
 
 use mork_types::card::{Card, Mode, Stage};
+use mork_types::config::Config;
 use mork_types::decisions;
 use mork_types::review::{FindingState, Review, Round, RoundView, Verdict};
 use mork_types::view::{OverviewStage, OverviewStageAt, OverviewStageKind, OverviewView};
@@ -33,7 +34,7 @@ struct RoundSlot {
     start_ms: Option<i64>,
 }
 
-pub(super) fn overview(state: &State, card: &Card, outside: &Outside) -> OverviewView {
+pub(super) fn overview(state: &State, card: &Card, outside: &Outside, config: &Config) -> OverviewView {
     // Ignore a finished review card left over from an earlier run of a restarted parent card.
     let review = review_card(state, card)
         .filter(|(rc, _)| card.mode == Mode::Review || rc.stage.is_live() || rc.first_seq >= card.first_seq);
@@ -55,7 +56,7 @@ pub(super) fn overview(state: &State, card: &Card, outside: &Outside) -> Overvie
                 at: stage_at(st.kind, current, review_ref),
                 start_ms: st.start_ms,
                 end_ms: st.end_ms,
-                summary: stage_summary(state, card, review_ref, outside, st.kind, flags),
+                summary: stage_summary(state, card, review_ref, outside, st.kind, flags, config),
                 round: stage_round(st.kind, review_ref),
             }
         })
@@ -346,6 +347,7 @@ fn stage_summary(
     outside: &Outside,
     kind: RawKind,
     flags: (bool, bool, bool, bool),
+    config: &Config,
 ) -> String {
     let (current, is_last, is_last_spec, is_last_build) = flags;
     match kind {
@@ -358,7 +360,7 @@ fn stage_summary(
         RawKind::Verify(Some(n)) if current => current_round_summary(state, card, outside, n),
         RawKind::Review(_) if current => review_sub(state, card, outside).unwrap_or_default(),
         RawKind::Verify(Some(n)) | RawKind::Review(Some(n)) => round_summary(review, n),
-        RawKind::Land if current => land_sub(state, card).unwrap_or_default(),
+        RawKind::Land if current => land_sub(state, card, config).unwrap_or_default(),
         RawKind::Land => ended_word(card, is_last, "landed"),
         RawKind::Report if current => String::new(),
         RawKind::Report | RawKind::Review(None) | RawKind::Verify(None) => ended_word(card, is_last, "done"),

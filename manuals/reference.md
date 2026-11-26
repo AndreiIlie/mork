@@ -979,8 +979,9 @@ Example: `mork ctl demo ex-550`
 
 Open PRs for a project with `forge.kind` set to `bitbucket` or `github`, as the poller last read them.
 
-The poller reads each hosted project's open PRs each `poll_seconds` (a minute by default), so a PR opened since its last read may be missing; they are the PRs `review` takes.
-How each gets its review card is the `pull-requests` skill's.
+The poller reads each hosted project's open PRs each `poll_seconds` (a minute by default), so a PR opened since its last read may be missing.
+The list includes GitHub fork PRs, which have no review card.
+The `pull-requests` skill explains which PRs get a review card.
 Answers `{"prs": {"project", "prs": [{"pr", "title", "author", "source", "destination", "updated", "link"}]}}`: `source` and `destination` are its branches, `updated` the time of its last update, `link` its forge page.
 An empty list means none is open.
 Refused for an unknown project, a project with a local forge, or one the poller hasn't read since Mork started.
@@ -996,17 +997,21 @@ Its diff is against the PR's destination branch, its clone at the integrated can
 It is verified off the merge queue, its round and its suite side by side; on a colleague's PR its findings, or “No findings.”, and a failed suite's comment are posted once both ended, while our own PR gets only “No findings.” when clean and its findings and failed suite go to its foreman alone, as the `pull-requests` and `review-cards` skills say.
 Nothing merges from a review alone.
 Answers `{"review": {"card"}}`.
-Refused for a project with a local forge, a PR not open as last read, or a review card already live.
+Refused for a project with a local forge, a PR not open as last read, a GitHub fork PR, or a review card already live.
 
 Example: `mork ctl review web 42`
 
 ### review.merge
 
-Opens a review card for an open PR, as `review` does, allowing its verified head to merge into its destination on the operator’s approval when the project uses approval merging.
+Only the operator can run `review.merge`, which opens a review card for an eligible PR as `review` does.
 
+On projects with approval merging, this allows the operator's approval to merge the verified head into its destination after the review closes.
 Manual projects wait for the operator to merge on the forge, as the `pull-requests` skill says.
+Even a clean review leaves the merge to the operator.
 A merge refused is held for the operator.
-Answers `{"review.merge": {"card"}}`; buzzed from an agent; refused as `review` is.
+Answers `{"review.merge": {"card"}}`.
+Refused as `review` is, including for GitHub fork PRs.
+An agent or orchestrator sending the command gets a buzz.
 
 Example: `mork ctl review.merge web 42`
 
