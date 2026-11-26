@@ -95,8 +95,7 @@ pub struct JobSpec {
     pub mounts: Vec<Mount>,
     /// The whole environment of the job (the wall clears everything else, 1.4.11.4).
     pub env: BTreeMap<String, String>,
-    /// TCP ports the job may connect to; `None`, any port: a turn's, and a suite's or checks'
-    /// (fac-93).
+    /// Landlock TCP connect ports. A private network namespace permits all its own loopback ports.
     pub ports: Option<Vec<u16>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub net: Option<Net>,

@@ -38,7 +38,10 @@ pub enum WallExecError {
     /// The syscall filter could not be installed.
     Seccomp(std::io::Error),
     /// The exec itself failed.
-    Exec { program: String, err: std::io::Error },
+    Exec {
+        program: String,
+        err: std::io::Error,
+    },
 }
 
 impl std::fmt::Display for WallExecError {
@@ -71,7 +74,7 @@ pub struct Args {
     pub argv: Vec<String>,
 }
 
-/// Parses `[--partial] [--any-port] <port>… -- <argv>`.
+/// Parses the wall mode and the ports to bridge or permit before the command separator.
 pub fn parse(args: &[String]) -> Result<Args, WallExecError> {
     let cut = args.iter().position(|a| a == "--").ok_or(WallExecError::NoSeparator)?;
     let (head, tail) = args.split_at(cut);
@@ -105,8 +108,11 @@ pub fn run(args: &[String]) -> WallExecError {
     if a.partial && !faults::TEST_SETTINGS {
         return WallExecError::PartialRefused;
     }
-    let mut cmd = Command::new(&a.argv[0]);
-    if a.bridge && let Err(e) = bridge(&mut cmd, a.ports.as_deref().unwrap_or_default()) {
+    let Some((program, rest)) = a.argv.split_first() else { return WallExecError::NoCommand };
+    let mut cmd = Command::new(program);
+    if a.bridge
+        && let Err(e) = bridge(&mut cmd, a.ports.as_deref().unwrap_or_default())
+    {
         return WallExecError::Bridge(e);
     }
     if let Err(e) = mork_sys::set_no_new_privs() {
@@ -124,7 +130,6 @@ pub fn run(args: &[String]) -> WallExecError {
     if let Err(e) = mork_sys::install_wall_filter() {
         return WallExecError::Seccomp(e);
     }
-    let Some((program, rest)) = a.argv.split_first() else { return WallExecError::NoCommand };
     // bwrap's `--chdir` sets `PWD`; the wall's environment is only what Mork sets
     // (1.4.11.4).
     let err = cmd.args(rest).env_remove("PWD").exec();
@@ -132,8 +137,8 @@ pub fn run(args: &[String]) -> WallExecError {
 }
 
 fn bridge(cmd: &mut Command, ports: &[u16]) -> std::io::Result<()> {
-    use std::net::{Ipv4Addr, Shutdown, TcpListener};
     use std::io::Read;
+    use std::net::{Ipv4Addr, Shutdown, TcpListener};
     let mut pair = mork_sys::wall_bridge::inherited_bridge()?;
     for port in ports {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, *port))?;

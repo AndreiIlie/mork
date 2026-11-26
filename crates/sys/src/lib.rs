@@ -10,8 +10,8 @@ pub mod wall_bridge;
 
 pub use landlock::{LandlockAbi, Restriction, abi as landlock_abi, restrict_self};
 pub use proc::{
-    ForkOutcome, close_fds_from, fork, install_term_flag, kill, prepare_bridge_spawn, prepare_guard_spawn, prepare_wall_spawn,
-    redirect_stdio, set_child_subreaper, set_no_new_privs, setsid, term_requested, try_reap,
+    ForkOutcome, close_fds_from, fork, install_term_flag, kill, prepare_bridge_spawn, prepare_guard_spawn,
+    prepare_wall_spawn, redirect_stdio, set_child_subreaper, set_no_new_privs, setsid, term_requested, try_reap,
 };
 pub use seccomp::install_wall_filter;
 

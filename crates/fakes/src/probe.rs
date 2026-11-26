@@ -49,6 +49,7 @@ pub struct Spec {
 #[serde(deny_unknown_fields)]
 pub struct TcpExchange {
     pub addr: String,
+    pub tunnel: Option<String>,
     pub send: String,
 }
 
@@ -57,6 +58,7 @@ fn err_word(e: &std::io::Error) -> String {
         Some(1) => "EPERM".into(),
         Some(13) => "EACCES".into(),
         Some(2) => "ENOENT".into(),
+        Some(101) => "ENETUNREACH".into(),
         Some(111) => "ECONNREFUSED".into(),
         Some(30) => "EROFS".into(),
         _ => format!("ERR {e}"),
@@ -111,12 +113,34 @@ fn tcp(target: &str) -> String {
 fn tcp_send(ex: &TcpExchange) -> String {
     use std::io::{BufRead, BufReader};
     use std::net::ToSocketAddrs;
-    let Some(addr) = ex.addr.to_socket_addrs().ok().and_then(|mut a| a.next()) else { return "ERR resolve".into() };
+    let proxy = std::env::var("HTTPS_PROXY").unwrap_or_default();
+    let target = if ex.addr == "$HTTPS_PROXY" { proxy.strip_prefix("http://").unwrap_or("") } else { &ex.addr };
+    let Some(addr) = target.to_socket_addrs().ok().and_then(|mut a| a.next()) else { return "ERR resolve".into() };
     let mut s = match std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(3)) {
         Ok(s) => s,
         Err(e) => return err_word(&e),
     };
     let _ = s.set_read_timeout(Some(Duration::from_secs(2)));
+    if let Some(host) = &ex.tunnel {
+        let request = format!("CONNECT {host} HTTP/1.1\r\nHost: {host}\r\n\r\n");
+        if let Err(e) = s.write_all(request.as_bytes()) {
+            return err_word(&e);
+        }
+        let mut reader = BufReader::new(&s);
+        let mut status = String::new();
+        if reader.read_line(&mut status).is_err() || !status.starts_with("HTTP/1.1 200 ") {
+            return status.trim_end().to_owned();
+        }
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) | Err(_) => return "ERR tunnel header".into(),
+                Ok(_) if line == "\r\n" => break,
+                Ok(_) => {}
+            }
+        }
+    }
     if let Err(e) = s.write_all(ex.send.as_bytes()) {
         return err_word(&e);
     }

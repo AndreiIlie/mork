@@ -703,8 +703,31 @@ token = "{}"
         (stream_name, dgram_name, tcp, (s, d))
     }
 
-    // A turn reaches a loopback port on no list, as a test's own server (fac-93), and no abstract
-    // socket outside. Below ABI 6 (the kernel's, or the test override's) T1.34 skips, saying why.
+    // These peers share the wall's network namespace but predate wall-exec's Landlock domain.
+    fn abstract_peers(rig: &mut Rig) {
+        use std::os::unix::fs::PermissionsExt;
+        let wrapper = rig.t.bin().join("bwrap-with-peers");
+        std::fs::write(
+            &wrapper,
+            r#"#!/usr/bin/python3
+import os, socket, subprocess, sys
+args = sys.argv[1:]
+if args[0] != "peers":
+    cut = args.index("--") + 1
+    os.execv("/usr/bin/bwrap", ["bwrap", *args[:cut], __file__, "peers", *args[cut:]])
+stream = socket.socket(socket.AF_UNIX)
+stream.bind(bytes([0]) + b"wall-stream")
+stream.listen()
+dgram = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+dgram.bind(bytes([0]) + b"wall-dgram")
+sys.exit(subprocess.run(args[1:], pass_fds=(4,)).returncode)
+"#,
+        )
+        .unwrap();
+        std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+        rig.set_env("MORK_TEST_BWRAP", wrapper.to_str().unwrap());
+    }
+
     fn sockets_and_ports(abi_override: Option<&str>) -> Result<(), String> {
         let abi = abi_override.and_then(|a| a.parse::<i64>().ok()).unwrap_or(mork_sys::landlock_abi().0);
         if abi < 6 {
@@ -712,11 +735,22 @@ token = "{}"
         }
         let (stream, dgram, tcp, _keep) = outside_listeners();
         let mut rig = Rig::new();
+        abstract_peers(&mut rig);
         let off = format!("127.0.0.1:{}", tcp.local_addr().unwrap().port());
-        let r = probe(&mut rig, json!({"abstract_stream": [stream], "abstract_dgram": [dgram], "tcp": [off]}));
-        assert_eq!(r["abstract_stream"][&stream], "EPERM", "{r}");
-        assert_eq!(r["abstract_dgram"][&dgram], "EPERM", "{r}");
-        assert_eq!(r["tcp"][&off], "CONNECTED", "{r}");
+        let external = "192.0.2.1:443";
+        let loopback = "import socket; s=socket.socket(); s.bind(('127.0.0.1',0)); s.listen(); c=socket.create_connection(s.getsockname()); p,_=s.accept(); c.sendall(b'x'); assert p.recv(1)==b'x'";
+        let r = probe(
+            &mut rig,
+            json!({"abstract_stream": [stream,"wall-stream"], "abstract_dgram": [dgram,"wall-dgram"],
+            "tcp": [off,external], "exec": [["python3","-c",loopback]]}),
+        );
+        assert_eq!(r["abstract_stream"]["wall-stream"], "EPERM", "{r}");
+        assert_eq!(r["abstract_dgram"]["wall-dgram"], "EPERM", "{r}");
+        assert_ne!(r["abstract_stream"][&stream], "CONNECTED", "{r}");
+        assert_ne!(r["abstract_dgram"][&dgram], "CONNECTED", "{r}");
+        assert_eq!(r["tcp"][&off], "ECONNREFUSED", "{r}");
+        assert_eq!(r["tcp"][external], "ENETUNREACH", "{r}");
+        assert_eq!(r["exec"][0]["code"], 0, "{r}");
         Ok(())
     }
 
@@ -900,16 +934,21 @@ exit:
             assert!(rig.runs("claude").is_empty(), "{k}: a turn ran");
         }
         // Partial, at ABI 5: the wall starts with its mounts, with no scoping (an abstract
-        // socket outside answers), and T1.34 skips.
+        // socket in the same namespace answers), and T1.34 skips.
         assert!(sockets_and_ports(Some("5")).is_err_and(|w| w.contains("below 6")));
         let (stream, _dgram, _tcp, _keep) = outside_listeners();
         let mut rig = Rig::new();
         rig.set_env("MORK_TEST_WALL", "partial");
         rig.set_env("MORK_TEST_LANDLOCK_ABI", "5");
+        abstract_peers(&mut rig);
         let state = rig.fhome().join("state.db");
-        let r = probe(&mut rig, json!({"exists": [state.display().to_string()], "abstract_stream": [stream]}));
+        let r = probe(
+            &mut rig,
+            json!({"exists": [state.display().to_string()], "abstract_stream": [stream,"wall-stream"]}),
+        );
         assert_eq!(r["exists"][state.display().to_string()], false, "{r}");
-        assert_eq!(r["abstract_stream"][&stream], "CONNECTED", "a partial wall at ABI 5 scoped anyway: {r}");
+        assert_eq!(r["abstract_stream"]["wall-stream"], "CONNECTED", "{r}");
+        assert_ne!(r["abstract_stream"][&stream], "CONNECTED", "{r}");
     }
 
     // fac-654: a turn sees and writes its seat's own `io/` alone, the one every turn of the seat has: no other
@@ -1211,16 +1250,73 @@ exit:
         assert!(rig.jobs("main/echo").is_empty(), "a job was made: {words}");
     }
 
-    // fac-671: a walled turn can connect to the bridge's loopback port, cannot see or read web.key,
-    // is refused `mork web`, and gets 401 on an unauthenticated WebSocket upgrade.
+    fn card_probe(rig: &Rig, spec: Value) -> Value {
+        rig.scenario(json!([{"agent":"ex-1/foreman","steps":[{"do":"probe","spec":spec},{"do":"hang"}]}]));
+        rig.say("ex-1", "Probe.");
+        let line = || {
+            let job = rig.jobs("ex-1/foreman").into_iter().next()?;
+            rig.out_lines(&job).into_iter().find(|v| v["type"] == "probe")
+        };
+        wait_until("the card's wall probe", LONG, || line().is_some());
+        let result = line().unwrap();
+        rig.send(json!({"stop":{"card":"ex-1"}}));
+        rig.wait_settled(LONG);
+        result
+    }
+
     #[test]
-    fn fac671_web_bridge_key_is_hidden_and_unauthenticated_upgrade_is_401() {
+    fn wall_proxy_and_local_ports() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::net::TcpListener;
+        if common::wall_test("wall proxy") {
+            return;
+        }
+        let server = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = server.local_addr().unwrap().port();
+        let other = TcpListener::bind("127.0.0.1:0").unwrap();
+        let blocked = other.local_addr().unwrap().port();
+        let worker = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut s, _) = server.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&s).read_line(&mut line).unwrap();
+                writeln!(s, "received {}", line.trim()).unwrap();
+            }
+        });
+        let mut rig = Rig::new();
+        rig.write_config(
+            &rig.config(&format!("host_ports = [{port}]\ndomains = [\"localhost:{port}\",\"localhost:{blocked}\"]")),
+        );
+        rig.put_cards(vec![rig.card("ex-1", mork_types::card::Mode::Full)]);
+        rig.start();
+        let proxy = "$HTTPS_PROXY";
+        let result = card_probe(
+            &rig,
+            json!({"tcp_send":[
+                {"addr":proxy,"tunnel":"denied.invalid:443","send":""},
+                {"addr":proxy,"tunnel":format!("localhost:{blocked}"),"send":""},
+                {"addr":proxy,"tunnel":format!("localhost:{port}"),"send":"tunnel\n"},
+                {"addr":format!("127.0.0.1:{port}"),"send":"direct\n"}
+            ]}),
+        );
+        assert_eq!(
+            result["tcp_send"],
+            json!(["HTTP/1.1 403 Forbidden", "HTTP/1.1 403 Forbidden", "received tunnel", "received direct"])
+        );
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn fac671_web_bridge_key_and_port_are_hidden() {
         if common::wall_test("fac-671 web bridge") {
             return;
         }
         use std::os::unix::fs::PermissionsExt;
         let mut rig = Rig::new();
-        let cfg = rig.config("").replace("[mork]\n", "[mork]\nweb_port = 0\n");
+        let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        let cfg =
+            rig.config(&format!("host_ports = [{port}]")).replace("[mork]\n", &format!("[mork]\nweb_port = {port}\n"));
+        rig.put_cards(vec![rig.card("ex-1", mork_types::card::Mode::Full)]);
         rig.write_config(&cfg);
         rig.start();
 
@@ -1236,8 +1332,6 @@ exit:
         assert_eq!(std::fs::metadata(&key_path).unwrap().permissions().mode() & 0o777, 0o600);
         assert!(!std::fs::read_to_string(&log_path).unwrap().contains(&key), "web.key leaked to app.log");
 
-        let upgrade = "GET /ws HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\
-                       Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n";
         let key_hex_bytes: String = key.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
         let spec = json!({
             "exists": [key_path.display().to_string()],
@@ -1245,15 +1339,13 @@ exit:
             "search_hex": key_hex_bytes,
             "search_roots": ["$HOME", rig.fhome().join("logins").display().to_string(), rig.fhome().join("run").display().to_string()],
             "tcp": [&addr],
-            "tcp_send": [{"addr": &addr, "send": upgrade}],
             "exec": [[common::exe().display().to_string(), "web"]],
         });
-        let r = probe(&mut rig, spec);
+        let r = card_probe(&rig, spec);
         assert_eq!(r["exists"][key_path.display().to_string()], false, "{r}");
         assert!(!r["read"][key_path.display().to_string()].as_str().unwrap().starts_with("READ"), "{r}");
         assert_eq!(r["found"], json!([]), "key bytes found inside wall: {r}");
-        assert_eq!(r["tcp"][&addr], "CONNECTED", "{r}");
-        assert_eq!(r["tcp_send"][0], "HTTP/1.1 401 Unauthorized", "{r}");
+        assert_eq!(r["tcp"][&addr], "ECONNREFUSED", "{r}");
         assert_ne!(r["exec"][0]["code"], 0, "mork web succeeded inside wall: {r}");
         assert!(r["exec"][0]["err"].as_str().unwrap().contains("refused inside a wall"), "{r}");
     }

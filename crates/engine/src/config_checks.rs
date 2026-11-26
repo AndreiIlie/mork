@@ -226,10 +226,14 @@ pub(crate) fn destination(entry: &str, default: Option<u16>) -> Option<(&str, u1
 
 fn hostname(host: &str) -> bool {
     let name = host.strip_suffix('.').unwrap_or(host);
-    name.len() <= 253 && name.split('.').all(|label| {
-        !label.is_empty() && label.len() <= 63 && !label.starts_with('-') && !label.ends_with('-')
-            && label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
-    })
+    name.len() <= 253
+        && name.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        })
 }
 
 #[cfg(test)]

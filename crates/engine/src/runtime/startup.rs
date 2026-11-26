@@ -218,9 +218,9 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
     let shared = Shared::new(opts.commit.clone(), opts.dirty, opts.home.root().display().to_string());
     let (tx, rx) = channel();
     let (mork, agent) = open_sockets(&opts, &shared, &tx, sock_fds)?;
-    let bound_web_port = config.mork.web_port.and_then(|port| {
-        crate::web::start(&opts.home, port, config.mork.web_assets.as_deref().map(std::path::PathBuf::from))
-    }).map(|addr| addr.port());
+    let assets = config.mork.web_assets.as_ref().map(std::path::PathBuf::from);
+    let bound_web_port =
+        config.mork.web_port.and_then(|port| crate::web::start(&opts.home, port, assets)).map(|a| a.port());
     let sampled = tx.clone();
     std::thread::spawn(move || crate::resources::watch(|r| sampled.send(Input::Resources(r)).is_ok()));
     builds::check_reload_target(&opts)?;

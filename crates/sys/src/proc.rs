@@ -153,7 +153,9 @@ fn prepare_spawn(cmd: &mut std::process::Command, keep: Option<i32>, bridge: Opt
                     return Err(io::Error::last_os_error());
                 }
             }
-            if let Some(fd) = bridge_copy && libc::dup2(fd, crate::wall_bridge::BRIDGE_FD) < 0 {
+            if let Some(fd) = bridge_copy
+                && libc::dup2(fd, crate::wall_bridge::BRIDGE_FD) < 0
+            {
                 return Err(io::Error::last_os_error());
             }
             if own_group && libc::setpgid(0, 0) != 0 {

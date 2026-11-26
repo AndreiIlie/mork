@@ -56,7 +56,9 @@ fn serve(listener: TcpListener, forward: Option<u16>, net: &Arc<Net>) -> io::Res
                     let _ = relay(stream, peer);
                 }
             }
-            None => { let _ = tunnel(stream, &net); }
+            None => {
+                let _ = tunnel(stream, &net);
+            }
         })?;
     }
     Ok(())
@@ -71,7 +73,9 @@ fn allowed<'a>(head: &'a [u8], entries: &[String]) -> Result<(&'a str, u16), Str
     let target = req.path.unwrap_or_default();
     let denied = || format!("Destination {target} is refused by mork.toml domains");
     let (host, port) = destination(target, None).ok_or_else(denied)?;
-    let listed = entries.iter().filter_map(|entry| destination(entry, Some(443)))
+    let listed = entries
+        .iter()
+        .filter_map(|entry| destination(entry, Some(443)))
         .any(|(name, p)| p == port && name.eq_ignore_ascii_case(host));
     if listed { Ok((host, port)) } else { Err(denied()) }
 }
@@ -87,7 +91,11 @@ enum Refused {
     Unavailable(io::Error),
 }
 
-fn connect(head: &[u8], net: &Net, resolve: impl FnOnce(&str, u16) -> io::Result<Vec<SocketAddr>>) -> Result<TcpStream, Refused> {
+fn connect(
+    head: &[u8],
+    net: &Net,
+    resolve: impl FnOnce(&str, u16) -> io::Result<Vec<SocketAddr>>,
+) -> Result<TcpStream, Refused> {
     let (host, port) = allowed(head, &net.domains).map_err(Refused::Policy)?;
     let addresses = resolve(host, port).map_err(Refused::Unavailable)?;
     let own = mork_sys::interface_addresses().map_err(Refused::Unavailable)?;
@@ -98,7 +106,10 @@ fn connect(head: &[u8], net: &Net, resolve: impl FnOnce(&str, u16) -> io::Result
             Err(e) => failed = Some(e),
         }
     }
-    Err(failed.map_or_else(|| Refused::Policy(format!("Local destination {host}:{port} is refused by mork.toml host_ports")), Refused::Unavailable))
+    Err(failed.map_or_else(
+        || Refused::Policy(format!("Local destination {host}:{port} is refused by mork.toml host_ports")),
+        Refused::Unavailable,
+    ))
 }
 
 fn tunnel(mut client: TcpStream, net: &Net) -> io::Result<()> {
@@ -111,7 +122,11 @@ fn tunnel(mut client: TcpStream, net: &Net) -> io::Result<()> {
                 Refused::Policy(text) => ("403 Forbidden", text),
                 Refused::Unavailable(e) => ("502 Bad Gateway", e.to_string()),
             };
-            return write!(client, "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reason}", reason.len());
+            return write!(
+                client,
+                "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reason}",
+                reason.len()
+            );
         }
     };
     client.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")?;
@@ -141,23 +156,34 @@ mod tests {
     #[test]
     fn refused_requests_skip_dns() {
         let net = Net { domains: vec!["registry.example".into(), "build.example:8443".into()], host_ports: vec![] };
-        for req in ["GET http://registry.example/ HTTP/1.1", "CONNECT bad.example:443 HTTP/1.1",
-                    "CONNECT registry.example:8443 HTTP/1.1", "CONNECT registry.example HTTP/1.1"] {
+        for req in [
+            "GET http://registry.example/ HTTP/1.1",
+            "CONNECT bad.example:443 HTTP/1.1",
+            "CONNECT registry.example:8443 HTTP/1.1",
+            "CONNECT registry.example HTTP/1.1",
+        ] {
             let head = format!("{req}\r\n\r\n");
-            assert!(matches!(connect(head.as_bytes(), &net, |_, _| panic!("resolved denied request")), Err(Refused::Policy(_))));
+            assert!(matches!(
+                connect(head.as_bytes(), &net, |_, _| Err(io::Error::other("resolved denied request"))),
+                Err(Refused::Policy(_))
+            ));
         }
-        assert_eq!(allowed(b"CONNECT REGISTRY.EXAMPLE:443 HTTP/1.1\r\n\r\n", &net.domains), Ok(("REGISTRY.EXAMPLE", 443)));
+        assert_eq!(
+            allowed(b"CONNECT REGISTRY.EXAMPLE:443 HTTP/1.1\r\n\r\n", &net.domains),
+            Ok(("REGISTRY.EXAMPLE", 443))
+        );
         assert_eq!(allowed(b"CONNECT build.example:8443 HTTP/1.1\r\n\r\n", &net.domains), Ok(("build.example", 8443)));
     }
 
     #[test]
-    fn machine_addresses_require_a_bridged_port() {
+    fn machine_addresses_require_a_bridged_port() -> Result<(), std::net::AddrParseError> {
         let own = [IpAddr::from([192, 0, 2, 1])];
         for addr in ["[::ffff:127.0.0.1]:443", "[::1]:443", "0.0.0.0:443", "192.0.2.1:443"] {
-            let addr = addr.parse().unwrap();
+            let addr = addr.parse()?;
             assert!(!address_allowed(addr, &own, &[]));
             assert!(address_allowed(addr, &own, &[443]));
         }
-        assert!(address_allowed("192.0.2.2:443".parse().unwrap(), &own, &[]));
+        assert!(address_allowed("192.0.2.2:443".parse()?, &own, &[]));
+        Ok(())
     }
 }

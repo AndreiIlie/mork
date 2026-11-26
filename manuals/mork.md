@@ -122,7 +122,12 @@ The wall keeps its own `/run`, `/tmp`, `/var/tmp`, `/proc` and `/dev`, with only
 When work needs one of his hidden files, what he runs or its ports, send your project's orchestrator a concrete request: it can copy a file, redacted, into your clone's `.git/` and answer about his paths, commands and ports.
 
 `/tmp` is emptied after your turn; a file a later turn needs lives in your working folder where git doesn't see it (under `.git/`; on a review card, under `.git/mork/`, all its clone keeps through its rounds).
-Any TCP port is reachable (`MORK_PORT` is your card's preview port, where its project's `preview` serves its clone once the operator turns it on).
+A walled turn can run loopback servers of its own.
+It reaches the machine on its project's `host_ports` and its card's preview (`MORK_PORT`) and mock ports, excluding the web bridge and configured tunnels.
+For web access, use the HTTP proxy in `HTTPS_PROXY`.
+It opens CONNECT tunnels only to the hosts and ports listed in `mork.toml` under `domains`.
+Direct external TCP, UDP and DNS are closed.
+Ask your project's orchestrator for a missing domain or local port.
 An image meant for your reply goes in your seat's `io/` folder, where the reply's `images` must be; `MORK_IO` holds its path, stable for your seat's lifetime, and the engine keeps an immutable per-job copy of each published reply image.
 You reach the engine with `mork ctl` and `mork test`, through a socket that knows which turn is yours, and machines outside with the door (`mork ctl door --help`; permitted reads run directly, `misc.run` asks the operator).
 

@@ -77,8 +77,12 @@ pub fn recv_listener(pair: BorrowedFd<'_>) -> io::Result<Option<(u8, TcpListener
     // SAFETY: a complete SCM_RIGHTS record contains fresh descriptors owned by the receiver.
     let fd = unsafe {
         let c = libc::CMSG_FIRSTHDR(&msg);
-        if c.is_null() || (*c).cmsg_type != libc::SCM_RIGHTS || (*c).cmsg_level != libc::SOL_SOCKET
-            || (*c).cmsg_len != libc::CMSG_LEN(size_of::<i32>() as u32) as usize || msg.msg_flags & libc::MSG_CTRUNC != 0 {
+        if c.is_null()
+            || (*c).cmsg_type != libc::SCM_RIGHTS
+            || (*c).cmsg_level != libc::SOL_SOCKET
+            || (*c).cmsg_len != libc::CMSG_LEN(size_of::<i32>() as u32) as usize
+            || msg.msg_flags & libc::MSG_CTRUNC != 0
+        {
             return Err(io::Error::other("expected one wall listener"));
         }
         OwnedFd::from_raw_fd(libc::CMSG_DATA(c).cast::<i32>().read())

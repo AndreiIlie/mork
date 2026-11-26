@@ -189,17 +189,8 @@ impl Engine {
         // A retry in its request's seat folder finds its images where that request's text names them (fac-654).
         let moved = if carried.as_deref() == Some(io.seat.as_path()) { &[][..] } else { shown.as_slice() };
         let short = self.short_retry(plan, seat.cli, &env, &place.cwd, moved);
-        let mut spec = self.ctx.spec(
-            &id,
-            mork_types::job::JobKind::Turn,
-            &plan.agent,
-            argv,
-            &place.cwd,
-            &places,
-            env,
-            None,
-            now,
-        );
+        let mut spec =
+            self.ctx.spec(&id, mork_types::job::JobKind::Turn, &plan.agent, argv, &place.cwd, &places, env, None, now);
         spec.wall = self.ctx.wall_of(&seat);
         spec.net = (spec.wall != WallMode::None).then(|| self.turn_net(a));
         spec.live = live;
@@ -218,8 +209,8 @@ impl Engine {
 
     fn turn_net(&self, agent: &mork_types::state::Agent) -> mork_types::job::Net {
         let config = &self.ctx.config;
-        let card = mork_core::messages::places::card_of(&self.state, &agent.place)
-            .and_then(|id| self.state.cards.get(&id));
+        let card =
+            mork_core::messages::places::card_of(&self.state, &agent.place).and_then(|id| self.state.cards.get(&id));
         let mut domains = config.mork.domains.clone();
         let mut ports = std::collections::BTreeSet::new();
         if let Some(card) = card {

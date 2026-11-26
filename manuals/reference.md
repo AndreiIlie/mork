@@ -78,6 +78,28 @@ Names match whole, case-sensitive; `*` matches any run of characters.
 Each wall's start scans below the listed folder without following links, skipping `node_modules`, `.git` and `target` folders.
 Matching directories are emptied as a whole.
 
+### domains and host_ports
+
+In `mork.toml`, `[mork] domains` lists destinations for all walled agent turns.
+A card also uses `[projects.<name>] domains`.
+List exact host names such as `"registry.npmjs.org"` for port 443 or `"registry.example:8443"` for one other port.
+Names are case-insensitive.
+Enclose IPv6 literals in brackets.
+Both lists default to empty.
+Configure the hosts for the model APIs and package registries your seats use before starting their turns.
+
+`[projects.<name>] host_ports` lists host loopback ports as numbers or inclusive ranges, for example `host_ports = [3306, "6300-6302"]`.
+It defaults to empty.
+A card also gets its preview and mock ports.
+The bound web bridge port and every configured tunnel port are excluded even when listed.
+Each bridged port appears at the same port on the turn's private loopback, alongside its own test servers.
+
+The supervisor runs `mork wall-proxy <job folder>` for the lifetime of each walled turn with the lists saved in its job.
+The proxy named by `HTTPS_PROXY` and `HTTP_PROXY` accepts CONNECT for a listed host and port.
+It rejects other destinations before DNS and returns 403 for plain HTTP requests.
+An address on the machine itself also requires a bridged port.
+The proxy carries bytes in both directions once the tunnel is open.
+
 ### web_port and web_assets
 
 In `mork.toml`, `[mork] web_port` enables the localhost HTTP and WebSocket bridge, bound on `127.0.0.1`.
