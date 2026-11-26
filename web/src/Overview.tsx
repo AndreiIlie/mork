@@ -17,7 +17,10 @@ import { PaneList, Row } from "./ui/List";
 import { PinnedScroll } from "./ui/PinnedScroll";
 import { ProgressBar } from "./ui/ProgressBar";
 
-const MARK: Record<Exclude<OverviewStageAt, "current">, string> = { passed: "✓", failed: "✕" };
+const MARK: Record<Exclude<OverviewStageAt, "current">, ReactNode> = {
+  passed: <span className="text-green-700">✓</span>,
+  failed: <span className="text-red-700">✕</span>,
+};
 const DEEP = "pl-[calc(var(--spacing-gutter)+48px)] pr-gutter";
 
 function minutes(ms: number): string {
@@ -276,7 +279,7 @@ export function Overview({
                   onClick={foldable ? () => setFolds((prev) => ({ ...prev, [key]: !open })) : undefined}
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="flex w-3 shrink-0 items-center justify-center font-mono text-label-12 text-gray-1000">
+                    <span className="flex w-3 shrink-0 items-center justify-center font-mono text-label-12">
                       {st.at === "current" ? <Dot color={status} pulse={status === "green"} /> : MARK[st.at]}
                     </span>
                     <span className="shrink-0 font-medium text-gray-1000">{st.label}</span>
