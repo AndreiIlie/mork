@@ -1,4 +1,4 @@
-//! `mork door-dispatch [--allow sql,mongo,libra,file,sh] [--receipts <dir>] [--tunnels <dir>]` (fac-1, fac-86):
+//! `mork door-dispatch [--allow sql,mongo,http,file,sh] [--receipts <dir>] [--tunnels <dir>]` (fac-1, fac-86):
 //! runs only allowed kinds, as argv never through a local shell, masking secrets; with `--receipts` a call runs once.
 
 use std::io::{BufRead, Read, Write};
@@ -183,7 +183,7 @@ fn run(s: &Settings, req: &DispatchRequest, plan: &Plan, bounds: Bounds) -> Disp
     if matches!(plan, Plan::Get { .. }) != req.into.is_some() {
         return refused("its file's place is missing, or isn't its plan's");
     }
-    let service = matches!(plan, Plan::Sql { .. } | Plan::Mongo { .. } | Plan::Libra { .. });
+    let service = matches!(plan, Plan::Sql { .. } | Plan::Mongo { .. } | Plan::Http { .. });
     if service != req.credential.is_some() {
         return refused("its credential is missing, or isn't its plan's");
     }
@@ -193,7 +193,7 @@ fn run(s: &Settings, req: &DispatchRequest, plan: &Plan, bounds: Bounds) -> Disp
     }
     if let Some(p) = &req.credential {
         redactor.add(&p.secret);
-        if matches!(plan, Plan::Libra { .. }) {
+        if matches!(plan, Plan::Http { .. }) {
             redactor.add(&p.name);
         }
     }

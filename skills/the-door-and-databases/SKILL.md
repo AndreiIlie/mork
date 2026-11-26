@@ -65,9 +65,10 @@ Projection, sort and document/byte/time bounds apply.
 Read it there with your own tools (`pdftotext`, `unzip`).
 `door.help` lists the file roots; build the path under a root from the database.
 
-`libra.get` takes any GET path `/…` at the configured API origin, with no ask.
+`http.get` takes any GET path `/…` at the configured API origin, with no ask.
 Optional endpoint names are aliases/templates: parameters fill `{name}` slots and all extra keys and values are encoded into the query.
-Credentials and tokens stay with the engine, requests stay at the configured origin, and signing stays on the server.
+The engine handles the OAuth2 client credentials and bearer token. Both requests use the HTTPS origin in `[targets.<id>.http]`.
+The token path defaults to `/oauth2/token`. The door sends `scope` only when configured.
 Output masking and limits apply.
 File roots and named logs keep their location restrictions.
 

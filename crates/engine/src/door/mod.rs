@@ -75,7 +75,7 @@ pub fn credentials(home: &Home, plan: &Plan) -> Result<(Option<Pair>, Vec<String
     let f = read(home)?;
     let Some(path) = &f.access else {
         return match plan {
-            Plan::Sql { .. } | Plan::Mongo { .. } | Plan::Libra { .. } => {
+            Plan::Sql { .. } | Plan::Mongo { .. } | Plan::Http { .. } => {
                 Err("targets.toml names no access file for its credentials".into())
             }
             _ => Ok((None, Vec::new())),
@@ -85,13 +85,13 @@ pub fn credentials(home: &Home, plan: &Plan) -> Result<(Option<Pair>, Vec<String
     let pair = match plan {
         Plan::Sql { login, .. } => Some(file.pair(&login.section, &login.user, &login.password, true)?),
         Plan::Mongo { login, .. } => Some(file.pair(&login.section, &login.user, &login.password, false)?),
-        Plan::Libra { client, .. } => Some(file.pair(&client.section, &client.key, &client.secret, false)?),
+        Plan::Http { client, .. } => Some(file.pair(&client.section, &client.key, &client.secret, false)?),
         _ => None,
     };
     let mut secrets = file.secrets();
     if let Some(p) = &pair {
         secrets.push(p.secret.clone());
-        if matches!(plan, Plan::Libra { .. }) {
+        if matches!(plan, Plan::Http { .. }) {
             secrets.push(p.name.clone());
         }
     }
