@@ -48,6 +48,30 @@ fn recap_reply() -> Value {
     r
 }
 
+#[test]
+fn preview_and_mock_ports_skip_web_and_tunnels_until_exhausted() {
+    let mut s = Sim::new();
+    s.config.mork.port_range = "41000-41003".into();
+    s.config.mork.web_port = Some(41000);
+    s.config.tunnels.insert(
+        "local".into(),
+        mork_types::config::TunnelConfig {
+            alias: "box".into(),
+            port: 41002,
+            remote_port: 41001,
+            url: "http://localhost:41002".into(),
+        },
+    );
+    start_brief(&mut s, json!({"visual": true}));
+    let card = s.card(CARD);
+    assert_eq!(card.port, Some(41001));
+    assert_eq!(card.mock.and_then(|m| m.port), Some(41003));
+
+    s.board("web-2", "web");
+    assert!(s.operator(json!({"start": {"card": "web-2"}})).is_ok());
+    assert_eq!(s.card("web-2").port, None);
+}
+
 fn mock_offer_reply() -> Value {
     let mut r = reply("brief-ready", "Mock ready");
     r["hand"]["message"] = json!("Mock ready at http://web-1.localhost:41001/");

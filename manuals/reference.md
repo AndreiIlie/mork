@@ -89,8 +89,11 @@ Both lists default to empty.
 Configure the hosts for the model APIs and package registries your seats use before starting their turns.
 
 `[projects.<name>] host_ports` lists host loopback ports as numbers or inclusive ranges, for example `host_ports = [3306, "6300-6302"]`.
-It defaults to empty.
+Each port must be at least 1024, including the first port in a range.
+The list defaults to empty.
 A card also gets its preview and mock ports.
+When assigning these, Mork skips live cards' preview and mock ports, the configured web port and every local tunnel port.
+With `web_port = 0` it skips the port assigned by the OS.
 The bound web bridge port and every configured tunnel port are excluded even when listed.
 Each bridged port appears at the same port on the turn's private loopback, alongside its own test servers.
 
@@ -146,7 +149,8 @@ For Cargo and npm, use `caches = [".cargo/registry", ".npm/_cacache"]` and `cach
 
 In `mork.toml`, `[mork] skills` names an optional absolute folder path (with no `.` or `..` component) whose regular files are merged with the built-in skills at startup into the same content-named folder mounted in every wall.
 Symlinks and non-regular files inside it are skipped, and a missing folder uses the built-in skills alone.
-Any other error opening the folder, a path under `.claude-plugin`, or a path colliding with a built-in skill fails startup.
+At the top level, `.claude-plugin`, `hooks`, `commands`, `agents` and `.mcp.json` are reserved plugin paths.
+Any other error opening the folder, a regular file or directory at a reserved path, or a file colliding with a built-in skill fails startup.
 
 ### tickets and review_tag
 

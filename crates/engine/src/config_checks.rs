@@ -11,7 +11,14 @@ pub(crate) fn check(text: &str, config: &Config) -> Result<(), ConfigError> {
     check_claude_accounts(text, config)?;
     check_domains(text, "mork", &config.mork.domains)?;
     for (name, project) in &config.projects {
-        check_domains(text, &format!("projects.{name}"), &project.domains)?;
+        let table = format!("projects.{name}");
+        check_domains(text, &table, &project.domains)?;
+        if let Some(range) = project.host_ports.iter().find(|r| r.from < 1024) {
+            return Err(ConfigError::Value {
+                line: key_line(text, Some(&table), "host_ports"),
+                message: format!("project `{name}` host_ports includes port {}, below the minimum of 1024", range.from),
+            });
+        }
     }
     check_projects(text, config)?;
     check_tunnels(text, config)?;

@@ -12,7 +12,7 @@ use crate::paths::Home;
 pub(super) const FILE: &str = "wall-service-ports.json";
 const TUNNELS: &str = "wall-tunnel-ports.lock";
 
-pub(crate) fn start(home: &Home, config: &Config) -> io::Result<BTreeSet<u16>> {
+pub(crate) fn start(home: &Home, config: &Config) -> io::Result<(BTreeSet<u16>, Option<u16>)> {
     // Surviving proxies lock this same inode through connect, including while an ephemeral port is assigned.
     let file = OpenOptions::new().create(true).truncate(false).write(true).open(home.root().join(FILE))?;
     file.lock()?;
@@ -22,7 +22,7 @@ pub(crate) fn start(home: &Home, config: &Config) -> io::Result<BTreeSet<u16>> {
     let web = config.mork.web_port.and_then(|port| crate::web::start(home, port, assets)).map(|addr| addr.port());
     let ports: BTreeSet<_> = config.tunnels.values().map(|t| t.port).chain(web).collect();
     serde_json::to_writer(&file, &ports)?;
-    Ok(ports)
+    Ok((ports, web))
 }
 
 pub(super) fn connect(file: &Path, addr: SocketAddr) -> io::Result<Option<TcpStream>> {

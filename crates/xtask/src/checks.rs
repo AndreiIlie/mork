@@ -51,22 +51,8 @@ fn output(mut command: Command) -> Result<std::process::Output, String> {
         .map_err(|e| format!("couldn't run {}: {e}", command.get_program().display()))
 }
 
-fn child(tool: &str) -> Result<Vec<Value>, String> {
-    let mut c = super::cargo();
-    match tool {
-        "rustfmt" => c.args(["fmt", "--all", "--check"]),
-        _ => c.args([
-            "clippy",
-            "--workspace",
-            "--all-targets",
-            "--all-features",
-            "--message-format=json",
-            "--",
-            "-D",
-            "warnings",
-        ]),
-    };
-    let out = output(c)?;
+fn child(tool: &str, command: Command) -> Result<Vec<Value>, String> {
+    let out = output(command)?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     let found = if tool == "rustfmt" {
@@ -135,9 +121,11 @@ pub(super) fn run() -> u8 {
             Vec::new()
         }),
     );
-    report.step("rustfmt", child("rustfmt"));
+    report.step("rustfmt", child("rustfmt", super::rustfmt()));
     report.step("comments", problems(&root, xtask::comments::check(&root), "comments"));
-    report.step("clippy", child("clippy"));
+    for (name, targets) in super::CLIPPY_PASSES {
+        report.step(name, child("clippy", super::clippy(targets, true)));
+    }
     report.step("audits", problems(&root, super::audits(), "audits"));
     report.step("web", web(&root));
     let document = json!({"status": report.status, "components": report.components,
