@@ -176,12 +176,16 @@ fn tickets_config_holds_unworded_open_pr_and_formats_configured_page_url() {
     }
     let refused = Err(ActionFailure::Internals { words: "refused".into() });
     sim.returned(&retried.id, refused.clone());
-    assert!(sim.state.actions[&retried.id].words.as_ref().unwrap().contains("card.change --note"));
+    let notice = sim.state.actions[&retried.id].words.as_deref().unwrap();
+    assert!(notice.contains("card.change --note"), "{notice}");
+    assert!(!notice.contains("--title"), "{notice}");
 
     sim.state.board.get_mut("ex-1").unwrap().description = "The description.".into();
     sim.operator(json!({"action.retry": {"action": retried.id}})).unwrap();
     sim.returned(&retried.id, refused);
-    assert!(sim.state.actions[&retried.id].words.as_ref().unwrap().contains("board title with card.change --title"));
+    let notice = sim.state.actions[&retried.id].words.as_deref().unwrap();
+    assert!(notice.contains("board title with card.change --title"), "{notice}");
+    assert!(!notice.contains("--note"), "{notice}");
 }
 
 fn sql_target(database: &str, schema_hint: Option<&str>) -> Target {
