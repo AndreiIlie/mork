@@ -17,6 +17,12 @@ fn fail(e: &(impl std::fmt::Display + ?Sized)) -> i32 {
     1
 }
 
+/// Validates the startup config for a running build's reload preflight.
+pub fn check_config() -> i32 {
+    let Some(path) = config::path() else { return fail("mork: no config path: set MORK_CONFIG or HOME") };
+    config::read(&path).map_or_else(|e| fail(&e), |_| 0)
+}
+
 /// `mork version [--json]`: its commit, and its manifest (1.8.2).
 pub fn version(rest: &[String]) -> i32 {
     let v = json!({
