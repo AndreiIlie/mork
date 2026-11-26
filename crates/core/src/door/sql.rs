@@ -412,6 +412,10 @@ mod tests {
             "WITH c AS (SELECT 1) DELETE (t) FROM t",
             "SELECT /*+ BKA('\\'') */ ' */ 1 INTO @v -- '",
             "SELECT /*+ # ' */ ' */ 1 INTO @v -- '",
+            // fac-748 review r2: no escape or comment in a hint hides a SET_VAR from the gate.
+            r#"SELECT /*+ SET_VAR(optimizer_switch = '\') SET_VAR(sql_select_limit = 9) SET_VAR(a = 'a) # ') */ 1"#,
+            r#"SELECT /*+ SET_VAR(optimizer_switch = "\") SET_VAR(sql_mode = '') SET_VAR(a = "a) -- ") */ 1"#,
+            "SELECT /*+ BKA(t) -- note\n */ 1",
         ]);
         for q in ["SELECT 1 /*!50000 # a note\n + 1 */", "SELECT REPLACE(a, 'x', 'y'), INSERT(a, 1, 2, 'z') FROM t"] {
             assert!(read(q).is_ok(), "refused: {q}");
@@ -420,6 +424,7 @@ mod tests {
             assert!(!read(q).unwrap().capped(20).unwrap().contains("999999"), "uncapped: {q}");
         }
         assert!(read("SELECT 1 /*+ SET_VAR(sql_mode = '') */").is_err());
+        assert!(read("SELECT /*+ SET_VAR(optimizer_switch = 'a#b--c') MAX_EXECUTION_TIME(500) */ 1").is_ok());
         assert!(read("SELECT /*+ MAX_EXECUTION_TIME(0) */ 1").unwrap().timed(1000).is_err());
     }
 

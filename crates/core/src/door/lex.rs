@@ -115,9 +115,7 @@ fn comment(q: &str, i: usize) -> Result<Option<usize>, String> {
 fn token(q: &str, i: usize) -> Result<(Tok, usize), String> {
     if q[i..].starts_with("/*+") {
         let end = q[i + 3..].find("*/").ok_or("an optimizer hint isn't closed")?;
-        if open_quote(&q[i + 3..i + 3 + end]) {
-            return Err("a quote in an optimizer hint isn't closed before its `*/`".into());
-        }
+        hint_body(&q[i + 3..i + 3 + end])?;
         let at = i + 3 + end + 2;
         return Ok((Tok::Hint(q[i..at].to_owned()), at));
     }
@@ -147,17 +145,27 @@ fn token(q: &str, i: usize) -> Result<(Tok, usize), String> {
 }
 
 // MySQL's hint parser reads quotes, doubled but never escaped, and no comments: a `*/` inside one
-// of its quotes doesn't end the hint.
-fn open_quote(body: &str) -> bool {
+// of its quotes doesn't end the hint, and the gate reads a hint's body only where both lexers agree.
+fn hint_body(body: &str) -> Result<(), String> {
+    if body.contains('\\') {
+        return Err("a backslash in an optimizer hint isn't read: the server's hint parser reads no escapes".into());
+    }
     let mut open = None;
-    for c in body.chars() {
+    let mut chars = body.chars().peekable();
+    while let Some(c) = chars.next() {
         match open {
             None if matches!(c, '\'' | '"' | '`') => open = Some(c),
+            None if c == '#' || (c == '-' && chars.peek() == Some(&'-')) => {
+                return Err("a comment in an optimizer hint isn't read: the server's hint parser reads none".into());
+            }
             Some(o) if c == o => open = None,
             None | Some(_) => {}
         }
     }
-    open.is_some()
+    match open {
+        Some(_) => Err("a quote in an optimizer hint isn't closed before its `*/`".into()),
+        None => Ok(()),
+    }
 }
 
 // MySQL's unquoted names: ASCII letters, digits, `_`, `$`, and any character beyond ASCII.
