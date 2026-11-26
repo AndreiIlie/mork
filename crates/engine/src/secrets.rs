@@ -235,29 +235,32 @@ mod tests {
     fn configured_ticket_token_is_masked() {
         const FIXTURE: &str = "MORK_TEST_TICKET_REDACTION_HOME";
         const PAT: &str = "configured-ticket-token";
+        const GITHUB: &str = "configured-github-token";
         const LEGACY: &str = "legacy-ticket-token";
         if let Some(dir) = std::env::var_os(FIXTURE) {
             let dir = Path::new(&dir);
             assert_eq!(std::env::var_os("HOME").as_deref(), Some(dir.as_os_str()));
-            let gather = |token: &Path| {
+            let gather = |tickets: &Path, github: &Path| {
                 let config: Config = serde_json::from_value(json!({
                     "mork": {}, "git": {"author": "Test <test@example.invalid>"},
                     "projects": {"example": {
                         "repo": dir, "board": {"kind": "markdown", "path": dir}, "test": "true",
-                        "forge": {"kind":"github","owner":"owner","repo":"repo","token":token},
+                        "forge": {"kind":"github","owner":"owner","repo":"repo","token":github},
                         "tickets": {"kind": "azure-devops", "api": "https://example.invalid/api",
-                                   "page": "https://example.invalid/tickets/", "token": token}
+                                   "page": "https://example.invalid/tickets/", "token": tickets}
                     }}
                 }))
                 .unwrap();
                 Secrets::gather(&Home::new(dir.join("mork")), &config, &BTreeMap::new())
             };
-            let configured = gather(&dir.join("pat"));
-            let missing = gather(&dir.join("missing"));
-            let git = crate::github::git_header(PAT);
-            assert_eq!(configured.mask(&git), "‹secret›");
-            assert_eq!(configured.mask(git.trim_start_matches("Basic ")), "‹secret›");
-            assert_eq!(configured.mask(&format!("Bearer {PAT}")), "Bearer ‹secret›");
+            let configured = gather(&dir.join("pat"), &dir.join("github"));
+            let missing = gather(&dir.join("missing"), &dir.join("missing"));
+            let git = crate::github::git_header(GITHUB);
+            for text in [GITHUB, &git, git.trim_start_matches("Basic ")] {
+                assert_eq!(configured.mask(text), "‹secret›");
+                assert_eq!(missing.mask(text), text);
+            }
+            assert_eq!(configured.mask(&format!("Bearer {GITHUB}")), "Bearer ‹secret›");
             for pat in [PAT, LEGACY] {
                 let header = crate::azure::header(pat);
                 for text in [pat, &header, header.trim_start_matches("Basic ")] {
@@ -277,6 +280,7 @@ mod tests {
         let untouched = std::time::SystemTime::UNIX_EPOCH;
         std::fs::File::open(&legacy).unwrap().set_times(std::fs::FileTimes::new().set_accessed(untouched)).unwrap();
         std::fs::write(dir.join("pat"), format!(" {PAT}\n")).unwrap();
+        std::fs::write(dir.join("github"), format!("{GITHUB}\n")).unwrap();
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", std::thread::current().name().unwrap(), "--nocapture"])
             .env("HOME", &dir)

@@ -24,8 +24,8 @@ fn approval_stands_on_its_commit_until_withdrawn() {
     assert!(!parse::approved(&reviews, "owner", "other"));
     reviews.push(review("CHANGES_REQUESTED"));
     assert!(!parse::approved(&reviews, "owner", "abc"));
-    reviews.push(review("DISMISSED"));
-    assert!(!parse::approved(&reviews, "owner", "abc"));
+    let dismissed = [review("APPROVED"), review("DISMISSED"), review("COMMENTED")];
+    assert!(!parse::approved(&dismissed, "owner", "abc"));
 }
 
 #[test]

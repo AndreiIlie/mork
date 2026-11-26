@@ -60,7 +60,7 @@ pub(super) fn resolve(client: &Client, pr: u64, id: u64) -> Result<bool> {
     if response["data"]["resolveReviewThread"]["thread"]["isResolved"] != true {
         return Err(failed("GitHub did not resolve the thread"));
     }
-    Ok(true)
+    Ok(false)
 }
 
 pub(super) fn thread(id: u64, root: &Value, all: &[Value]) -> Result<Thread> {
