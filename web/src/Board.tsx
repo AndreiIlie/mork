@@ -272,8 +272,17 @@ function ProjectBacklog({
         <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
           <span className="flex items-center gap-2">
             <span className="text-label-12 text-gray-700">Auto delegation</span>
-            <Segmented height={26} options={["Off", "On"] as const} value={board.auto ? "On" : "Off"} disabled={(v) => !live || !!pending[board.project] || (v === "On") === board.auto}
-              onChange={(v) => press(board.project, { label: "Auto delegation", command: { auto: { project: board.project, off: v === "Off" } } })} />
+            <Segmented
+              height={26}
+              options={["Off", "On"] as const}
+              value={board.auto ? "On" : "Off"}
+              disabled={() => !live || !!pending[board.project]}
+              onChange={(v) => {
+                const on = v === "On";
+                if (on === board.auto) return;
+                press(board.project, { label: "Auto delegation", command: { auto: { project: board.project, off: !on } } });
+              }}
+            />
           </span>
           {lookback !== undefined && lookback.rows.length > 0 && (
             <LookBack

@@ -98,7 +98,7 @@ function foldRepeats(steps: StepView[]): Folded[] {
   return out;
 }
 
-function TurnSteps({ turn, nowMs, compact = false }: { reviewForeman?: string; turn: ChatTurn; nowMs: number; compact?: boolean }) {
+function TurnSteps({ turn, nowMs, compact = false }: { turn: ChatTurn; nowMs: number; compact?: boolean }) {
   const t = turn.turn;
   const shown = foldRepeats(t.steps).slice(-(compact ? LIVE_STEPS_SHOWN : STEPS_SHOWN));
   const hidden = Math.max(0, turn.step_count - shown.reduce((n, r) => n + r.times, 0));

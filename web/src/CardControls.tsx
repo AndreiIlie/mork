@@ -21,6 +21,8 @@ export function CardControls({ card, status, live }: { card: CardHeader; status:
   const active = control("active");
   const visual = control("visual");
   const delegation = control("delegation");
+  const currentLevel = LEVELS[delegation?.position ?? 0];
+  const levelCommand = (level: (typeof LEVELS)[number]) => delegation?.positions[LEVELS.indexOf(level)]?.command;
   const preview = card.about.preview;
   const pause = active?.positions[active.position === 1 ? 0 : 1]?.command;
   const flipVisual = visual?.positions[visual.position === 1 ? 0 : 1]?.command;
@@ -55,9 +57,16 @@ export function CardControls({ card, status, live }: { card: CardHeader; status:
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <span className="text-label-12 text-gray-700">Delegation</span>
-            <Segmented height={28} options={LEVELS} value={LEVELS[delegation?.position ?? 0]}
-              disabled={(level) => disabled || !delegation?.positions[LEVELS.indexOf(level)]?.command}
-              onChange={(level) => send("Delegation", delegation?.positions[LEVELS.indexOf(level)]?.command)} />
+            <Segmented
+              height={28}
+              options={LEVELS}
+              value={currentLevel}
+              disabled={(level) => disabled || !delegation || (level !== currentLevel && !levelCommand(level))}
+              onChange={(level) => {
+                const command = levelCommand(level);
+                if (command) send("Delegation", command);
+              }}
+            />
             <Button size="control" tier="secondary" disabled={disabled || !brief || !flipVisual} pressed={visual?.position === 1} onClick={() => send("Visual", flipVisual)}>Visual</Button>
             {preview?.on && <a href={preview.url} target="_blank" rel="noreferrer" className="font-mono text-label-12 text-gray-900 underline">{preview.url.replace(/^http:\/\//, "").replace(/\/$/, "")}</a>}
             <Button size="control" tier="secondary" pressed={preview?.on === true} disabled={disabled || !preview?.enabled} onClick={() => send("Preview", { preview: { card: card.id, action: preview?.on ? "stop" : "start" } })}>Preview</Button>
