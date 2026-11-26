@@ -48,7 +48,7 @@ A full card's foreman on the configured `[mork] project` may run one wall-test f
 
 Four things are tested: the wall (what a seat's job can see, reach and write), the door (it runs nothing without its approval, passes arguments as literal words and leaks no credential), pure state-machine transitions in `mork-core` (`decide` in memory, with no filesystem, git, or sandbox), and narrow unit or isolated temp-dir tests in `crates/engine` for parsers, symlink/filesystem safety helpers, and in-flight turn recovery. Recovery fixtures replay saved job folders and state in a temporary directory without starting processes or waiting on timers.
 
-No other integration test is added: none for crash recovery, timing, or the window. A change to the wall, the door, a `mork-core` transition, or a tested `crates/engine` parser, safety helper, or turn recovery path keeps its tests true. A test that flakes is deleted.
+No other integration test is added: none for crash recovery, timing, or the window. A change to the wall, the door, a `mork-core` transition, or a tested `crates/engine` parser, safety helper, or turn recovery path keeps its tests true. When a test flakes, fix the source of nondeterminism or use a deterministic fixture that exercises the same behavior. Never mask a flake with sleeps or retries.
 
 ## Rules the code is held to (1.12)
 
@@ -58,7 +58,8 @@ No other integration test is added: none for crash recovery, timing, or the wind
 - The engine never runs git with an agent's clone as its repository.
 - The engine makes, writes and moves paths inside an agent's clone, `.git/` included, only through `sys`'s `mkdir_beneath` (one level per call), `write_beneath`, `append_beneath` and `move_dir_beneath`, rooted at a path of its own (the clone folder, a home folder), as `runtime/handoff.rs`'s `put_back` does: a seat can plant a link anywhere in its clone, and `std::fs` follows it. Never `open_no_symlinks` or `open_beneath_no_symlinks` there: they refuse a link anywhere in the absolute path, so they fail on a home reached through a link, and are for configured paths.
 - No backward-compatibility shims for older builds' live state: Mork is a single-user tool, so breaking live-state changes drain active cards before reloading (or run a one-shot migration removed afterward) instead of keeping retired variants and recovery paths in Rust code. Only completed historical cards' journal rendering stays readable.
+- Each public release documents which versions users can upgrade from and when they must start fresh.
 
 ## Comments
 
-Comments say why, never what: a reason, an invariant, a warning, or a card pointer. At most 2 lines; longer belongs in the card note. If you need to explain what, change the code. Doc comments only on pub items, stating the contract. TODOs carry a card id. The checks enforce this.
+Comments say why, never what: a reason, an invariant, a warning, or a card pointer. A run of consecutive standalone line comments may exceed 2 lines when its first line begins with `// SAFETY:` or `// INVARIANT:`. Keep all other comments to 2 lines and put longer explanations in the card note. If you need to explain what, change the code. Doc comments only on pub items, stating the contract. TODOs carry a card id. The checks enforce this.

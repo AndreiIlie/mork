@@ -331,6 +331,9 @@ impl Engine {
         if let Err(e) = builds::check_shortcut() {
             return err(ErrorCode::Refused, e.to_string());
         }
+        if let Err(e) = builds::check_target_config(&self.opts.home, &full) {
+            return err(ErrorCode::Refused, e.to_string());
+        }
         let id = crate::random::uuid();
         // A tenth of a second at least before the exec, for the watchers' writers to send this
         // answer and the views that show the reload (5.1.3, M4.14).
