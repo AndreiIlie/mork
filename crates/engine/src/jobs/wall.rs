@@ -119,6 +119,8 @@ pub struct WallPlaces {
     pub run_dir: String,
     /// Read-only: toolchains, the running binary's folder, `builds/`, the checks folder.
     pub read_only: Vec<String>,
+    /// A peer's clone may disappear between enumeration and bwrap startup.
+    pub peer_clones: Vec<String>,
     /// Read-write: the job's `io/`, the clone.
     pub read_write: Vec<String>,
     /// The seat's credential set, bound at `/run/credentials`.
@@ -193,12 +195,12 @@ pub fn system() -> std::io::Result<Vec<Mount>> {
 fn binds(p: &WallPlaces) -> Vec<Mount> {
     let mut binds = vec![Mount::Rw { path: p.agent_home.clone() }, Mount::Ro { path: p.run_dir.clone() }];
     binds.extend(p.read_only.iter().map(|r| Mount::Ro { path: r.clone() }));
+    binds.extend(p.peer_clones.iter().map(|r| Mount::RoTry { path: r.clone() }));
     binds.extend(p.read_write.iter().map(|r| Mount::Rw { path: r.clone() }));
     binds.extend(p.skills.iter().map(|s| Mount::Ro { path: s.clone() }));
     binds.sort_by_key(|b| match b {
-        Mount::Ro { path } | Mount::Rw { path } => path.len(),
-        Mount::RoTry { .. }
-        | Mount::RwAt { .. }
+        Mount::Ro { path } | Mount::RoTry { path } | Mount::Rw { path } => path.len(),
+        Mount::RwAt { .. }
         | Mount::RoAt { .. }
         | Mount::RoTryAt { .. }
         | Mount::Tmpfs { .. }

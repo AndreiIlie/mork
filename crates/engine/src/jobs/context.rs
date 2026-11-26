@@ -216,12 +216,12 @@ impl Context {
             return Ok(places);
         }
         places.system = wall::system().map_err(|e| e.to_string())?;
-        places.read_only.extend(
-            files::child_dirs(&self.home.clones())
-                .map_err(|e| e.to_string())?
-                .into_iter()
-                .map(|p| p.display().to_string()),
-        );
+        places.peer_clones = files::child_dirs(&self.home.clones())
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|p| p.display().to_string())
+            .filter(|p| !places.read_only.contains(p) && !places.read_write.contains(p))
+            .collect();
         let empty_file = self.home.run_dir().join("empty");
         files::write_whole(&empty_file, b"").map_err(|e| e.to_string())?;
         places.hidden = self.hidden_folders();

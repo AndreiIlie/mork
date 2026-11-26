@@ -1679,7 +1679,6 @@ dependencies = [
  "httparse",
  "image",
  "mork-core",
- "mork-fakes",
  "mork-sys",
  "mork-types",
  "percent-encoding",

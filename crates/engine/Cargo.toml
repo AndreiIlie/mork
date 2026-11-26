@@ -28,7 +28,6 @@ shlex.workspace = true
 
 [dev-dependencies]
 fastrand.workspace = true
-mork-fakes.workspace = true
 
 [lints]
 workspace = true
