@@ -1,9 +1,10 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AskLabel, InlineAsk } from "./InlineAsk";
 import { Markdown } from "./Markdown";
 import { ActivityTracker, EndedTurnRow } from "./Turns";
 import { fetchImage, requestCommand } from "./bridge";
 import { authorName, clockTime, plural } from "./format";
-import type { ChatTurn, HistoryPage, ImageView, MessageView, PlaceView, ReplyHand } from "./types";
+import type { ChatTurn, HandView, HistoryPage, ImageView, MessageView, PlaceView, ReplyHand, TriageView } from "./types";
 import { Dot } from "./ui/Dot";
 import { PinnedScroll } from "./ui/PinnedScroll";
 
@@ -95,10 +96,10 @@ function collapseRepeats(entries: StreamEntry[]): StreamEntry[] {
 // A closed ask with its typed options and pick, as its hand gave them (fac-696).
 function askText(h: ReplyHand): string {
   const options = (h.options ?? []).map((o, i) => `${i + 1}. ${o}`);
-  if (options.length === 0 || h.ask.trim() === "") return h.ask;
+  if (!h.ask || options.length === 0) return "";
   const named = h.pick !== undefined && h.pick >= 1 && h.pick <= options.length;
   const why = h.reason !== undefined && h.reason !== "" ? `: ${h.reason}` : ".";
-  return `${h.ask}\n\n${options.join("\n")}${named ? `\n\nI'd pick ${h.pick}${why}` : ""}`;
+  return `${options.join("\n")}${named ? `\n\nI'd pick ${h.pick}${why}` : ""}`;
 }
 
 function firstLine(text: string): string {
@@ -211,7 +212,17 @@ function FoldedRow({
   );
 }
 
-function MessageRow({ m, tzOffsetMin, run }: { m: MessageView; tzOffsetMin: number; run?: MessageView[] }) {
+interface MessageRowProps {
+  m: MessageView;
+  tzOffsetMin: number;
+  nowMs: number;
+  live: boolean;
+  hand?: HandView;
+  triage?: TriageView;
+  run?: MessageView[];
+}
+
+function MessageRow({ m, tzOffsetMin, nowMs, live, hand, triage, run }: MessageRowProps) {
   const times = run?.length ?? 1;
   if (m.kind === "marker") {
     return (
@@ -245,10 +256,10 @@ function MessageRow({ m, tzOffsetMin, run }: { m: MessageView; tzOffsetMin: numb
   }
   const operator = m.kind === "operator";
   const engine = m.kind === "engine";
-  const body =
+  const body = hand?.kind === "approve-brief" ? "" :
     m.hand !== null
-      ? [m.text, m.ask_open ? "" : askText(m.hand)].filter((part) => part.trim() !== "").join("\n\n")
-      : m.text !== ""
+      ? [m.text, hand !== undefined ? "" : askText(m.hand)].filter((part) => part.trim() !== "").join("\n\n")
+      : hand?.choices !== undefined ? hand.choices.ask : m.text !== ""
         ? m.text
         : m.headline;
   const head = (
@@ -260,13 +271,13 @@ function MessageRow({ m, tzOffsetMin, run }: { m: MessageView; tzOffsetMin: numb
       {m.from.is === "agent" && m.from.label !== m.from.role && (
         <span className="text-label-12 text-gray-900">{m.from.role}</span>
       )}
-      {m.ask_open && <span className="text-label-12 text-gray-900">asks below</span>}
+      {hand !== undefined && <AskLabel hand={hand} nowMs={nowMs} />}
       <span className="font-mono text-label-12 tabular-nums text-gray-700">{clockTime(m.time_ms, tzOffsetMin)}</span>
     </div>
   );
   if (operator) {
     return (
-      <article className="py-3">
+      <article data-seq={m.seq} className="py-3">
         <div className="w-fit max-w-full border border-gray-400 bg-gray-100 px-3 py-2">
           {head}
           {body !== "" && (
@@ -280,7 +291,7 @@ function MessageRow({ m, tzOffsetMin, run }: { m: MessageView; tzOffsetMin: numb
     );
   }
   return (
-    <article className="py-3">
+    <article data-seq={m.seq} className="py-3">
       {head}
       {m.hand !== null && m.hand.headline !== "" && (
         <p className="mt-1 text-label-14 font-medium text-gray-1000">{m.hand.headline}</p>
@@ -291,6 +302,7 @@ function MessageRow({ m, tzOffsetMin, run }: { m: MessageView; tzOffsetMin: numb
         </div>
       )}
       <MessageExtras m={m} />
+      {hand !== undefined && <InlineAsk key={hand.ask} hand={hand} live={live} triage={triage} />}
     </article>
   );
 }
@@ -337,7 +349,14 @@ function useStreamHistory(view: PlaceView, live: boolean) {
   };
 }
 
-interface StreamProps {
+export interface ChatAsks {
+  hands: HandView[];
+  triage?: TriageView;
+  jump?: number;
+  onReached: () => void;
+}
+
+interface StreamProps extends ChatAsks {
   view: PlaceView;
   tzOffsetMin: number;
   nowMs: number;
@@ -345,7 +364,7 @@ interface StreamProps {
 }
 
 /** One seat's scrollable conversation stream, interleaved with ended turns and inline live activity trackers. */
-export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, live }: StreamProps) {
+export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, live, hands, triage, jump, onReached }: StreamProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const keepRef = useRef(false);
   const { messages, earlier, turns, loading, error, loadEarlier, prependHeightRef } = useStreamHistory(view, live);
@@ -364,10 +383,32 @@ export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, l
     keepRef.current = true;
   }, [messages, prependHeightRef]);
 
+  const bySeq = new Map(hands.map((hand) => [hand.seq, hand]));
+  const loaded = new Set(messages.map((m) => m.seq));
+  const pinned = (view.pinned ?? []).filter((m) => bySeq.has(m.seq) && !loaded.has(m.seq));
+  const row = (m: MessageView, run?: MessageView[]) => (
+    <MessageRow key={m.seq} m={m} run={run} tzOffsetMin={tzOffsetMin} nowMs={nowMs}
+      hand={bySeq.get(m.seq)} triage={triage} live={live} />
+  );
+
+  useLayoutEffect(() => {
+    if (jump === undefined) return;
+    const box = scrollRef.current;
+    const target = box?.querySelector<HTMLElement>(`[data-seq="${jump}"]`);
+    if (box && target) {
+      keepRef.current = true;
+      target.scrollIntoView({ block: "center" });
+      onReached();
+    } else if (earlier > 0 && messages.length > 0 && jump < messages[0].seq && !error && !loading) {
+      loadEarlier(box);
+    }
+  }, [jump, earlier, messages, loading, error, loadEarlier, onReached]);
+
   return (
     <section className="flex min-w-0 flex-1 flex-col">
       <PinnedScroll scrollRef={scrollRef} keepRef={keepRef}>
         <div className="px-gutter py-2">
+          {pinned.map((m) => row(m))}
           {earlier > 0 && messages.length > 0 && (
             <div className="py-2">
               <button
@@ -390,7 +431,7 @@ export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, l
           ) : (
             entries.map((entry) =>
               entry.kind === "message" ? (
-                <MessageRow key={`m:${entry.m.seq}`} m={entry.m} tzOffsetMin={tzOffsetMin} run={entry.run} />
+                row(entry.m, entry.run)
               ) : (
                 <EndedTurnRow key={`t:${entry.t.turn.job}`} turn={entry.t} tzOffsetMin={tzOffsetMin} nowMs={nowMs} />
               ),

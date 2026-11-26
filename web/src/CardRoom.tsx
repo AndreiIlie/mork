@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ownHands } from "./alerts";
 import { Overview } from "./Overview";
 import { Pipeline } from "./Pipeline";
-import { RoomHands } from "./RoomDock";
+import { HandIcon } from "./icons";
 import { SeatChat, SeatDot } from "./SeatChat";
 import { watchPlace } from "./bridge";
 import { agentSeatName, seatPlace, thousands } from "./format";
@@ -44,11 +44,13 @@ function SeatSwitcher({
   seats,
   open,
   nameOf,
+  markOf,
   onOpen,
 }: {
   seats: AgentRow[];
   open: string;
   nameOf: (agent: string) => string;
+  markOf: (agent: string) => string | undefined;
   onOpen: (agent: string) => void;
 }) {
   if (seats.length === 0) return null;
@@ -58,6 +60,7 @@ function SeatSwitcher({
       {seats.map((s) => (
         <Button key={s.agent} tier="secondary" size="sm" pressed={s.agent === open} onClick={() => onOpen(s.agent)}>
           <SeatDot light={s.light} />
+          {markOf(s.agent) && <span aria-label="Raised Hand" className={markOf(s.agent)}><HandIcon /></span>}
           <span className="font-mono font-medium text-gray-1000">{nameOf(s.agent)}</span>
           <span className="font-normal text-gray-700">
             {s.label}
@@ -96,38 +99,22 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
   const seatName = (agent: string) => (agent === reviewForeman ? "review foreman" : agentSeatName(agent));
   const cardHands = screen.hands.filter((h) => h.card === card.id);
   const own = ownHands(cardHands);
-  const docked = [...own, ...cardHands.filter((h) => h.given)];
-
   const [pickedSeat, setPickedSeat] = useState<string | null>(null);
-  const [pickedHand, setPickedHand] = useState<string | null>(handAsk);
-
-  useEffect(() => {
-    if (handAsk === null) return;
-    if (cardHands.some((h) => h.ask === handAsk)) {
-      setPickedHand(handAsk);
-      setPickedSeat(null);
-    }
-  }, [handAsk]);
-
-  const clearHandParam = () => {
-    if (handAsk !== null) replaceRoute(cardPath(card.id));
-  };
-
-  const onOpenHand = (h: HandView) => {
-    setPickedHand(h.ask);
-    setPickedSeat(null);
-    clearHandParam();
+  const linked = cardHands.find((h) => h.ask === handAsk);
+  const waiting = pickHand(cardHands, own, handAsk);
+  const handSeat = seats.find((s) => placeOf(s.agent) === waiting?.message_place)?.agent;
+  const markOf = (agent: string) => {
+    const here = cardHands.filter((h) => h.message_place === placeOf(agent));
+    if (here.length === 0) return undefined;
+    if (here.every((h) => h.given)) return "text-gray-700";
+    return here.some((h) => !h.given && h.color === "red") ? "text-red-700" : "text-amber-700";
   };
 
   const onPickSeat = (agent: string) => {
     setPickedSeat(agent);
-    clearHandParam();
+    if (handAsk !== null) replaceRoute(cardPath(card.id));
   };
 
-  const whole = pickHand(cardHands, own, pickedHand);
-  // Chat follows the hand shown whole when a seat raised it, else the current pipeline step's seat, until picked.
-  const handSeat =
-    whole !== undefined && whole.role !== null ? seats.find((s) => placeOf(s.agent) === whole.place)?.agent : undefined;
   const step = card.pipeline.find((s) => s.at === "current")?.kind;
   const stageSeat =
     card.mode === "review" || card.mode === "report"
@@ -137,8 +124,8 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
         : step === "verify" && review !== undefined && reviewForemanRow !== null
           ? `${review.card}/foreman`
           : `${card.id}/foreman`;
-  const openSeat = pickedSeat ?? handSeat ?? stageSeat;
-  const openPlace = placeOf(openSeat);
+  const openSeat = (linked ? handSeat : pickedSeat) ?? handSeat ?? stageSeat;
+  const openPlace = linked?.message_place ?? placeOf(openSeat);
   const extraPlace = openPlace !== card.id && openPlace !== card.spec ? openPlace : null;
 
   useEffect(() => {
@@ -147,7 +134,8 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
   }, [extraPlace]);
 
   const ownRoom = ownRoomLabel(card);
-  const answering = whole !== undefined && whole.role !== null && whole.place === openPlace;
+  const hands = cardHands.filter((h) => h.message_place === openPlace);
+  const answering = hands.some((h) => h.kind === "answer" || h.kind === "blocked" && h.role !== null);
 
   return (
     <main className="flex min-w-0 flex-1 flex-col">
@@ -169,7 +157,7 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
         title={card.title}
       >
         {card.pipeline.length > 0 && <Pipeline steps={card.pipeline} />}
-        <SeatSwitcher seats={seats} open={openSeat} nameOf={seatName} onOpen={onPickSeat} />
+        <SeatSwitcher seats={seats} open={openSeat} nameOf={seatName} markOf={markOf} onOpen={onPickSeat} />
       </PageHeader>
       <SplitPane
         left={
@@ -182,20 +170,6 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
               status={overviewStatus(own, seats)}
               nowMs={nowMs}
             />
-            {docked.length > 0 && (
-              <div className="max-h-[60%] shrink-0 overflow-y-auto border-t border-gray-400 pb-3">
-                <RoomHands
-                  cardId={card.id}
-                  hands={docked}
-                  triage={buildView.triage}
-                  ownRoom={ownRoom}
-                  openAsk={whole?.ask}
-                  onOpenHand={onOpenHand}
-                  nowMs={nowMs}
-                  live={live}
-                />
-              </div>
-            )}
           </>
         }
         right={
@@ -206,6 +180,7 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
             room={seatRoomLabel(openSeat, openPlace, card, review?.card)}
             view={views[openPlace]}
             answering={answering}
+            asks={{ hands, triage: buildView.triage, jump: linked?.seq, onReached: () => onPickSeat(openSeat) }}
             tzOffsetMin={screen.tz_offset_min}
             nowMs={nowMs}
             live={live}

@@ -1,9 +1,7 @@
 import { useState, useSyncExternalStore } from "react";
-import { HandCard, labelColor } from "./HandCard";
 import { Markdown } from "./Markdown";
 import { sendCommand } from "./bridge";
-import { ago, coldMinutes, plural } from "./format";
-import { ChevronIcon, Cold } from "./icons";
+import { ChevronIcon } from "./icons";
 import { OfferButtons, RefusalLine } from "./offers";
 import type { HandView, Offer, TriageView } from "./types";
 import { Button } from "./ui/Button";
@@ -87,7 +85,6 @@ export function TriagePanel({
   cardId,
   hand,
   triage,
-  nowMs,
   live,
   pending,
   refusal,
@@ -96,7 +93,6 @@ export function TriagePanel({
   cardId: string;
   hand: HandView;
   triage: TriageView;
-  nowMs: number;
   live: boolean;
   pending: string | null;
   refusal: string | null;
@@ -108,7 +104,6 @@ export function TriagePanel({
     () => EMPTY_ENTRY,
   );
   const [proofs, setProofs] = useState<Record<number, boolean>>({});
-  const cold = coldMinutes(hand.cold_at_ms, nowMs);
   const left = triage.findings.filter((f) => choices[f.n] === undefined).length;
   const count = (c: Choice) => triage.findings.filter((f) => choices[f.n] === c).length;
   const tally =
@@ -145,35 +140,7 @@ export function TriagePanel({
   };
 
   return (
-    <HandCard
-      color={labelColor(hand)}
-      head={
-        <>
-          <span className="text-label-13 text-gray-900">
-            Review round {triage.round} {triage.stalemate ? "stalemate" : "failed"} · {triage.findings.length}{" "}
-            {plural(triage.findings.length, "finding", "findings")} to triage
-          </span>
-          {hand.given && <span className="text-label-13 text-gray-900">sent to orchestrator</span>}
-          {cold !== null && <Cold minutes={cold} />}
-          <span className="font-mono text-label-12 tabular-nums text-gray-700">{ago(nowMs - hand.raised_ms)}</span>
-        </>
-      }
-      actions={
-        <>
-          <OfferButtons
-            offers={hand.offers}
-            live={live && !sending}
-            pending={pending}
-            onPress={onPress}
-            className="flex flex-wrap items-center gap-2"
-          />
-          <span className="pr-2 font-mono text-label-12 tabular-nums text-gray-900">{tally}</span>
-          <Button tier="primary" size="sm" disabled={!live || left > 0 || sending} onClick={send}>
-            {sending ? "Sending…" : "Send"}
-          </Button>
-        </>
-      }
-    >
+    <div>
       <ul className="divide-y divide-gray-400">
         {triage.findings.map((f) => (
           <li key={f.n} className="py-2 pl-4 pr-2">
@@ -210,7 +177,20 @@ export function TriagePanel({
           </li>
         ))}
       </ul>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+          <OfferButtons
+            offers={hand.offers}
+            live={live && !sending}
+            pending={pending}
+            onPress={onPress}
+            className="flex flex-wrap items-center gap-2"
+          />
+          <span className="pr-2 font-mono text-label-12 tabular-nums text-gray-900">{tally}</span>
+          <Button tier="primary" size="sm" disabled={!live || left > 0 || sending} onClick={send}>
+            {sending ? "Sending…" : "Send"}
+          </Button>
+      </div>
       <RefusalLine refusal={sendError ?? refusal} className="px-4 py-2" />
-    </HandCard>
+    </div>
   );
 }

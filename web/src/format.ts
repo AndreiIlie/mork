@@ -98,16 +98,16 @@ export function agentSeatName(agent: string): string {
 
 // A hand's place below its card: `spec`, a role's `dm foreman`, a child's `researcher-2`, or a folded review place.
 export function wherePlace(hand: HandView): string {
-  if (hand.card === null || hand.place === hand.card) return "";
-  if (hand.place.startsWith(`${hand.card}/`)) {
-    const rest = hand.place.slice(hand.card.length + 1);
+  if (hand.card === null || hand.message_place === hand.card) return "";
+  if (hand.message_place.startsWith(`${hand.card}/`)) {
+    const rest = hand.message_place.slice(hand.card.length + 1);
     if (!rest.endsWith("/dm")) return rest;
     const seat = rest.slice(0, -"/dm".length);
     return /-\d+$/.test(seat) ? seat : `dm ${seat}`;
   }
-  const slash = hand.place.indexOf("/");
+  const slash = hand.message_place.indexOf("/");
   if (slash < 0) return "Review";
-  const rest = hand.place.slice(slash + 1);
+  const rest = hand.message_place.slice(slash + 1);
   if (!rest.endsWith("/dm")) return `Review · ${rest}`;
   const seat = rest.slice(0, -"/dm".length);
   return `Review · ${/-\d+$/.test(seat) ? seat : `dm ${seat}`}`;

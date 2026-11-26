@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RoomStream } from "./RoomStream";
+import { RoomStream, type ChatAsks } from "./RoomStream";
 import { SeatModelPanel, useSeatModel } from "./SeatModel";
 import { sendCommand } from "./bridge";
 import { coldMinutes, thousands } from "./format";
@@ -66,6 +66,7 @@ export function SeatChat({
   room,
   view,
   answering,
+  asks,
   tzOffsetMin,
   nowMs,
   live,
@@ -76,6 +77,7 @@ export function SeatChat({
   room: string;
   view: PlaceView | undefined;
   answering: boolean;
+  asks: ChatAsks;
   tzOffsetMin: number;
   nowMs: number;
   live: boolean;
@@ -108,7 +110,7 @@ export function SeatChat({
       </div>
       {view !== undefined ? (
         <div className="flex min-h-0 flex-1">
-          <RoomStream key={view.place} view={view} tzOffsetMin={tzOffsetMin} nowMs={nowMs} live={live} />
+          <RoomStream {...asks} key={view.place} view={view} tzOffsetMin={tzOffsetMin} nowMs={nowMs} live={live} />
         </div>
       ) : (
         <section className="flex min-h-0 flex-1 items-center justify-center p-gutter">

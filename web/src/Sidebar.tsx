@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { type AlertPermission, ownHands } from "./alerts";
 import type { Link } from "./bridge";
-import { cardTarget, coldMinutes, dollars, workingSeats } from "./format";
+import { ago, cardTarget, coldMinutes, dollars, wherePlace, workingSeats } from "./format";
 import { BoardIcon, ChevronIcon, Cold, HandIcon, MorkMark } from "./icons";
 import { RefusalLine, useHandOffers } from "./offers";
 import { quotaReading } from "./quota";
@@ -38,12 +38,15 @@ function HandItem({ hand, activeCard, nowMs }: { hand: HandView; activeCard: str
         <span title={hand.card ?? hand.place} className="min-w-0 truncate font-mono text-label-12 font-medium text-gray-1000">
           {hand.card ?? hand.place}
         </span>
-        {hand.role !== null && <span className="min-w-0 shrink-[4] truncate text-label-12 text-gray-900">{hand.role}</span>}
+        <span className="min-w-0 shrink-[4] truncate text-label-12 text-gray-900">
+          {[wherePlace(hand), hand.role ?? (hand.card === null ? null : "engine"), hand.design && "design"].filter(Boolean).join(" · ")}
+        </span>
         <span className="ml-auto flex shrink-0 items-center gap-2">
+          {hand.card !== null && <span className={LABEL}>{ago(nowMs - hand.raised_ms)}</span>}
           {cold !== null && <Cold minutes={cold} />}
         </span>
       </div>
-      <p className="mt-0.5 truncate pl-4 text-label-12 text-gray-900">{hand.words}</p>
+      <p className="mt-0.5 truncate pl-4 text-label-12 text-gray-900">{hand.card === null ? hand.words : hand.headline}</p>
     </>
   );
   const className = `${ROW} ${active ? ACTIVE : HOVER}`;
