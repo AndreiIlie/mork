@@ -6,6 +6,7 @@ import { Dot } from "./ui/Dot";
 
 // An unfolded turn shows its latest steps only, never a scrolling list.
 const STEPS_SHOWN = 8;
+const LIVE_STEPS_SHOWN = 3;
 const NOTE = "py-0.5 text-gray-700";
 
 function DetailRow({ d }: { d: Detail }) {
@@ -36,16 +37,18 @@ function DetailRow({ d }: { d: Detail }) {
 
 function StepRow({ st, before, runs, nowMs }: { st: StepView; before: number; runs: boolean; nowMs: number }) {
   const [open, setOpen] = useState(false);
+  const raw = st.command && st.command.text + (st.command.cut ? "…" : "");
   return (
     <li>
       <button
         type="button"
+        title={raw}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={`flex w-full cursor-pointer items-baseline gap-3 py-0.5 text-left hover:text-gray-1000 ${runs ? "text-gray-1000" : "text-gray-900"}`}
       >
         <span className={`min-w-0 flex-1 ${open ? "whitespace-pre-wrap break-words font-mono" : "truncate"}`}>
-          {st.words}
+          {open ? raw ?? st.words : st.words}
         </span>
         <span className="shrink-0 font-mono tabular-nums text-gray-700">
           {st.start_ms === undefined ? "" : took(before + (st.end_ms ?? nowMs) - st.start_ms)}
@@ -74,7 +77,14 @@ function foldRepeats(steps: StepView[]): Folded[] {
   const out: Folded[] = [];
   for (const st of steps) {
     const last = out[out.length - 1];
-    if (last !== undefined && last.st.words === st.words && (st.details ?? []).length === 0) {
+    if (
+      last !== undefined &&
+      last.st.words === st.words &&
+      last.st.command?.text === st.command?.text &&
+      !last.st.command?.cut &&
+      !st.command?.cut &&
+      (st.details ?? []).length === 0
+    ) {
       const prev = last.st;
       const done = prev.start_ms !== undefined && prev.end_ms !== undefined ? prev.end_ms - prev.start_ms : 0;
       const thought = (prev.thought_ms ?? 0) + (st.thought_ms ?? 0);
@@ -88,23 +98,23 @@ function foldRepeats(steps: StepView[]): Folded[] {
   return out;
 }
 
-function TurnSteps({ turn, nowMs }: { turn: ChatTurn; nowMs: number }) {
+function TurnSteps({ turn, nowMs, compact = false }: { turn: ChatTurn; nowMs: number; compact?: boolean }) {
   const t = turn.turn;
-  const shown = foldRepeats(t.steps).slice(-STEPS_SHOWN);
+  const shown = foldRepeats(t.steps).slice(-(compact ? LIVE_STEPS_SHOWN : STEPS_SHOWN));
   const hidden = Math.max(0, turn.step_count - shown.reduce((n, r) => n + r.times, 0));
   const thinking = thinkingMs(turn, nowMs);
   return (
     <ol className="border-l border-gray-400 pl-3 text-label-12">
-      {hidden > 0 && (
+      {!compact && hidden > 0 && (
         <li className="py-0.5 text-gray-700">
           {hidden} earlier {plural(hidden, "step", "steps")}
         </li>
       )}
-      {shown.length === 0 && hidden === 0 && <li className="py-0.5 text-gray-700">No steps yet.</li>}
+      {!compact && shown.length === 0 && hidden === 0 && <li className="py-0.5 text-gray-700">No steps yet.</li>}
       {shown.map(({ st, times, before }, i) => (
         <Fragment key={st.id}>
-          {st.thought_ms !== undefined && <li className={NOTE}>Thought for {took(st.thought_ms)}</li>}
-          {(st.details ?? []).map((d) => (
+          {!compact && st.thought_ms !== undefined && <li className={NOTE}>Thought for {took(st.thought_ms)}</li>}
+          {!compact && (st.details ?? []).map((d) => (
             <DetailRow key={d.id} d={d} />
           ))}
           <StepRow
@@ -115,11 +125,11 @@ function TurnSteps({ turn, nowMs }: { turn: ChatTurn; nowMs: number }) {
           />
         </Fragment>
       ))}
-      {t.thought_ms !== undefined && <li className={NOTE}>Thought for {took(t.thought_ms)}</li>}
-      {(t.after ?? []).map((d) => (
+      {!compact && t.thought_ms !== undefined && <li className={NOTE}>Thought for {took(t.thought_ms)}</li>}
+      {!compact && (t.after ?? []).map((d) => (
         <DetailRow key={d.id} d={d} />
       ))}
-      {thinking !== null && <li className={`${NOTE} text-gray-1000`}>Thinking… {took(thinking)}</li>}
+      {!compact && thinking !== null && <li className={`${NOTE} text-gray-1000`}>Thinking… {took(thinking)}</li>}
     </ol>
   );
 }
@@ -177,12 +187,12 @@ export function EndedTurnRow({ turn, tzOffsetMin, nowMs }: { turn: ChatTurn; tzO
   );
 }
 
-/** Single-line live activity stream row under the last entry; clicking unfolds its latest 8 steps. */
+/** The live turn shows three recent actions until expanded. */
 export function ActivityTracker({ turn, nowMs }: { turn: ChatTurn; nowMs: number }) {
   const [open, setOpen] = useState(false);
   const steps = turn.turn.steps;
   const thinking = thinkingMs(turn, nowMs);
-  const now = thinking !== null ? `Thinking… ${took(thinking)}` : steps[steps.length - 1]?.words || "working";
+  const status = thinking !== null ? `Thinking… ${took(thinking)}` : steps.length === 0 ? "working" : "";
   return (
     <div className="py-1">
       <button
@@ -193,13 +203,13 @@ export function ActivityTracker({ turn, nowMs }: { turn: ChatTurn; nowMs: number
       >
         <Dot color="green" pulse />
         <span className="shrink-0 font-mono text-gray-1000">{agentSeatName(turn.agent)}</span>
-        <span className="min-w-0 flex-1 truncate">{now}</span>
+        <span className="min-w-0 flex-1 truncate">{open ? "" : status}</span>
         <span className="shrink-0 font-mono tabular-nums text-gray-700">{turnNote(turn, nowMs)}</span>
         <ChevronIcon open={open} className="text-gray-700" />
       </button>
-      {open && (
+      {(open || steps.length > 0) && (
         <div className="pb-3 pl-5">
-          <TurnSteps turn={turn} nowMs={nowMs} />
+          <TurnSteps turn={turn} nowMs={nowMs} compact={!open} />
         </div>
       )}
     </div>
