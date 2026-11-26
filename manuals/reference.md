@@ -186,6 +186,7 @@ Each result shows the exact signature and a short matching passage, in manual or
 A match in the signature or opening line shows the opening summary.
 With `--json`, the same results form an array of objects with `signature` and `snippet` strings.
 With no matches, plain text prints nothing and JSON prints `[]`.
+An exact `--help` argument anywhere after `search` prints this entry.
 Search runs locally, including inside a wall.
 
 Example: `mork ctl search merge queue --json`

@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use mork_types::chat::MessagesView;
-use mork_types::seen::TurnView;
+use mork_types::seen::{CommandView, TurnView};
 use mork_types::view::{BoardView, Doing, HistoryPage, MessageView, PlaceView, Screen};
 use serde_json::{Value, json};
 
@@ -162,8 +162,7 @@ fn fit_messages(all: Vec<MessageView>, pinned: &mut Vec<MessageView>, left: usiz
 // Matches web/src/Turns.tsx `STEPS_SHOWN`: older steps shed details before recent visible steps do.
 const RECENT_STEPS: usize = 8;
 
-// What a view shows of a turn: its latest steps, each detail cut, and past its share of the line
-// older hidden steps shed details first, then recent thinking, then recent narration text.
+// Older steps yield space first. Within each group, thinking and narration go before command text.
 pub(super) fn bounded_turn(t: &mut TurnView, steps: usize, budget: usize) {
     let gone = t.steps.len().saturating_sub(steps);
     let mut cut = gone > 0;
@@ -193,16 +192,22 @@ pub(super) fn bounded_turn(t: &mut TurnView, steps: usize, budget: usize) {
 }
 
 fn evict_commands(steps: &mut [mork_types::seen::StepView], size: &mut usize, budget: usize) -> bool {
+    if *size <= budget {
+        return false;
+    }
+    let evicted = CommandView { text: String::new(), cut: true };
+    let after = size_of(&evicted);
     let mut cut = false;
     for command in steps.iter_mut().filter_map(|s| s.command.as_mut()) {
         if *size <= budget {
             break;
         }
         let before = size_of(command);
-        command.text.clear();
-        command.cut = true;
-        *size = size.saturating_sub(before).saturating_add(size_of(command));
-        cut = true;
+        if before > after {
+            *command = evicted.clone();
+            *size -= before - after;
+            cut = true;
+        }
     }
     cut
 }
@@ -418,5 +423,28 @@ impl Engine {
         for (conn, watched) in &watchers {
             self.send_views(conn, watched);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // why: malformed step fixtures fail the test.
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+    use mork_types::seen::StepView;
+
+    #[test]
+    fn command_eviction_only_spends_bytes_it_saves() {
+        let mut steps: Vec<StepView> = serde_json::from_value(json!([
+            {"id": "1", "words": "pwd", "command": {"text": "pwd"}},
+            {"id": "2", "words": "escaped", "command": {"text": "\u{1}\u{2}"}}
+        ])).unwrap();
+        let mut size = size_of(&steps);
+        assert!(evict_commands(&mut steps, &mut size, 0));
+        assert_eq!(steps[0].command.as_ref().unwrap().text, "pwd");
+        assert_eq!(steps[1].command, Some(CommandView { text: String::new(), cut: true }));
+        assert_eq!(size, size_of(&steps));
+        assert!(!evict_commands(&mut steps, &mut size, 0));
     }
 }

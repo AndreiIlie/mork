@@ -71,7 +71,7 @@ fn label(line: &str) -> Option<String> {
             (!names.is_empty()).then(|| format!("Read {}", names.join(", ")))
         }
         ["sed", "-n", range, path] => sed_range(range, path),
-        ["rg" | "grep", args @ ..] => search(args),
+        [tool @ ("rg" | "grep"), args @ ..] => search(tool, args),
         ["git", "status", ..] => Some("Check working tree status".into()),
         ["git", "diff", rest @ ..] => {
             let mut flags = rest.iter().take_while(|w| **w != "--");
@@ -103,7 +103,7 @@ fn sed_range(range: &str, path: &str) -> Option<String> {
     Some(format!("Read {} ({lines})", file_name(path)?))
 }
 
-fn search(args: &[&str]) -> Option<String> {
+fn search(tool: &str, args: &[&str]) -> Option<String> {
     let mut args = args.iter().copied().peekable();
     while let Some(flag) = args.next_if(|w| w.starts_with('-')) {
         match flag {
@@ -112,7 +112,16 @@ fn search(args: &[&str]) -> Option<String> {
                 args.next()?;
             }
             "--line-number" | "--hidden" | "--fixed-strings" | "--ignore-case" | "--no-heading" => {}
-            _ if flag.len() > 1 && flag[1..].chars().all(|c| "niIrRFwlHhsS".contains(c)) => {}
+            _ if flag.len() > 1 => {
+                let short = &flag[1..];
+                let (switches, replacement) = if tool == "rg" { short.split_once('r').unzip() } else { (None, None) };
+                if !switches.unwrap_or(short).chars().all(|c| "niIrRFwlHhsS".contains(c)) {
+                    return None;
+                }
+                if replacement == Some("") {
+                    args.next()?;
+                }
+            }
             _ => return None,
         }
     }
