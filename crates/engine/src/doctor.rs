@@ -33,7 +33,8 @@ fn with_clones(home: &Home, store: &Store, mut state: State, findings: &mut Vec<
     let names = std::fs::read_dir(home.clones()).into_iter().flatten().flatten();
     let ids = names.map(|e| mork_types::CardId::new(e.file_name().to_string_lossy()));
     let ended = ids.filter(|c| state.unloaded.cards.contains(c)).collect();
-    let records = store.cards_records(&ended).inspect_err(|e| findings.push(format!("cannot read ended cards: {e}"))).ok()?;
+    let records =
+        store.cards_records(&ended).inspect_err(|e| findings.push(format!("cannot read ended cards: {e}"))).ok()?;
     for (id, r) in records {
         state.absorb(&id, r);
     }
