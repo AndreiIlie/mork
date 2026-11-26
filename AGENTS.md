@@ -18,6 +18,7 @@ A card changes only what its agreed specification asks; this says, of each path,
 | `Cargo.toml`, `Cargo.lock`, `.cargo/`, `.gitignore` | a card's | the build |
 | `manuals/reference.md` | a card's, changed with the commands it describes | compiled in: `mork manual reference` and the commands' help print it |
 | `manuals/mork.md`, `roles/`, `skills/` | a card's, to keep their text true to what its agreed change does; a new rule or procedure only when the card agreed it with the operator | compiled in, every seat reads them |
+| `orchestrator-skills/` | a card's, to keep their text true to what its agreed change does; a new rule or procedure only when the card agreed it with the operator | linked into orchestrator CLIs, never compiled in |
 | `AGENTS.md`: "Build, test, run" | a card's, kept true to what it changes | how the code is built and tested |
 | `AGENTS.md`: this table, "Tests", "Rules the code is held to (1.12)", "Comments"; `clippy.toml`, `rustfmt.toml` | the operator's | the rules the code is held to |
 

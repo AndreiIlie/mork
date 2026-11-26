@@ -47,6 +47,7 @@ Mork is an 8-crate Rust workspace with a dependency graph and boundary rules enf
 | `crates/xtask/` | Workspace verification: rustfmt, comments, clippy, crate-graph and capability audits, file/function size caps, test-assertion diff checks, web Tailwind/TS checks, and parallel test runner. |
 | `web/` | Local web UI (React 19, TypeScript, Tailwind CSS v4, Vite). |
 | `manuals/`, `roles/`, `skills/` | Operating manuals and on-demand skills loaded into agent seats. |
+| `orchestrator-skills/` | Skills for the orchestrator sessions you run outside Mork: link each skill folder into your CLI's skills folder (`~/.claude/skills/`, `~/.agents/skills/`). |
 
 ## Security Model and Current Limitations
 
