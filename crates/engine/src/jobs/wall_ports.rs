@@ -10,11 +10,13 @@ use mork_types::config::Config;
 use crate::paths::Home;
 
 pub(super) const FILE: &str = "wall-service-ports.json";
+const TUNNELS: &str = "wall-tunnel-ports.lock";
 
 pub(crate) fn start(home: &Home, config: &Config) -> io::Result<BTreeSet<u16>> {
     // Surviving proxies lock this same inode through connect, including while an ephemeral port is assigned.
     let file = OpenOptions::new().create(true).truncate(false).write(true).open(home.root().join(FILE))?;
     file.lock()?;
+    OpenOptions::new().create(true).append(true).open(home.root().join(TUNNELS))?;
     file.set_len(0)?;
     let assets = config.mork.web_assets.as_ref().map(std::path::PathBuf::from);
     let web = config.mork.web_port.and_then(|port| crate::web::start(home, port, assets)).map(|addr| addr.port());
@@ -30,16 +32,20 @@ pub(super) fn connect(file: &Path, addr: SocketAddr) -> io::Result<Option<TcpStr
 
 fn permit(file: &Path, port: u16) -> io::Result<Option<File>> {
     let (guard, ports) = locked_ports(file)?;
-    Ok((!ports.contains(&port)).then_some(guard))
+    // A removed tunnel may still own its port. New tunnels can only open on a currently reserved port.
+    let free = !ports.contains(&port) && mork_sys::byte_is_free(&File::open(file.with_file_name(TUNNELS))?, port)?;
+    Ok(free.then_some(guard))
 }
 
 pub(super) fn tunnel_input(home: &Home, port: u16) -> io::Result<File> {
-    let (guard, ports) = locked_ports(&home.root().join(FILE))?;
+    let (_guard, ports) = locked_ports(&home.root().join(FILE))?;
     if !ports.contains(&port) {
         return Err(io::Error::other(format!("local port {port} is not reserved for the tunnel")));
     }
-    // At EOF, stdin stays empty and its inherited lock outlives the tracker until SSH and its guard exit.
-    Ok(guard)
+    // SSH and its guard inherit only this port's lock, so neither can hold up publication during reload.
+    let input = File::open(home.root().join(TUNNELS))?;
+    mork_sys::hold_byte(&input, port)?;
+    Ok(input)
 }
 
 fn locked_ports(path: &Path) -> io::Result<(File, BTreeSet<u16>)> {
@@ -76,9 +82,13 @@ mod tests {
         let mut ssh = input.try_clone()?;
         drop(input);
         assert_eq!(ssh.read(&mut [0])?, 0);
-        assert!(matches!(writer.try_lock(), Err(std::fs::TryLockError::WouldBlock)));
-        drop(ssh);
+        writer.try_lock()?;
+        writer.unlock()?;
         assert!(start(&home, &config)?.is_empty());
+        assert!(permit(&file, 4321)?.is_none());
+        assert!(permit(&file, 4322)?.is_some());
+        assert!(tunnel_input(&home, 4321).is_err());
+        drop(ssh);
         assert!(permit(&file, 4321)?.is_some());
         Ok(())
     }

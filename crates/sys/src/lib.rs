@@ -44,6 +44,28 @@ pub fn lock_is_free(file: &std::fs::File) -> io::Result<bool> {
     if err.raw_os_error() == Some(libc::EWOULDBLOCK) { Ok(false) } else { Err(err) }
 }
 
+/// Holds a shared lock on one byte until the last copy of this open file description closes.
+pub fn hold_byte(file: &std::fs::File, byte: u16) -> io::Result<()> {
+    byte_lock(file, byte, libc::F_OFD_SETLK, libc::F_RDLCK).map(|_| ())
+}
+
+/// Checks whether another open file description holds the byte, without acquiring a lock.
+pub fn byte_is_free(file: &std::fs::File, byte: u16) -> io::Result<bool> {
+    byte_lock(file, byte, libc::F_OFD_GETLK, libc::F_WRLCK).map(|kind| i32::from(kind) == libc::F_UNLCK)
+}
+
+fn byte_lock(file: &std::fs::File, byte: u16, cmd: i32, kind: i32) -> io::Result<i16> {
+    // SAFETY: all fields of flock are integers; OFD locks require l_pid to start at zero.
+    let mut lock: libc::flock = unsafe { std::mem::zeroed() };
+    lock.l_type = kind as i16;
+    lock.l_whence = libc::SEEK_SET as i16;
+    lock.l_start = byte.into();
+    lock.l_len = 1;
+    // SAFETY: both OFD commands take a pointer to a live flock and retain no pointer.
+    let result = unsafe { libc::fcntl(file.as_raw_fd(), cmd, &raw mut lock) };
+    if result == -1 { Err(io::Error::last_os_error()) } else { Ok(lock.l_type) }
+}
+
 pub fn getpid() -> i32 {
     std::process::id().cast_signed()
 }
