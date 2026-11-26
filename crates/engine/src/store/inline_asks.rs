@@ -40,7 +40,7 @@ pub(super) fn migrate(tx: &Transaction<'_>) -> Result<()> {
     Ok(())
 }
 
-fn source(tx: &Transaction<'_>, ask: &Ask) -> Result<Option<u64>> {
+fn source(tx: &Transaction<'_>, ask: &Ask) -> Result<Option<i64>> {
     if ask.kind == AskKind::Triage {
         return Ok(tx
             .query_row(
@@ -88,7 +88,7 @@ fn matches_answer(a: &Ask, hand: &serde_json::Value) -> bool {
         || (hand["ask"] == "" && hand["color"] == "red" && hand["withdraw_ask"] != true && hand["headline"] == a.text)
 }
 
-fn replacement(tx: &Transaction<'_>, a: &Ask) -> Result<u64> {
+fn replacement(tx: &Transaction<'_>, a: &Ask) -> Result<i64> {
     let seat: Option<String> = if a.kind == AskKind::Answer {
         tx.query_row(
             "SELECT json_extract(data,'$.place') FROM entities WHERE kind='agent' AND id=?1",
@@ -103,7 +103,7 @@ fn replacement(tx: &Transaction<'_>, a: &Ask) -> Result<u64> {
         .as_deref()
         .or_else(|| a.agent.as_deref().filter(|k| a.kind == AskKind::Answer && k.ends_with("/dm")))
         .unwrap_or(a.place.as_str());
-    let seq: u64 = tx.query_row("SELECT coalesce(max(seq)+1,0) FROM messages", [], |r| r.get(0))?;
+    let seq: i64 = tx.query_row("SELECT coalesce(max(seq)+1,0) FROM messages", [], |r| r.get(0))?;
     let headline = mork_core::messages::asks::word(a.kind);
     let data = json!({"seq":seq,"place":place,"time":a.raised_ms,"from":"engine","to":"operator",
         "kind":"engine","headline":headline,"text":a.text,"images":[],"findings":[]});
