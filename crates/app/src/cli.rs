@@ -39,6 +39,10 @@ pub fn run(args: &[String]) -> i32 {
             Some(dir) => jobs::supervisor::main(Path::new(dir)),
             None => usage("mork supervise <job folder>"),
         },
+        Some("wall-proxy") => match rest.first() {
+            Some(dir) => jobs::wall_proxy::main(Path::new(dir)),
+            None => usage("mork wall-proxy <job folder>"),
+        },
         Some("wall-exec") => {
             eprintln!("{}", jobs::wall_exec::run(rest));
             126

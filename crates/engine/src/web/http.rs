@@ -49,6 +49,12 @@ pub enum WsCheck {
 
 /// Reads an HTTP request head from `stream`, returning it and any bytes buffered past `\r\n\r\n`.
 pub fn read_head(stream: &mut TcpStream) -> io::Result<Option<(Head, Vec<u8>)>> {
+    let Some((bytes, extra)) = read_head_bytes(stream)? else { return Ok(None) };
+    let head = parse_head(&bytes).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "bad HTTP"))?;
+    Ok(Some((head, extra)))
+}
+
+pub(crate) fn read_head_bytes(stream: &mut TcpStream) -> io::Result<Option<(Vec<u8>, Vec<u8>)>> {
     let start = crate::clock::instant();
     let mut buf = Vec::with_capacity(1024);
     let mut chunk = [0u8; 2048];
@@ -73,8 +79,8 @@ pub fn read_head(stream: &mut TcpStream) -> io::Result<Option<(Head, Vec<u8>)>> 
             return Err(io::Error::new(io::ErrorKind::InvalidData, "request head too large"));
         }
     };
-    let head = parse_head(&buf[..head_end]).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "bad HTTP"))?;
-    Ok(Some((head, buf[head_end..].to_vec())))
+    let extra = buf.split_off(head_end);
+    Ok(Some((buf, extra)))
 }
 
 fn find_head_end(buf: &[u8]) -> Option<usize> {

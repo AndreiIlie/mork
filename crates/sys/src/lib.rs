@@ -1,6 +1,8 @@
 //! Every `unsafe` block of the workspace lives here (1.12.2), each with its `// SAFETY:` line.
 //! Callers use the safe wrappers only.
 
+mod interface_addresses;
+pub use interface_addresses::interface_addresses;
 mod landlock;
 mod proc;
 mod seccomp;
