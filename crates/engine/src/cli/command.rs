@@ -127,3 +127,6 @@ fn search(args: &[&str]) -> Option<String> {
         format!("Search {pattern} in {}", paths.join(", "))
     })
 }
+
+#[cfg(test)]
+mod tests;
