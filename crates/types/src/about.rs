@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 /// Its project, branch and base, its pull request, its current run's cost and delegation level.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CardAbout {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<PreviewControl>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<String>,
     pub project: crate::ProjectId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
@@ -69,4 +73,28 @@ pub struct Summary {
     pub card: crate::CardId,
     pub title: String,
     pub text: String,
+}
+
+/// The preview's current state and the availability of its opposite position.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PreviewControl {
+    pub on: bool,
+    pub url: String,
+    pub enabled: bool,
+}
+
+/// Defaults and mode availability for a board card's next run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StartDefaults {
+    pub level: u8,
+    pub from: String,
+    pub visual: bool,
+    pub carries: Vec<crate::CardId>,
+    pub modes: StartModes,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StartModes {
+    pub full: bool,
+    pub report: bool,
 }

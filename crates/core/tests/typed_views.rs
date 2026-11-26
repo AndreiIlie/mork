@@ -123,3 +123,74 @@ fn an_orchestrators_choice_needs_the_ask_given_to_it() {
     assert!(refused.is_err(), "the ask isn't given to the orchestrator: {refused:?}");
     assert!(s.messages(CARD).iter().all(|m| m.choice.is_none()), "no choice is kept");
 }
+
+fn room(s: &Sim, id: &str) -> mork_types::view::PlaceView {
+    mork_core::views::place::place(&s.state, id, Some(0), &Outside::default(), s.ctx())
+}
+
+#[test]
+fn room_controls_parent_and_standing_decisions_follow_the_card() {
+    let mut s = start_no_planner();
+    s.config.projects.get_mut("web").unwrap().preview = Some("serve".into());
+    let card = s.state.cards.get_mut(CARD).unwrap();
+    card.preview = true;
+    let port = card.port.unwrap();
+    s.state.board.get_mut(CARD).unwrap().description = "operator 01.01: Decision: Keep both rooms.\n\nWords.".into();
+    let mut child = s.state.agents[FOREMAN].clone();
+    child.key = "web-1/researcher-1".into();
+    child.role = mork_types::reply::Role::Researcher;
+    child.place = "web-1/researcher-1/dm".into();
+    child.parent = Some(FOREMAN.into());
+    s.state.agents.insert(child.key.clone(), child);
+    let view = room(&s, CARD);
+    let row = view.sessions.iter().find(|a| a.agent == "web-1/researcher-1").unwrap();
+    assert_eq!(row.parent.as_ref().unwrap().as_str(), FOREMAN);
+    assert_eq!(view.decisions, ["Keep both rooms."]);
+    let about = view.card.unwrap().about;
+    assert_eq!(about.actions, ["close"]);
+    let preview = about.preview.unwrap();
+    assert!(preview.on && preview.enabled);
+    assert_eq!(preview.url, format!("http://web-1.localhost:{port}/"));
+}
+
+#[test]
+fn first_run_and_restart_offer_only_the_modes_and_defaults_the_engine_applies() {
+    use mork_core::decide::Event;
+    use mork_core::state::unloaded::{Records, wanted};
+    use mork_types::card::{Card, Carried, Mode};
+    let mut s = Sim::new();
+    s.board("web-2", "web");
+    let carried = s.state.board["web-2"].clone();
+    s.board(CARD, "web");
+    s.state.board.insert(carried.id.clone(), carried);
+    s.operator(json!({"auto":{"project":"web"}})).unwrap();
+    let fresh = room(&s, CARD);
+    assert!(fresh.card.is_none());
+    let start = fresh.start.unwrap();
+    assert_eq!((start.level, start.from.as_str()), (1, "project"));
+    assert!(start.modes.full && start.modes.report);
+    assert!(screen(&s.state, &Outside::default(), s.ctx()).boards.iter().any(|b| b.project == "web" && b.auto));
+
+    let id = mork_types::CardId::new(CARD);
+    let mut prior = Card::new(id.clone(), "web", "Earlier run", Mode::Full, 1, s.now);
+    prior.stage = Stage::Closed;
+    s.state.cards.insert(id.clone(), prior.clone());
+    let start = room(&s, CARD).start.unwrap();
+    assert_eq!((start.level, start.from.as_str()), (1, "project"));
+
+    s.state.cards.remove(&id);
+    prior.carries.push(Carried { id: "web-2".into(), ..Default::default() });
+    prior.head = Some("commit".into());
+    prior.delegated = true;
+    prior.self_sustained = true;
+    prior.visual = true;
+    s.state.unloaded.cards.insert(id.clone());
+    let cmd = serde_json::from_value(json!({"watch":{"places":["screen",CARD],"full":true}})).unwrap();
+    assert!(wanted(&s.state, &Event::Command { from: Sender::Operator, cmd }).cards.contains(&id));
+    s.state.absorb(&id, Records { card: Some(prior), ..Default::default() });
+    assert!(room(&s, "web-2").start.is_none());
+    let start = room(&s, CARD).start.unwrap();
+    assert_eq!((start.level, start.from.as_str()), (2, "run"));
+    assert!(start.visual && start.modes.full && !start.modes.report);
+    assert_eq!(start.carries, [mork_types::CardId::new("web-2")]);
+}

@@ -52,7 +52,7 @@ pub fn wanted<'a>(state: &State, config: &'a Config) -> Vec<(CardId, &'a str, u1
 }
 
 /// A card's preview link: its own host name, so its login cookie is its own (fac-222).
-pub(super) fn url(card: &CardId, port: u16) -> String {
+pub(crate) fn url(card: &CardId, port: u16) -> String {
     format!("http://{}.localhost:{port}/", card.as_str().to_lowercase())
 }
 

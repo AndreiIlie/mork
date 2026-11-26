@@ -213,6 +213,8 @@ pub struct Offer {
 /// One board in main's Board tab (5.8.1, fac-37).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BoardView {
+    #[serde(default)]
+    pub auto: bool,
     pub project: crate::ProjectId,
     /// Its live cards, in the order they started.
     pub live: BoardGroup,
@@ -275,6 +277,10 @@ pub struct LiveMarks {
 /// One place, as the window shows it (5.7, 5.8.2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlaceView {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub decisions: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<crate::about::StartDefaults>,
     pub place: PlaceId,
     pub kind: PlaceKind,
     pub revision: u64,
@@ -356,6 +362,8 @@ pub struct CardHeader {
 /// One agent's row (5.7.4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentRow {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<crate::AgentKey>,
     pub agent: AgentKey,
     pub role: Role,
     /// Its seat's label and effort (`sol`, `xhigh`).
