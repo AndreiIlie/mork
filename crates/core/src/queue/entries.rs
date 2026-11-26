@@ -237,8 +237,8 @@ fn fix_request(p: &mut Poster<'_>, c: &Card, at: &str, failure: Option<&str>, ct
         c.head.as_ref().map_or("its head", |h| h.short()),
         what.join("\n\n")
     );
-    let headline = format!("PR {pr}'s findings");
-    super::suite_news::send(p, &c.id, Told::Foreman { card: ours.id.clone(), headline, text });
+    let (role, headline) = (Role::Foreman, format!("PR {pr}'s findings"));
+    super::suite_news::send(p, &c.id, Told::Agent { card: ours.id.clone(), role, headline, text });
     p.journal("entry.fix_request", Some(ours.id.as_str()), json!({"review": c.id, "findings": c.findings.len()}));
 }
 

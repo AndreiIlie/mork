@@ -104,8 +104,10 @@ When active, the cap is passed to Claude via `--autocompact` and to agy via `AGY
 In `mork.toml`, `[mork] fresh_context_percent` accepts whole percentages from `0` through `100` and defaults to `70`.
 A full card’s foreman starts a fresh session when it takes a fix or “Join the base” request and its stored usage exceeds that percentage of the effective window shown under “Context size”.
 At 70% of 200,000 tokens, 140,000 keeps the current session and 140,001 starts a fresh one.
-Zero disables the percentage trigger. Reported compaction independently triggers a fresh session at the next such request, even after intervening turns.
-Claude and agy support the percentage check when both usage and window are known. Claude, agy and walled Codex report compaction.
+Zero disables the percentage trigger.
+Reported compaction independently triggers a fresh session at the next such request, even after intervening turns.
+Claude and agy support the percentage check when both usage and window are known.
+Claude, agy and walled Codex report compaction.
 
 ### caches and cache_files
 

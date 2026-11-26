@@ -135,22 +135,27 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
             message: "`max_test_runs` must be a whole number from 1".into(),
         });
     }
-    if config.mork.context_cap != 0 && !(CONTEXT_CAP_MIN..=CONTEXT_CAP_MAX).contains(&config.mork.context_cap) {
+    context_settings(text, &config.mork)?;
+    crate::config_checks::caches(text, &mut config.mork)?;
+    slice(text, &config.slice)?;
+    crate::config_checks::check(text, &config)?;
+    Ok(config)
+}
+
+fn context_settings(text: &str, settings: &mork_types::config::MorkConfig) -> Result<(), ConfigError> {
+    if settings.context_cap != 0 && !(CONTEXT_CAP_MIN..=CONTEXT_CAP_MAX).contains(&settings.context_cap) {
         return Err(ConfigError::Value {
             line: key_line(text, Some("mork"), "context_cap"),
             message: format!("`context_cap` must be 0 or between {CONTEXT_CAP_MIN} and {CONTEXT_CAP_MAX}"),
         });
     }
-    if config.mork.fresh_context_percent > 100 {
+    if settings.fresh_context_percent > 100 {
         return Err(ConfigError::Value {
             line: key_line(text, Some("mork"), "fresh_context_percent"),
             message: "`fresh_context_percent` must be a whole percentage from 0 to 100".into(),
         });
     }
-    crate::config_checks::caches(text, &mut config.mork)?;
-    slice(text, &config.slice)?;
-    crate::config_checks::check(text, &config)?;
-    Ok(config)
+    Ok(())
 }
 
 // The baseline seat writes a clone before any approve (fac-636), and agy approves its tools unasked (fac-657): their

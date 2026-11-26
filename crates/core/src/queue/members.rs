@@ -253,7 +253,7 @@ pub(crate) fn send_return_request(p: &mut Poster<'_>, c: &Card, tip: Option<Sha>
             card: id.clone(),
             fix: FixImport { tip, base: super::joins::base(c, ctx), headline, text: ask },
         },
-        None => Told::Foreman { card: id.clone(), headline, text: ask },
+        None => Told::Agent { card: id.clone(), role: Role::Foreman, headline, text: ask },
     };
     super::suite_news::send(p, &id, told);
 }

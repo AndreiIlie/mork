@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::card::FixImport;
 use crate::ids::CardId;
+use crate::reply::Role;
 
 /// A failed candidate's news, until it is told: its log's copies.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -21,8 +22,8 @@ pub struct SuiteNews {
 pub enum Told {
     /// Said to the operator in a card's room.
     Operator { card: CardId, text: String },
-    /// A fix request ready for the foreman to take.
-    Foreman { card: CardId, headline: String, text: String },
+    /// A request to a card's seat, waking it.
+    Agent { card: CardId, role: Role, headline: String, text: String },
     /// A request to a card's foreman held until the base's tip reaches its clone (fac-144).
     Fix { card: CardId, fix: FixImport },
 }
