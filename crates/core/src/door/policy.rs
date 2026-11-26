@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use mork_types::door::{FILE_GET_MAX, FileCat, FileGet, FileTail, LibraGet, MiscRun, MongoFind, Op, ShRun, SqlSelect};
+use mork_types::door::{FILE_GET_MAX, FileCat, FileGet, FileTail, HttpGet, MiscRun, MongoFind, Op, ShRun, SqlSelect};
 use mork_types::door_call::Verdict;
 use mork_types::door_config::{ArgType, Limits, Target, TargetsFile, Transport};
 use mork_types::door_plan::{Bounds, Envelope, Plan, Route};
@@ -27,7 +27,7 @@ pub fn resolve(file: &TargetsFile, target: &str, op: &Op) -> Result<Resolved, St
     let (plan, verdict, items) = match op {
         Op::SqlSelect(p) => sql(t, target, p, file.defaults)?,
         Op::MongoFind(p) => mongo(t, target, p, limits)?,
-        Op::LibraGet(p) => libra(t, target, p)?,
+        Op::HttpGet(p) => http(t, target, p)?,
         Op::FileTail(p) => tail(t, target, p, limits)?,
         Op::FileCat(p) => cat(t, target, p)?,
         Op::FileGet(p) => get(t, target, p)?,
@@ -63,7 +63,7 @@ fn kinds(t: &Target) -> Vec<String> {
     let has = [
         ("sql", t.sql.is_some()),
         ("mongo", t.mongo.is_some()),
-        ("libra", t.libra.is_some()),
+        ("http", t.http.is_some()),
         ("file", t.file.is_some()),
         ("sh", !t.sh.is_empty()),
     ];
@@ -130,9 +130,9 @@ fn mongo(t: &Target, target: &str, p: &MongoFind, limits: Limits) -> Result<Step
 }
 
 // Endpoint names are templates, not permissions (fac-124); all GETs stay at the configured origin.
-fn libra(t: &Target, target: &str, p: &LibraGet) -> Result<Step, String> {
-    let l = t.libra.as_ref().ok_or_else(|| format!("`{target}` has no Libra"))?;
-    let template = l.endpoints.get(&p.endpoint);
+fn http(t: &Target, target: &str, p: &HttpGet) -> Result<Step, String> {
+    let http = t.http.as_ref().ok_or_else(|| format!("`{target}` has no HTTP configuration"))?;
+    let template = http.endpoints.get(&p.endpoint);
     let mut path = match template {
         Some(e) => e.path.clone(),
         None if get_path(&p.endpoint) => p.endpoint.clone(),
@@ -158,11 +158,11 @@ fn libra(t: &Target, target: &str, p: &LibraGet) -> Result<Step, String> {
         let separator = if path.contains('?') { '&' } else { '?' };
         path = format!("{path}{separator}{}", query.join("&"));
     }
-    let plan = Plan::Libra {
-        client: l.client.clone(),
-        origin: l.origin.clone(),
-        token_path: l.token_path.clone(),
-        scope: l.scope.clone(),
+    let plan = Plan::Http {
+        client: http.client.clone(),
+        origin: http.origin.clone(),
+        token_path: http.token_path.clone(),
+        scope: http.scope.clone(),
         path,
     };
     Ok((plan, Verdict::new(ALLOWED, "a GET at the configured origin"), 0))

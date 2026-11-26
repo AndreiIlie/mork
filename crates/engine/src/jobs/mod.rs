@@ -4,7 +4,7 @@ pub mod bounded;
 pub mod context;
 pub mod door_dispatch;
 pub mod door_files;
-pub mod door_libra;
+pub mod door_http;
 pub mod door_mysql;
 pub mod door_services;
 pub mod door_ssh;

@@ -100,7 +100,7 @@ pub struct Target {
     #[serde(default)]
     pub mongo: Option<Mongo>,
     #[serde(default)]
-    pub libra: Option<Libra>,
+    pub http: Option<Http>,
     #[serde(default)]
     pub file: Option<Files>,
     #[serde(default)]
@@ -181,23 +181,22 @@ pub struct Mongo {
     pub auth_database: Option<String>,
 }
 
-/// `[targets.<id>.libra]`: Libra's API, by `curl` on this machine, through the target: a token
-/// for the client's key and secret, then bearer-authenticated GETs.
+/// `[targets.<id>.http]`: an HTTPS API reached through the target. OAuth2 client credentials are exchanged
+/// for a bearer token at the same origin.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Libra {
+pub struct Http {
     pub client: Client,
     /// `https://<host>:<port>`: the token and the API both.
     pub origin: String,
     #[serde(default = "d_token_path")]
     pub token_path: String,
-    #[serde(default = "d_scope")]
-    pub scope: String,
+    pub scope: Option<String>,
     #[serde(default)]
     pub endpoints: BTreeMap<String, Endpoint>,
 }
 
-/// A Libra GET alias: `{name}` parameters fill its path; all other parameters form its query.
+/// An HTTP GET alias: `{name}` parameters fill its path; all other parameters form its query.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Endpoint {
@@ -290,7 +289,4 @@ fn d_mongo() -> u16 {
 }
 fn d_token_path() -> String {
     "/oauth2/token".into()
-}
-fn d_scope() -> String {
-    "default".into()
 }

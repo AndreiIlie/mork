@@ -1,7 +1,7 @@
 //! Target policies are validated whole and described without connection details or credentials.
 //! Descriptions expose the operations and bounds an agent may request (fac-1, fac-124).
 
-use mork_types::door_config::{Libra, Limits, Login, Sql, Target, TargetsFile, Transport};
+use mork_types::door_config::{Http, Limits, Login, Sql, Target, TargetsFile, Transport};
 use serde_json::{Value, json};
 
 // The longest a read-only server's SQL may be given: an hour.
@@ -81,31 +81,34 @@ fn check_services(t: &Target, access: bool) -> Result<(), String> {
     {
         return Err("[mongo] needs a login (an access section and its fields) and a host and port".into());
     }
-    if let Some(l) = &t.libra {
-        check_libra(l)?;
+    if let Some(http) = &t.http {
+        check_http(http)?;
     }
-    if !access && (t.sql.is_some() || t.mongo.is_some() || t.libra.is_some()) {
+    if !access && (t.sql.is_some() || t.mongo.is_some() || t.http.is_some()) {
         return Err("its credentials are sections of the access file: name it, as `access`".into());
     }
     Ok(())
 }
 
-fn check_libra(l: &Libra) -> Result<(), String> {
-    let c = &l.client;
+fn check_http(http: &Http) -> Result<(), String> {
+    let c = &http.client;
     if !(name(&c.section) && name(&c.key) && name(&c.secret)) {
-        return Err("[libra] needs a client (an access section and its fields)".into());
+        return Err("[http] needs a client (an access section and its fields)".into());
     }
-    let host = l.origin.strip_prefix("https://").unwrap_or("");
+    let host = http.origin.strip_prefix("https://").unwrap_or("");
     if !name(host) {
-        return Err("[libra] origin is `https://<host>:<port>`, nothing more".into());
+        return Err("[http] origin is `https://<host>:<port>`, nothing more".into());
     }
-    if !super::policy::get_path(&l.token_path) || !name(&l.scope) {
-        return Err("[libra] needs a token_path (`/…`) and a scope".into());
+    if !super::policy::get_path(&http.token_path) {
+        return Err("[http] needs a token_path (`/…`)".into());
     }
-    for (id, e) in &l.endpoints {
+    if http.scope.as_deref().is_some_and(|scope| !name(scope)) {
+        return Err("[http] scope must be a valid name".into());
+    }
+    for (id, e) in &http.endpoints {
         let names = super::policy::placeholders(&e.path);
         if names.is_none() || !super::policy::get_path(&e.path.replace(['{', '}'], "")) {
-            return Err(format!("[libra.endpoints.{id}]: its path is `/…`, paired `{{name}}` placeholders"));
+            return Err(format!("[http.endpoints.{id}]: its path is `/…`, paired `{{name}}` placeholders"));
         }
     }
     Ok(())
@@ -147,9 +150,9 @@ pub fn describe(f: &TargetsFile, id: &str, t: &Target) -> Value {
         v["mongo"] =
             json!({"database": m.database, "collections": "every collection its login may read", "read_only": true});
     }
-    if let Some(l) = &t.libra {
-        v["libra"] =
-            json!({"endpoints": l.endpoints, "paths": "any GET path at the configured origin", "read_only": true});
+    if let Some(http) = &t.http {
+        v["http"] =
+            json!({"endpoints": http.endpoints, "paths": "any GET path at the configured origin", "read_only": true});
     }
     if let Some(fl) = &t.file {
         v["file"] = json!({"roots": fl.roots, "logs": fl.logs});

@@ -29,10 +29,10 @@ pub struct MongoFind {
     pub limit: Option<u64>,
 }
 
-/// `libra.get`: a GET at the configured API origin, through the target's whitelisted address.
+/// `http.get`: a GET at the configured API origin, through the target's whitelisted address.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct LibraGet {
+pub struct HttpGet {
     pub endpoint: String,
     #[serde(default)]
     pub params: BTreeMap<String, String>,
@@ -87,7 +87,7 @@ pub struct MiscRun {
 pub enum Op {
     SqlSelect(SqlSelect),
     MongoFind(MongoFind),
-    LibraGet(LibraGet),
+    HttpGet(HttpGet),
     FileTail(FileTail),
     FileCat(FileCat),
     FileGet(FileGet),
@@ -118,7 +118,7 @@ impl Op {
         Ok(match op {
             "sql.select" => Self::SqlSelect(typed(op, params)?),
             "mongo.find" => Self::MongoFind(typed(op, params)?),
-            "libra.get" => Self::LibraGet(typed(op, params)?),
+            "http.get" => Self::HttpGet(typed(op, params)?),
             "file.tail" => Self::FileTail(typed(op, params)?),
             "file.cat" => Self::FileCat(typed(op, params)?),
             "file.get" => Self::FileGet(typed(op, params)?),
@@ -132,7 +132,7 @@ impl Op {
         match self {
             Self::SqlSelect(_) => "sql.select",
             Self::MongoFind(_) => "mongo.find",
-            Self::LibraGet(_) => "libra.get",
+            Self::HttpGet(_) => "http.get",
             Self::FileTail(_) => "file.tail",
             Self::FileCat(_) => "file.cat",
             Self::FileGet(_) => "file.get",
@@ -146,7 +146,7 @@ impl Op {
         let v = match self {
             Self::SqlSelect(p) => serde_json::to_value(p),
             Self::MongoFind(p) => serde_json::to_value(p),
-            Self::LibraGet(p) => serde_json::to_value(p),
+            Self::HttpGet(p) => serde_json::to_value(p),
             Self::FileTail(p) => serde_json::to_value(p),
             Self::FileCat(p) => serde_json::to_value(p),
             Self::FileGet(p) => serde_json::to_value(p),
@@ -225,9 +225,9 @@ pub const OPS: &[OpSpec] = &[
         ],
     },
     OpSpec {
-        name: "libra.get",
+        name: "http.get",
         returns: "json",
-        about: "any GET path at the configured Libra origin, through the target's whitelisted address; signing stays on the server",
+        about: "any GET path at the configured HTTPS origin using OAuth2 client credentials",
         params: &[
             req("endpoint", "string", "an endpoint alias/template or any GET path (`/…`); no approval ask"),
             opt(
@@ -318,7 +318,7 @@ pub const UNSTOPPED: &str =
 /// Whether an operation only reads. Only a call that can change something (`sh.run`, `misc.run`)
 /// is held for the operator when its outcome is unclear; a read fails and is asked again.
 pub fn is_read(op: &str) -> bool {
-    matches!(op, "sql.select" | "mongo.find" | "file.cat" | "file.get" | "file.tail" | "libra.get")
+    matches!(op, "sql.select" | "mongo.find" | "file.cat" | "file.get" | "file.tail" | "http.get")
 }
 
 /// A read stopped because its caller went (fac-183): its words begin so, and its result says

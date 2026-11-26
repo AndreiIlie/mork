@@ -32,7 +32,7 @@ pub enum Plan {
     },
     /// A GET of `path` (its query included) at `origin`, with a token for the client's key and
     /// secret: both requests by `curl`, through the target.
-    Libra { client: Client, origin: String, token_path: String, scope: String, path: String },
+    Http { client: Client, origin: String, token_path: String, scope: Option<String>, path: String },
     /// A regular file under a root, opened beneath it: no symlink, no `..`.
     Read { root: String, path: String },
     /// A regular file under a root, opened as `Read` is, copied whole into the request's `into`.
@@ -49,7 +49,7 @@ impl Plan {
         match self {
             Self::Sql { .. } => "sql",
             Self::Mongo { .. } => "mongo",
-            Self::Libra { .. } => "libra",
+            Self::Http { .. } => "http",
             Self::Read { .. } | Self::Get { .. } | Self::Tail { .. } => "file",
             Self::Run { .. } => "sh",
         }

@@ -11,7 +11,7 @@ use mork_types::door_plan::{Bounds, Pair, Plan, Ran, Route, Session};
 use super::bounded::{self, Hold, Watch};
 use super::door_files::{deliver, get_beneath, last_lines, read_beneath, tail};
 use super::door_ssh::{self, Scratch, Tunnel};
-use super::{door_libra, door_mysql};
+use super::{door_http, door_mysql};
 use crate::clock;
 use crate::door::redact::Redactor;
 
@@ -60,11 +60,11 @@ pub fn execute(c: &Call<'_>, r: &mut Redactor) -> Result<Ran, String> {
             ran.lost |= *misc && ran.truncated;
             ran
         }
-        (_, Plan::Sql { .. } | Plan::Mongo { .. } | Plan::Libra { .. }) => service(c, max, deadline, r)?,
+        (_, Plan::Sql { .. } | Plan::Mongo { .. } | Plan::Http { .. }) => service(c, max, deadline, r)?,
     };
     ran.elapsed = u64::try_from(clock::elapsed(start).as_millis()).unwrap_or(u64::MAX);
     ran.stdout = match c.plan {
-        Plan::Libra { .. } | Plan::Mongo { .. } => r.mask_json(&ran.stdout),
+        Plan::Http { .. } | Plan::Mongo { .. } => r.mask_json(&ran.stdout),
         _ => r.mask_text(&ran.stdout, ran.truncated),
     };
     ran.stderr = r.mask_text(&ran.stderr, true);
@@ -183,7 +183,7 @@ fn tail_of(ran: Ran, lines: u64, max: usize) -> Ran {
 fn address(plan: &Plan) -> Result<(&str, u16), String> {
     match plan {
         Plan::Sql { host, port, .. } | Plan::Mongo { host, port, .. } => Ok((host, *port)),
-        Plan::Libra { origin, .. } => door_libra::address(origin).ok_or_else(|| "its origin isn't one".to_owned()),
+        Plan::Http { origin, .. } => door_http::address(origin).ok_or_else(|| "its origin isn't one".to_owned()),
         _ => Err("not a service".into()),
     }
 }
@@ -198,7 +198,7 @@ fn service(c: &Call<'_>, max: usize, deadline: Instant, r: &mut Redactor) -> Res
                 sql(scratch, pair, at, (database, query, (rows, c.bounds.timeout_ms)), (max, c.session), deadline)?
             }
             Plan::Mongo { .. } => mongo(scratch, pair, at, c.plan, max, deadline)?,
-            _ => libra(pair, at, c.plan, max, deadline, r),
+            _ => http(pair, at, c.plan, max, deadline, r),
         })
     })?;
     ran.lost |= ran.exit != Some(0) && lost;
@@ -341,33 +341,32 @@ fn mongo(s: &Scratch, pair: &Pair, at: &At<'_>, plan: &Plan, max: usize, deadlin
     Ok(helper(&argv, &[], &env(), max, deadline, &Watch::default()))
 }
 
-// The token first, every token in its answer masked before it is judged; refused, the GET is never
-// made and only Libra's error is kept. A GET answered other than 2xx fails too, Libra's words kept.
-fn libra(pair: &Pair, at: &At<'_>, plan: &Plan, max: usize, deadline: Instant, r: &mut Redactor) -> Ran {
-    let Plan::Libra { origin, token_path, scope, path, .. } = plan else { return Ran::default() };
+// Even a failed token response can contain credentials that must be masked before reporting the error.
+fn http(pair: &Pair, at: &At<'_>, plan: &Plan, max: usize, deadline: Instant, r: &mut Redactor) -> Ran {
+    let Plan::Http { origin, token_path, scope, path, .. } = plan else { return Ran::default() };
     let env = env();
     let seconds = || left(deadline).as_secs().max(1);
-    let config = door_libra::token(origin, token_path, scope, &pair.name, &pair.secret, at, seconds());
-    let got = helper(&door_libra::argv(), config.as_bytes(), &env, 64 * 1024, deadline, &Watch::default());
-    let (body, status) = door_libra::answer(&got.stdout);
-    for t in door_libra::tokens_of(body) {
+    let config = door_http::token(origin, token_path, scope.as_deref(), &pair.name, &pair.secret, at, seconds());
+    let got = helper(&door_http::argv(), config.as_bytes(), &env, 64 * 1024, deadline, &Watch::default());
+    let (body, status) = door_http::answer(&got.stdout);
+    for t in door_http::tokens_of(body) {
         r.add(&t);
     }
-    let token = door_libra::token_of(body).filter(|_| got.exit == Some(0) && status == Some(200));
+    let token = door_http::token_of(body).filter(|_| got.exit == Some(0) && status == Some(200));
     let Some(token) = token else {
-        let said = door_libra::refusal(body);
-        let why = format!("Libra's token request failed (HTTP {status:?}): {} {said}", got.stderr.trim());
+        let said = door_http::refusal(body);
+        let why = format!("OAuth2 token request failed (HTTP {status:?}): {} {said}", got.stderr.trim());
         let exit = Some(got.exit.filter(|e| *e != 0).unwrap_or(22));
         return Ran { exit, stdout: String::new(), stderr: why, timed_out: got.timed_out, ..Ran::default() };
     };
     r.add(&token);
-    let config = door_libra::get(origin, path, &token, at, seconds());
+    let config = door_http::get(origin, path, &token, at, seconds());
     let mut ran =
-        helper(&door_libra::argv(), config.as_bytes(), &env, max.saturating_add(8), deadline, &Watch::default());
-    let (body, status) = door_libra::answer(&ran.stdout);
+        helper(&door_http::argv(), config.as_bytes(), &env, max.saturating_add(8), deadline, &Watch::default());
+    let (body, status) = door_http::answer(&ran.stdout);
     let body = body.to_owned();
     if ran.exit == Some(0) && !status.is_some_and(|s| (200..300).contains(&s)) {
-        ran.stderr = format!("Libra answered HTTP {status:?}: {body}");
+        ran.stderr = format!("GET returned HTTP {status:?}: {body}");
         ran.exit = Some(22);
     }
     ran.stdout = body;

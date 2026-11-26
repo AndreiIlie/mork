@@ -1,5 +1,5 @@
-//! A Libra read (fac-86): its config, credential and token, comes on stdin never argv; over ssh it goes
-//! through the forward, so Libra sees the whitelisted box's address, and checks Libra's own certificate.
+//! OAuth2 credentials and tokens reach curl on stdin. Over SSH the forward preserves the target's
+//! source address while curl verifies the configured origin's certificate.
 
 use super::door_services::At;
 
@@ -31,7 +31,7 @@ fn common(url: &str, at: &At<'_>, seconds: u64) -> String {
 pub fn token(
     origin: &str,
     token_path: &str,
-    scope: &str,
+    scope: Option<&str>,
     key: &str,
     secret: &str,
     at: &At<'_>,
@@ -39,7 +39,11 @@ pub fn token(
 ) -> String {
     let mut c = common(&format!("{origin}{token_path}"), at, seconds);
     c.push_str(&format!("user = {}\n", value(&format!("{key}:{secret}"))));
-    c.push_str(&format!("data = {}\n", value(&format!("grant_type=client_credentials&scope={scope}"))));
+    let grant = match scope {
+        Some(scope) => format!("grant_type=client_credentials&scope={scope}"),
+        None => "grant_type=client_credentials".to_owned(),
+    };
+    c.push_str(&format!("data = {}\n", value(&grant)));
     c
 }
 
@@ -75,7 +79,7 @@ pub fn tokens_of(body: &str) -> Vec<String> {
     held.filter(|t| !t.is_empty()).map(str::to_owned).collect()
 }
 
-/// What a failed token request's answer said: Libra's `error` and `error_description` alone; a body
+/// What a failed token request's answer said: the server's `error` and `error_description` alone; a body
 /// that isn't a whole JSON object (cut short, a proxy's page) could hold a token unread, so is withheld.
 pub fn refusal(body: &str) -> String {
     if body.trim().is_empty() {
@@ -95,5 +99,44 @@ pub fn address(origin: &str) -> Option<(&str, u16)> {
     match rest.split_once(':') {
         Some((host, port)) => Some((host, port.parse().ok()?)),
         None => Some((rest, 443)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mork_types::door::Op;
+    use mork_types::door_plan::Plan;
+    use serde_json::json;
+
+    #[test]
+    fn http_get_sends_only_the_configured_scope() {
+        let target = r#"
+version = 2
+access = "/credentials"
+[targets.api]
+description = "Example API"
+transport = "local"
+[targets.api.http]
+origin = "https://api.example.org"
+client = { section = "api" }
+"#;
+        let op = Op::parse("http.get", &json!({"endpoint": "/items"})).unwrap();
+        for (setting, form) in [
+            ("", "grant_type=client_credentials"),
+            ("scope = \"default\"", "grant_type=client_credentials&scope=default"),
+            ("scope = \"items:read\"", "grant_type=client_credentials&scope=items:read"),
+        ] {
+            let targets = crate::door::parse(&format!("{target}{setting}")).unwrap();
+            let call = crate::door::resolve(&targets, "api", &op).unwrap();
+            let Plan::Http { origin, token_path, scope, .. } = call.resolved.envelope.plan else {
+                panic!("http.get must dispatch an HTTP plan");
+            };
+            let at = At::Tcp("api.example.org", 443);
+            let config = token(&origin, &token_path, scope.as_deref(), "key", "secret", &at, 1);
+            assert!(config.lines().any(|line| line == "url = \"https://api.example.org/oauth2/token\""));
+            let data: Vec<_> = config.lines().filter_map(|line| line.strip_prefix("data = ")).collect();
+            assert_eq!(data, [format!("\"{form}\"")]);
+        }
     }
 }
