@@ -221,6 +221,17 @@ impl Engine {
         tail: Option<u64>,
         full: bool,
     ) -> Option<Result<Value, ErrorBody>> {
+        // A former member may have closed with work of its own while its board card still looks runnable.
+        let cards = places
+            .iter()
+            .filter_map(|place| mork_core::messages::places::card_of(&self.state, place))
+            .filter_map(|id| self.state.cards.get(&id))
+            .filter(|c| c.stage == mork_types::card::Stage::Closed)
+            .flat_map(|c| c.carries.iter().map(|k| &k.id))
+            .filter(|id| self.state.unloaded.cards.contains(*id))
+            .cloned()
+            .collect();
+        self.load(&mork_core::state::unloaded::Wanted { cards, ..Default::default() });
         let watched = super::Watched::new(places.clone(), tail, full);
         self.watchers.retain(|(c, _)| c.id != conn.id);
         self.watchers.push((Arc::clone(conn), watched.clone()));

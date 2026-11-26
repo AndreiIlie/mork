@@ -1778,7 +1778,7 @@ Runs a command of your own in a test slot, never the configured suite: `mork tes
 Give the program and each argument as separate words, never the whole command as one quoted string (`"npx jest a.test.js"` is looked up as one program's name and not found), the program directly after `--run`, with no `--` before it; arguments after it pass through unchanged, a `--` among them included.
 `{io}` in an argument becomes your seat's `io/` folder, the one `MORK_IO` names.
 
-When `[mork] project` is configured, on that project it runs under its test settings: `env` with `MORK_UNWALLED=1` and `MORK_TEST_PORTS` the project's first port range, and the app's `faults` added to a `cargo test` that builds the app and names no features of its own.
+When `[mork] project` is configured, on that project it runs under its test settings: `env` with `MORK_UNWALLED=1`, and the app's `faults` added to a `cargo test` that builds the app and names no features of its own.
 Its stdin and output pass through (a heredoc reaches the command), and it exits with the command's code; nothing is remembered: only verification's and the merge queue's passes are.
 
 Example: `mork test --run cargo test -p mork-core --test fac14_review`
@@ -1789,7 +1789,7 @@ Runs one wall-test file outside every wall, with its tests' walls enabled: `mork
 Only the foreman of a full card of the configured `[mork] project` may use it.
 When `[mork] project` is unset, or for any other project's seat, review or report card's seat, researcher or other seat, `--walls` is refused before taking a slot.
 
-The engine runs `cargo test -p mork-app --test <file> --features mork-app/faults` in the card's clone as it stands, uncommitted changes included, with `MORK_UNWALLED` unset and `MORK_TEST_PORTS` the project's first port range.
+The engine runs `cargo test -p mork-app --test <file> --features mork-app/faults` in the card's clone as it stands, uncommitted changes included, with `MORK_UNWALLED` unset.
 `--no-default-features` before the file replaces the `faults` feature with the production build.
 The file is a nonempty plain test-file name: ASCII letters, digits, underscores and hyphens, with no leading hyphen, path, extension or wildcard.
 The optional filter is at most one nonempty word, with no leading hyphen, whitespace or control character.

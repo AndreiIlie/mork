@@ -54,7 +54,7 @@ Mork is an 8-crate Rust workspace with a dependency graph and boundary rules enf
 - **Filesystem, syscall, and per-seat isolation:** File isolation is enforced by Bubblewrap mounts (`--ro-bind / /`, tmpfs over host home directories, read-write only inside the card's clone and scratch paths) with `--unshare-user/pid/ipc`, `--cap-drop ALL`, a minimal seccomp-bpf filter denying x32 ABI, `io_uring_setup`, `userfaultfd`, and `ptrace`, and private per-seat home directories (`homes/`).
 - **Network egress:** Walled agent turns run with `--unshare-net` and private loopback. Configure `domains` for the model APIs and registries your seats use. A host-side CONNECT proxy checks the requested host and port before DNS. Project `host_ports` and card preview and mock ports are bridged, excluding the web bridge and SSH tunnels.
 - **Autonomous CLI execution:** Inside the sandbox, seats run with CLI permission prompts disabled so work does not stall waiting on interactive shell prompts. The sandbox wall, fail-closed `PreToolUse` hooks, and door allowlists are the enforcement boundary.
-- **Hosted forge support:** Local git merge-queue landings work with any git repository. Hosted PR automation currently implements Bitbucket behind the `ForgeRead`/`ForgeWrite` traits; a GitHub Issues + Pull Requests provider is next on the roadmap.
+- **Hosted forge support:** Local git merge-queue landings work with any git repository. Mork supports hosted pull request automation on Bitbucket and GitHub through the `ForgeRead` and `ForgeWrite` traits.
 
 ## Quick Start (Linux)
 
