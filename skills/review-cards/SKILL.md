@@ -65,7 +65,8 @@ Nothing reviews a review card in turn.
    An unforeseen consequence, regression or broken edge case the plan introduces is a finding, even where the plan's text leads to it.
    A claim without proof can be dropped or returned to the reviewer for proof.
    If you dispute what a reviewer's proof shows, disagree about whether the discrepancy blocks, or intend to drop or downgrade a proved finding, get one reply before deciding.
-   Ask the original reviewer to address the exact point you dispute, grouping its disputed findings in one request.
+   Group the original reviewer's disputed findings in one request and name the exact points you dispute.
+   Ask it to explain only those points in `hand.message` and return a revised topic verdict listing every finding it still considers blocking in `findings`.
    Alternatively, request one independent read of those points from a different model allowed for this review's kind, giving it the relevant requirement and code locations without the first reviewer's conclusion.
    After that single reply, decide from the evidence and explain any drop or downgrade in your verdict's `hand.message`.
    When nothing is disputed, proceed directly to the verdict.

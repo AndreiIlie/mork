@@ -15,7 +15,8 @@ description: "Use when you are a review card's blind reviewer with one topic of 
    If you join in a later round, also read the preceding-round comparison your foreman gives you (`git diff refs/rounds/<n>-on-base <commit>` when the round provides it, or `git diff refs/rounds/<n> <commit>` otherwise) and any base comparison your foreman gives you.
    Trace the merged base's effects into affected callers and dependents, including unlisted files.
    On a pushed PR too, your first pass reads the whole PR against its destination; the source-head endpoints are for your later passes (step 8).
-   When asked to reconsider a finding or give an independent tiebreak read, answer just the disputed points on that candidate, with the evidence and your blocking judgment for each.
+   When asked to reconsider your verdict, re-examine only the disputed points on that candidate, then report your revised topic verdict as in step 9.
+   For an independent tiebreak read, assess only the disputed points on that candidate, with the evidence and your blocking judgment for each.
 3. **Establish the discrepancy first.**
    Identify the applicable requirement ("Under review", the pull request or the branch) or existing contract.
    Cite the file and line and show from the code what the change actually does.
@@ -114,5 +115,7 @@ JSON
    Raise again in your verdict what isn't fixed, by its number: begin its summary with `#<n>` (`#5 …`), so it stays that finding wherever its line moved or however you word it now.
 9. **Report blocking findings** in `findings`, with the discrepancy and why it blocks in `summary`, and the evidence in `file`, `line` and `proof`.
    For each proved discrepancy you judge nonblocking, give its file:line, code proof and reason in `hand.message`.
-   Return `review-fail` when a finding blocks, otherwise `review-pass`.
+   On reconsideration, limit `hand.message` to the disputed points, giving the evidence and your blocking judgment for each.
+   Your revised verdict replaces your earlier verdict for this round, so list every finding you still consider blocking for your topic in `findings`, including undisputed ones.
+   Return `review-fail` when any finding blocks, otherwise `review-pass` with empty `findings`.
    The foreman weighs your verdict; you move nothing.
