@@ -48,12 +48,12 @@ pub(super) fn overview(state: &State, card: &Card, outside: &Outside, config: &C
         .enumerate()
         .map(|(i, st)| {
             let is_last = i + 1 == raw.len();
-            let current = card.stage.is_live() && is_last;
-            let flags = (current, is_last, Some(i) == last_spec, Some(i) == last_build);
+            let at = stage_at(st.kind, is_last.then_some(card.stage), review_ref);
+            let flags = (at == OverviewStageAt::Current, is_last, Some(i) == last_spec, Some(i) == last_build);
             OverviewStage {
                 kind: stage_kind(st.kind),
                 label: stage_label(st.kind),
-                at: stage_at(st.kind, current, review_ref),
+                at,
                 start_ms: st.start_ms,
                 end_ms: st.end_ms,
                 summary: stage_summary(state, card, review_ref, outside, st.kind, flags, config),
@@ -155,7 +155,7 @@ fn apply_phase_mark(out: &mut Vec<RawStage>, pt: &Point) {
     match pt.mark {
         Mark::Stage(Stage::Starting | Stage::Brief) => push_if_diff(out, RawKind::Spec, pt.at),
         Mark::Stage(Stage::Build) => {
-            if out.is_empty() || out.last().is_some_and(|s| s.kind == RawKind::Spec) {
+            if out.last().is_none_or(|s| matches!(s.kind, RawKind::Spec | RawKind::Land)) {
                 push_phase(out, RawKind::Build, pt.at);
             }
         }
@@ -328,9 +328,12 @@ fn stage_label(kind: RawKind) -> String {
     }
 }
 
-fn stage_at(kind: RawKind, current: bool, review: Option<&Review>) -> OverviewStageAt {
-    if current {
+fn stage_at(kind: RawKind, last_stage: Option<Stage>, review: Option<&Review>) -> OverviewStageAt {
+    if last_stage.is_some_and(Stage::is_live) {
         return OverviewStageAt::Current;
+    }
+    if kind == RawKind::Land && last_stage != Some(Stage::Done) {
+        return OverviewStageAt::Failed;
     }
     if let RawKind::Verify(Some(n)) | RawKind::Review(Some(n)) = kind
         && review.and_then(|r| r.rounds.iter().find(|x| x.n == n)).is_some_and(|r| r.verdict == Some(Verdict::Failed))
