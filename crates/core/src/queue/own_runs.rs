@@ -1,21 +1,16 @@
 //! `mork test --run` on Mork's own project (fac-73): inside a card's wall no inner wall can start and the
-//! app's tests build only with its `faults`; a run there gets both, and the fakes on the first port range.
-
-use mork_types::config::ProjectConfig;
+//! app's tests build only with its `faults`; a run there gets both.
 
 const APP: &str = "mork-app";
 const FAULTS: &str = "mork-app/faults";
 
 /// The argv of a run lease of Mork's own project: `command` under `env` with the test settings, and the app's
 /// `faults` added to a `cargo test` that builds the app and names no features.
-pub fn argv(project: &ProjectConfig, command: &[String]) -> Vec<String> {
+pub fn argv(command: &[String]) -> Vec<String> {
     if command.is_empty() {
         return Vec::new();
     }
     let mut argv = vec!["env".to_owned(), "MORK_UNWALLED=1".to_owned()];
-    if let Some(p) = project.ports.iter().find(|p| p.from < p.to) {
-        argv.push(format!("MORK_TEST_PORTS={}-{}", p.from, p.to));
-    }
     let mut command = command.to_vec();
     if let Some(at) = cargo_test(&command).filter(|&at| builds_the_app(&command[at + 1..])) {
         command.splice(at + 1..at + 1, ["--features".to_owned(), FAULTS.to_owned()]);
@@ -25,7 +20,7 @@ pub fn argv(project: &ProjectConfig, command: &[String]) -> Vec<String> {
 }
 
 /// Builds one wall-test file's command, refusing paths, options and extra filters (fac-480).
-pub fn walls_argv(project: &ProjectConfig, words: &[String]) -> Result<Vec<String>, String> {
+pub fn walls_argv(words: &[String]) -> Result<Vec<String>, String> {
     let production = words.first().is_some_and(|w| w == "--no-default-features");
     let words = &words[usize::from(production)..];
     let Some(file) = words.first() else {
@@ -45,9 +40,6 @@ pub fn walls_argv(project: &ProjectConfig, words: &[String]) -> Result<Vec<Strin
         return Err("`mork test --walls` accepts at most one filter word that is no flag".into());
     }
     let mut argv = vec!["env".into(), "-u".into(), "MORK_UNWALLED".into()];
-    if let Some(p) = project.ports.iter().find(|p| p.from < p.to) {
-        argv.push(format!("MORK_TEST_PORTS={}-{}", p.from, p.to));
-    }
     argv.extend(["cargo".into(), "test".into(), "-p".into(), APP.into(), "--test".into(), file.clone()]);
     if production {
         argv.push("--no-default-features".into());

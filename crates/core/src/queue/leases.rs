@@ -210,7 +210,7 @@ fn argv(project: Option<&ProjectConfig>, own: bool, kind: LeaseKind, command: &[
             v
         }
         // Mork's own tests, run inside a card's wall (fac-73).
-        (LeaseKind::Run, Some(p)) if own => super::own_runs::argv(p, command),
+        (LeaseKind::Run, Some(_)) if own => super::own_runs::argv(command),
         // An agent's suite is refused before any slot (fac-65).
         (LeaseKind::Run | LeaseKind::Suite | LeaseKind::File | LeaseKind::Walls, _) | (LeaseKind::Checks, None) => {
             command.to_vec()

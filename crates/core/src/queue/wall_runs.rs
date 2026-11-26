@@ -28,8 +28,10 @@ pub(crate) fn command(
     if !state.agents.get(key).is_some_and(|a| a.role == Role::Foreman) {
         return Err("`mork test --walls` is only for a full card's foreman".into());
     }
-    let project = ctx.config.projects.get(&c.project).ok_or("the card's project is not configured")?;
-    super::own_runs::walls_argv(project, words)
+    if !ctx.config.projects.contains_key(&c.project) {
+        return Err("the card's project is not configured".into());
+    }
+    super::own_runs::walls_argv(words)
 }
 
 pub(crate) fn stop(p: &mut Poster<'_>, lease: &str, ctx: Ctx<'_>) {

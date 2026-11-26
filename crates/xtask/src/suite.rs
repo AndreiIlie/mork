@@ -167,9 +167,10 @@ fn is_result(line: &str) -> bool {
 /// `--exact` matches.
 pub fn listed(b: &Binary) -> Result<BTreeSet<String>, String> {
     let mut cmd = Command::new(&b.program);
-    cmd.args(&b.args).arg("--list").current_dir(&b.dir).env_remove(crate::walls::RECORD);
+    cmd.args(&b.args).arg("--list").current_dir(&b.dir);
     let out = cmd
         .envs(b.env.iter().map(|(k, v)| (k, v)))
+        .env_remove(crate::walls::RECORD)
         .stdin(Stdio::null())
         .stderr(Stdio::inherit())
         .output()

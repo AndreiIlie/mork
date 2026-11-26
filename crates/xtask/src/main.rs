@@ -137,7 +137,7 @@ fn suite(walled: bool) -> bool {
     let faults = recording(xtask::suite::build(&root, &xtask::suite::WORKSPACE, &FAULTS, &[]), records.as_deref());
     let fakes = run(fakes(), "building the fakes");
     let start = std::time::Instant::now();
-    let a = pass(faults, "the suite, with faults");
+    let a = pass(faults, "the suite, with faults", None);
     let mut doc = cargo();
     doc.args(["test", "--no-fail-fast", "--workspace", "--doc"]).args(FAULTS);
     let d = run(doc, "the documentation tests, with faults");
@@ -146,7 +146,7 @@ fn suite(walled: bool) -> bool {
     let timed = report(&xtask::budget::within(elapsed).err().into_iter().collect::<Vec<_>>());
     eprintln!("xtask: building the suite, production-only");
     let production = xtask::suite::build(&root, &xtask::suite::PRODUCTION, &[], &["production"]);
-    let b = pass(recording(production, records.as_deref()), "the production-only tests");
+    let b = pass(recording(production, records.as_deref()), "the production-only tests", None);
     let c = hygiene();
     let steps = [
         ("the fakes", fakes),
@@ -191,7 +191,7 @@ fn walls() -> bool {
         eprintln!("xtask: {what}: {named} recorded");
         ran += named;
         let start = std::time::Instant::now();
-        steps.push((what, pass(picked, what)));
+        steps.push((what, pass(picked, what, Some(named))));
         elapsed += start.elapsed();
     }
     eprintln!("xtask: the unwalled passes ran in {}m{}s", elapsed.as_secs() / 60, elapsed.as_secs() % 60);
@@ -212,14 +212,15 @@ fn fakes() -> Command {
     c
 }
 
-fn pass(binaries: Result<Vec<xtask::suite::Binary>, String>, what: &str) -> bool {
+fn pass(binaries: Result<Vec<xtask::suite::Binary>, String>, what: &str, known_count: Option<usize>) -> bool {
     let binaries = match binaries {
         Ok(b) => b,
         Err(e) => return report(&[format!("{what}: {e}")]),
     };
     let at_most = xtask::suite::at_most();
     // The engine reads the count as the suite's total, adding each pass's as it starts (fac-697).
-    let tests = xtask::suite::count(&binaries).map_or_else(String::new, |n| format!(" {n} tests,"));
+    let count = known_count.or_else(|| xtask::suite::count(&binaries));
+    let tests = count.map_or_else(String::new, |n| format!(" {n} tests,"));
     eprintln!("xtask: {what}: {} test binaries,{tests} {at_most} at a time", binaries.len());
     let failed = xtask::suite::run_all(&binaries, at_most);
     if !failed.is_empty() {
