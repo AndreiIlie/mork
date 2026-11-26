@@ -30,6 +30,7 @@ fn open_pr(pr_num: u64, title: &str, dest: &str, head: &Sha, review_requested: b
         title: title.into(),
         branch: format!("feat-{pr_num}"),
         head: head.clone(),
+        fork: false,
         ours: false,
         dest: dest.into(),
         updated: String::new(),
@@ -243,4 +244,41 @@ fn projects_identifies_each_forge() {
     let projects = result["projects"]["projects"].as_array().unwrap();
     assert_eq!(projects[0]["forge"], json!({"kind":"bitbucket","workspace":"ws","slug":"ex"}));
     assert_eq!(projects[1]["forge"], json!({"kind":"local"}));
+}
+
+#[test]
+fn github_forks_are_listed_and_cannot_enter_review() {
+    let mut sim = Sim::new();
+    let mut fork = open_pr(14, "tagged", "master", &sha("fork"), true);
+    fork.fork = true;
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![fork] });
+    assert_eq!(sim.state.world.open_prs["ex"][0].pr, 14);
+    for cmd in ["review", "review.merge"] {
+        assert!(sim.operator(json!({(cmd):{"project":"ex","pr":14}})).unwrap_err().message.contains("fork"));
+    }
+    assert!(sim.state.cards.is_empty());
+    assert!(sim.state.actions.is_empty());
+}
+
+#[test]
+fn a_refused_project_holds_and_recovers_only_its_own_fetch() {
+    let mut sim = Sim::new();
+    sim.config.projects.get_mut("web").unwrap().forge = sim.config.projects["ex"].forge.clone();
+    for project in ["ex", "web"] {
+        sim.apply(Event::TokenRead { project: project.into(), refused: Some("refused".into()) });
+        sim.apply(Event::OpenPrsRead {
+            project: project.into(),
+            prs: vec![open_pr(15, "fix", "master", &sha("tip"), false)],
+        });
+    }
+    sim.apply(Event::TokenRead { project: "ex".into(), refused: None });
+    let fetch = |project: &str| {
+        sim.state.actions.values().find(|a| matches!(&a.what,ActionWhat::Fetch {project:p,..} if p == project)).unwrap()
+    };
+    assert_eq!(fetch("ex").status, ActionStatus::Pending);
+    assert_eq!(fetch("web").status, ActionStatus::Held);
+    let open: Vec<_> =
+        sim.state.asks.values().filter(|a| a.open && a.kind == mork_types::ask::AskKind::Token).collect();
+    assert_eq!(open.len(), 1);
+    assert!(open[0].text.contains("web"));
 }

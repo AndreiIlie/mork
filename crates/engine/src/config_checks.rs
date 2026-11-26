@@ -59,9 +59,22 @@ fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError>
 
 fn check_projects(text: &str, config: &Config) -> Result<(), ConfigError> {
     for (name, p) in &config.projects {
-        if let mork_types::config::ForgeConfig::Bitbucket { review_tag: Some(tag), .. } = &p.forge
-            && tag.trim().is_empty()
-        {
+        if let mork_types::config::ForgeConfig::Github { token, approver, .. } = &p.forge {
+            let table = format!("projects.{name}.forge");
+            if !std::path::Path::new(token).is_absolute() {
+                return Err(ConfigError::Value {
+                    line: key_line(text, Some(&table), "token"),
+                    message: format!("project {name} forge.token must be an absolute path"),
+                });
+            }
+            if p.forge.merges_on_approval() && approver.as_deref().is_none_or(|s| s.trim().is_empty()) {
+                return Err(ConfigError::Value {
+                    line: key_line(text, Some(&table), "merge"),
+                    message: format!("project {name} forge.approver is required for approval merges"),
+                });
+            }
+        }
+        if p.forge.review_tag().is_some_and(|tag| tag.trim().is_empty()) {
             return Err(ConfigError::Value {
                 line: key_line(text, Some(&format!("projects.{name}.forge")), "review_tag"),
                 message: format!("project `{name}` `review_tag` must not be empty"),

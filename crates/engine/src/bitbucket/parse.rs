@@ -75,6 +75,7 @@ pub fn open_pr(p: &Value, me: Option<&str>) -> Option<OpenPr> {
         title: text("/title"),
         branch: text("/source/branch/name"),
         head: Sha::new(text("/source/commit/hash")),
+        fork: false,
         ours: me.is_some_and(|m| is_account(author, m)),
         dest: text("/destination/branch/name"),
         updated: text("/updated_on"),

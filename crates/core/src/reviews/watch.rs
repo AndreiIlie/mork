@@ -73,7 +73,7 @@ fn left(p: &mut Poster<'_>, project: &str, prs: &[OpenPr]) {
 fn review_open(p: &mut Poster<'_>, project: &str, prs: &[OpenPr], ctx: Ctx<'_>) {
     let tagged_project = ctx.config.projects.get(project).is_some_and(|c| c.forge.has_review_trigger());
     let mut fetch = false;
-    for pr in prs {
+    for pr in prs.iter().filter(|pr| !pr.fork) {
         crate::queue::approval::close_stale(p, project, pr);
         if ours(p, project, pr, ctx) {
             continue;

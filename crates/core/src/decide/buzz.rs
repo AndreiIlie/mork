@@ -375,6 +375,9 @@ fn merge_buzz(
         false => format!(
             "Merging {card} into {base} is the merge train's: once its gates pass its candidate is verified, its review round and its suite, and it lands from the merge queue's front; nothing lands on {base} on an agent's or an orchestrator's word. The operator's /merge in {card}'s room says where it stands."
         ),
+        true if !project.forge.merges_on_approval() => {
+            format!("The operator merges {card} into {base} by hand on {forge}.")
+        }
         true => format!(
             "Only the operator's approval on {forge} merges {card} into {base}: its PR is published once its gates pass and its candidate is verified, and his approval merges it while that verification stands on the approved head; nothing merges on an agent's or an orchestrator's word. The operator's /merge in {card}'s room says where it stands."
         ),

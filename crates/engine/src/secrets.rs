@@ -67,6 +67,12 @@ impl Secrets {
     pub fn gather(home: &Home, config: &Config, telemetry: &BTreeMap<String, String>) -> Self {
         let mut s = Self::default();
         crate::bitbucket::add_secrets(&mut s);
+        for path in config.projects.values().filter_map(|p| p.forge.token_path()) {
+            if let Ok(token) = crate::github::read_file(path) {
+                s.add("the GitHub token", &token);
+                s.add("the GitHub token", crate::github::git_header(&token).trim_start_matches("Basic "));
+            }
+        }
         for tickets in config.projects.values().filter_map(|p| p.tickets.as_ref()) {
             s.add_ticket_token(tickets);
         }
@@ -236,6 +242,7 @@ mod tests {
                     "mork": {}, "git": {"author": "Test <test@example.invalid>"},
                     "projects": {"example": {
                         "repo": dir, "board": {"kind": "markdown", "path": dir}, "test": "true",
+                        "forge": {"kind":"github","owner":"owner","repo":"repo","token":token},
                         "tickets": {"kind": "azure-devops", "api": "https://example.invalid/api",
                                    "page": "https://example.invalid/tickets/", "token": token}
                     }}
@@ -245,6 +252,9 @@ mod tests {
             };
             let configured = gather(&dir.join("pat"));
             let missing = gather(&dir.join("missing"));
+            let git = crate::github::git_header(PAT);
+            assert_eq!(configured.mask(&git), "Basic ‹secret›");
+            assert_eq!(configured.mask(&format!("Bearer {PAT}")), "Bearer ‹secret›");
             for pat in [PAT, LEGACY] {
                 let header = crate::azure::header(pat);
                 for text in [pat, &header, header.trim_start_matches("Basic ")] {

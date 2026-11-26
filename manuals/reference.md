@@ -34,7 +34,10 @@ When `hide` is `false`, none of those refuse anything; secret scanning and refus
 
 Each project requires a `[projects.<name>.board]` table with `kind = "markdown"` and `path` pointing to the folder that contains `backlog/`.
 An absent `[projects.<name>.forge]` table selects `local`.
-A forge with `kind = "bitbucket"` requires `workspace` and `slug` and accepts an optional `review_tag`.
+A forge with `kind = "bitbucket"` requires `workspace` and `slug` and accepts an optional `review_tag`. Bitbucket keeps the review token, its `approver=` line and the separate operator merge token.
+A forge with `kind = "github"` requires `owner`, `repo` and `token`, the absolute path to a file containing only its token. The engine uses it for Git and all API calls. Walls mask the configured file and logs redact the credential.
+Both hosted forges accept `merge = "manual"` (the default) or `merge = "approval"`. In manual mode the operator merges on the forge and the card lands when the poller reads the merge. To keep automatic merging on approval, existing Bitbucket projects must explicitly select `approval`.
+GitHub approval merges require `approver`, the operator’s login, and a token owned by a different account. Manual mode permits the operator's own token. GitHub also accepts `review_tag`. GitHub PRs from forks appear in `prs` and are excluded from review and merge.
 
 ### git_author
 
@@ -47,7 +50,7 @@ Projects that omit `git_author` and seats without a project use the required `[g
 In `mork.toml`, `backup = "origin"` in a `[projects.<name>.forge]` table with `kind = "local"` names a remote in the project's `repo` for a project without pull requests.
 After each local landing the engine pushes the current `refs/heads/<base>` to the same branch on that remote, never forced.
 The local base stays the base of record; no PR, API or token is used.
-Without `backup`, or on a Bitbucket project, nothing changes.
+Without `backup`, or on a hosted project, nothing changes.
 
 The push uses SSH's BatchMode and a two-minute time limit under the project's outward-action lock, so its next landing may wait for that attempt.
 Failure leaves the card done and the queue free once the attempt ends, with a held action and a red ask carrying git's words; `action.retry` runs it again.
@@ -111,7 +114,7 @@ In `mork.toml`, `[projects.<name>.tickets]` with `kind = "azure-devops"` require
 Every wall masks all projects' ticket token files.
 Log redaction and outward text checks use those same configured files.
 Projects with `tickets` parse ticket numbers from card notes and PRs, format PR titles, branches, descriptions and room details from them, and require a `PR wording` note before publishing a PR with tickets.
-`[projects.<name>.forge] review_tag` names a non-empty title substring that triggers automatic PR review into any destination branch on a Bitbucket project, rather than only its base branch.
+`[projects.<name>.forge] review_tag` names a non-empty title substring that triggers automatic PR review into any destination branch on a hosted project with an eligible source branch.
 
 ### claude_accounts
 
@@ -383,7 +386,7 @@ The configured projects, in the order their tables appear in `mork.toml`.
 
 Each entry in `projects.projects` has `name`, `base`, `prefix` (the board's card ID prefix), `local`, `forge` and `auto.on`.
 A local project has `local: true` and `forge: {"kind":"local"}`.
-A Bitbucket project has `local: false` and its `forge` holds `kind`, `workspace` and `slug`.
+A Bitbucket project has `local: false` and its `forge` holds `kind`, `workspace` and `slug`. A GitHub project also has `local: false` and exposes `kind`, `owner` and `repo`.
 A read.
 
 Example: `mork ctl projects`
@@ -762,7 +765,7 @@ Only the operator may, on both kinds of project.
 A full card starts verification automatically when its head's checks pass or when none are configured.
 The review round and whole suite run side by side, then the card enters its project's merge queue at the back.
 Only the front lands, as the `joins-and-the-train` skill says.
-On a repository with PRs only his approval on Bitbucket merges it, as the `bitbucket` skill says.
+On a repository with PRs its project’s forge merge setting applies, as the `pull-requests` skill says.
 Answers `{"merge": {"card", "landing", "ahead"}}`: its step (`none`; `queued`, `fetch`, `prepare` and `test` while it is being verified, `review` while its suite ended and its round runs; `passed`, verified and in the queue; `merge` landing; `published`, `approval` and `hand-merged` for its PR) and the cards of the merge queue before it, all of them while it is still being verified.
 Refused when it has no head that passed its checks, isn't ready, or (buzz) from anyone but the operator.
 
@@ -915,7 +918,7 @@ Example: `mork ctl pick ex-120/foreman --model claude-opus-5-5 --effort high`
 
 Closes a live card's run, with why.
 
-It is stopped, its asks close, its agents go (their sessions end), its head is kept and its clone removed; a PR stays as it is on Bitbucket.
+It is stopped, its asks close, its agents go (their sessions end), its head is kept and its clone removed; a PR stays as it is on its forge.
 Its board isn't changed: `card.close` does that.
 Answers `{"close": {"card"}}`.
 Refused when the card isn't live.
@@ -965,34 +968,34 @@ Example: `mork ctl demo ex-550`
 
 ### prs
 
-Open PRs for a project with `forge.kind` set to `bitbucket`, as the poller last read them.
+Open PRs for a project with `forge.kind` set to `bitbucket` or `github`, as the poller last read them.
 
-The poller reads every Bitbucket project's open PRs each `poll_seconds` (a minute by default), so a PR opened since its last read may be missing; they are the PRs `review` takes.
-How each gets its review card is the `bitbucket` skill's.
-Answers `{"prs": {"project", "prs": [{"pr", "title", "author", "source", "destination", "updated", "link"}]}}`: `source` and `destination` are its branches, `updated` Bitbucket's time of its last update, `link` its page on Bitbucket.
+The poller reads each hosted project's open PRs each `poll_seconds` (a minute by default), so a PR opened since its last read may be missing; they are the PRs `review` takes.
+How each gets its review card is the `pull-requests` skill's.
+Answers `{"prs": {"project", "prs": [{"pr", "title", "author", "source", "destination", "updated", "link"}]}}`: `source` and `destination` are its branches, `updated` the time of its last update, `link` its forge page.
 An empty list means none is open.
-Refused for an unknown project, a project not on Bitbucket, or one the poller hasn't read since Mork started.
+Refused for an unknown project, a project with a local forge, or one the poller hasn't read since Mork started.
 A read.
 
 Example: `mork ctl prs web`
 
 ### review
 
-Opens a review card for an open PR on a Bitbucket project, a colleague's or our own when no review of it is live: `pr-<project>-<n>`.
+Opens a review card for an open PR on a hosted project, a colleague's or our own when no review of it is live: `pr-<project>-<n>`.
 
 Its diff is against the PR's destination branch, its clone at the integrated candidate.
-It is verified off the merge queue, its round and its suite side by side; on a colleague's PR its findings, or “No findings.”, and a failed suite's comment are posted once both ended, while our own PR gets only “No findings.” when clean and its findings and failed suite go to its foreman alone, as the `bitbucket` and `review-cards` skills say.
+It is verified off the merge queue, its round and its suite side by side; on a colleague's PR its findings, or “No findings.”, and a failed suite's comment are posted once both ended, while our own PR gets only “No findings.” when clean and its findings and failed suite go to its foreman alone, as the `pull-requests` and `review-cards` skills say.
 Nothing merges from a review alone.
 Answers `{"review": {"card"}}`.
-Refused for a project not on Bitbucket, a PR not open as last read, or a review card already live.
+Refused for a project with a local forge, a PR not open as last read, or a review card already live.
 
 Example: `mork ctl review web 42`
 
 ### review.merge
 
-Opens a review card for an open PR, as `review` does, with the PR merged on the operator's approval on Bitbucket: the operator's alone.
+Opens a review card for an open PR, as `review` does, allowing its verified head to merge into its destination on the operator’s approval when the project uses approval merging.
 
-No review merges it, clean or not: only the operator's approval on Bitbucket does, as the `bitbucket` skill says.
+Manual projects wait for the operator to merge on the forge, as the `pull-requests` skill says.
 A merge refused is held for the operator.
 Answers `{"review.merge": {"card"}}`; buzzed from an agent; refused as `review` is.
 
@@ -1238,7 +1241,7 @@ For a backup push, each attempt sends the current local base tip, including comm
 Its asks close and it is pending again.
 A door call is never run again (its requester asks again).
 A merge's retry is a merge, and needs the operator's consent; a PR's checks again that his approval stands on its head.
-A held PR opening takes its wording as it is now, checked again: on a project with `tickets.kind` set to `azure-devops`, from the card's newest `PR wording` note (first line `PR wording`, then `Title: <summary>`, then `<ticket number>: <note>` lines; see the bitbucket skill).
+A held PR opening takes its wording as it is now, checked again: on a project with `tickets.kind` set to `azure-devops`, from the card's newest `PR wording` note (first line `PR wording`, then `Title: <summary>`, then `<ticket number>: <note>` lines; see the pull-requests skill).
 A card with tickets on such a project whose note lacks a summary or a ticket's note stays held, with what to write; no fallback is published.
 Any other card's title is the board title in a few words.
 A board note held with every attempt refused by its content check before anything was replaced is made again from the card's file as it is now, and written only over that content; any other board write keeps the content it was made from, and refuses again if the file changed, as does a note one of whose attempts may have written.

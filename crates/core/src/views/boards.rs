@@ -121,7 +121,7 @@ fn step_words(c: &Card, base: &str) -> String {
         Some(Landing::Passed(_)) => "verified, waiting to land".to_owned(),
         Some(Landing::HandMerged) => "merged outside Mork".to_owned(),
         Some(Landing::Published { .. }) => "published".to_owned(),
-        Some(Landing::Approval { .. }) => "its PR waiting for the operator's approval".to_owned(),
+        Some(Landing::Approval { .. }) => "waiting for its PR to merge".to_owned(),
         Some(Landing::Merge { .. }) => "merging its PR".to_owned(),
     }
 }

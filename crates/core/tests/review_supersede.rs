@@ -23,6 +23,7 @@ fn open_pr(pr: u64, head: &Sha) -> OpenPr {
         title: format!("PR {pr}"),
         branch: format!("feat-{pr}"),
         head: head.clone(),
+        fork: false,
         ours: false,
         dest: "master".into(),
         updated: String::new(),
@@ -123,6 +124,7 @@ fn fail_entry_round_one(sim: &mut Sim, rc: &str, h1: &Sha, c1: &Sha) {
         verdict_reply("review-fail", "Failed", vec![finding("src/a.rs", 10, "[reviewer-1] bug in a")]),
     );
     sim.suite(rc, 0);
+    assert!(sim.has_action(|w| matches!(w,mork_types::action::ActionWhat::Comment { source:Some(s),.. } if &s.head == h1 && &s.candidate == c1)));
     sim.settle_actions();
 }
 

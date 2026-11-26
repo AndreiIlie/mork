@@ -51,7 +51,7 @@ fn posted(
     });
     for body in result.into_iter().chain(failed) {
         let (id, repo) = (card.id.clone(), crate::queue::pr::repo_of(card, ctx.config));
-        let what = ActionWhat::Comment { card: id, pr, file: String::new(), line: 0, body, repo };
+        let what = ActionWhat::Comment { source: None, card: id, pr, file: String::new(), line: 0, body, repo };
         // Each finished run's result is its own, as a run finishes once: a retry is its same action.
         super::findings::comment(p, what, true);
     }
@@ -71,6 +71,9 @@ fn posted(
         (false, None) => format!("The review has no findings: PR {pr} gets one comment saying so."),
     };
     let forge = ctx.config.forge_label(&card.project);
+    if !ctx.config.projects.get(&card.project).is_some_and(|p| p.forge.merges_on_approval()) {
+        return Some(format!("{text} Merge the PR manually on {forge}."));
+    }
     Some(format!("{text} Only your approval on {forge} merges it, once its run passed on the head you approved."))
 }
 
@@ -81,7 +84,15 @@ fn ours(p: &mut Poster<'_>, card: &Card, pr: u64, failed: bool, ctx: Ctx<'_>) ->
         return None;
     }
     let (id, repo) = (card.id.clone(), crate::queue::pr::repo_of(card, ctx.config));
-    let what = ActionWhat::Comment { card: id, pr, file: String::new(), line: 0, body: NO_FINDINGS.to_owned(), repo };
+    let what = ActionWhat::Comment {
+        source: None,
+        card: id,
+        pr,
+        file: String::new(),
+        line: 0,
+        body: NO_FINDINGS.to_owned(),
+        repo,
+    };
     super::findings::comment(p, what, true);
     crate::queue::approval::notify_reviewed(p, card, ctx);
     Some(format!("The review of our PR {pr} has no findings: it gets one comment saying so."))

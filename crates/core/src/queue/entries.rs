@@ -140,7 +140,8 @@ pub fn conflicted(p: &mut Poster<'_>, mut c: Card, k: Candidate, purpose: &Purpo
         if let Some(pr) = c.pr {
             let body = format!("This PR conflicts with {into}: {why}.");
             let repo = super::pr::repo_of(&c, ctx.config);
-            let what = ActionWhat::Comment { card: c.id.clone(), pr, file: String::new(), line: 0, body, repo };
+            let what =
+                ActionWhat::Comment { source: None, card: c.id.clone(), pr, file: String::new(), line: 0, body, repo };
             crate::reviews::findings::comment(p, what, false);
         }
     }

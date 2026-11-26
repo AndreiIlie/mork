@@ -113,6 +113,9 @@ mod walled {
         }
         let mut rig = Rig::new();
         let token = rig.t.bin().join("ticket-token");
+        let github = rig.t.bin().join("github-token");
+        // An invalid credential keeps this wall test entirely offline.
+        std::fs::write(&github, "fixture secret").unwrap();
         std::fs::write(&token, "sample-ticket-secret").unwrap();
         let cfg = rig.config(&format!(
             r#"[projects.mork.tickets]
@@ -120,12 +123,19 @@ kind = "azure-devops"
 api = "https://example.invalid/api"
 page = "https://example.invalid/tickets/"
 token = "{}"
+[projects.mork.forge]
+kind = "github"
+owner = "fixture"
+repo = "fixture"
+token = "{}"
 "#,
-            token.display()
+            token.display(),
+            github.display()
         ));
         rig.write_config(&cfg);
-        let result = probe(&mut rig, json!({"read": [&token]}));
+        let result = probe(&mut rig, json!({"read": [&token,&github]}));
         assert_eq!(result["read"][token.display().to_string()], "READ ", "{result}");
+        assert_eq!(result["read"][github.display().to_string()], "READ ", "{result}");
     }
 
     const HIDDEN_NAMES: &[&str] = &[

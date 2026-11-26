@@ -374,8 +374,10 @@ fn write_change(tx: &rusqlite::Transaction<'_>, c: &Change) -> Result<()> {
             memory::write(tx, c)?;
         }
         // The token's verdict outlives a restart (3.7.2, M3.2).
-        Change::SetTokenRefused(project, Some(r)) => put_entity(tx, "forge-token", project, &serde_json::to_string(&(project,r))?)?,
-        Change::SetTokenRefused(project, None) => {
+        Change::SetTokenRefused { project, refused: Some(r) } => {
+            put_entity(tx, "forge-token", project, &serde_json::to_string(&(project, r))?)?
+        }
+        Change::SetTokenRefused { project, refused: None } => {
             tx.execute("DELETE FROM entities WHERE kind = 'forge-token' AND id = ?1", params![project.as_str()])?;
         }
         Change::SetBoard { .. } | Change::SetOpenPrs { .. } | Change::SetChecksFolder { .. } => {}

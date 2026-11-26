@@ -257,9 +257,13 @@ fn poll_now(
     verdicts: &super::verdict::Verdicts,
 ) {
     let (reads, owned, tickets, readers) = reads;
-    let send = |e: Event| { let _ = tx.send(Input::Event(Box::new(e))); };
+    let send = |e: Event| {
+        let _ = tx.send(Input::Event(Box::new(e)));
+    };
     for (name, p) in projects {
-        let asked = || { let _ = tx.send(Input::TokenAsked(name.clone())); };
+        let asked = || {
+            let _ = tx.send(Input::TokenAsked(name.clone()));
+        };
         let lock = locks.of(name);
         let held = lock.lock();
         let credential = match forge::Credential::read(&p.forge) {
@@ -269,10 +273,16 @@ fn poll_now(
                 asked();
                 continue;
             }
-            Err(_) => { asked(); continue; }
+            Err(_) => {
+                asked();
+                continue;
+            }
         };
         credential.pinned(|| {
-            let Ok(repo) = readers.read(&p.forge) else { asked(); return };
+            let Ok(repo) = readers.read(&p.forge) else {
+                asked();
+                return;
+            };
             let verdict = verdicts.of(name);
             match repo.identity() {
                 Ok(Identity::Known(refused)) => {
@@ -292,7 +302,9 @@ fn poll_now(
                 open_read((locks, readers), home, (name, p), prs, owned, &send);
             }
             for (card, _, pr) in reads.iter().filter(|(_, proj, _)| proj == name) {
-                if let Some(e) = pr_event((locks, readers), home, card, name, p, *pr, false) { send(e); }
+                if let Some(e) = pr_event((locks, readers), home, card, name, p, *pr, false) {
+                    send(e);
+                }
             }
         });
     }
@@ -310,7 +322,7 @@ fn open_read(
 ) {
     let watched: Vec<u64> = prs
         .iter()
-        .filter(|x| mork_core::reviews::watch::watched(p, &x.dest) && !owned.contains(&(name.clone(), x.pr)))
+        .filter(|x| !x.fork && mork_core::reviews::watch::watched(p, &x.dest) && !owned.contains(&(name.clone(), x.pr)))
         .map(|x| x.pr)
         .collect();
     send(Event::OpenPrsRead { project: name.clone(), prs });

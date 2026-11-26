@@ -135,6 +135,35 @@ fn a_published_pr_merges_on_its_approval() {
 }
 
 #[test]
+fn manual_pr_lands_after_the_operator_merges_it() {
+    let mut s = Sim::new();
+    s.config.projects.get_mut("ex").unwrap().forge = serde_json::from_value(json!({
+        "kind":"github","owner":"example","repo":"repo","token":"/token"
+    }))
+    .unwrap();
+    s.through_brief(PR, "ex");
+    s.built(PR, "h1", "base1");
+    verifying(&mut s, PR);
+    s.round_asked(PR);
+    s.round_ends(PR, &[], &[]);
+    s.suite(PR, 0);
+    assert!(!merge_asked(&s.pr_read(PR, true)));
+    assert!(s.state.asks.values().any(|a| a.open && a.text.contains("review and merge my PR on GitHub")));
+    let c = s.card(PR);
+    let seen = mork_types::work::PrSeen {
+        pr: 7,
+        state: mork_types::work::PrState::Merged,
+        approved: false,
+        head: c.pushed.unwrap(),
+        dest: Some("master".into()),
+        merge_commit: Some(sha("merged")),
+        merge_parents: vec![sha("base1"), sha("h1")],
+    };
+    s.apply(Event::PrRead { card: c.id, seen, before_merge: false });
+    assert_eq!(s.stage(PR), Stage::Done);
+}
+
+#[test]
 fn failed_checks_go_back_to_the_foreman() {
     let mut s = Sim::new();
     s.through_brief(LOCAL, "web");

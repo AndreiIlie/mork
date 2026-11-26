@@ -43,7 +43,8 @@ pub fn holds(c: &Card, project: &str, pr: u64) -> bool {
 pub fn own(p: &mut Poster<'_>, c: &Card, seen: &PrSeen, ctx: Ctx<'_>) {
     let Some(Landing::Approval { tree, base, commit, verified }) = c.landing.clone() else { return };
     let (Some(head), Some(cfg)) = (c.pushed.clone(), ctx.config.projects.get(&c.project)) else { return };
-    if !cfg.forge.merges_on_approval() || c.paused || !seen.approved || seen.dest.as_deref() != Some(cfg.base.as_str()) {
+    if !cfg.forge.merges_on_approval() || c.paused || !seen.approved || seen.dest.as_deref() != Some(cfg.base.as_str())
+    {
         return;
     }
     let base = if verified {
@@ -66,7 +67,12 @@ pub fn colleague(p: &mut Poster<'_>, c: &Card, seen: &PrSeen, ctx: Ctx<'_>) {
     let Some(cfg) = ctx.config.projects.get(&c.project) else { return };
     let asked = c.review.as_ref().is_some_and(|r| r.merge);
     let Some(into) = seen.dest.clone().filter(|d| asked || crate::reviews::watch::watched(cfg, d)) else { return };
-    if !cfg.forge.merges_on_approval() || c.paused || c.pr != Some(seen.pr) || seen.state != PrState::Open || !seen.approved {
+    if !cfg.forge.merges_on_approval()
+        || c.paused
+        || c.pr != Some(seen.pr)
+        || seen.state != PrState::Open
+        || !seen.approved
+    {
         return;
     }
     if owner(p.state, c.project.as_str(), seen.pr).is_some() {
@@ -197,7 +203,7 @@ pub fn conflicted(p: &mut Poster<'_>, mut a: Action, f: &ActionFailure, ctx: Ctx
     let ActionWhat::Merge { card, pr, head, repo, dest, .. } = a.what.clone() else { return };
     let into = dest.unwrap_or_else(|| MASTER.to_owned());
     let body = format!("Cannot merge this PR: it conflicts with {into} (at its head {}).", head.short());
-    p.act(ActionWhat::Comment { card: card.clone(), pr, file: String::new(), line: 0, body, repo });
+    p.act(ActionWhat::Comment { source: None, card: card.clone(), pr, file: String::new(), line: 0, body, repo });
     let pushed = |c: &Card| c.pushed.as_ref() == Some(&head);
     let (Some(c), Some(tip)) = (p.card(&card).filter(|c| waits(c) && pushed(c)), tip.clone()) else {
         return crate::decide::actions::hold(p, a, words);
@@ -248,19 +254,23 @@ pub fn wait(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
     let (id, project) = (c.id.clone(), c.project.clone());
     p.put_card(c.clone());
     let link = link(&c, pr, ctx);
+    let landing = if ctx.config.projects.get(&project).is_some_and(|p| p.forge.merges_on_approval()) {
+        "Your approval merges the verified head."
+    } else {
+        "Merge the PR manually on the forge."
+    };
     p.journal("pr.waiting", Some(id.as_str()), json!({"pr": pr}));
     if verified {
-        let words = format!(
-            "{id}'s PR {pr} is open in your name: {link}. Its review round and suite passed on this head; nothing merges it before your approval."
-        );
-        super::members::say(p, &id, "its PR is open and awaiting approval", &words);
+        let words =
+            format!("{id}'s PR {pr} is open: {link}. Its review round and suite passed on this head. {landing}");
+        super::members::say(p, &id, "its verified PR is open", &words);
         let repo = repo_of(&c, ctx.config);
         let body = crate::reviews::results::NO_FINDINGS.to_owned();
-        p.act_as(ActionWhat::Comment { card: id, pr, file: String::new(), line: 0, body, repo }, true);
+        p.act_as(ActionWhat::Comment { source: None, card: id, pr, file: String::new(), line: 0, body, repo }, true);
         notify_approval(p, &c, commit.as_ref(), ctx);
     } else {
         let words = format!(
-            "{id}'s PR {pr} is open in your name: {link}. Its review runs first: you are told once the review of this head finds nothing; nothing merges it before your approval."
+            "{id}'s PR {pr} is open: {link}. Its review runs first: you are told once the review of this head finds nothing. {landing}"
         );
         super::members::say(p, &id, "its PR is open and awaiting review", &words);
         if let Some(review) = p.card(&crate::reviews::cards::card_id(c.project.as_str(), pr)) {
@@ -316,8 +326,13 @@ fn notify_approval(p: &mut Poster<'_>, c: &Card, reviewed: Option<&Sha>, ctx: Ct
     }
     let forge = ctx.config.forge_label(&c.project);
     let (id, link) = (c.id.clone(), link(c, pr, ctx));
-    let verb = if ctx.config.projects.get(&c.project).is_some_and(|p| p.forge.merges_on_approval()) { "approve" } else { "merge" };
-    let words = format!("PR {pr} at {head} was reviewed with no findings. Please review and {verb} my PR on {forge}: {link}.");
+    let verb = if ctx.config.projects.get(&c.project).is_some_and(|p| p.forge.merges_on_approval()) {
+        "approve"
+    } else {
+        "merge"
+    };
+    let words =
+        format!("PR {pr} at {head} was reviewed with no findings. Please review and {verb} my PR on {forge}: {link}.");
     let stale: Vec<mork_types::AskId> = p
         .all_asks()
         .filter(|a| a.open && a.place == id.as_str() && a.kind == AskKind::ApprovePr && a.text != words)
@@ -332,7 +347,8 @@ fn notify_approval(p: &mut Poster<'_>, c: &Card, reviewed: Option<&Sha>, ctx: Ct
 /// Tracks the approval observed on our current pushed head, closing obsolete approval asks.
 pub fn approval_read(p: &mut Poster<'_>, c: &mut Card, seen: &PrSeen, ctx: Ctx<'_>) {
     let current = seen.state == PrState::Open && c.pushed.as_ref() == Some(&seen.head);
-    let approved = current && seen.approved && ctx.config.projects.get(&c.project).is_some_and(|p| p.forge.merges_on_approval());
+    let approved =
+        current && seen.approved && ctx.config.projects.get(&c.project).is_some_and(|p| p.forge.merges_on_approval());
     let was = c.gates.approved.clone().filter(|(h, _)| *h == seen.head);
     let next = approved.then(|| was.unwrap_or_else(|| (seen.head.clone(), p.now)));
     if c.gates.approved != next {

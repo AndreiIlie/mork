@@ -175,11 +175,11 @@ impl ForgeWrite for Client {
         .map_err(operator_result)
     }
 
-    fn comment(&self, pr: u64, file: &str, line: u64, body: &str) -> Result<Comment> {
-        calls::comment(&self.repo, pr, file, line, body)
+    fn comment(&self, pr: u64, post: crate::forge::CommentPost<'_>) -> Result<Comment> {
+        calls::comment(&self.repo, pr, post.file, post.line, post.body)
     }
 
-    fn reply(&self, pr: u64, parent: u64, body: &str) -> Result<Option<u64>> {
+    fn reply(&self, pr: u64, parent: u64, body: &str, _check: &dyn Fn(&str) -> Result<()>) -> Result<Option<u64>> {
         calls::reply(&self.repo, pr, parent, body)
     }
 
@@ -187,7 +187,7 @@ impl ForgeWrite for Client {
         calls::resolve(&self.repo, pr, comment)
     }
 
-    fn merge(&self, pr: u64) -> Result<String> {
+    fn merge(&self, pr: u64, _head: &str) -> Result<String> {
         calls::merge(&self.operator()?, pr, false).map_err(operator_result)
     }
 }

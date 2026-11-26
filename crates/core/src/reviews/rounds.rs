@@ -91,9 +91,14 @@ pub(super) fn request(
     out.push_str(&ruled(rc, &cloned.resolved));
     if super::gate::entry(rc) {
         out.push_str(&checks(rc, ours.is_none()));
+        let landing = if ctx.config.projects.get(&rc.project).is_some_and(|p| p.forge.merges_on_approval()) {
+            format!("The operator's approval on {forge} merges the verified head.")
+        } else {
+            format!("The operator merges the PR manually on {forge}.")
+        };
         match ours {
-            Some(ours) => out.push_str(&own_pr(rc, ours, forge)),
-            None => out.push_str(&colleague(rc, forge)),
+            Some(ours) => out.push_str(&own_pr(rc, ours, forge, &landing)),
+            None => out.push_str(&colleague(rc, forge, &landing)),
         }
         out.push_str(&ours_notes(state, subject, ours, ctx));
         if let Some(r) = rc.review.as_deref() {
@@ -237,13 +242,13 @@ fn standing_on(state: &State, c: &Card, id: &CardId) -> String {
 }
 
 // Our PR follows its specification and house rules, as our branch does (fac-220).
-fn own_pr(rc: &Card, ours: &Card, forge: &str) -> String {
+fn own_pr(rc: &Card, ours: &Card, forge: &str, landing: &str) -> String {
     let dest = rc.review.as_ref().and_then(|r| r.dest.as_deref()).unwrap_or("its base");
     let posting = format!(
         "Every run reports once its round and its suite both ended: your proven findings go back to its foreman to fix on its branch, never to {forge}, and a clean run posts only a comment saying No findings. on the PR. Unresolved findings and their reviewers stay for the next head."
     );
     let mut out = format!(
-        "\n\nThis is our card's PR {}, into {dest}, reviewed against {}'s specification and the repository's AGENTS.md like our branch card. {posting} Nothing merges it but the operator's approval on {forge}, once its run passed on the head he approved.",
+        "\n\nThis is our card's PR {}, into {dest}, reviewed against {}'s specification and the repository's AGENTS.md like our branch card. {posting} {landing}",
         rc.pr.unwrap_or_default(),
         ours.id
     );
@@ -449,11 +454,11 @@ pub fn under_way(rc: &Card) -> String {
 
 // What a colleague's review card's foreman is asked besides its candidate: where its verdict and
 // findings go, what it judges, and its orchestration.
-fn colleague(card: &Card, forge: &str) -> String {
+fn colleague(card: &Card, forge: &str, landing: &str) -> String {
     let dest = card.review.as_ref().and_then(|r| r.dest.as_deref()).unwrap_or("its base");
     let what = match card.pr {
         Some(pr) => format!(
-            "This is PR {pr}, into {dest}: once your round and its suite have both ended, your proven findings are posted as line comments, each the issue and its proof, or a comment saying No findings, and a failed suite's one comment beside them. The review closes after posting; its history, unresolved findings and their reviewers remain for the next eligible head. Nothing merges it but the operator's approval on {forge}, once its run passed on the head he approved."
+            "This is PR {pr}, into {dest}: once your round and its suite have both ended, your proven findings are posted as line comments, each the issue and its proof, or a comment saying No findings, and a failed suite's one comment beside them. The review closes after posting; its history, unresolved findings and their reviewers remain for the next eligible head. {landing}"
         ),
         None => format!(
             "This is a colleague's branch {}: your verdict and findings are reported to the operator; it has no PR.",

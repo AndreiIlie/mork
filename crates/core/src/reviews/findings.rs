@@ -105,11 +105,17 @@ fn same(x: &Raised, f: &Finding) -> bool {
     x.file == f.file && x.line == f.line && x.summary == f.summary
 }
 
+fn source(card: &Card, n: u32) -> Option<mork_types::action::CommentSource> {
+    let round = card.review.as_ref()?.rounds.iter().find(|r| r.n == n)?;
+    Some(mork_types::action::CommentSource { head: round.head.clone()?, candidate: round.commit.clone() })
+}
+
 fn ask_earlier(p: &mut Poster<'_>, card: &Card, x: &Raised, ctx: Ctx<'_>) {
     let Some(pr) = card.pr else { return };
     let f = Finding { file: x.file.clone(), line: x.line, summary: x.summary.clone(), proof: x.proof.clone() };
     let saved = x.action.as_ref().and_then(|id| p.action(id.as_str())).map(|a| a.what);
     let what = saved.filter(|w| matches!(w, ActionWhat::Comment { .. })).unwrap_or_else(|| ActionWhat::Comment {
+        source: source(card, x.round),
         card: card.id.clone(),
         pr,
         file: x.file.clone(),
@@ -294,6 +300,7 @@ fn post_findings(p: &mut Poster<'_>, card: &Card, ctx: Ctx<'_>) {
     let Some(pr) = card.pr else { return };
     for f in &card.findings {
         let what = ActionWhat::Comment {
+            source: source(card, run_round(card)),
             card: card.id.clone(),
             pr,
             file: f.file.clone(),

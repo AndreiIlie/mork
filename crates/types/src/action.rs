@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::ids::{CardId, Sha};
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommentSource {
+    pub head: Sha,
+    pub candidate: Sha,
+}
+
 /// What an action does, with what it needs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
@@ -32,6 +38,8 @@ pub enum ActionWhat {
     },
     /// Post a finding as an inline comment on a colleague's PR.
     Comment {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source: Option<CommentSource>,
         card: CardId,
         pr: u64,
         file: String,

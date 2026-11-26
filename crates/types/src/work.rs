@@ -258,6 +258,8 @@ pub enum PrState {
 pub struct OpenPr {
     #[serde(default)]
     pub review_requested: bool,
+    #[serde(default)]
+    pub fork: bool,
     pub pr: u64,
     pub author: String,
     pub title: String,

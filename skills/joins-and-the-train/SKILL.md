@@ -29,7 +29,7 @@ When that merge changes files its rounds approved, it leaves the queue to be ver
 The card's turns are held from its landing step until it lands, unless the queue waits on the operator.
 With `forge.backup` configured, each local landing also queues a non-forced push of the current base to that remote; its attempt may delay the next landing for up to two minutes, and failure leaves the card done with a held backup action.
 
-**On a repository with pull requests** our card is verified the same way before anything is published, then published as the "Bitbucket" skill says.
+**On a repository with pull requests** our card is verified the same way before anything is published, then published as the `pull-requests` skill says.
 A colleague's pull request and a branch review are verified the same way off the queue, on their destination's tip, and report once their round and their suite both ended; a branch review only reports, and never lands.
 
 **A join.**
@@ -46,7 +46,7 @@ On a delegated or self-sustained card, a failed review round with findings skips
 A failed suite with no failed review round, failed checks, or a failed round with no findings returns straight to the foreman; a conflict of its candidate returns as a join; the engine resolves none.
 The same goes for a failure or a conflict at the queue's front.
 Fixed and through its gates again, the card is verified again and enters the queue at its back.
-A colleague's pull request's results are posted as the "Bitbucket" skill says, a conflict as soon as it is known.
+A colleague's pull request's results are posted as the `pull-requests` skill says, a conflict as soon as it is known.
 
 **What can't be trusted holds the card:** a suite that couldn't run (exit 126 or 127, a signal, an exit the project's `infra_exits` lists, such as a test database down), an interrupted run, a checkout that changed under it, checks that can't be trusted.
 The card keeps its place, the queue's front holding the queue, a red ask says why, and only the operator's or an orchestrator's `resume` runs it again.

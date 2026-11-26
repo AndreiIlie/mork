@@ -303,7 +303,9 @@ impl Engine {
             self.hooks_send();
         }
         for (project, cfg) in &self.ctx.config.projects {
-            if cfg.forge.hosted() { self.pipe.verdict.of(project).follow(self.state.world.token_refused.get(project)); }
+            if cfg.forge.hosted() {
+                self.pipe.verdict.of(project).follow(self.state.world.token_refused.get(project));
+            }
         }
         for intent in &d.intents {
             self.carry_out(intent);

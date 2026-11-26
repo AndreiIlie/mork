@@ -104,7 +104,7 @@ While its card's mock is open, at brief once its baseline is built or at build o
 Mork's binary, builds, installed browsers and skills, your project's checks checkout and its data folder at `/data`, and your seat's credentials remain bound as before.
 
 A listed folder's `hide` names are shown empty and read-only wherever that folder is shown, `/data` included.
-Every wall masks every project's configured tickets token file wherever its folder is shown.
+Every wall masks every project's configured forge and tickets token files wherever its folder is shown.
 Each seat has a writable home of its own for its lifetime.
 A walled seat sees only its own home.
 Seats share the active CLI logins read-write so renewals reach every seat.
@@ -342,7 +342,7 @@ For that, it writes no script or harness of its own, starts no server, seeds no 
 A run outside it is a question to the operator first.
 
 **Only verification runs the suite:** before it, an agent tests only what it touched (`mork test --file <path>…` where the project has a one-file command, else `mork test --run <program> [arguments…]`) and runs the checks gate before it hands on (`mork test --checks`).
-The `joins-and-the-train` skill has its steps, the `bitbucket` skill what a repository with PRs does.
+The `joins-and-the-train` skill has its steps, the `pull-requests` skill what a repository with PRs does.
 
 ## Turns and sessions
 

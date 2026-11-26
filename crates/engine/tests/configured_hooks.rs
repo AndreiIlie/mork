@@ -74,6 +74,7 @@ url = "http://localhost:4001"
     assert_eq!(c.claude_accounts.get("work-1").map(String::as_str), Some("Claude · work"));
     let p = &c.projects["example.com"];
     assert!(p.forge.has_review_trigger());
+    assert!(!p.forge.merges_on_approval());
     let t = p.tickets.as_ref().unwrap();
     assert_eq!(t.api(), "https://example.invalid/org/proj/_apis/wit/workitems");
     assert_eq!(t.page(), "https://example.invalid/org/proj/_workitems/edit/");
@@ -258,4 +259,27 @@ fn provider_tables_are_strict() {
         assert!(parse_with(extra).is_err(), "{extra}");
     }
     assert!(parse(&BASE.replace(r#"{ kind = "markdown", path = "/b/example" }"#, r#""/b/example""#)).is_err());
+}
+
+#[test]
+fn github_forge_config_checks_credentials_and_merge_mode() {
+    let config = |token: &str, extra: &str| {
+        parse_with(&format!(
+            r#"[projects."example.com".forge]
+kind = "github"
+owner = "example"
+repo = "repo"
+token = "{token}"
+{extra}"#
+        ))
+    };
+    let manual = config("/token", "").unwrap();
+    let forge = &manual.projects["example.com"].forge;
+    assert!(!forge.merges_on_approval());
+    assert_eq!(forge.repo_key().as_deref(), Some("github.com/example/repo"));
+    assert!(config("relative", "").is_err());
+    assert!(config("/token", r#"review_tag = " ""#).is_err());
+    assert!(config("/token", r#"merge = "approval""#).is_err());
+    let approved = config("/token", "merge = \"approval\"\napprover = \"operator\"").unwrap();
+    assert!(approved.projects["example.com"].forge.merges_on_approval());
 }

@@ -123,7 +123,10 @@ pub enum Change {
         prefixes: BTreeMap<mork_types::ProjectId, String>,
     },
     /// The token's verdict (3.7.2): stored, and read again at each start.
-    SetTokenRefused(mork_types::ProjectId, Option<String>),
+    SetTokenRefused {
+        project: mork_types::ProjectId,
+        refused: Option<String>,
+    },
     /// A project's open PRs, as the poller read them: in memory only.
     SetOpenPrs {
         project: mork_types::ProjectId,
@@ -192,7 +195,7 @@ impl State {
                 self.apply_memory(c);
             }
             Change::SetBoard { .. }
-            | Change::SetTokenRefused(..)
+            | Change::SetTokenRefused { .. }
             | Change::SetOpenPrs { .. }
             | Change::SetChecksFolder { .. } => self.apply_world(c),
         }
@@ -231,8 +234,12 @@ impl State {
         if let Change::SetBoard { cards, prefixes } = c {
             self.board = cards.iter().map(|c| (c.id.clone(), c.clone())).collect();
             self.world.board_prefixes = prefixes.clone();
-        } else if let Change::SetTokenRefused(project, reason) = c {
-            if let Some(r) = reason { self.world.token_refused.insert(project.clone(), r.clone()); } else { self.world.token_refused.remove(project); }
+        } else if let Change::SetTokenRefused { project, refused: reason } = c {
+            if let Some(r) = reason {
+                self.world.token_refused.insert(project.clone(), r.clone());
+            } else {
+                self.world.token_refused.remove(project);
+            }
         } else if let Change::SetOpenPrs { project, prs } = c {
             self.world.open_prs.insert(project.clone(), prs.clone());
         } else if let Change::SetChecksFolder { project, commit } = c {

@@ -130,7 +130,7 @@ Nothing reviews a review card in turn.
    A passed round releases each reviewer with none of its findings left to verify; one with a finding open stays for it.
    A released reviewer receives no more messages: a later round's topic whose reviewer was released goes to a new reviewer.
 
-**A colleague's pull request or branch:** closure leaves the operator's approval on Bitbucket available.
+**A colleague's pull request or branch:** closure leaves the PR available for the operator’s manual merge or approval on its forge.
 A colleague's branch is reported to the operator once its round and suite both ended, and nothing lands it; asking again after a fix is a new round on the same card, your reviewers and their open findings kept.
 Post nothing yourself, merge nothing.
 Our card's branch gate ends with our card.

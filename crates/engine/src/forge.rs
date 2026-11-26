@@ -2,7 +2,7 @@ use mork_types::config::{ForgeConfig, ProjectConfig};
 use mork_types::review::Threads;
 use mork_types::work::{ActionFailure, OpenPr, PrSeen};
 
-use crate::bitbucket;
+use crate::{bitbucket, github};
 
 pub(crate) type Result<T> = std::result::Result<T, ActionFailure>;
 #[derive(Debug, Clone, Default)]
@@ -48,12 +48,21 @@ pub(crate) trait ForgeRead {
     fn threads(&self, pr: u64, ids: &[(u32, u64)]) -> Threads;
 }
 
+pub(crate) struct CommentPost<'a> {
+    pub file: &'a str,
+    pub line: u64,
+    pub body: &'a str,
+    pub head: Option<&'a str>,
+    pub inline: bool,
+    pub check: &'a dyn Fn(&str) -> Result<()>,
+}
+
 pub(crate) trait ForgeWrite {
     fn publish(&self, branch: &str, base: &str, text: (&str, &str), pr: Option<u64>) -> Result<u64>;
-    fn comment(&self, pr: u64, file: &str, line: u64, body: &str) -> Result<Comment>;
-    fn reply(&self, pr: u64, parent: u64, body: &str) -> Result<Option<u64>>;
+    fn comment(&self, pr: u64, post: CommentPost<'_>) -> Result<Comment>;
+    fn reply(&self, pr: u64, parent: u64, body: &str, check: &dyn Fn(&str) -> Result<()>) -> Result<Option<u64>>;
     fn resolve(&self, pr: u64, comment: u64) -> Result<bool>;
-    fn merge(&self, pr: u64) -> Result<String>;
+    fn merge(&self, pr: u64, head: &str) -> Result<String>;
 }
 
 fn local() -> ActionFailure {
@@ -64,6 +73,7 @@ impl Readers {
     pub(crate) fn read(&self, config: &ForgeConfig) -> Result<Box<dyn ForgeRead>> {
         match config {
             ForgeConfig::Local { .. } => Err(local()),
+            ForgeConfig::Github { .. } => Ok(Box::new(github::Client::new(config)?)),
             ForgeConfig::Bitbucket { workspace, slug, review_tag, .. } => {
                 Ok(Box::new(bitbucket::Reader::new(workspace, slug, review_tag.clone(), self.fulls.clone())?))
             }
@@ -74,6 +84,7 @@ impl Readers {
 pub(crate) fn write(config: &ForgeConfig) -> Result<Box<dyn ForgeWrite>> {
     match config {
         ForgeConfig::Local { .. } => Err(local()),
+        ForgeConfig::Github { .. } => Ok(Box::new(github::Client::new(config)?)),
         ForgeConfig::Bitbucket { workspace, slug, .. } => Ok(Box::new(bitbucket::Client::new(workspace, slug)?)),
     }
 }
@@ -81,30 +92,34 @@ pub(crate) fn write(config: &ForgeConfig) -> Result<Box<dyn ForgeWrite>> {
 pub(crate) fn source(project: &ProjectConfig) -> std::result::Result<(String, Vec<(String, String)>), String> {
     match &project.forge {
         ForgeConfig::Local { .. } => Ok((project.repo.clone(), Vec::new())),
+        ForgeConfig::Github { owner, repo, token, .. } => github::source(owner, repo, token),
         ForgeConfig::Bitbucket { workspace, slug, .. } => bitbucket::source(workspace, slug),
     }
 }
 
 pub(crate) enum Credential {
     Bitbucket(String),
+    Github(String),
 }
 
 impl Credential {
     pub fn read(config: &ForgeConfig) -> Result<Self> {
         match config {
             ForgeConfig::Local { .. } => Err(local()),
+            ForgeConfig::Github { token, .. } => github::read_file(token).map(Self::Github),
             ForgeConfig::Bitbucket { .. } => bitbucket::token_text().map(Self::Bitbucket),
         }
     }
 
     pub fn text(&self) -> &str {
         match self {
-            Self::Bitbucket(text) => text,
+            Self::Bitbucket(text) | Self::Github(text) => text,
         }
     }
 
     pub fn pinned<T>(&self, call: impl FnOnce() -> T) -> T {
         match self {
+            Self::Github(text) => github::pinned(text, call),
             Self::Bitbucket(text) => bitbucket::pinned(text.clone(), call),
         }
     }

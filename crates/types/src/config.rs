@@ -174,8 +174,25 @@ pub enum MergeMode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ForgeConfig {
-    Local { backup: Option<String> },
-    Bitbucket { workspace: String, slug: String, review_tag: Option<String>, #[serde(default)] merge: MergeMode },
+    Local {
+        backup: Option<String>,
+    },
+    Github {
+        owner: String,
+        repo: String,
+        token: String,
+        approver: Option<String>,
+        review_tag: Option<String>,
+        #[serde(default)]
+        merge: MergeMode,
+    },
+    Bitbucket {
+        workspace: String,
+        slug: String,
+        review_tag: Option<String>,
+        #[serde(default)]
+        merge: MergeMode,
+    },
 }
 
 impl Default for ForgeConfig {
@@ -186,7 +203,10 @@ impl Default for ForgeConfig {
 
 impl ForgeConfig {
     pub fn merges_on_approval(&self) -> bool {
-        matches!(self, Self::Bitbucket { merge: MergeMode::Approval, .. })
+        matches!(
+            self,
+            Self::Bitbucket { merge: MergeMode::Approval, .. } | Self::Github { merge: MergeMode::Approval, .. }
+        )
     }
 
     pub fn hosted(&self) -> bool {
@@ -197,13 +217,14 @@ impl ForgeConfig {
         match self {
             Self::Local { .. } => "local",
             Self::Bitbucket { .. } => "Bitbucket",
+            Self::Github { .. } => "GitHub",
         }
     }
 
     pub fn skill(&self) -> &'static str {
         match self {
             Self::Local { .. } => "joins-and-the-train",
-            Self::Bitbucket { .. } => "bitbucket",
+            Self::Bitbucket { .. } | Self::Github { .. } => "pull-requests",
         }
     }
 
@@ -211,6 +232,7 @@ impl ForgeConfig {
         match self {
             Self::Local { .. } => None,
             Self::Bitbucket { workspace, slug, .. } => Some(format!("{workspace}/{slug}")),
+            Self::Github { owner, repo, .. } => Some(format!("github.com/{owner}/{repo}")),
         }
     }
 
@@ -220,23 +242,39 @@ impl ForgeConfig {
             Self::Bitbucket { workspace, slug, .. } => {
                 Some(format!("https://bitbucket.org/{workspace}/{slug}/pull-requests/{pr}"))
             }
+            Self::Github { owner, repo, .. } => Some(format!("https://github.com/{owner}/{repo}/pull/{pr}")),
         }
     }
 
     pub fn has_review_trigger(&self) -> bool {
-        matches!(self, Self::Bitbucket { review_tag: Some(_), .. })
+        self.review_tag().is_some()
+    }
+
+    pub fn review_tag(&self) -> Option<&str> {
+        match self {
+            Self::Bitbucket { review_tag, .. } | Self::Github { review_tag, .. } => review_tag.as_deref(),
+            Self::Local { .. } => None,
+        }
+    }
+
+    pub fn token_path(&self) -> Option<&str> {
+        match self {
+            Self::Github { token, .. } => Some(token),
+            _ => None,
+        }
     }
 
     pub fn backup(&self) -> Option<&String> {
         match self {
             Self::Local { backup } => backup.as_ref(),
-            Self::Bitbucket { .. } => None,
+            Self::Bitbucket { .. } | Self::Github { .. } => None,
         }
     }
 
     pub fn project_view(&self) -> serde_json::Value {
         match self {
             Self::Local { .. } => serde_json::json!({"kind": "local"}),
+            Self::Github { owner, repo, .. } => serde_json::json!({"kind":"github", "owner":owner, "repo":repo}),
             Self::Bitbucket { workspace, slug, .. } => {
                 serde_json::json!({"kind":"bitbucket", "workspace":workspace, "slug":slug})
             }

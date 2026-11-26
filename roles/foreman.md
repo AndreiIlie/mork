@@ -100,8 +100,8 @@ Follow the editing limits in Delegating.
   Your open asks stay open: answer or withdraw them as at any time.
   The planner agrees a new plan, which you challenge as at any brief; with no planner, you recap it yourself.
   Its approve asks you to "Continue the build" from the new plan and the decisions recorded since; only a `built` from a turn that read that request submits.
-- **A join:** "Join the base" (a submitted head lacks the newest base tip the engine has seen, a peer landed on the card's files, the merge of the base into its candidate conflicted, or Bitbucket refused the operator's approved merge for its conflicts): merge the base in yourself.
-- **A PR** (a repository with PRs): the `bitbucket` skill has the flow.
+- **A join:** "Join the base" (a submitted head lacks the newest base tip the engine has seen, a peer landed on the card's files, the merge of the base into its candidate conflicted, or the forge refused the operator's approved merge for its conflicts): merge the base in yourself.
+- **A PR** (a repository with PRs): the `pull-requests` skill has the flow.
   The engine asks the operator to approve; you need not raise it.
 - **"Reword a comment":** a waking request carrying the refusal's reason when a PR comment is refused, asking you to reword the finding and post it again.
 - **The engine's updates:** an overlap with another card, a passed round, a change to the card's visual mode after approval (or at any stage on a no-planner full card) or to its delegation level on a no-planner full card, a report card or a review card.

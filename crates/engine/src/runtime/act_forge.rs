@@ -22,7 +22,7 @@ fn merge_as_operator(
     into: &str,
     head: &Sha,
 ) -> Result<Value, ActionFailure> {
-    match forge::write(&p.forge)?.merge(pr) {
+    match forge::write(&p.forge)?.merge(pr, head.as_str()) {
         Ok(hash) => Ok(verify(c, p, project, &hash, head)),
         Err(ActionFailure::Conflict { words, .. }) => {
             let (tip, files) = conflict(c, p, project, into, head);
@@ -87,7 +87,7 @@ pub fn run(c: &Call) -> Result<Value, ActionFailure> {
             check(c, description, "the PR's description")?;
             Ok(json!({"pr": forge::write(&p.forge)?.publish(branch, &p.base, (title, description), *pr)?}))
         }
-        ActionWhat::Comment { pr, file, line, body, .. } => {
+        ActionWhat::Comment { pr, file, line, body, source, .. } => {
             let k = c.card()?;
             let at = if file.is_empty() {
                 "the comment on the PR".to_owned()
@@ -95,13 +95,27 @@ pub fn run(c: &Call) -> Result<Value, ActionFailure> {
                 format!("the comment at {file}:{line}")
             };
             check(c, body, &at)?;
-            let posted = forge::write(&c.project(&k.project)?.forge)?.comment(*pr, file, *line, body)?;
+            let cfg = c.project(&k.project)?.forge;
+            let source = source.as_ref();
+            let inline = matches!(cfg, mork_types::config::ForgeConfig::Github { .. })
+                && source.is_some_and(|s| same_lines(c, &k.project, s, file));
+            let post = forge::CommentPost {
+                file,
+                line: *line,
+                body,
+                head: source.map(|s| s.head.as_str()),
+                inline,
+                check: &|text| check(c, text, &at),
+            };
+            let posted = forge::write(&cfg)?.comment(*pr, post)?;
             Ok(landing(&posted, file, *line))
         }
         ActionWhat::ReplyComment { pr, comment, body, .. } => {
             let k = c.card()?;
             check(c, body, "the reply on the PR")?;
-            Ok(json!({"id": forge::write(&c.project(&k.project)?.forge)?.reply(*pr, *comment, body)?}))
+            Ok(
+                json!({"id": forge::write(&c.project(&k.project)?.forge)?.reply(*pr, *comment, body, &|text| check(c, text, "the reply on the PR"))?}),
+            )
         }
         // Nothing of ours is sent: the comment's id alone, its thread resolved as the review bot posted it.
         ActionWhat::ResolveComment { pr, comment, .. } => {
@@ -125,6 +139,15 @@ pub fn run(c: &Call) -> Result<Value, ActionFailure> {
         | ActionWhat::RemoveTrain { .. }
         | ActionWhat::Door(_) => Err(failed("not a forge action")),
     }
+}
+
+fn same_lines(c: &Call, project: &str, source: &mork_types::action::CommentSource, file: &str) -> bool {
+    if source.head == source.candidate {
+        return true;
+    }
+    let Ok(m) = c.mirror(project) else { return false };
+    let contents = |at: &Sha| mirror::contents_at(&c.home, &m, at.as_str(), &[file]).ok();
+    contents(&source.head).is_some_and(|head| Some(head) == contents(&source.candidate))
 }
 
 // Never forced, and only after the checks of what it adds.

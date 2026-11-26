@@ -19,6 +19,7 @@ pub mod faults;
 pub mod files;
 mod forge;
 pub mod git;
+mod github;
 pub mod jobs;
 mod lock;
 pub mod login_files;

@@ -152,7 +152,9 @@ impl Engine {
         if what.is_some_and(board_write) {
             return self.run_action_now(id);
         }
-        if let Some(action) = self.state.actions.get(id).filter(|a| super::act_run::reaches_forge(&self.ctx.config, &a.what)) {
+        if let Some(action) =
+            self.state.actions.get(id).filter(|a| super::act_run::reaches_forge(&self.ctx.config, &a.what))
+        {
             let project = project_of(self, &action.what);
             if !self.pipe.token_asked.contains(&project) {
                 self.pipe.token_wait.entry(project).or_default().push(id.into());

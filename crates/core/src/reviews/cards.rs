@@ -38,6 +38,9 @@ pub(super) fn review(state: &State, project: &str, n: u64, merge: bool, ctx: Ctx
     let Some(pr) = state.world.open_prs.get(project).and_then(|all| all.iter().find(|x| x.pr == n)).cloned() else {
         return Decision::refused(format!("PR {n} isn't open on {project} as the poller last read it"));
     };
+    if pr.fork {
+        return Decision::refused(format!("PR {n} is from a fork: only branches in {project} can be reviewed"));
+    }
     let id = card_id(project, n);
     if state.cards.get(&id).is_some_and(|c| c.stage.is_live()) {
         return Decision::refused(format!("{id} is live already"));

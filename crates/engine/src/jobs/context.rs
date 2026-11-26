@@ -276,8 +276,14 @@ impl Context {
         let accounts = self.home.login_home().join(".claude/accounts");
         let mut hidden =
             vec![files::HiddenPath { path: std::fs::canonicalize(&accounts).unwrap_or(accounts), directory: true }];
-        for tickets in self.config.projects.values().filter_map(|p| p.tickets.as_ref()) {
-            let path = Path::new(tickets.token());
+        let tokens = self
+            .config
+            .projects
+            .values()
+            .flat_map(|p| [p.forge.token_path(), p.tickets.as_ref().map(|t| t.token())])
+            .flatten();
+        for token in tokens {
+            let path = Path::new(token);
             match std::fs::canonicalize(path) {
                 Ok(path) if path.is_file() => hidden.push(files::HiddenPath { path, directory: false }),
                 Ok(_) => {}
