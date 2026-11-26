@@ -361,7 +361,11 @@ Held reports wake it once when the last child at work stops.
 Your session keeps its context from turn to turn until it ends; a restart or a reload of Mork doesn't end it, `fresh` does.
 A session's start gives you this manual, your role's, who you are, the reply contract, your card and your context; each later turn gives where the card stands, what is live, the news since your last turn and a reminder of the reply.
 A planner's or foreman's later turn repeats a standing section, its plan and the reply's reminder only when changed or after compaction: one left out still stands.
-Every turn says how full your context is: when it is heavy, finish what is in hand and make yourself fresh (`mork ctl fresh <your key>`), your judgement, not a threshold.
+Every turn reports the context size when known.
+Any seat can finish its work in hand and use `mork ctl fresh <your key>`.
+A full card’s foreman automatically starts fresh when taking a fix or “Join the base” request if its session has compacted or its stored usage exceeds `[mork] fresh_context_percent` of its effective window (default 70%).
+Setting the percentage to zero leaves the compaction trigger active.
+The new session receives the current card, approved plan, standing decisions and pending request.
 
 ## When things go wrong
 

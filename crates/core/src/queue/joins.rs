@@ -10,7 +10,7 @@ use mork_types::{CardId, Sha};
 use serde_json::json;
 
 use crate::decide::{Ctx, Intent};
-use crate::messages::requests::{ask_agent, tell_agent};
+use crate::messages::requests::{ask_fix_or_join, tell_agent};
 use crate::post::Poster;
 use crate::state::Change;
 
@@ -126,7 +126,7 @@ fn fix_request(p: &mut Poster<'_>, mut c: Card, said: &str) {
     let Some(f) = c.fix_import.take() else { return };
     p.put_card(c.clone());
     let text = format!("{}\n\n{said}", f.text);
-    ask_agent(p, &c.id, Role::Foreman, &f.headline, &text);
+    ask_fix_or_join(p, &c.id, &f.headline, &text);
 }
 
 /// Reimports after a stopped import settles, unless its card is paused (fac-97).
@@ -211,7 +211,7 @@ fn request(p: &mut Poster<'_>, c: &Card, j: &Join) {
         "{}. Join the base now: {b}'s tip {tip} is in its clone as origin/{b}, already fetched: the clone has no remote to fetch from. Once it is joined and its checks pass, it is verified again and enters the merge queue at its back. The `joins-and-the-train` skill has how.",
         j.why.trim_end_matches('.')
     );
-    ask_agent(p, &c.id, Role::Foreman, "Join the base", &text);
+    ask_fix_or_join(p, &c.id, "Join the base", &text);
 }
 
 /// Schedules imports for overlapping live peers after a landing, deferring join requests until import.

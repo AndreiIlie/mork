@@ -135,16 +135,27 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
             message: "`max_test_runs` must be a whole number from 1".into(),
         });
     }
-    if config.mork.context_cap != 0 && !(CONTEXT_CAP_MIN..=CONTEXT_CAP_MAX).contains(&config.mork.context_cap) {
+    context_settings(text, &config.mork)?;
+    crate::config_checks::caches(text, &mut config.mork)?;
+    slice(text, &config.slice)?;
+    crate::config_checks::check(text, &config)?;
+    Ok(config)
+}
+
+fn context_settings(text: &str, settings: &mork_types::config::MorkConfig) -> Result<(), ConfigError> {
+    if settings.context_cap != 0 && !(CONTEXT_CAP_MIN..=CONTEXT_CAP_MAX).contains(&settings.context_cap) {
         return Err(ConfigError::Value {
             line: key_line(text, Some("mork"), "context_cap"),
             message: format!("`context_cap` must be 0 or between {CONTEXT_CAP_MIN} and {CONTEXT_CAP_MAX}"),
         });
     }
-    crate::config_checks::caches(text, &mut config.mork)?;
-    slice(text, &config.slice)?;
-    crate::config_checks::check(text, &config)?;
-    Ok(config)
+    if settings.fresh_context_percent > 100 {
+        return Err(ConfigError::Value {
+            line: key_line(text, Some("mork"), "fresh_context_percent"),
+            message: "`fresh_context_percent` must be a whole percentage from 0 to 100".into(),
+        });
+    }
+    Ok(())
 }
 
 // The baseline seat writes a clone before any approve (fac-636), and agy approves its tools unasked (fac-657): their
@@ -379,6 +390,19 @@ mod tests {
             };
             assert_eq!(line, 3);
             assert!(message.contains("context_cap"), "{message}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn fresh_context_percent_accepts_whole_percentages_including_zero() -> Result<(), ConfigError> {
+        let config = |setting: &str| parse(&format!("[mork]\n{setting}\n[git]\nauthor = \"A <a@b>\"\n"));
+        assert_eq!(config("")?.mork.fresh_context_percent, 70);
+        for value in [0, 25, 100] {
+            assert_eq!(config(&format!("fresh_context_percent = {value}"))?.mork.fresh_context_percent, value);
+        }
+        for bad in ["-1", "101", "70.5"] {
+            assert!(config(&format!("fresh_context_percent = {bad}")).is_err());
         }
         Ok(())
     }

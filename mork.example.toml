@@ -15,6 +15,7 @@ caches = [".cargo/registry", ".npm/_cacache"]
 cache_files = [".cargo/.package-cache", ".cargo/.package-cache-mutate"]
 env = { RUSTUP_HOME = "/home/you/.rustup" }
 context_cap = 400000
+fresh_context_percent = 70
 max_test_runs = 4
 web_port = 41900
 web_assets = "/path/to/mork/web/dist"

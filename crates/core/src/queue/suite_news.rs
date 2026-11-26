@@ -47,6 +47,9 @@ fn pointed(text: &str, path: &str) -> String {
 fn deliver(p: &mut Poster<'_>, told: Told) {
     match told {
         Told::Operator { card, text } => crate::reviews::cards::to_operator(p, &card, &text),
+        Told::Agent { card, role: mork_types::reply::Role::Foreman, headline, text } => {
+            crate::messages::requests::ask_fix_or_join(p, &card, &headline, &text);
+        }
         Told::Agent { card, role, headline, text } => {
             crate::messages::requests::ask_agent(p, &card, role, &headline, &text);
         }

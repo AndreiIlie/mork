@@ -10,6 +10,40 @@ use crate::messages::places::{self, MAIN};
 use crate::post::Poster;
 use crate::state::{Change, State};
 
+/// Consumes a fix or join only on the wake that reads it, after any in-flight turn settles.
+pub(super) fn at_boundary(state: &State, a: &mut Agent, ctx: Ctx<'_>) {
+    if !matches!(a.owed, Some(Owed::Wake)) {
+        return;
+    }
+    let Some(seq) = a.fix_or_join.take() else { return };
+    if seq < a.seen || !super::prompt::resumes(a) {
+        return;
+    }
+    let Some(card) = state.cards.get(a.place.as_str()) else { return };
+    if card.mode != mork_types::card::Mode::Full {
+        return;
+    }
+    if a.ran.compacted || above_threshold(ctx.config, a) {
+        let fresh = Fresh {
+            replaces: a.session.clone(),
+            by: Sender::Engine.label(),
+            at: ctx.now,
+            pending: false,
+            vendor: None,
+        };
+        replace(state, a, fresh);
+    }
+}
+
+fn above_threshold(config: &mork_types::config::Config, a: &Agent) -> bool {
+    let percent = config.mork.fresh_context_percent;
+    let Some(context) = super::costs::stored_context(config, a) else { return false };
+    percent > 0
+        && context
+            .window
+            .is_some_and(|window| u128::from(context.used) * 100 > u128::from(window) * u128::from(percent))
+}
+
 /// `fresh <agent>`: a key (`ex-550/foreman`), or a name for main's agent (`echo`), whoever
 /// sends it (3.6.3). A turn running ends in the old session; the next starts the new one.
 pub(super) fn fresh(state: &State, from: &Sender, name: &str, ctx: Ctx<'_>) -> Decision {

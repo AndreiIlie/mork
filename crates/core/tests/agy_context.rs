@@ -76,6 +76,77 @@ fn wake_planner_from_foreman(s: &mut Sim, text: &str) {
     .unwrap();
 }
 
+fn approved_agy_card() -> Sim {
+    let mut s = start_agy_card(true);
+    run_agy_turn(&mut s, FOREMAN, recap_reply(), agy_session("conv-1"));
+    s.operator(json!({"approve": {"card": CARD}})).unwrap();
+    s.settle_actions();
+    s
+}
+
+#[test]
+fn checks_fix_starts_fresh_only_above_the_configured_percentage() {
+    let mut s = approved_agy_card();
+    s.built(CARD, "h1", "base1");
+    s.checks(CARD, 1, &[json!({"file": "src/a.rs", "line": 1, "summary": "Bad value", "proof": "Mismatch"})]);
+    s.state.board.get_mut(CARD).unwrap().description =
+        "operator 01.01: Decision: Current rule.\noperator 01.01: Discarded discussion.\n\nCurrent card body.".into();
+    let plan = |s: &Sim| turns::plan(&s.state, &AgentKey::new(FOREMAN), s.ctx(), false).unwrap();
+    for (percent, used, resume) in [
+        (70, None, true),
+        (70, Some(140_000), true),
+        (0, Some(160_000), true),
+        (80, Some(160_000), true),
+        (80, Some(160_001), false),
+    ] {
+        s.config.mork.fresh_context_percent = percent;
+        s.state.agents.get_mut(FOREMAN).unwrap().context = used;
+        assert_eq!(plan(&s).resume, resume, "{percent}% with {used:?} tokens");
+    }
+    s.config.mork.context_cap = 0;
+    assert!(plan(&s).resume, "agy supplied usage but no window");
+    s.config.mork.context_cap = 200_000;
+    let (job, prompt) = s.turn_started_with_argv(FOREMAN, AGY_ARGV);
+    assert!(s.state.jobs[&job].opening);
+    assert!(s.state.agents[FOREMAN].session.is_none());
+    assert_has_all(
+        &prompt,
+        &["Stage: build", "Current card body.", PLAN_TEXT, "Current rule.", "Bad value", "Mismatch"],
+    );
+    assert!(!prompt.contains("Discarded discussion."));
+}
+
+#[test]
+fn compaction_survives_intervening_turns_until_the_join_request_is_taken() {
+    let mut s = approved_agy_card();
+    s.config.mork.fresh_context_percent = 0;
+    run_agy_turn(
+        &mut s,
+        FOREMAN,
+        reply("working", "Building"),
+        SessionSeen { compacted: true, ..agy_session("conv-1") },
+    );
+    s.operator(json!({"say": {"place": CARD, "text": "Continue."}})).unwrap();
+    s.tip = "base2";
+    let turn = run_agy_turn(&mut s, FOREMAN, reply("built", "Built"), agy_session("conv-1"));
+    assert!(turn.contains("# Current card specification") && !turn.contains("This session is fresh:"));
+    s.take(CARD, "h1", "base1", &["src/a.rs"]);
+    s.operator(json!({"say": {"place": CARD, "text": "Which files changed?"}})).unwrap();
+    let (job, before_join) = s.turn_started_with_argv(FOREMAN, AGY_ARGV);
+    assert!(!before_join.contains("This session is fresh:"));
+    s.imported(CARD);
+    assert_eq!(s.state.agents[FOREMAN].session.as_deref(), Some("conv-1"));
+    s.apply(Event::JobEnded {
+        id: job,
+        end: JobEnd::Finished { reply: Ok(reply("working", "Answered")), session: agy_session("conv-1") },
+    });
+    let resumed = run_agy_turn(&mut s, FOREMAN, reply("working", "Joining"), agy_session("conv-2"));
+    assert_has_all(&resumed, &["This session is fresh: it replaces session `conv-1`", PLAN_TEXT, "Join the base now"]);
+    let agent = &s.state.agents[FOREMAN];
+    assert!(!agent.ran.compacted && agent.fix_or_join.is_none());
+    assert_eq!(agent.session.as_deref(), Some("conv-2"));
+}
+
 #[test]
 fn agy_holds_standing_sections_across_resumes_and_resends_after_compaction() {
     let mut s = start_agy_card(true);
