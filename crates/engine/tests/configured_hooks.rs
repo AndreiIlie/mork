@@ -311,6 +311,9 @@ token = "{token}"
     assert!(config("relative", "").is_err());
     assert!(config("/token", r#"review_tag = " ""#).is_err());
     assert!(config("/token", r#"merge = "approval""#).is_err());
-    let approved = config("/token", "merge = \"approval\"\napprover = \"operator\"").unwrap();
+    assert!(config("/token", "merge = \"approval\"\napprover = \"  \"").is_err());
+    let approved = config("/token", "merge = \"approval\"\napprover = \"  operator \"").unwrap();
     assert!(approved.projects["example.com"].forge.merges_on_approval());
+    assert!(matches!(&approved.projects["example.com"].forge,
+        mork_types::config::ForgeConfig::Github { approver: Some(login), .. } if login == "operator"));
 }

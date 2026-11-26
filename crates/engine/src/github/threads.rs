@@ -22,13 +22,14 @@ fn graphql(client: &Client, query: &str, variables: Value) -> Result<Value> {
     Ok(body)
 }
 
-pub(super) fn root_id(thread: &Value) -> Result<u64> {
-    let id = &thread["comments"]["nodes"][0]["fullDatabaseId"];
-    let raw = id
-        .as_u64()
-        .or_else(|| id.as_str()?.parse().ok())
-        .ok_or_else(|| failed("GitHub thread lacks its root comment"))?;
-    comments::key(raw, false)
+pub(super) fn index_page(threads: &Value, out: &mut BTreeMap<u64, Value>) -> Result<()> {
+    for thread in threads["nodes"].as_array().ok_or_else(|| failed("Missing GitHub review threads"))? {
+        let id = &thread["comments"]["nodes"][0]["fullDatabaseId"];
+        if let Some(raw) = id.as_u64().or_else(|| id.as_str()?.parse().ok()) {
+            out.insert(comments::key(raw, false)?, thread.clone());
+        }
+    }
+    Ok(())
 }
 
 fn roots(client: &Client, pr: u64) -> Result<BTreeMap<u64, Value>> {
@@ -37,9 +38,7 @@ fn roots(client: &Client, pr: u64) -> Result<BTreeMap<u64, Value>> {
     loop {
         let response = graphql(client, QUERY, json!({"owner":client.owner,"repo":client.repo,"pr":pr,"after":after}))?;
         let threads = &response["data"]["repository"]["pullRequest"]["reviewThreads"];
-        for t in threads["nodes"].as_array().ok_or_else(|| failed("Missing GitHub review threads"))? {
-            out.insert(root_id(t)?, t.clone());
-        }
+        index_page(threads, &mut out)?;
         if threads["pageInfo"]["hasNextPage"] == false {
             return Ok(out);
         }

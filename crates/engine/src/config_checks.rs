@@ -6,7 +6,7 @@ use mork_types::config::Config;
 
 use crate::config::{ConfigError, key_line, table_line};
 
-pub(crate) fn check(text: &str, config: &Config) -> Result<(), ConfigError> {
+pub(crate) fn check(text: &str, config: &mut Config) -> Result<(), ConfigError> {
     check_skills(text, config)?;
     check_claude_accounts(text, config)?;
     check_domains(text, "mork", &config.mork.domains)?;
@@ -68,9 +68,10 @@ fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError>
     Ok(())
 }
 
-fn check_projects(text: &str, config: &Config) -> Result<(), ConfigError> {
-    for (name, p) in &config.projects {
-        if let mork_types::config::ForgeConfig::Github { token, approver, .. } = &p.forge {
+fn check_projects(text: &str, config: &mut Config) -> Result<(), ConfigError> {
+    for (name, p) in &mut config.projects {
+        let approval = p.forge.merges_on_approval();
+        if let mork_types::config::ForgeConfig::Github { token, approver, .. } = &mut p.forge {
             let table = format!("projects.{name}.forge");
             if !std::path::Path::new(token).is_absolute() {
                 return Err(ConfigError::Value {
@@ -78,7 +79,8 @@ fn check_projects(text: &str, config: &Config) -> Result<(), ConfigError> {
                     message: format!("project {name} forge.token must be an absolute path"),
                 });
             }
-            if p.forge.merges_on_approval() && approver.as_deref().is_none_or(|s| s.trim().is_empty()) {
+            *approver = approver.as_deref().map(|s| s.trim().to_owned());
+            if approval && approver.as_deref().is_none_or(str::is_empty) {
                 return Err(ConfigError::Value {
                     line: key_line(text, Some(&table), "merge"),
                     message: format!("project {name} forge.approver is required for approval merges"),

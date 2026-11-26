@@ -28,7 +28,8 @@ pub(super) fn parse(row: &Value, issue: bool) -> Result<Comment> {
     let inline = row["path"]
         .as_str()
         .map(|p| Anchor { path: Some(p.into()), line: row["line"].as_u64().or_else(|| row["original_line"].as_u64()) });
-    if (issue || row["subject_type"] == "file")
+    if parent.is_none()
+        && (issue || row["subject_type"] == "file")
         && let Some((prefix, rest)) = body.split_once("\n\n")
     {
         if let Some(raw) = prefix
