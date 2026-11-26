@@ -4,6 +4,9 @@
 # Optional: set `project = "mork"` only if you are developing Mork itself
 # (enables self-rebuilds and two-phase wall verification on Mork's own repo).
 
+# Model requests and login refresh for Claude Code and Codex with ChatGPT sign-in.
+domains = ["api.anthropic.com", "platform.claude.com", "chatgpt.com", "auth.openai.com"]
+
 # Bound read-only into every sandbox wall; each `bin` joins PATH in order.
 toolchains = [
   { path = "/usr/local", bin = "bin" },
@@ -23,10 +26,10 @@ web_assets = "/path/to/mork/web/dist"
 [git]
 author = "Your Name <you@example.com>"
 
-# Cross-family seat roster: different model families plan, build, and review.
+# The planner and reviewers use Codex. The work foreman uses Claude.
 [seats.planner]
-cli = "claude"
-model = "claude-opus-4-5"
+cli = "codex"
+model = "gpt-5.3-codex"
 effort = "high"
 
 [seats.foreman]
@@ -51,6 +54,8 @@ repo = "/path/to/my-app"
 base = "main"
 board = { kind = "markdown", path = "/path/to/my-app-board" }
 forge = { kind = "local" }
+# npm and Cargo registries for this project's builds.
+domains = ["registry.npmjs.org", "index.crates.io", "static.crates.io"]
 slots = 3
 test = "cargo test"
 # Optional:
