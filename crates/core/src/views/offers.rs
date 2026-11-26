@@ -3,12 +3,13 @@
 
 use mork_types::about::{Switch, SwitchPosition};
 use mork_types::ask::{Ask, AskKind};
-use mork_types::card::{Card, Mode, Stage};
+use mork_types::card::{Card, Mode};
 use mork_types::state::{Agent, Sender};
 use mork_types::view::Offer;
 use mork_types::{AgentKey, CardId, Command};
 
 use crate::decide::{Ctx, Event, decide};
+use crate::lifecycle::carried::restart_carries;
 use crate::messages::places::{self, MAIN};
 use crate::state::State;
 
@@ -74,7 +75,7 @@ fn card_actions(state: &State, card: &CardId, ctx: Ctx<'_>) -> Vec<Offer> {
         ("merge", Command::Merge { card: c() }),
         ("done", Command::Done { card: c() }),
         ("post", Command::Post { card: c() }),
-        ("start", start_command(card, None, restart_carries(state.cards.get(card)))),
+        ("start", start_command(card, None, restart_carries(state, card, ctx))),
     ];
     candidates.into_iter().filter(|(_, cmd)| accepted(state, cmd, ctx)).map(|(l, cmd)| offer(l, cmd)).collect()
 }
@@ -199,13 +200,6 @@ fn session_missing<'s, 'a>(agent: impl Fn(&AgentKey) -> Option<&'s Agent>, ask: 
     missing.then_some(k)
 }
 
-fn restart_carries(prior: Option<&Card>) -> Vec<CardId> {
-    prior
-        .filter(|c| c.stage != Stage::Done)
-        .map(|c| c.carries.iter().map(|k| k.id.clone()).collect())
-        .unwrap_or_default()
-}
-
 fn start_command(card: &CardId, mode: Option<Mode>, carries: Vec<CardId>) -> Command {
     Command::Start {
         card: card.clone(),
@@ -227,7 +221,7 @@ pub(super) fn start_defaults(state: &State, place: &str, ctx: Ctx<'_>) -> Option
     if prior.is_some_and(|c| c.stage.is_live()) {
         return None;
     }
-    let carries = restart_carries(prior);
+    let carries = restart_carries(state, &id, ctx);
     let takes = |mode, members| accepted(state, &start_command(&id, Some(mode), members), ctx);
     let modes = mork_types::about::StartModes {
         full: takes(Mode::Full, carries.clone()),
