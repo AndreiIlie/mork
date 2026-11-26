@@ -134,11 +134,7 @@ pub fn raises_gate(p: &Poster<'_>, who: &Who, r: &Reply) -> bool {
 }
 
 pub(super) fn joined(base: &str, who: &Who, r: &Reply) -> String {
-    if !r.hand.ask {
-        base.to_owned()
-    } else {
-        format!("{base} · {}: {}", who.role.as_str(), r.hand.ask_words())
-    }
+    if !r.hand.ask { base.to_owned() } else { format!("{base} · {}: {}", who.role.as_str(), r.hand.ask_words()) }
 }
 
 /// An agent that answers again, not blocked, has carried on: its `blocked` and `error` asks are
@@ -187,6 +183,7 @@ pub fn outcome(p: &mut Poster<'_>, who: &Who, r: &Reply, job: &Job, ctx: Ctx<'_>
                 Color::Yellow,
                 joined("the report is ready; /done ends the card", who, r),
             );
+            raise.seq = p.posted_hand(&mork_types::state::Sender::Agent(who.key.clone()));
             raise.design = asks::marked(p.state, who, r);
             asks::raise(p, raise);
         }
@@ -207,6 +204,7 @@ fn blocked(p: &mut Poster<'_>, who: &Who, r: &Reply) {
     let text = joined(&format!("{} is blocked: {}", who.key, r.hand.headline), who, r);
     let mut raise = Raise::new(&places::asks_room(p.state, who), AskKind::Blocked, Color::Red, text);
     raise.agent = Some(who.key.clone());
+    raise.seq = p.posted_hand(&mork_types::state::Sender::Agent(who.key.clone()));
     raise.design = asks::marked(p.state, who, r);
     asks::raise(p, raise);
 }

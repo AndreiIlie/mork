@@ -1,9 +1,8 @@
 //! A place's conversation (5.7.5): its messages, the page of earlier ones, and the turns between them. Turn positions
 //! come from existing jobs and messages, without adding a record (fac-138).
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
-use mork_types::ask::{AskKind, Color};
 use mork_types::card::Mode;
 use mork_types::chat::{ChatTurn, MessagesView};
 use mork_types::job::JobKind;
@@ -28,7 +27,7 @@ pub fn messages(state: &State, place: &str, tail: Option<u64>) -> MessagesView {
 /// page of what a view's tail left out (fac-42).
 pub fn history(state: &State, place: &str, before: u64, count: u64) -> HistoryPage {
     let all: Vec<&Message> = state.messages_in(place).collect();
-    let open = open_asks(state, place, &all);
+    let open = ask_links(state);
     let rf = review_foreman(state, place);
     let end = all.iter().position(|m| m.seq >= before).unwrap_or(all.len());
     let start = end.saturating_sub(usize::try_from(count).unwrap_or(usize::MAX));
@@ -44,12 +43,12 @@ pub(super) fn conversation(
     tail: Option<u64>,
 ) -> (Vec<MessageView>, usize, Vec<MessageView>) {
     let all: Vec<&Message> = state.messages_in(place).collect();
-    let open = open_asks(state, place, &all);
+    let open = ask_links(state);
     let tail = tail.map_or(MESSAGES_MAX, |t| usize::try_from(t).unwrap_or(usize::MAX).min(MESSAGES_MAX));
     let earlier = all.len().saturating_sub(tail);
     let rf = review_foreman(state, place);
     let pinned =
-        all[..earlier].iter().filter(|m| open.contains(&m.seq)).map(|m| shown(m, &open, rf.as_ref())).collect();
+        all[..earlier].iter().filter(|m| open.contains_key(&m.seq)).map(|m| shown(m, &open, rf.as_ref())).collect();
     (all[earlier..].iter().map(|m| shown(m, &open, rf.as_ref())).collect(), earlier, pinned)
 }
 
@@ -59,8 +58,8 @@ fn review_foreman(state: &State, place: &str) -> Option<AgentKey> {
     (state.cards.get(&card)?.mode == Mode::Review).then(|| AgentKey::new(format!("{card}/foreman")))
 }
 
-fn shown(m: &Message, open: &BTreeSet<u64>, review_foreman: Option<&AgentKey>) -> MessageView {
-    let mut v = MessageView { ask_open: open.contains(&m.seq), ..message(m) };
+fn shown(m: &Message, open: &BTreeMap<u64, &mork_types::AskId>, review_foreman: Option<&AgentKey>) -> MessageView {
+    let mut v = MessageView { open_ask: open.get(&m.seq).copied().cloned(), ..message(m) };
     if let (Sender::Agent(k), Author::Agent { label, .. }) = (&m.from, &mut v.from)
         && Some(k) == review_foreman
     {
@@ -69,49 +68,10 @@ fn shown(m: &Message, open: &BTreeSet<u64>, review_foreman: Option<&AgentKey>) -
     v
 }
 
-// An `answer` ask is the hand that raised it, which later replies leave open (fac-271); a block, a
-// recap's or a report's gate is its agent's latest hand's, each next reply closing or replacing it.
-pub(super) fn open_asks(state: &State, place: &str, all: &[&Message]) -> BTreeSet<u64> {
-    let card = crate::messages::places::card_of(state, place);
-    let hands: Vec<&Message> = all.iter().copied().filter(|m| m.hand.is_some()).collect();
-    state
-        .asks
-        .values()
-        .filter(|a| a.open && (a.place == place || a.card.is_some() && a.card == card))
-        .filter(|a| matches!(a.kind, AskKind::Answer | AskKind::Blocked | AskKind::ApproveBrief | AskKind::Done))
-        .filter_map(|a| source_hand(state, a, &hands))
-        .collect()
+fn ask_links(state: &State) -> BTreeMap<u64, &mork_types::AskId> {
+    state.asks.values().filter(|a| a.open).filter_map(|a| Some((a.seq?, &a.id))).collect()
 }
 
-/// The seq of the hand among `hands` that raised ask `a`, open or closed.
-pub(super) fn source_hand(state: &State, a: &mork_types::ask::Ask, hands: &[&Message]) -> Option<u64> {
-    let key = owner(state, a)?;
-    let mine = hands.iter().rev().filter(|m| matches!(&m.from, Sender::Agent(k) if *k == key));
-    let raised = |m: &&&Message| {
-        m.hand.as_ref().is_some_and(|h| {
-            if a.kind == AskKind::Answer {
-                // A hand after the ask's raising can't be its source; the red fallback is a red hand
-                // with an empty `ask`, not withdrawing.
-                let red = !h.ask && h.color == Color::Red && !h.withdraw_ask && h.headline == a.text;
-                m.time <= a.raised_ms && (h.ask_words().trim() == a.text || red)
-            } else {
-                h.ask
-            }
-        })
-    };
-    let found = if a.kind == AskKind::Answer { mine.into_iter().find(raised) } else { mine.take(1).find(raised) };
-    found.map(|m| m.seq)
-}
-
-// A report's `done` ask names no agent: its foreman raised it with its report (4.4.5). A review
-// card's names none either, and carries no hand's ask.
-fn owner(state: &State, a: &mork_types::ask::Ask) -> Option<AgentKey> {
-    if let Some(key) = &a.agent {
-        return Some(key.clone());
-    }
-    let card = state.cards.get(a.card.as_ref()?)?;
-    (a.kind == AskKind::Done && card.mode == Mode::Report).then(|| AgentKey::new(format!("{}/foreman", card.id)))
-}
 // An engine message to an agent is a marker whose text unfolds under it (fac-384); one to the operator shows whole (5.7.5).
 pub(super) fn message(m: &Message) -> MessageView {
     let (from, kind) = match &m.from {
@@ -142,7 +102,7 @@ pub(super) fn message(m: &Message) -> MessageView {
         hand: m.hand.clone(),
         findings: m.findings.clone(),
         images: m.images.iter().map(|p| image(p)).collect(),
-        ask_open: false,
+        open_ask: None,
         choice: m.choice,
     }
 }

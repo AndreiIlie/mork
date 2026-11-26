@@ -195,13 +195,14 @@ pub(super) fn recapped(p: &mut Poster<'_>, mut card: Card, (who, job): (&Who, &J
     }
     p.journal("brief.planned", Some(id.as_str()), json!({}));
     if !crate::agents::required::challenge(p, &mut card, ctx.config) {
-        offer(p, &mut card, ctx);
+        let seq = p.posted_hand(&Sender::Agent(who.key.clone()));
+        offer(p, &mut card, ctx, seq);
     }
     p.put_card(card);
 }
 
 /// Offers the standing plan once no challenge of it waits; mutates `c` in place for its caller to stage.
-pub(crate) fn offer(p: &mut Poster<'_>, c: &mut Card, ctx: Ctx<'_>) {
+pub(crate) fn offer(p: &mut Poster<'_>, c: &mut Card, ctx: Ctx<'_>, seq: Option<u64>) {
     // A visual card's plan, its mock included, is the operator's alone to approve: an offered one stays as it is (fac-636).
     if c.stage != Stage::Brief || c.draft.is_none() || c.challenge.is_some() || (c.visual && c.recap) {
         return;
@@ -212,6 +213,7 @@ pub(crate) fn offer(p: &mut Poster<'_>, c: &mut Card, ctx: Ctx<'_>) {
     let room = places::room_of(&c.id, holder);
     asks::close(p, &room, &[AskKind::ApproveBrief]);
     let mut raise = Raise::new(&room, AskKind::ApproveBrief, Color::Yellow, words);
+    raise.seq = seq;
     raise.agent = Some(crate::messages::requests::agent_of(&c.id, holder).key);
     asks::raise(p, raise);
 }

@@ -43,6 +43,8 @@ pub enum AskKind {
 /// Something waiting on the operator.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ask {
+    /// The message carrying this ask. Historical closed asks may have no link.
+    pub seq: Option<u64>,
     pub id: crate::AskId,
     pub place: crate::PlaceId,
     pub card: Option<crate::ids::CardId>,
@@ -109,6 +111,7 @@ impl Ask {
         text: &str,
     ) -> Self {
         Self {
+            seq: None,
             id,
             place: crate::PlaceId::new(place),
             card,

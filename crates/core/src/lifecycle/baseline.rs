@@ -226,7 +226,7 @@ pub(super) fn turned_off(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
         ask_agent(p, &id, holder, super::start::AGREE_HEADLINE, &text);
     }
     if waiting {
-        super::brief::offer(p, &mut c, ctx);
+        super::brief::offer(p, &mut c, ctx, None);
         p.put_card(c);
     }
 }

@@ -49,7 +49,7 @@ pub fn apply(
     if parent.is_some() {
         p.close_answer(&who.key);
     } else {
-        answer_ask(p, who, reply, gate);
+        answer_ask(p, who, reply, gate, hand_seq);
     }
     p.journal(
         "reply",
@@ -118,7 +118,7 @@ fn companion(p: &Poster<'_>, who: &Who, reply: &Reply, m: &ReplyMessage, target:
 
 // An agent has at most one `answer` ask open: it stays until answered, replaced by this reply's `ask` or
 // withdrawn (fac-271); a red hand's headline is raised only when none is pending or withdrawn.
-fn answer_ask(p: &mut Poster<'_>, who: &Who, reply: &Reply, gate: bool) {
+fn answer_ask(p: &mut Poster<'_>, who: &Who, reply: &Reply, gate: bool, seq: u64) {
     let h = &reply.hand;
     let pending = p.all_asks().any(|a| a.kind == AskKind::Answer && a.open && a.agent.as_ref() == Some(&who.key));
     let raised = if h.ask {
@@ -134,6 +134,7 @@ fn answer_ask(p: &mut Poster<'_>, who: &Who, reply: &Reply, gate: bool) {
     let Some((color, text)) = raised.filter(|_| !gate) else { return };
     let place = places::asks_room(p.state, who);
     let mut r = super::asks::Raise::new(&place, AskKind::Answer, color, text);
+    r.seq = Some(seq);
     r.agent = Some(who.key.clone());
     r.design = super::asks::marked(p.state, who, reply);
     r.choices = (color == Color::Yellow).then(|| h.choices()).flatten();

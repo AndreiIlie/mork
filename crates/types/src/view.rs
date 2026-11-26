@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-pub use crate::chat::HistoryPage;
+pub use crate::chat::{Author, HistoryPage, ImageView, Line, MessageView};
 pub use crate::overview::{LiveRow, OverviewStage, OverviewStageAt, OverviewStageKind, OverviewView, SuiteProgress};
 pub use crate::pipeline::{Fact, StageAt, StageKind, StageMark, Times};
 pub use crate::rooms::{PlaceKind, RoomRow, Under};
@@ -11,7 +11,7 @@ pub use crate::rooms::{PlaceKind, RoomRow, Under};
 use crate::ask::{AskKind, Color};
 use crate::card::{Mode, Stage};
 use crate::config::Effort;
-use crate::reply::{Finding, Hand as ReplyHand, Role};
+use crate::reply::Role;
 use crate::{AgentKey, CardId, Command, PlaceId};
 
 /// The whole screen but the place shown: the top line, the rooms, the hands, the boards.
@@ -158,6 +158,9 @@ pub enum AgentLight {
 /// One open ask (5.9): the window marks its place's row and lists it where it was raised (fac-96).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HandView {
+    pub seq: u64,
+    pub message_place: PlaceId,
+    pub headline: String,
     pub ask: crate::AskId,
     pub place: PlaceId,
     pub card: Option<CardId>,
@@ -425,74 +428,4 @@ pub enum Doing {
         words: String,
     },
     Idle,
-}
-
-/// One message, as the conversation draws it (5.7.5).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MessageView {
-    pub seq: u64,
-    pub time_ms: i64,
-    pub from: Author,
-    pub to: Option<String>,
-    pub kind: Line,
-    pub headline: String,
-    /// The text: a marker's shows only unfolded under its divider (5.7.5, fac-384).
-    pub text: String,
-    /// The text was cut to keep the view within its line (M1.16).
-    pub cut: bool,
-    /// The operator's messages in main are numbered.
-    pub number: Option<u64>,
-    pub hand: Option<Box<ReplyHand>>,
-    pub findings: Vec<Finding>,
-    /// The images it carries, drawn as thumbnails (fac-31). A view made before them has none.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub images: Vec<ImageView>,
-    /// Its hand's ask is still open: not answered, nor replaced by a newer one (3.5.5, fac-39).
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub ask_open: bool,
-    /// The option of a seat's ask this answer chose, by its number from 1 (fac-696).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub choice: Option<u32>,
-}
-
-/// An image a message carries (fac-696): its path outside any wall, and where the web bridge serves it, for a job's
-/// published copy.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ImageView {
-    pub path: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-}
-
-/// Who wrote it, for its colour (5.2).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "is", rename_all = "kebab-case")]
-pub enum Author {
-    Operator,
-    Engine,
-    /// A project's outside orchestrator (fac-244).
-    Orchestrator {
-        project: String,
-    },
-    /// The operator's outside PA, on what it sent before the orchestrators replaced it (fac-119, fac-244).
-    Pa,
-    Agent {
-        label: String,
-        role: Role,
-    },
-}
-
-/// How a message draws.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Line {
-    /// An engine message to an agent: a thin divider, its label and time, its text unfolding under it.
-    Marker,
-    /// An engine message to the operator or to everyone in a place: whole, or one line that unfolds
-    /// when long (fac-39).
-    Engine,
-    /// The operator's words: whole, bright.
-    Operator,
-    /// An agent's message: its words to the operator whole, to another agent one line that unfolds.
-    Agent,
 }

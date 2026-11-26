@@ -89,7 +89,7 @@ pub fn replied(p: &mut Poster<'_>, c: &mut Card, who: &Who, r: &Reply, job: &Job
     c.challenge = None;
     p.journal("challenge.answered", Some(c.id.as_str()), json!({"seq": seq, "objections": objected}));
     if !objected {
-        crate::lifecycle::brief::offer(p, c, ctx);
+        crate::lifecycle::brief::offer(p, c, ctx, None);
     }
     true
 }

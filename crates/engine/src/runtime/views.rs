@@ -155,7 +155,7 @@ fn bounded_messages(mut v: MessagesView) -> MessagesView {
 fn fit_messages(all: Vec<MessageView>, pinned: &mut Vec<MessageView>, left: usize) -> (Vec<MessageView>, usize) {
     let kept = newest_within(&all, VIEW_BUDGET.saturating_sub(size_of(pinned)).min(left));
     let cut = all.len() - kept.len();
-    pinned.extend(all.into_iter().take(cut).filter(|m| m.ask_open).map(trimmed));
+    pinned.extend(all.into_iter().take(cut).filter(|m| m.open_ask.is_some()).map(trimmed));
     (kept, cut)
 }
 

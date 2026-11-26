@@ -174,6 +174,7 @@ pub(super) fn replied(p: &mut Poster<'_>, c: &Card, who: &Who, r: &Reply, job: &
     }
     if first {
         let mut raise = Raise::new(who.place.as_str(), AskKind::Mock, Color::Yellow, text);
+        raise.seq = p.posted_hand(&mork_types::state::Sender::Agent(who.key.clone()));
         raise.agent = Some(who.key.clone());
         asks::raise(p, raise);
     }
