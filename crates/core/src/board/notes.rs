@@ -187,11 +187,7 @@ fn own_record<'a, S: AsRef<str>>(
 }
 
 /// Separates the dated notes while preserving the specification's original whitespace.
-pub(crate) fn apart<'a>(
-    state: &State,
-    board: Option<&BoardCard>,
-    description: &'a str,
-) -> (Vec<String>, &'a str) {
+pub(crate) fn apart<'a>(state: &State, board: Option<&BoardCard>, description: &'a str) -> (Vec<String>, &'a str) {
     let written = board.map(|b| super::writes::written(state, &b.project, &b.file)).unwrap_or_default();
     let lines: Vec<&str> = description.lines().collect();
     let n = split(&lines, &written);

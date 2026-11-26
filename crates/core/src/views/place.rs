@@ -183,7 +183,11 @@ fn summaries(state: &State, c: &Card) -> Vec<Summary> {
             let (title, description) = board.map_or((title, description), |b| (&b.title, &b.description));
             let (_, body) = crate::board::notes::apart(state, board, description);
             let text = body.trim();
-            (!text.is_empty()).then(|| Summary { card: id.clone(), title: title.clone(), text: text.replace("\r\n", "\n") })
+            (!text.is_empty()).then(|| Summary {
+                card: id.clone(),
+                title: title.clone(),
+                text: text.replace("\r\n", "\n"),
+            })
         })
         .collect()
 }

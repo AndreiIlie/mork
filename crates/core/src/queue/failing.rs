@@ -5,6 +5,8 @@ use std::collections::BTreeMap;
 
 use mork_types::work::Failing;
 
+use super::suite_log::{JestMarker, XTASK, jest_marker};
+
 /// What a Rust binary that failed without naming a failing test, killed or crashed, is listed as.
 pub const NO_TEST: &str = "(the binary failed, naming no failing test)";
 
@@ -59,7 +61,7 @@ fn xtask(whole: &str, packages: &BTreeMap<String, String>) -> Option<Vec<Failing
     let mut seen = false;
     let (mut out, mut file, mut named) = (Vec::new(), None::<String>, false);
     for l in whole.lines() {
-        if let Some(said) = l.strip_prefix("xtask: ") {
+        if let Some(said) = l.strip_prefix(XTASK) {
             seen = true;
             if let Some(f) = file.take().filter(|_| !named) {
                 out.push(Failing { file: f, test: NO_TEST.to_owned() });
@@ -108,19 +110,23 @@ fn jest(whole: &str) -> Option<Vec<Failing>> {
     let mut seen = false;
     let (mut out, mut file) = (Vec::new(), None::<String>);
     for l in whole.lines() {
-        let t = l.trim();
-        if t.starts_with("Test Suites: ") {
-            seen = true;
-            file = None;
-        } else if let Some(rest) = t.strip_prefix("FAIL ") {
-            seen = true;
-            file = path(rest);
-        } else if t.starts_with("PASS ") || t == "Summary of all failing tests" {
-            file = None;
-        } else if let (Some(f), Some(test)) = (&file, l.strip_prefix("  ● "))
-            && test != "Console"
-        {
-            out.push(Failing { file: f.clone(), test: test.trim_end().to_owned() });
+        match jest_marker(l) {
+            Some(JestMarker::Totals) => {
+                seen = true;
+                file = None;
+            }
+            Some(JestMarker::Fail(rest)) => {
+                seen = true;
+                file = path(rest);
+            }
+            Some(JestMarker::Pass(_) | JestMarker::Summary) => file = None,
+            None => {
+                if let (Some(f), Some(test)) = (&file, l.strip_prefix("  ● "))
+                    && test != "Console"
+                {
+                    out.push(Failing { file: f.clone(), test: test.trim_end().to_owned() });
+                }
+            }
         }
     }
     seen.then_some(out)

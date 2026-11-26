@@ -2,6 +2,7 @@
 // why: test code: a failed unwrap is the test failing, which 1.12.4 leaves to tests.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use mork_core::queue::{failing, suite_log};
 use mork_engine::jobs::suite_progress::{Output, Reader};
 use mork_types::view::SuiteProgress;
 
@@ -40,6 +41,13 @@ xtask: mork-app tests/m0_walled_turn.rs: test m0_production_build_refuses_a_part
         latest: Some("m0_production_build_refuses_a_partial_wall".into()),
     };
     assert_eq!(read(output), Some(want));
+    let failures = failing::read(output, &Default::default()).unwrap();
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0].test, "two");
+    assert_eq!(failures[0].file, "mork-core tests/a.rs");
+    let report = suite_log::told(output, "", "suite.out", Some(&failures));
+    assert!(report.contains("test two ... FAILED"));
+    assert!(!report.contains("xtask: mork-core tests/a.rs: test two"));
 }
 
 #[test]
@@ -73,6 +81,10 @@ Test Suites: 1 failed, 2 passed, 3 total
         latest: Some("app/shared/money.test.js".into()),
     };
     assert_eq!(read(output), Some(want));
+    let failures = failing::read(output, &Default::default()).unwrap();
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0].file, "server/features/payees/payees-service.test.js");
+    assert_eq!(failures[0].test, "payees › refuses a blank IBAN");
 }
 
 #[test]

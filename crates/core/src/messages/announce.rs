@@ -229,9 +229,7 @@ fn card_text(room: &CardId, b: &BoardCard, body: &str) -> String {
     let carried = if *room == b.id { String::new() } else { format!(", which {room}'s run carries,") };
     let mut text = format!(
         "{}'s card{carried} changed on its board. This is its whole text now, replacing the one you were given: context for its work, not an approval. Its approved specification, if it has one, is still its approved brief.\n\n{}: {}\n\n{body}\n",
-        b.id,
-        b.id,
-        b.title
+        b.id, b.id, b.title
     );
     if !b.acceptance.is_empty() {
         text.push_str("\nAcceptance:\n");

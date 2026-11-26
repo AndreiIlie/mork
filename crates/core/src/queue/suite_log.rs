@@ -7,6 +7,34 @@ use mork_types::work::Failing;
 const BLOCK: usize = 20;
 const MOST: usize = 120;
 
+pub const XTASK: &str = "xtask: ";
+
+/// The name and verdict from an xtask per-test update, before the binary repeats its output.
+pub fn live_result(said: &str) -> Option<(&str, &str)> {
+    said.split_once(": test ")?.1.rsplit_once(" ... ")
+}
+
+pub enum JestMarker<'a> {
+    Pass(&'a str),
+    Fail(&'a str),
+    Summary,
+    Totals,
+}
+
+/// Recognizes Jest's file headers and the two markers around its repeated failure list.
+pub fn jest_marker(line: &str) -> Option<JestMarker<'_>> {
+    let line = line.trim();
+    if let Some(rest) = line.strip_prefix("PASS ") {
+        Some(JestMarker::Pass(rest))
+    } else if let Some(rest) = line.strip_prefix("FAIL ") {
+        Some(JestMarker::Fail(rest))
+    } else if line == "Summary of all failing tests" {
+        Some(JestMarker::Summary)
+    } else {
+        line.starts_with("Test Suites: ").then_some(JestMarker::Totals)
+    }
+}
+
 /// The run's output for its foreman: its `failing` tests by file, its failures with their panic or
 /// error lines read from `whole`, then `tail` as the run kept it, then the path of its `log`.
 pub fn told(whole: &str, tail: &str, log: &str, failing: Option<&[Failing]>) -> String {
@@ -36,18 +64,16 @@ fn failures(whole: &str) -> Vec<String> {
     let mut i = 0;
     while let Some(&l) = lines.get(i) {
         i += 1;
-        if let Some(said) = l.strip_prefix("xtask: ") {
+        if let Some(said) = l.strip_prefix(XTASK) {
             // A test's result told as it landed is told again under its binary's verdict (fac-697).
-            if said.split_once(": test ").is_some_and(|(_, t)| t.contains(" ... ")) {
+            if live_result(said).is_some() {
                 continue;
             }
             in_failed = said.contains("FAILED");
             if in_failed {
                 kept.push(l.to_owned());
                 let what = said.split(": FAILED").next().unwrap_or(said);
-                if let Some(s) =
-                    start.filter(|s| lines.get(*s).is_some_and(|x| x.strip_prefix("xtask: ") == Some(what)))
-                {
+                if let Some(s) = start.filter(|s| lines.get(*s).is_some_and(|x| x.strip_prefix(XTASK) == Some(what))) {
                     kept.extend(errors(lines.get(s + 1..i - 1).unwrap_or_default()));
                 }
             }
@@ -73,7 +99,7 @@ fn block(rest: &[&str]) -> (Vec<String>, usize) {
     let end = rest
         .iter()
         .position(|l| {
-            l.starts_with("---- ") || *l == "failures:" || l.starts_with("test result:") || l.starts_with("xtask: ")
+            l.starts_with("---- ") || *l == "failures:" || l.starts_with("test result:") || l.starts_with(XTASK)
         })
         .unwrap_or(rest.len());
     let said =
@@ -105,7 +131,7 @@ fn under(rest: &[&str]) -> (Vec<String>, usize) {
 }
 
 fn ends(l: &str) -> bool {
-    l.starts_with("xtask: ") || l.starts_with("test ")
+    l.starts_with(XTASK) || l.starts_with("test ")
 }
 
 fn cap(mut lines: Vec<String>) -> Vec<String> {

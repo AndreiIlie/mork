@@ -439,7 +439,8 @@ mod tests {
         let mut steps: Vec<StepView> = serde_json::from_value(json!([
             {"id": "1", "words": "pwd", "command": {"text": "pwd"}},
             {"id": "2", "words": "escaped", "command": {"text": "\u{1}\u{2}"}}
-        ])).unwrap();
+        ]))
+        .unwrap();
         let mut size = size_of(&steps);
         assert!(evict_commands(&mut steps, &mut size, 0));
         assert_eq!(steps[0].command.as_ref().unwrap().text, "pwd");
