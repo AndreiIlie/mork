@@ -83,7 +83,7 @@ impl Engine {
                 m.place,
                 m.kind,
                 m.headline,
-                m.text
+                m.hand.as_ref().map_or_else(|| m.text.clone(), |h| h.with_options(&m.text))
             );
             text.push_str(&whole_hand(m));
         }
@@ -96,9 +96,6 @@ fn whole_hand(m: &Message) -> String {
         let word = |v: serde_json::Value| v.as_str().map(str::to_owned).unwrap_or_default();
         let color = word(serde_json::json!(h.color));
         let _ = write!(out, "\nA {color} hand.\n");
-        if h.ask {
-            let _ = write!(out, "\nAsks: {}\n", h.ask_words());
-        }
     }
     for f in &m.findings {
         let _ = write!(out, "\n- {}:{}: {}\n  Proof: {}\n", f.file, f.line, f.summary, f.proof);

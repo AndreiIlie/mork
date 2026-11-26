@@ -15,7 +15,7 @@ pub fn merged(old: Option<PlaceView>, mut new: PlaceView) -> PlaceView {
     let mut kept: Vec<MessageView> = old.messages.into_iter().take(keep).collect();
     // An ask kept is open while the engine pins it: answered or replaced since, it isn't.
     for m in &mut kept {
-        m.ask_open = new.pinned.iter().any(|p| p.seq == m.seq);
+        m.open_ask = new.pinned.iter().find(|p| p.seq == m.seq).and_then(|p| p.open_ask.clone());
     }
     let first = kept.first().map_or(0, |m| m.seq);
     new.pinned.retain(|p| p.seq < first);

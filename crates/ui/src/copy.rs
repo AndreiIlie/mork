@@ -27,10 +27,7 @@ pub fn text(m: &MessageView) -> String {
         parts.push(head.to_owned());
     }
     if !words.is_empty() {
-        parts.push(words.to_owned());
-    }
-    if let Some(h) = &m.hand {
-        parts.extend(labelled("ask", &h.ask_words()));
+        parts.push(m.hand.as_ref().map_or_else(|| words.to_owned(), |h| h.with_options(words)));
     }
     for f in &m.findings {
         let mut lines = vec![format!("{}:{} {}", f.file, f.line, f.summary.trim())];

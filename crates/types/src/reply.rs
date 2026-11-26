@@ -152,7 +152,18 @@ impl Hand {
 
     /// Its ask as one text, its options and pick in it, for every reader that reads words.
     pub fn ask_words(&self) -> String {
-        if self.ask { self.choices().map_or_else(|| self.message.clone(), |c| c.words()) } else { String::new() }
+        if self.ask { self.with_options(&self.message) } else { String::new() }
+    }
+
+    /// Renders the displayed body with any options and recommendation, including its sketch when present.
+    pub fn with_options(&self, body: &str) -> String {
+        self.choices().map_or_else(
+            || body.to_owned(),
+            |mut c| {
+                body.clone_into(&mut c.ask);
+                c.words()
+            },
+        )
     }
 
     /// A recap's typed sketch, when it gave one.

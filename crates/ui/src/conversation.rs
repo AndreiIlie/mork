@@ -28,7 +28,6 @@ const BEFORE_PREVIEW: f32 = 12.0;
 const BEFORE_DIVIDER: f32 = 14.0;
 const DIVIDERS: f32 = 6.0;
 const UNDER_HEADER: f32 = 4.0;
-const ABOVE_ASK: f32 = 8.0;
 const DOT: f32 = 7.0;
 const COPY: &str = "copy";
 // A divider's characters past its label, time and copy: the gaps between them and the rules'.
@@ -191,12 +190,14 @@ fn copy<'a>(seq: u64) -> Element<'a, Message> {
 
 fn block<'a>(app: &'a App, t: &Titles, m: &'a MessageView, id: String, offset: i32) -> Element<'a, Message> {
     let unfolded = app.unfolded(m.seq);
-    let mut col = column![header(m, offset), gap_v(UNDER_HEADER), prose::view(&shape::words(m), Tone::Text, t)];
+    let mut col = column![header(m, offset), gap_v(UNDER_HEADER)];
+    if let Some(ask) = ask(m, t) {
+        col = col.push(ask);
+    } else {
+        col = col.push(prose::view(&shape::words(m), Tone::Text, t));
+    }
     if let Some(thumbs) = images(m) {
         col = col.push(container(thumbs).padding(Padding::ZERO.top(UNDER_HEADER)));
-    }
-    if let Some(ask) = ask(m, t) {
-        col = col.push(container(ask).padding(Padding::ZERO.top(ABOVE_ASK)));
     }
     if shape::folds(m) {
         let more: Element<'a, Message> = if unfolded { details(m) } else { txt("more …", Tone::Dim).into() };
@@ -247,8 +248,8 @@ fn images<'a>(m: &'a MessageView) -> Option<Element<'a, Message>> {
 
 // Open, framed in orange and bright; answered or replaced, dim.
 fn ask<'a>(m: &'a MessageView, t: &Titles) -> Option<Element<'a, Message>> {
-    let words = m.hand.as_ref().map(|h| h.ask_words()).filter(|a| !a.trim().is_empty())?;
-    if m.ask_open {
+    let words = m.hand.as_ref().filter(|h| h.ask)?.with_options(&m.text);
+    if m.open_ask.is_some() {
         let inner = row![bold("ask", Tone::Orange), gap(fonts::ADVANCE), prose::view(words.trim(), Tone::Bright, t)];
         return Some(container(inner).padding([4.0, 10.0]).style(theme::ask_open).into());
     }

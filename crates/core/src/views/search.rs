@@ -95,8 +95,8 @@ impl Search {
     pub fn offer(&mut self, found: Found) {
         match found {
             Found::Message { card, message: m } => {
-                let ask = m.hand.as_ref().map(|h| h.ask_words()).unwrap_or_default();
-                let mut text = [m.headline.as_str(), m.text.as_str(), ask.as_str()].join("\n");
+                let body = m.hand.as_ref().map_or_else(|| m.text.clone(), |h| h.with_options(&m.text));
+                let mut text = [m.headline.as_str(), body.as_str()].join("\n");
                 for f in &m.findings {
                     let _ = write!(text, "\n{}:{}: {}\n{}", f.file, f.line, f.summary, f.proof);
                 }
