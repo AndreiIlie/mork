@@ -204,7 +204,6 @@ function LookBack({
   );
 }
 
-
 interface StartSelection {
   id: string | null;
   view?: PlaceView;
@@ -240,7 +239,7 @@ function AreaRows({ group, startable, start, live }: { group: BoardGroup; starta
               <span className="min-w-0 flex-1 truncate text-label-14 text-gray-1000">{r.title}</span>
               {r.status !== undefined && <span className={`shrink-0 ${MONO} text-gray-700`}>{r.status}</span>}
             </Row>
-            {start.id === r.id && <StartStrip card={r} view={start.view} live={live} onDone={() => start.select(null)} />}
+            {startable && !r.room && start.id === r.id && <StartStrip card={r} view={start.view} live={live} onDone={() => start.select(null)} />}
           </div>
         ))}
     </>

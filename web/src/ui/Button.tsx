@@ -39,7 +39,7 @@ export interface ButtonProps extends AriaAttributes {
 
 const PRESSED = "border-gray-1000 bg-gray-200 text-gray-1000";
 
-/** Symmetric sharp-corner button in three tiers and two sizes, optionally square. */
+/** Symmetric sharp-corner button in three tiers and three sizes, optionally square. */
 export function Button({
   tier,
   size = "md",

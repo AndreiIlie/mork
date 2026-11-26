@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { watchCard } from "./bridge";
+import { watchPlace } from "./bridge";
 import { RefusalLine, useHandOffers } from "./offers";
 import type { BoardRow, PlaceView, StartDefaults } from "./types";
 import { Button } from "./ui/Button";
 import { TextInput } from "./ui/TextInput";
 import { Segmented } from "./ui/Segmented";
 
-const INPUT = "h-[30px] w-full border border-gray-400 bg-background-100 px-3 text-label-13 text-gray-1000 placeholder:text-gray-700";
+const INPUT = "w-full border border-gray-400 bg-background-100 px-3 text-label-13 text-gray-1000 placeholder:text-gray-700";
 const FIELD = "text-label-12 text-gray-700";
 
 export function NewCard({ projects, project, live, onDone }: { projects: string[]; project: string; live: boolean; onDone: () => void }) {
@@ -64,7 +64,7 @@ function StartForm({ card, defaults, live, onDone }: { card: BoardRow; defaults:
   const { pending, refusals, press } = useHandOffers();
   const start = () => {
     const delegation = level === defaults.level ? {} : level === 2 ? { "self-sustained": true } : { delegated: true };
-    const options = full ? { visual: visual && !defaults.visual, "no-planner": noPlanner, carries: defaults.carries } : {};
+    const options = full ? { visual: visual && !defaults.visual || undefined, "no-planner": noPlanner || undefined, carries: defaults.carries } : {};
     press("start", { label: "Start", command: { start: { card: card.id, mode: full ? "full" : "report", ...options, ...delegation } } }, onDone);
   };
   const kept = [
@@ -121,8 +121,8 @@ function StartForm({ card, defaults, live, onDone }: { card: BoardRow; defaults:
 
 export function StartStrip({ card, view, live, onDone }: { card: BoardRow; view?: PlaceView; live: boolean; onDone: () => void }) {
   useEffect(() => {
-    watchCard(card.id);
-    return () => watchCard(null);
+    watchPlace(card.id);
+    return () => watchPlace(null);
   }, [card.id]);
   if (!view?.start) return <div className="flex items-center gap-3 bg-background-200 px-edge py-3 text-label-13">
     <span>{view ? `${card.id} can't start now.` : "Loading…"}</span><Button tier="ghost" size="control" onClick={onDone}>Cancel</Button>
