@@ -1336,6 +1336,70 @@ exit:
     }
 
     #[test]
+    fn review_walls_reach_the_approved_mock() {
+        if common::wall_test("review walls reach the approved mock") {
+            return;
+        }
+        use mork_types::card::{Mock, MockStep, Mode, Stage};
+        use mork_types::review::Review;
+        use std::io::{BufRead, BufReader, Write};
+        use std::net::TcpListener;
+
+        let mock = TcpListener::bind("127.0.0.1:0").unwrap();
+        let preview = TcpListener::bind("127.0.0.1:0").unwrap();
+        let mock_addr = mock.local_addr().unwrap();
+        let preview_addr = preview.local_addr().unwrap();
+        let mut rig = Rig::new();
+        let cfg = rig.config("").replace("[mork]\n", &format!("[mork]\nvite = {:?}\n", rig.t.bin()));
+        rig.write_config(&cfg);
+        let mut subject = rig.card("ex-2", Mode::Full);
+        subject.visual = true;
+        subject.port = Some(preview_addr.port());
+        subject.mock = Some(Mock { step: MockStep::Approved, port: Some(mock_addr.port()), ..Mock::default() });
+        let mut review = rig.card("ex-1", Mode::Review);
+        review.stage = Stage::Review;
+        review.review = Some(Box::new(Review { of: Some(subject.id.clone()), ..Review::default() }));
+        rig.put_cards(vec![subject, review]);
+        let probe = json!({"do":"probe","spec":{"tcp_send":[
+            {"addr":mock_addr,"send":"render\n"},
+            {"addr":preview_addr,"send":"GET / HTTP/1.0\r\n\r\n"}
+        ]}});
+        rig.scenario(json!([
+            {"agent":"ex-1/foreman","steps":[probe,
+             {"do":"ctl","args":["spawn","ex-1","reviewer","--topic","Visual","Compare the approved mock."]},{"do":"hang"}]},
+            {"agent":"ex-1/reviewer-1","steps":[probe,{"do":"hang"}]}
+        ]));
+        // A bound stand-in for the mock host keeps the port assigned until both seats have read it.
+        let server = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut stream, _) = mock.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                assert_eq!(line, "render\n");
+                writeln!(stream, "approved mock").unwrap();
+            }
+        });
+        rig.start();
+        rig.say("ex-1", "Review the mock.");
+        for seat in ["ex-1/foreman", "ex-1/reviewer-1"] {
+            let result = || {
+                let job = rig.jobs(seat).into_iter().next()?;
+                rig.out_lines(&job).into_iter().find(|v| v["type"] == "probe")
+            };
+            wait_until(seat, LONG, || result().is_some());
+            let result = result().unwrap();
+            assert_eq!(result["tcp_send"][0], "approved mock", "{seat}: {result}");
+            assert!(
+                matches!(result["tcp_send"][1].as_str(), Some("ECONNREFUSED" | "HTTP/1.1 403 Forbidden")),
+                "{result}"
+            );
+        }
+        server.join().unwrap();
+        rig.send(json!({"stop":{"card":"ex-1"}}));
+        rig.wait_settled(LONG);
+    }
+
+    #[test]
     fn fac671_web_bridge_key_and_port_are_hidden() {
         if common::wall_test("fac-671 web bridge") {
             return;

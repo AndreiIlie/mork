@@ -92,6 +92,7 @@ Configure the hosts for the model APIs and package registries your seats use bef
 Each port must be at least 1024, including the first port in a range.
 The list defaults to empty.
 A card also gets its preview and mock ports.
+A review of a card's branch or its PR also gets the approved mock port named in the round request.
 When assigning these, Mork skips live cards' preview and mock ports, the configured web port and every local tunnel port.
 With `web_port = 0` it skips the port assigned by the OS.
 The bound web bridge port and every configured tunnel port are excluded even when listed.

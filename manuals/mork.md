@@ -127,6 +127,7 @@ When work needs one of his hidden files, what he runs or its ports, send your pr
 `/tmp` is emptied after your turn; a file a later turn needs lives in your working folder where git doesn't see it (under `.git/`; on a review card, under `.git/mork/`, all its clone keeps through its rounds).
 A walled turn can run loopback servers of its own.
 It reaches the machine on its project's `host_ports` and its card's preview (`MORK_PORT`) and mock ports, excluding the web bridge and configured tunnels.
+A linked review card can also reach the approved mock port named in its round request.
 For web access, use the HTTP proxy in `HTTPS_PROXY`.
 It opens CONNECT tunnels only to the hosts and ports listed in `mork.toml` under `domains`.
 Direct external TCP, UDP and DNS are closed.
