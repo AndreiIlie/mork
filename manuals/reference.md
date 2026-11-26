@@ -21,7 +21,7 @@ The same field syntax works in the window's `/` commands.
 ### project
 
 In `mork.toml`, `[mork] project` is optional (the `[mork]` table itself stays required) and names the configured project that holds Mork's own repository.
-When unset, no project is Mork's own: nothing self-builds on landing or from the base tip, the suite runs once walled with no second unwalled phase, and `build`, `pin`, `reload` to a target and `mork test --walls` are refused.
+When unset, no project is Mork's own: nothing self-builds on landing or from the base tip, the suite runs once walled with no second unwalled phase, and `build`, `pin`, every `reload` and `mork test --walls` are refused.
 Unset also switches off Mork project as a destination: closing turns ask `feedback` alone and refuse `mork_feedback`, cross-project `notes.add --project` is refused for every seat, finished reloads wake no orchestrator, `general` memory is written by the operator alone, and `orchestrator.review general` is refused without recording `reviewed_ms`.
 
 ### internals
@@ -510,7 +510,7 @@ New sessions receive complete manuals.
 
 A process restart or reload doesn't end agent sessions.
 Answers `{"reload": {"target", "id"}}`.
-Refused when a reload is already under way, nothing is pinned and no target is given, reloading to a target when `[mork] project` is unset, or for any of `pin`'s reasons.
+Refused when a reload is already under way, nothing is pinned and no target is given, `[mork] project` is unset (with or without a target), or for any of `pin`'s reasons.
 A failed reload is said in main, and the old build carries on.
 
 Example: `mork ctl reload`

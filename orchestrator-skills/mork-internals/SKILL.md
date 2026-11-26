@@ -6,7 +6,7 @@ description: "Use when you run the Mork instance itself, as Mork project's orche
 # Running Mork
 
 When `mork.toml`'s `[mork] project` names the project holding Mork's own repository, its orchestrator runs Mork itself, and other projects' orchestrators ask it for changes here.
-When it is unset, the operator does, and `build`, `pin` and `reload --target` are refused.
+When it is unset, the operator does, and `build`, `pin` and every `reload` are refused: a config change takes a restart.
 For a command's syntax and who may send it, run `mork ctl search <query>` or `mork ctl <command> --help`; the configuration keys are under Configuration in `mork manual reference`.
 
 Mork's home is `$MORK_HOME`, else `$XDG_DATA_HOME/mork`, else `~/.local/share/mork`.
@@ -28,8 +28,9 @@ It holds `state.db` (read it, never write it), `jobs/`, `clones/<card>/`, `mirro
   After a CLI upgrade, run a turn of a seat on it and check that it ends and `mork ctl usage` still reads its pool.
 - **Machine load:** every job runs in `mork_work.slice`, its CPU and IO weights and `memory_high` set in `[slice]`.
   Check a project's `test` command before blaming the machine.
-- **A project's checks:** `checks = { command, folder }` runs `command` in `folder`.
-  To ship a change to a checks tool kept in its own checkout, make a new checkout of the new commit, point `folder` at it (backing up `mork.toml` first) and reload.
+- **A project's checks:** `checks = { command, folder }` runs `command` from the card's clone root, with `--base <fork> --json <report>`.
+  `folder`'s git checkout is mounted read-only in its wall, its commit and whether it is clean reported; a checkout with uncommitted changes isn't run.
+  To ship a change to a checks tool kept in its own checkout, make a new checkout of the new commit, point `folder` and any path in `command` at it (backing up `mork.toml` first) and reload.
 - **Dropping a project:** delete its memory and notes while it is still configured (`memory.delete` and `notes.delete` refuse a project that isn't).
   Then remove its `[projects.<name>]` section, and delete `mirrors/<name>`, `mirrors/<name>.bundles` and `records/<name>`.
   Remove a config key a card retires before that card lands.
@@ -40,7 +41,7 @@ It holds `state.db` (read it, never write it), `jobs/`, `clones/<card>/`, `mirro
 - Mork builds its base branch's new tip by itself and pins it; `build <commit>` builds one by hand, into `builds/<commit>/`.
   Every pin and every completed reload points `~/.local/bin/mork` at its build.
 - The running build is the `runs <commit>` of the last start line in `logs/app.log` (`tail -10`), never the `~/.local/bin/mork` link, which follows the pin.
-- To apply a config change or a new build: `mork ctl --as orchestrator:<project> reload [--target <commit>]`, then wait until commands stop answering `reloading`, and start `wakes` again.
+- To apply a config change or a new build, with `[mork] project` set: `mork ctl --as orchestrator:<project> reload [--target <commit>]`, then wait until commands stop answering `reloading`, and start `wakes` again.
 - When a card changing `web/` lands and `[mork] web_assets` names the operator's checkout's `web/dist`, rebuild it there with `cargo xtask web`.
 
 ## Notes, manuals and disk
