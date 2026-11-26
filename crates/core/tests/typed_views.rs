@@ -206,15 +206,20 @@ fn first_run_and_restart_offer_only_the_modes_and_defaults_the_engine_applies() 
     assert_eq!(start.carries, [mork_types::CardId::new("web-2")]);
 }
 
-#[test]
-fn restart_carries_only_available_members_after_a_run_closed_without_work() {
-    let mut s = board_with_cards(&["web-2", "web-3", "web-4", "web-5"]);
-    s.operator(json!({"start": {"card": CARD, "carries": ["web-5", "web-2", "web-4", "web-3"]}})).unwrap();
-    s.operator(json!({"close": {"card": CARD, "why": "Restart separately"}})).unwrap();
+fn close_run_without_work(s: &mut Sim, carries: &[&str]) -> Result<(), mork_types::protocol::ErrorBody> {
+    s.operator(json!({"start": {"card": CARD, "carries": carries}}))?;
+    s.operator(json!({"close": {"card": CARD, "why": "Restart separately"}}))?;
     for id in s.open_jobs(|p| matches!(p, Purpose::Bundle { .. })) {
         s.end_job(&id, json!({"branch": CARD, "bundle": false, "head": null, "clean": true, "dirty": []}));
     }
     s.settle_actions();
+    Ok(())
+}
+
+#[test]
+fn restart_carries_only_available_members_after_a_run_closed_without_work() {
+    let mut s = board_with_cards(&["web-2", "web-3", "web-4", "web-5"]);
+    close_run_without_work(&mut s, &["web-5", "web-2", "web-4", "web-3"]).unwrap();
     s.operator(json!({"start": {"card": "web-2"}})).unwrap();
     s.state.board.get_mut("web-3").unwrap().status = "Done".into();
 
@@ -228,13 +233,9 @@ fn restart_carries_only_available_members_after_a_run_closed_without_work() {
 }
 
 #[test]
-fn full_and_report_restarts_are_available_when_no_former_member_can_join() {
-    use mork_types::card::{Card, Carried, Mode};
+fn report_restart_is_available_when_a_formerly_carried_card_is_running() {
     let mut s = board_with_cards(&["web-2"]);
-    let mut prior = Card::new(CARD.into(), "web", "Earlier run", Mode::Full, 1, s.now);
-    prior.stage = Stage::Closed;
-    prior.carries.push(Carried { id: "web-2".into(), ..Default::default() });
-    s.state.cards.insert(prior.id.clone(), prior);
+    close_run_without_work(&mut s, &["web-2"]).unwrap();
     s.operator(json!({"start": {"card": "web-2"}})).unwrap();
     let start = room(&s, CARD).start.unwrap();
     assert!(start.carries.is_empty());
