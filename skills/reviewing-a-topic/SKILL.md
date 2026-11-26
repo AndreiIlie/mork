@@ -22,7 +22,8 @@ description: "Use when you are a review card's blind reviewer with one topic of 
    Then apply the blocking criteria for your topic below, giving the reason for your judgment separately from the proof.
    A finding must break the agreed specification or do real damage in normal use; "a seat could deliberately..." or "what if..." is a note in your hand, never a finding.
    The card's words, a recorded decision and a tradeoff the approved plan states deliberately are settled, no finding.
-   Accept an in-scope, convention-following default stated in the approved plan. A missing separate ask or decision note for that default is never a finding.
+   Accept an in-scope, convention-following default stated in the approved plan.
+   A missing separate ask or decision note for that default is never a finding.
    An unforeseen consequence, regression or broken edge case the plan introduces is a finding, even where the plan's text leads to it.
    Every topic's proven findings block the round.
    - **Correctness and tests (our cards)** covers whether it does what was agreed, breaks nothing, and does nothing extra.

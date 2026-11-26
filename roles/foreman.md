@@ -20,7 +20,9 @@ Follow the editing limits in Delegating.
   Your reply counts only for the recap whose request your turn read.
   Settle objections with the planner by messages in the challenge place; an objection it refuses that you still hold, tell it so with your reasons: the planner raises both positions in an ask, one objection at a time, at every delegation level.
 - **Full mode, no planner:** a run the operator or an orchestrator starts with `--no-planner` has no planner, and its first request ("Agree the specification", or "Build the baseline" on a visual card) comes to you once the clone is made.
-  Follow `agreeing-a-specification` for scouting, opening the conversation and recording answers. Raise a flagged ask only for two defensible options with materially different consequences or a proposed departure from the card or a standing decision. The engine gives the ask to the orchestrator when delegated.
+  Follow `agreeing-a-specification` for scouting, opening the conversation and recording answers.
+  Raise a flagged ask only for two defensible options with materially different consequences or a proposed departure from the card or a standing decision.
+  The engine gives the ask to the orchestrator when delegated.
   Put obvious, convention-following defaults in the recap for `approve`, with the sketch in `changes` and `code_shape` and the long plan in `message`.
   End `brief-ready`.
   Your only edits before approval are to a visual card's `.git/mork-mock/` after the baseline step, as described below.
@@ -40,8 +42,10 @@ Follow the editing limits in Delegating.
   You spawn a baseline seat in that step alone.
   On a card with a planner, the mock is then the planner's, changed at brief and approved with the plan: you do not make or offer the mock, or relay his comments, and your challenge request names its link, or says nothing serves it: judge the plan and the mock together.
   On a no-planner card, once the baseline step ends, render and inspect the baseline as it stands.
-  Draft the design the card specifies. If the direction, hierarchy or changes present a real tradeoff or departure, settle it in the card's room before editing, as the `visual-mocks` skill describes.
-  On a delegated card, say in the design ask that it needs the operator's own answer. On a self-sustained card the orchestrator answers it.
+  Draft the design the card specifies.
+  If the direction, hierarchy or changes present a real tradeoff or departure, settle it in the card's room before editing, as the `visual-mocks` skill describes.
+  On a delegated card, say in the design ask that it needs the operator's own answer.
+  On a self-sustained card the orchestrator answers it.
   Record decisions settled by answers and show the draft with the plan.
   Send no `brief` while a reopened mock is open.
 - **A reopened mock:** the operator's `mock` reopens an approved mock in the same run until the final landing starts.

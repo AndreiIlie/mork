@@ -34,17 +34,22 @@ Once the baseline step ends, the planner (or the foreman on a no-planner card) h
 
 1. **Read the card against the baseline**
 
-   Render and inspect the existing baseline. When the card specifies the design, go straight to the first draft.
-   Ask about direction, information hierarchy or concrete changes only for a real tradeoff or proposed departure. Attach the baseline screenshot to that design ask.
+   Render and inspect the existing baseline.
+   When the card specifies the design, go straight to the first draft.
+   Ask about direction, information hierarchy or concrete changes only for a real tradeoff or proposed departure.
+   Attach the baseline screenshot to that design ask.
    Use an ASCII layout sketch in the conversation when it helps.
    Record decisions on the card as they settle.
    When a design ask is needed, wait for its answer before editing `.git/mork-mock/`.
-   With delegation off, the operator answers the design ask in your room. On a delegated card, mark the ask as needing his own answer so the orchestrator brings it to him. On a self-sustained card, the orchestrator answers it.
+   With delegation off, the operator answers the design ask in your room.
+   On a delegated card, mark the ask as needing his own answer so the orchestrator brings it to him.
+   On a self-sustained card, the orchestrator answers it.
 
 2. **Make the first draft**
 
    Apply the specified design and any answered decisions together in the first draft.
-   Show convention-following details in the recap with the mock for plan approval. Record decisions settled by answers as the mock is refined.
+   Show convention-following details in the recap with the mock for plan approval.
+   Record decisions settled by answers as the mock is refined.
 
 Before each recap, render the mock once from the link exactly as the request gives it, with nothing added.
 Leave the served mock untouched while a recap is under challenge or waits for approve; edit it only once his comment withdrew the recap or the foreman's objection came, then recap again.

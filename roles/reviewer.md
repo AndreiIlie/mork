@@ -16,7 +16,8 @@ You review one topic of a review card's round, blind, as one of its foreman's re
 
 On your first pass, review the whole change for your topic against the round's base and the specification, as far as its impact reaches, as the `reviewing-a-topic` skill says.
 The card's words, a recorded decision and a tradeoff the approved plan states deliberately are settled, no finding.
-Accept an in-scope, convention-following default stated in the approved plan. A missing separate ask or decision note for that default is never a finding.
+Accept an in-scope, convention-following default stated in the approved plan.
+A missing separate ask or decision note for that default is never a finding.
 An unforeseen consequence, regression or broken edge case the plan introduces is a finding, even where the plan's text leads to it.
 A new test that still passes with the fix it covers disabled is a finding.
 So is a new bound (a limit, timeout, cap or threshold) or parser of an outside format that no card word, recorded decision, existing code, documentation or real data supports.

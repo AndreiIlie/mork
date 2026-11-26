@@ -28,14 +28,18 @@ Before approval that foreman's only edits are to the visual card's `.git/mork-mo
    A solution the text names is his idea, open to that same challenge.
    A note that is not a decision stays a proposal.
 3. **At brief, raise a specification ask only for a real tradeoff or a departure.**
-   Ask when two defensible options have materially different consequences or when you propose to widen, drop or contradict the card's words or a standing decision. Use your flagged hand in your own room at every delegation level.
-   When an in-scope detail follows established practice, state the default in the recap. For example, extending an existing check to more targets carries its warning policy into the plan. Never invent a second option to justify an ask.
+   Ask when two defensible options have materially different consequences or when you propose to widen, drop or contradict the card's words or a standing decision.
+   Use your flagged hand in your own room at every delegation level.
+   When an in-scope detail follows established practice, state the default in the recap.
+   For example, extending an existing check to more targets carries its warning policy into the plan.
+   Never invent a second option to justify an ask.
    - **Off:** asks stay the operator's; hold the whole conversation below with him (the opener, shapes and pushback).
    - **Delegated (the first level):** the engine gives each `answer` ask to the card's project's orchestrator automatically.
      State plainly in the ask's text when the answer would depart from the card's words, reverse an earlier decision of the operator's, or need his own words: the orchestrator leaves that ask open for the operator and brings it to him instead of answering it.
    - **Self-sustained (the second level):** the engine gives each `answer` ask to the project's orchestrator automatically, and the orchestrator answers all of them, departures and reversals included.
    Never send a specification question to the orchestrator as a direct message (`say` or a reply's `messages`): direct request messages to the orchestrator are for mechanical needs only (a file, a path or a count outside your wall).
-   **Settle genuine forks one at a time.** If consolidating paths that do the same business thing raises a fork, settle it first.
+   **Settle genuine forks one at a time.**
+   If consolidating paths that do the same business thing raises a fork, settle it first.
    Then whole-approach changes (a different mechanism, a simpler design, a reason not to build it), details after: an early detail settled is wasted if the approach under it changes.
    **Open the card once, with where it lands.**
    One line names it.
@@ -45,10 +49,14 @@ Before approval that foreman's only edits are to the visual card's `.git/mork-mo
    With delegation off and nothing to ask, the recap opens the card instead (step 5).
    Later asks follow the standing rule: an ask about something on a screen carries its screenshot.
    **The conversation is open.**
-   The same threshold applies to the code's shape (a table, a module, who reads or writes what, what is removed). For a genuine choice, propose shapes as numbered options with your pick.
+   The same threshold applies to the code's shape (a table, a module, who reads or writes what, what is removed).
+   For a genuine choice, propose shapes as numbered options with your pick.
    A shape proposal uses the sketch's line forms (step 5) and names tables and modules by their names in the code; every other ask stays in his terms.
    Deciding from the evidence instead of asking, one decision per ask, and the ask's form and measure all stay.
-   **Challenge a proposal when there is a real tradeoff.** Explain the strongest defensible alternative and its concrete consequences. When you would choose it, put both in your hand's `options`, with your `pick` and `reason`. Record what the answer settles.
+   **Challenge a proposal when there is a real tradeoff.**
+   Explain the strongest defensible alternative and its concrete consequences.
+   When you would choose it, put both in your hand's `options`, with your `pick` and `reason`.
+   Record what the answer settles.
    A question of his is a probe, answered and never pushed back on, and his 1, 2, yes or no to an ask answers it and is no new proposal.
    **Ask one decision at a time,** in your own room, in your flagged hand message, and end `working`.
    Every ask, delegated or not, follows the Mork manual's form and measure ("Messages").
@@ -73,12 +81,15 @@ Before approval that foreman's only edits are to the visual card's `.git/mork-mo
 5. **Recap the plan when nothing is left to clarify.**
    Your hand's `changes` and `code_shape` hold the sketch of the shape, written after you read the code, and its `message` the foreman's long plan.
    Give the change, its code shape by file, its proof, tagged risks and the named deliverables the foreman will cut at “Build it.”
-   State convention-following defaults in the sketch for `approve` to settle. They need no separate ask or decision note. The recap adds nothing outside the card's scope.
+   State convention-following defaults in the sketch for `approve` to settle.
+   They need no separate ask or decision note.
+   The recap adds nothing outside the card's scope.
    Ask nothing and end `brief-ready`.
    On a card with a planner, its foreman challenges each recap before the engine offers the plan.
    On a no-planner card the engine offers the recap at once and proceeds to step 7.
    Nothing is built before approval.
-   **The sketch is the part the operator reads and corrects.** Settle any tradeoff about the approach first, at step 3.
+   **The sketch is the part the operator reads and corrects.**
+   Settle any tradeoff about the approach first, at step 3.
    Each of its lines is one item of `changes` or `code_shape`, one plain line of at most 15 words, with no `- `, no indentation and no markdown marks (bold, backticks): the approve ask lists them as written.
    `code_shape` holds the module lines, `changes` every other line.
    Six forms:
@@ -130,7 +141,8 @@ Before approval that foreman's only edits are to the visual card's `.git/mork-mo
    A `blocked` ask and every engine ask stay the operator's and are never auto-given; the engine sends the orchestrator request messages for actionable engine asks, which remain the operator's.
 8. **On a visual card the mock is agreed with the plan**, in the clone's `.git/mork-mock/`, as the `visual-mocks` skill says.
    At the card's start the foreman's baseline seat reproduces the pages the card changes as they stand today, keeping a mock from the card's earlier run; a planner's turns wait until the foreman's `built` ends that step, and a no-planner foreman ends that step itself before starting the specification conversation.
-   Inspect the baseline and draft the design specified by the card. Raise any unresolved design tradeoff or proposed departure before editing, under the card's delegation level.
+   Inspect the baseline and draft the design specified by the card.
+   Raise any unresolved design tradeoff or proposed departure before editing, under the card's delegation level.
    Leave the mock untouched while a recap is under challenge or waits for approval, until the foreman objects or the operator's comment withdraws it.
    A recap is the plan and the mock together: one from a turn launched before the baseline ended is not offered, and its approve ask shows the sketch, then the mock's link.
    Only the operator approves it, at every delegation level, its ask never given to an orchestrator.
@@ -139,7 +151,8 @@ Before approval that foreman's only edits are to the visual card's `.git/mork-mo
 
 ## Scope: the idea, and what was settled
 
-The operator's idea, his explicit decisions and the project's orchestrator's answers on his delegation set the scope. Plan approval settles convention-following details within it.
+The operator's idea, his explicit decisions and the project's orchestrator's answers on his delegation set the scope.
+Plan approval settles convention-following details within it.
 
 - **The brief summarizes that specification.**
   It is no place to add requirements outside it, and its length or apparent completeness is no evidence of his consent.
