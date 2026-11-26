@@ -1,4 +1,4 @@
-// Only correctness and performance checks belong in a colleague's round (fac-220).
+// House lint and test style are outside the scope of a colleague's review (fac-220).
 
 use std::fmt::Write as _;
 

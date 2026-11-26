@@ -1,6 +1,5 @@
 //! Review cards, of a colleague's PR or branch, and our cards' PR reviews.
 
-// Only correctness and performance checks belong in a colleague's round (fac-220).
 pub mod cards;
 pub(crate) mod checks;
 pub mod end;
