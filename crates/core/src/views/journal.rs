@@ -100,13 +100,9 @@ pub struct Row {
 pub fn message(m: Message) -> Value {
     let mut v = serde_json::to_value(m).unwrap_or_default();
     let mut cut = false;
-    for (path, max) in [
-        ("/text", TEXT_MAX),
-        ("/headline", WORDS_MAX),
-        ("/hand/message", TEXT_MAX),
-        ("/hand/headline", WORDS_MAX),
-        ("/hand/ask", WORDS_MAX),
-    ] {
+    for (path, max) in
+        [("/text", TEXT_MAX), ("/headline", WORDS_MAX), ("/hand/message", TEXT_MAX), ("/hand/headline", WORDS_MAX)]
+    {
         if let Some(Value::String(s)) = v.pointer_mut(path) {
             cut |= trim(s, max);
         }

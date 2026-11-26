@@ -60,12 +60,12 @@ fn owed_turn(a: &Agent, job: &Job) -> bool {
 fn waiting_for(card: &Card) -> Option<(&'static str, &'static str)> {
     match card.stage {
         Stage::Brief if card.no_planner && super::mock::baseline(card) => {
-            Some(("brief", "`built` to end the baseline step, or a question in the hand's `ask`"))
+            Some(("brief", "`built` to end the baseline step, or a question in a flagged hand message"))
         }
-        Stage::Brief => Some(("brief", "`brief-ready` with a recap, or a question in the hand's `ask`")),
-        Stage::Build if super::mock::open(card) => {
-            card.no_planner.then_some(("build", "`brief-ready` with a mock offer, or a question in the hand's `ask`"))
-        }
+        Stage::Brief => Some(("brief", "`brief-ready` with a recap, or a question in a flagged hand message")),
+        Stage::Build if super::mock::open(card) => card
+            .no_planner
+            .then_some(("build", "`brief-ready` with a mock offer, or a question in a flagged hand message")),
         Stage::Build => Some(("build", "`built`")),
         Stage::Report if card.mode == Mode::Report => Some(("report", "`report-ready`")),
         Stage::Starting
@@ -108,7 +108,7 @@ fn effective(p: &Poster<'_>, card: &Card, who: &Who, r: &Reply, job: &Job) -> bo
 }
 
 fn brings_turn(p: &Poster<'_>, who: &Who, r: &Reply, routes: &[Route]) -> bool {
-    if !r.hand.ask.is_empty() || (r.hand.color == Color::Red && !r.hand.withdraw_ask) {
+    if r.hand.ask || (r.hand.color == Color::Red && !r.hand.withdraw_ask) {
         return true;
     }
     r.messages.iter().zip(routes).any(|(m, route)| {
@@ -134,11 +134,7 @@ pub fn raises_gate(p: &Poster<'_>, who: &Who, r: &Reply) -> bool {
 }
 
 pub(super) fn joined(base: &str, who: &Who, r: &Reply) -> String {
-    if r.hand.ask.is_empty() {
-        base.to_owned()
-    } else {
-        format!("{base} · {}: {}", who.role.as_str(), r.hand.ask_words())
-    }
+    if !r.hand.ask { base.to_owned() } else { format!("{base} · {}: {}", who.role.as_str(), r.hand.ask_words()) }
 }
 
 /// An agent that answers again, not blocked, has carried on: its `blocked` and `error` asks are
@@ -187,6 +183,7 @@ pub fn outcome(p: &mut Poster<'_>, who: &Who, r: &Reply, job: &Job, ctx: Ctx<'_>
                 Color::Yellow,
                 joined("the report is ready; /done ends the card", who, r),
             );
+            raise.seq = p.posted_hand(&mork_types::state::Sender::Agent(who.key.clone()));
             raise.design = asks::marked(p.state, who, r);
             asks::raise(p, raise);
         }
@@ -207,6 +204,7 @@ fn blocked(p: &mut Poster<'_>, who: &Who, r: &Reply) {
     let text = joined(&format!("{} is blocked: {}", who.key, r.hand.headline), who, r);
     let mut raise = Raise::new(&places::asks_room(p.state, who), AskKind::Blocked, Color::Red, text);
     raise.agent = Some(who.key.clone());
+    raise.seq = p.posted_hand(&mork_types::state::Sender::Agent(who.key.clone()));
     raise.design = asks::marked(p.state, who, r);
     asks::raise(p, raise);
 }

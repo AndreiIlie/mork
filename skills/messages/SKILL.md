@@ -22,7 +22,7 @@ An ask to the operator about something on a screen carries a screenshot of it wh
 For a web page, use the wall's headless Chromium, as the `visual-mocks` skill says.
 When the project has a preview skill of its own among your skills, follow its rendering rules.
 For an ask to the operator about Mork's native window, use the words shown on screen.
-To show the operator a layout or a mechanism, or to hand an agent a picture, put a screenshot or a diagram in your seat's `io/` (`MORK_IO`) and list its full path in the `images` of your hand (shown beside your message and ask) or of a message (carried into its recipient's turn).
+To show the operator a layout or a mechanism, or to hand an agent a picture, put a screenshot or a diagram in your seat's `io/` (`MORK_IO`) and list its full path in the `images` of your hand (shown beside the hand's message) or of a message (carried into its recipient's turn).
 The engine copies each file, so later edits don't change it.
 `mork ctl say <place> --kind <kind> <text>` gives it too.
 The news says each message with its kind's verb: `ex-550/foreman asks researcher-1: …`, `ex-550/researcher-1 answers foreman: …`, `ex-550/researcher-1 notes to foreman: …`.
@@ -35,20 +35,21 @@ The foreman and the planner write to each other by name, `planner` and `foreman`
 The planner answers the foreman's DM by `foreman/dm`, which reaches that seat alone.
 The operator's or an orchestrator's word naming the other room's seat is refused: `planner` in the build room, `foreman` in the spec room.
 Opening the planner's ask opens the spec room for the reply.
-A card started with no planner has one room: an unaddressed message there reaches its foreman at every stage, `planner` is refused, and the foreman holds the specification itself, raising open questions in its hand's `ask`.
-Never send the orchestrator a specification question as a message (`say` or a reply's `messages`): every specification question goes in your hand's `ask`, which the engine automatically gives to the project's orchestrator on a delegated or self-sustained card.
+A card started with no planner has one room: an unaddressed message there reaches its foreman at every stage, `planner` is refused, and the foreman holds the specification itself, raising open questions in its flagged hand message.
+Never send the orchestrator a specification question as a message (`say` or a reply's `messages`): every specification question goes in your flagged hand message, which the engine automatically gives to the project's orchestrator on a delegated or self-sustained card.
 Direct request messages to `orchestrator` are for mechanical needs only.
 
 Your session's start says exactly whom you reach from where you are; a change comes as a Mork announcement.
 Nothing counts an exchange's turns or stops it: loops are discouraged by what the kinds mean.
 
-**Writing to the operator,** only in your hand's `ask`, then ending your turn to wait for his answer:
+**Writing to the operator,** only in your flagged hand message, then ending your turn to wait for his answer:
 
-For a decision ask, the Mork manual's measure wins over every line below: cut what does not fit, never move it to the message or another ask.
+For a decision ask, the Mork manual's measure wins over every line below: cut what does not fit, never move it to another ask.
 An answer to his question is one or two plain sentences, detail only when he asks; a report he asked for is complete; a failure is in full.
 A planner or foreman whose system prompt carries the operator's output style writes by that style where it differs from this form and these lines.
 
-- His question is a question, never a hint: answer it first, yes or no, with what the code says, in your hand only (a message too shows it twice).
+- Take his question at face value.
+  Answer it first in your flagged hand message, with yes or no and what the code says.
   An angry question still wants an answer, not a build or a rewrite: his questions test the quality of your work.
 - Use plain language and one short question.
   When he asks why something happens, give the cause.
@@ -59,7 +60,7 @@ A planner or foreman whose system prompt carries the operator's output style wri
 - Propose the minimal version of a mechanism first: no derived statistics, no verification machinery he didn't ask for.
 - A proposal to change content (titles, texts, numbers) names the exact items and their old and new values within the decision ask's measure: a rule or a criterion alone doesn't show him the result.
   A report with no decision keeps the old and new values side by side in a short table.
-- He reads the ask alone, never the message before it: everything needed to answer goes in the ask, in his terms, what the person sees and does, never code names, except a question about the code's shape, which may name tables and modules as the sketch does; the message stays empty or one line, at most 15 words beside a decision ask.
+- Write everything needed to answer in the flagged message, in his terms, what the person sees and does, never code names, except a question about the code's shape, which may name tables and modules as the sketch does.
   A decision ask may carry a tiny worked example (bill 1000 = BL1 600 + BL2 400) or a rule's formula and one worked number in a line before the question; otherwise cut them.
   A question about a state may use screenshots labelled 1 and 2, your pick after the options.
   A report he asked for may keep its full examples and formulas.
@@ -71,10 +72,11 @@ A planner or foreman whose system prompt carries the operator's output style wri
 
 The options go in the hand's `options`, which the engine numbers; the pick's number in `pick`, its why in `reason`.
 
-Good, the message beside it empty:
+Good:
 
 ```text
-ask: Older bills carry the previous tenant's name.
+ask: true
+message: Older bills carry the previous tenant's name.
      Should a tenant see the bills from before their contract started?
 options: No: the list starts on the contract's first day.
          Yes: older bills show too, marked "before your contract".
@@ -83,19 +85,18 @@ reason: the previous tenant's name is personal.
 ```
 
 Bad, the same question.
-Message: fifteen lines of what was read, what happens today, what is taken as settled and what is still to come.
-Ask: "The card already says a tenant sees only their own apartment's bills, and the list is built per apartment (`BillList`).
+Message with `ask` true: "The card already says a tenant sees only their own apartment's bills, and the list is built per apartment (`BillList`).
 Should older bills show, and if they do, should the total count them?
 My pick is no for both.
 After this I will ask about the export and the email."
 
-What is wrong: what he needs sits in the message; it restates what the card settles; it holds two decisions; it trails the questions still to come after the ask, where each ask should stand alone; it names code; it offers no options.
+What is wrong: it restates what the card settles; it holds two decisions; it trails the questions still to come after the ask, where each ask should stand alone; it names code; it offers no options.
 
 Bad, one decision, the order and the numbering right, but too long.
-Message: "Older bills retain the previous tenant's name alongside the apartment and billing period, so the new tenant can identify who lived there."
 
 ```text
-ask: Older bills show the previous tenant's name alongside the apartment and billing period, so tenants may learn who lived there before their own contract started.
+ask: true
+message: Older bills show the previous tenant's name alongside the apartment and billing period, so tenants may learn who lived there before their own contract started.
      Should tenants who rent the apartment today be able to see those older bills with the previous tenant's name still visible alongside the other details shown on them, or not?
 options: No. Show older bills with the previous tenant's name hidden and keep the apartment and billing period visible.
          Yes. Show older bills with the previous tenant's name visible alongside the apartment and billing period, as they appear today.
@@ -104,13 +105,14 @@ reason: the previous tenant's name is personal information the current tenant do
 ```
 
 The question exceeds 25 words.
-The background line, each option, the reason and the message all exceed 15 words.
+The background line, each option, and the reason exceed 15 words.
 Cut the excess and keep the same decision and options.
 
-Cut version, the message beside it empty:
+Cut version:
 
 ```text
-ask: Older bills show the previous tenant's name.
+ask: true
+message: Older bills show the previous tenant's name.
      Should the current tenant see the previous tenant's name on older bills?
 options: No: hide the previous tenant's name.
          Yes: show the previous tenant's name.

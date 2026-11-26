@@ -32,7 +32,7 @@ pub fn challenge(p: &mut Poster<'_>, c: &mut Card, config: &Config) -> bool {
          the facts and what to reuse, and test the plan against your knowledge, best practices and outside \
          sources. Write, edit and commit nothing. Send every consequential objection to `planner` as one request, \
          strongest first, with what you would do instead, then end `working`. With none, end `working` with no \
-         request to the planner, an empty `ask` and no red hand: the engine then offers the plan. Your reply \
+         request to the planner, `ask` false and no red hand: the engine then offers the plan. Your reply \
          counts for this plan alone: a newer recap is challenged again.{}",
         mocked(c, config)
     );
@@ -83,13 +83,13 @@ pub fn replied(p: &mut Poster<'_>, c: &mut Card, who: &Who, r: &Reply, job: &Job
         return false;
     }
     let objected = objected(p.state, who, r, job);
-    if !objected && (!r.hand.ask.trim().is_empty() || r.hand.color == Color::Red) {
+    if !objected && (r.hand.ask || r.hand.color == Color::Red) {
         return false;
     }
     c.challenge = None;
     p.journal("challenge.answered", Some(c.id.as_str()), json!({"seq": seq, "objections": objected}));
     if !objected {
-        crate::lifecycle::brief::offer(p, c, ctx);
+        crate::lifecycle::brief::offer(p, c, ctx, None);
     }
     true
 }
@@ -183,7 +183,7 @@ fn foreman_rule(card: &Card) -> String {
          Write, edit and commit nothing. The operator's words in this build room reach you at every \
          stage: answer them, and send what would change the specification to `planner` as a request. Send your \
          objections to `planner` as one request, strongest first, and end `working`. \
-         With none, end `working` with no request to the planner, an empty `ask` and no red hand. \
+         With none, end `working` with no request to the planner, `ask` false and no red hand. \
          If the planner refuses an objection you still hold, tell it so as a request with your reasons: the planner \
          raises both positions in an ask, one objection at a time, at every delegation level. The plan's \
          approve hands you its build in this session.\n\n",

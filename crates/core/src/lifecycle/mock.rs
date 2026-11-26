@@ -107,14 +107,14 @@ pub(super) fn request(c: &Card, config: &Config) -> String {
     )
 }
 
-/// Where the mock is served, or that nothing serves it and the seat raises that in its hand's `ask`.
+/// Where the mock is served, or that nothing serves it and the seat raises that in its flagged hand message.
 pub(super) fn served(c: &Card, config: &Config) -> String {
     match (link(c, config), config.mork.vite.is_some()) {
         (Some(link), _) => format!(
             "which the engine serves with Vite at {link}, its `index.html` first, the clone readable so it can import the project's SASS and files; its output in `{LOG}`"
         ),
-        (None, true) => "but no port of Mork's range was free for its host, so nothing serves it: raise that in your hand's `ask`".to_owned(),
-        (None, false) => "but Mork has no Vite host set (mork.toml's `[mork] vite`), so nothing serves it: raise that in your hand's `ask`".to_owned(),
+        (None, true) => "but no port of Mork's range was free for its host, so nothing serves it: raise that in your flagged hand message".to_owned(),
+        (None, false) => "but Mork has no Vite host set (mork.toml's `[mork] vite`), so nothing serves it: raise that in your flagged hand message".to_owned(),
     }
 }
 
@@ -174,6 +174,7 @@ pub(super) fn replied(p: &mut Poster<'_>, c: &Card, who: &Who, r: &Reply, job: &
     }
     if first {
         let mut raise = Raise::new(who.place.as_str(), AskKind::Mock, Color::Yellow, text);
+        raise.seq = p.posted_hand(&mork_types::state::Sender::Agent(who.key.clone()));
         raise.agent = Some(who.key.clone());
         asks::raise(p, raise);
     }
@@ -187,7 +188,7 @@ pub(super) fn clear_offer(p: &Poster<'_>, c: &Card, who: &Who, r: &Reply, job: &
         && who.place.as_str() == crate::messages::places::room_of(&c.id, holder)
         && r.outcome == Outcome::BriefReady
         && open(c)
-        && super::brief::clear(&r.hand.ask)
+        && !r.hand.ask
         && r.hand.color != Color::Red
         && !r.hand.message.trim().is_empty()
         && read_request(p, who.place.as_str(), HEADLINE, 0, job)

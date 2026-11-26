@@ -168,6 +168,9 @@ With `--full`, each agent row of a card's room and DMs carries its `turn`: read 
 A view keeps only its agents' latest steps: `cut` says some went, and a text's own `cut` that it was cut.
 The card header's `about.seat_costs` gives each seat's current-run `agent`, `cost_cents`, `unknown` flag and four `tokens` sums, including seats already gone.
 Each agent row also carries an optional `cache` (`running`, or `idle` with `cold_at_ms`), and a card's room view carries `summaries` (its card's and each carried card's) and `findings` (its review card's raised findings with their states, without proofs).
+A schema 7 reply uses `hand.message` for its text and `hand.ask` to flag it as a question.
+A message carrying an open ask names its ID in `open_ask`.
+Each open hand links back through `seq` and `message_place` and carries the message's headline.
 A `screen` event's `hands` carry `cold_at_ms` while their waiting seat's prompt cache is idle, `projects` carries each project's look-back state, and `top.resources` carries the machine's sampled CPU and RAM.
 
 Example: `mork ctl watch main ex-550`, `mork ctl watch main --tail 50`; with turn traces, `mork ctl watch ex-550 --full`
@@ -254,7 +257,7 @@ Example: `mork ctl history main 4120 50`; with the turns, `mork ctl history ex-5
 ### history.search
 
 Finds the posted messages of cards' rooms and DMs and the cards' records holding any of the words, case-insensitive, as `memory.search` matches: those matching the most words first, then a card's text and notes, then the newest, at most 20.
-A message is searched by its headline, its text, its hand's ask and each of its findings' file, line, summary and proof.
+A message is searched by its headline, its text, any ask options and recommendation and each of its findings' file, line, summary and proof.
 A card's records are its title and text, each of its dated notes, and its journal events but its messages'; turns' transcripts are not searched.
 A card on a board is read as the engine last read its file, writes made after it ended included, its notes told apart as `card.show` tells them; one on no board as it was stored.
 
@@ -600,7 +603,7 @@ Its place is its DM, `<card>/<role>-<n>/dm`, nested under its card's row in the 
 It has a session of its own, which its later tasks resume: the foreman's message to it by name (`researcher-1`), or the operator's in its DM.
 The engine reports its `built`, `reported` or `blocked` to its parent in its parent's room (the spec room for a planner's researcher), reaching its running turn between tool calls or waking it for its next turn: it submits nothing, the foreman alone submits the card with its own `built`, after merging `origin/<base>` in that turn.
 Between a foreman's turns, a question, `blocked`, or a red hand outside a reviewer's verdict wakes it at once.
-A plain completion or a reviewer's verdict with an empty ask, reaching a foreman between its turns with no wake owed it, while another of its children is at work (its turn running, or one owed it that may start now: unpaused, any usage limit reset) is held: the held reports wake the foreman once, carrying their round, when its last child at work stops by any end, and stay held until a turn it launches with its news reads them.
+A plain completion or a reviewer's verdict with `ask` false, reaching a foreman between its turns with no wake owed it, while another of its children is at work (its turn running, or one owed it that may start now: unpaused, any usage limit reset) is held: the held reports wake the foreman once, carrying their round, when its last child at work stops by any end, and stay held until a turn it launches with its news reads them.
 A retry or correction keeps them.
 Resuming the foreman restores a wake that a stop or second cut dropped, after the replay if one is owed.
 A planner's researchers wake it per report.
@@ -669,7 +672,7 @@ That seat is the planner on a full card, a visual card's taking its first turn o
 `--no-planner` starts a full run with no planner: its foreman holds the specification at brief and after approval.
 The first turn goes to the foreman, once the clone is made, and its wall is the foreman's.
 On a visual no-planner card, "Build the baseline" comes first, and the foreman's `built` ends the baseline step and begins the specification conversation on the mock; otherwise "Agree the specification" comes first.
-It scouts, may give researchers questions, raises open questions in its hand's `ask` under the card's delegation level, records its decisions, and recaps the specification and code shape, its sketch in the hand's `changes` and `code_shape`.
+It scouts, may give researchers questions, raises open questions in its flagged hand message under the card's delegation level, records its decisions, and recaps the specification and code shape, its sketch in the hand's `changes` and `code_shape`.
 It ends `brief-ready`, an outcome offered to this foreman alone at brief past any baseline step and while a reopened mock is open.
 Before approval it writes, edits and commits nothing, except for edits in `.git/mork-mock/` on a visual card once the visual direction is confirmed after the baseline step.
 No seat challenges its recap: it is offered for `approve` at once (never self-approved), its `approve-brief` ask given automatically to the project's orchestrator on a delegated non-visual card, while a visual card's waits for the operator's own approve.
@@ -1325,7 +1328,7 @@ Example: `mork ctl test.done lease-1760600000000 0`
 Runs an operation on a machine outside your wall, through the engine.
 The engine reaches it over the operator's own access (his ssh alias, his account on the service) with the box's own tools, nothing of Mork's installed there, and reads the credentials itself: none is ever shown to you.
 
-`op` is one of `sql.select {query}`, `mongo.find {collection, filter?, projection?, sort?, limit?}`, `libra.get {endpoint, params?}`, `file.tail {log, lines?}`, `file.cat {root, path}`, `file.get {root, path}`, `sh.run {command, args?}`, `misc.run {argv}`; `mork ctl door --help` lists them, `mork ctl door --target <t> --help` describes a target.
+`op` is one of `sql.select {query}`, `mongo.find {collection, filter?, projection?, sort?, limit?}`, `http.get {endpoint, params?}`, `file.tail {log, lines?}`, `file.cat {root, path}`, `file.get {root, path}`, `sh.run {command, args?}`, `misc.run {argv}`; `mork ctl door --help` lists them, `mork ctl door --target <t> --help` describes a target.
 A request is resolved against the target's allowlist; an allowed call runs when its target is free.
 A `misc.run` becomes the operator's ask, answered with `door.once` or `door.no`.
 It opens in the build room on a two-room card and in your place otherwise.
@@ -1349,7 +1352,11 @@ A started call keeps running, except `sql.select`, which stops when its last cal
 A call dropped as busy or because its caller went answers no later request: asking again, in the same turn too, makes a new call.
 A queued non-read call nobody waits on, including an approved `misc.run` or a `sh.run` pending across a restart, has no queue time limit and runs when its target is free.
 
-Each operation keeps to its bounds: `sql.select` runs one read-only statement on any table the operator's login on the target may read, `information_schema` and the `sys` schema refused (appending `[targets.<id>.sql] schema_hint` when configured), a replica (`read_only = true` in its `[sql]`) with its own row cap and timeout; `mongo.find` only finds, its code-executing operators refused; `libra.get` runs any GET path at the configured API origin; `file.get` copies one regular file under a named root into the asking seat's `io/` folder (`MORK_IO`), at most 20 MB.
+Each operation keeps to its bounds: `sql.select` runs one read-only statement on any table the operator's login on the target may read, `information_schema` and the `sys` schema refused (appending `[targets.<id>.sql] schema_hint` when configured), a replica (`read_only = true` in its `[sql]`) with its own row cap and timeout; `mongo.find` only finds, its code-executing operators refused; `http.get` runs any GET path at the configured API origin; `file.get` copies one regular file under a named root into the asking seat's `io/` folder (`MORK_IO`), at most 20 MB.
+For `http.get`, `[targets.<id>.http]` sets the HTTPS `origin` and the OAuth2 `client` credential reference.
+The door obtains a token from `token_path` (default `/oauth2/token`) at that origin and uses it for the GET.
+It sends `scope` only when configured.
+Set `scope = "default"` if the service requires that literal value.
 An orchestrator's `file.get` outside a turn copies to `<mork home>/door/files/<call id>-<file name>` (`<call id>` is the action id), private to the operator's user and outside every wall.
 It is kept 14 days; the daily prune removes older copies.
 The answer's `file` gives the full path; the caller never chooses a destination.
@@ -1512,7 +1519,7 @@ The retired `[seats.mocker]` is refused as a config error.
 `[mork] vite` in mork.toml names a folder where the operator ran `npm install vite sass`: the engine serves the mock's folder with it on a second port of the card's, at `http://<card>.localhost:<port>/`, its output in `.git/mork-mock-host/host.log` in the clone, from its baseline step's opening until the card lands, closes or is done, or its mock is skipped.
 No command starts or stops it.
 Its host reads the clone and writes only its own `.git/mork-mock-host/`, where its configuration, cache and log live.
-With no `vite` set, or no free port, the mock runs unserved: the engine's requests say so, and the specification holder raises it in its hand's `ask`.
+With no `vite` set, or no free port, the mock runs unserved: the engine's requests say so, and the specification holder raises it in its flagged hand message.
 The card's seats get a line at their session's start with the mock's folder and link, and its review card's round request carries the link and says how the mock is judged.
 Kept on the card across restarts and its later full runs; `card.show` says `visual`.
 Answers `{"visual": {"card", "visual"}}`.

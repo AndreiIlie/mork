@@ -134,6 +134,9 @@ export interface Offer {
 }
 
 export interface HandView {
+  seq: number;
+  message_place: string;
+  headline: string;
   ask: string;
   place: string;
   card: string | null;
@@ -345,7 +348,7 @@ export interface ReplyHand {
   color: Color;
   headline: string;
   message: string;
-  ask: string;
+  ask: boolean;
   design?: boolean;
   withdraw_ask?: boolean;
   images?: string[];
@@ -383,7 +386,7 @@ export interface MessageView {
   hand: ReplyHand | null;
   findings: Finding[];
   images?: ImageView[];
-  ask_open?: boolean;
+  open_ask?: string;
   /** The option number an answer chose, when it chose one. */
   choice?: number;
 }

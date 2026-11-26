@@ -403,10 +403,10 @@ pub(super) fn first(card: &Card) -> String {
     format!(
         "Agree {id}'s specification, as the `agreeing-a-specification` skill says. Scout first: read the card \
          and what it names, and give researcher seats the other questions the plan depends on. Never decide a \
-         specification question alone: raise every open question in your hand's `ask` (on a delegated or \
+         specification question alone: raise every open question in your flagged hand message (on a delegated or \
          self-sustained card the engine gives it to the project's orchestrator automatically; never send a \
          specification question as a message to the orchestrator). Direct request messages to the orchestrator are \
-         for mechanical needs only. Answer a question of his in your hand's `ask`, never as a decision nor in a \
+         for mechanical needs only. Answer a question of his in your flagged hand message, never as a decision nor in a \
          recap. Once nothing needs clarifying, recap it asking nothing, with the sketch of its shape in \
          the hand's `changes` and `code_shape`, in the skill's plain line forms, the long plan in its `message`, and \
          end `brief-ready`. \
@@ -415,7 +415,7 @@ pub(super) fn first(card: &Card) -> String {
          Otherwise settle them with the foreman by messages, as long as it takes, changing the plan for the \
          objections you take, then recap it: your messages to `foreman` and its to you pass in the card's \
          challenge place, which no window shows. The operator's words reach you in this spec room, the foreman his in \
-         the build room. One it still holds after your refusal goes in your hand's `ask` with both \
+         the build room. One it still holds after your refusal goes in your flagged hand message with both \
          positions, one at a time, at every delegation level (never decide it alone). An offered plan never \
          approves itself: it raises an `approve-brief` ask (given to the project's orchestrator automatically on \
          a delegated non-visual card) and waits for `approve` from the operator, or from the project's orchestrator \
@@ -436,10 +436,10 @@ fn alone(card: &Card) -> String {
         "{id} has no planner: you hold its specification, at brief and after approval. Agree it as the \
          `agreeing-a-specification` skill says. Scout first: read the card and what it names, and give researcher \
          seats the other questions the plan depends on. {writes} Never decide a specification question alone: raise \
-         every open question in your hand's `ask` \
+         every open question in your flagged hand message \
          (on a delegated or self-sustained card the engine gives it to the project's orchestrator automatically; \
          never send a specification question as a message to the orchestrator). Direct request messages to the \
-         orchestrator are for mechanical needs only. Answer a question of his in your hand's `ask`, never as a \
+         orchestrator are for mechanical needs only. Answer a question of his in your flagged hand message, never as a \
          decision nor in a recap. Once nothing needs clarifying, recap it asking nothing, with the sketch of its \
          shape in the hand's `changes` and `code_shape`, in the skill's plain line forms, the long plan in its \
          `message`, and end `brief-ready`. No seat challenges it: an offered plan never approves itself; it raises an `approve-brief` \

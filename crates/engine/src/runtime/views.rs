@@ -48,7 +48,6 @@ fn trimmed(mut m: MessageView) -> MessageView {
     if let Some(h) = m.hand.as_mut() {
         h.message = cut_to(&h.message, TEXT_MAX).0;
         h.headline = cut_to(&h.headline, WORDS_MAX).0;
-        h.ask = cut_to(&h.ask, WORDS_MAX).0;
     }
     for f in &mut m.findings {
         f.proof = cut_to(&f.proof, WORDS_MAX).0;
@@ -156,7 +155,7 @@ fn bounded_messages(mut v: MessagesView) -> MessagesView {
 fn fit_messages(all: Vec<MessageView>, pinned: &mut Vec<MessageView>, left: usize) -> (Vec<MessageView>, usize) {
     let kept = newest_within(&all, VIEW_BUDGET.saturating_sub(size_of(pinned)).min(left));
     let cut = all.len() - kept.len();
-    pinned.extend(all.into_iter().take(cut).filter(|m| m.ask_open).map(trimmed));
+    pinned.extend(all.into_iter().take(cut).filter(|m| m.open_ask.is_some()).map(trimmed));
     (kept, cut)
 }
 
@@ -280,6 +279,7 @@ fn shorten(b: &mut BoardView, r: Rows) {
 
 fn bounded_screen(mut s: Screen) -> Screen {
     for h in &mut s.hands {
+        h.headline = cut_to(&h.headline, WORDS_MAX).0;
         // Large triage asks list every finding for the native window; keep them whole until LINE_BUDGET trims (fac-680).
         if h.kind != mork_types::ask::AskKind::Triage {
             h.words = cut_to(&h.words, WORDS_MAX).0;

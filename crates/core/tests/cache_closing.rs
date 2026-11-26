@@ -254,7 +254,8 @@ fn views_report_cache_state_and_waiting_hand_cold_at() {
 
     // Idle with an open ask shows Idle { cold_at_ms } in Context and cold_at_ms on HandView.
     let mut ask = reply("working", "Question");
-    ask["hand"]["ask"] = json!("Proceed?");
+    ask["hand"]["message"] = json!("Proceed?");
+    ask["hand"]["ask"] = json!(true);
     finish_with_tools(&mut s, &id, ask);
     let expected = agent(&s, PLANNER).last_turn_ms.unwrap() + cache::CLAUDE_MS;
 

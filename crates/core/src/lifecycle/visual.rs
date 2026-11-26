@@ -37,7 +37,7 @@ pub(super) fn toggle(state: &State, card: &CardId, on: bool, ctx: Ctx<'_>) -> De
     } else if on && !was && at_brief(&c) && c.recap && p.all_asks().any(|a| super::brief::is_given_plan(a, &id)) {
         // A visual card's plan is the operator's alone: replace a given plan ask with a fresh ungiven one that notifies him.
         let mut c = Card { recap: false, ..c };
-        super::brief::offer(&mut p, &mut c, ctx);
+        super::brief::offer(&mut p, &mut c, ctx, None);
         p.put_card(c);
     } else {
         p.put_card(c);

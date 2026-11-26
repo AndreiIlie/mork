@@ -49,7 +49,7 @@ pub fn apply(
     if parent.is_some() {
         p.close_answer(&who.key);
     } else {
-        answer_ask(p, who, reply, gate);
+        answer_ask(p, who, reply, gate, hand_seq);
     }
     p.journal(
         "reply",
@@ -111,29 +111,30 @@ fn message(
 fn companion(p: &Poster<'_>, who: &Who, reply: &Reply, m: &ReplyMessage, target: &Who) -> bool {
     let h = &reply.hand;
     let final_reply = matches!(reply.outcome, Outcome::ReviewPass | Outcome::ReviewFail);
-    let asks = !h.ask.trim().is_empty();
+    let asks = h.ask;
     let parent = p.agent(&who.key).and_then(|a| a.parent);
     final_reply && !asks && m.kind != Some(Intent::Request) && parent.as_ref() == Some(&target.key)
 }
 
-// An agent has at most one `answer` ask open: it stays until answered, replaced by this reply's `ask` or
+// An agent has at most one `answer` ask open: it stays until answered, replaced by this reply's flagged message or
 // withdrawn (fac-271); a red hand's headline is raised only when none is pending or withdrawn.
-fn answer_ask(p: &mut Poster<'_>, who: &Who, reply: &Reply, gate: bool) {
+fn answer_ask(p: &mut Poster<'_>, who: &Who, reply: &Reply, gate: bool, seq: u64) {
     let h = &reply.hand;
     let pending = p.all_asks().any(|a| a.kind == AskKind::Answer && a.open && a.agent.as_ref() == Some(&who.key));
-    let raised = if !h.ask.is_empty() {
+    let raised = if h.ask {
         Some((Color::Yellow, h.ask_words()))
     } else if h.color == Color::Red && !gate && !pending && !h.withdraw_ask {
         Some((Color::Red, h.headline.clone()))
     } else {
         None
     };
-    if !h.ask.is_empty() || h.withdraw_ask {
+    if h.ask || h.withdraw_ask {
         p.close_answer(&who.key);
     }
     let Some((color, text)) = raised.filter(|_| !gate) else { return };
     let place = places::asks_room(p.state, who);
     let mut r = super::asks::Raise::new(&place, AskKind::Answer, color, text);
+    r.seq = Some(seq);
     r.agent = Some(who.key.clone());
     r.design = super::asks::marked(p.state, who, reply);
     r.choices = (color == Color::Yellow).then(|| h.choices()).flatten();

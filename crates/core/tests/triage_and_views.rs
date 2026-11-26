@@ -238,7 +238,8 @@ fn views_fold_branch_review_and_map_hands_to_parent() {
 
     s.operator(json!({"say": {"place": rc, "text": "ping"}})).unwrap();
     let mut ask_reply = reply("working", "Question");
-    ask_reply["hand"]["ask"] = json!("Keep going?");
+    ask_reply["hand"]["message"] = json!("Keep going?");
+    ask_reply["hand"]["ask"] = json!(true);
     s.turn(&format!("{rc}/foreman"), ask_reply);
     let sc2 = screen(&s.state, &Outside::default(), s.ctx());
     let rev_hand = sc2.hands.iter().find(|h| h.place.as_str() == rc).unwrap();

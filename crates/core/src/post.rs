@@ -10,7 +10,7 @@ pub use agent::new_agent;
 use std::collections::BTreeMap;
 
 use mork_types::action::Action;
-use mork_types::ask::{Ask, AskKind, Color};
+use mork_types::ask::{Ask, AskKind};
 use mork_types::card::Card;
 use mork_types::state::{Agent, AgentStatus, Message, MessageKind, Owed, Place, Sender};
 use mork_types::{AgentKey, AskId, CardId};
@@ -413,22 +413,6 @@ impl<'a> Poster<'a> {
         }
         given.sort();
         given
-    }
-
-    pub fn ask(
-        &mut self,
-        id: mork_types::AskId,
-        place: &str,
-        kind: AskKind,
-        color: Color,
-        text: &str,
-        agent: Option<&AgentKey>,
-    ) {
-        let card = crate::messages::places::card_of(self.state, place);
-        let mut a = Ask::new(id.clone(), place, card, kind, color, text);
-        a.agent = agent.cloned();
-        a.raised_ms = self.now;
-        self.asks.insert(id, a);
     }
 
     /// Everything, as changes, with a journal line per message.

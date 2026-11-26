@@ -22,7 +22,11 @@ export function cardPath(id: string, hand?: string | null): string {
 
 /** Moves to `path` in this tab's history; App re-reads the route on `popstate`. */
 export function navigate(path: string): void {
-  if (path === window.location.pathname + window.location.search) return;
+  if (path === window.location.pathname + window.location.search) {
+    const hand = new URLSearchParams(window.location.search).get("hand");
+    if (hand) document.getElementById(hand)?.scrollIntoView({ block: "center" });
+    return;
+  }
   window.history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }

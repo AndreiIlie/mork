@@ -2,6 +2,7 @@
 //! `synchronous = FULL`, foreign keys on. The only place `rusqlite` appears (1.12.2).
 
 mod history;
+mod inline_asks;
 mod journal;
 mod journal_read;
 mod kept;
@@ -121,10 +122,14 @@ impl Store {
             return Err(wrong);
         }
         configure(&conn)?;
-        if version == 0 {
+        if version < schema::NEWEST {
             let tx = conn.transaction()?;
-            schema::create(&tx)?;
-            set_meta_in(&tx, "created_by", build)?;
+            if version == 0 {
+                schema::create(&tx)?;
+                set_meta_in(&tx, "created_by", build)?;
+            } else {
+                inline_asks::migrate(&tx)?;
+            }
             set_meta_in(&tx, "migrated_by", build)?;
             tx.pragma_update(None, "user_version", schema::NEWEST)?;
             tx.commit()?;

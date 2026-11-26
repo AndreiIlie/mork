@@ -140,8 +140,6 @@ fn open(p: &mut Poster<'_>, mut c: Card, rc: &Card, mut pending: PendingTriage, 
     pending.stalemate = stalemate.is_some();
     let color = if pending.stalemate { Color::Red } else { Color::Yellow };
     let text = ask_text(&c, rc, &pending, stalemate);
-    let ask = asks::raise(p, Raise::new(id.as_str(), AskKind::Triage, color, text));
-    pending.ask = ask;
     let count = pending.items.len();
     let (headline, notice) = match stalemate {
         Some((prev, repeated)) => (
@@ -153,7 +151,9 @@ fn open(p: &mut Poster<'_>, mut c: Card, rc: &Card, mut pending: PendingTriage, 
             ("findings wait for triage", format!("Review round {} failed: {count} {word} for triage.", pending.round))
         }
     };
-    crate::queue::members::say(p, &id, headline, &notice);
+    let mut raise = Raise::new(id.as_str(), AskKind::Triage, color, text);
+    raise.seq = Some(crate::queue::members::say(p, &id, headline, &notice));
+    pending.ask = asks::raise(p, raise);
     c.triage = Some(pending);
     p.put_card(c);
 }

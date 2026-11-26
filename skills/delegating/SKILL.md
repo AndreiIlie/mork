@@ -68,7 +68,7 @@ Use the least work that answers the task.
   Never wait or poll for it in that turn.
 - **Its report is no submission.**
   The engine's report of a child's finished, blocked, asking or red reply reaches you in your room, in your running turn between tool calls or by waking you for your next turn.
-  Between a foreman's turns, a plain completion or a reviewer's verdict with an empty ask waits while another child is at work.
+  Between a foreman's turns, a plain completion or a reviewer's verdict with `ask` false waits while another child is at work.
   The held reports wake the foreman once when its last child at work stops.
   A question, `blocked`, or a red hand outside a reviewer's verdict wakes it at once.
   A planner's researchers wake it each time.
@@ -78,4 +78,4 @@ Use the least work that answers the task.
   Read its report against the task before acting on it.
   Ask it to check again if the task needs more.
 - **A child's question** comes to you as a request.
-  Answer it from the card's specification; an open specification question goes to `planner` on a full card that has one, else in your hand's `ask` under the card's delegation level, then tell the child.
+  Answer it from the card's specification; an open specification question goes to `planner` on a full card that has one, else in your flagged hand message under the card's delegation level, then tell the child.
