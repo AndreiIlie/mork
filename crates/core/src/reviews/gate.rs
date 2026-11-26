@@ -344,13 +344,15 @@ fn new_card(p: &mut Poster<'_>, subject: &Card, base: &Sha, ctx: Ctx<'_>) -> Opt
 
 /// Linked branch reviews and our live cards' PRs use inside defaults; other reviews use outside defaults.
 pub fn kind(state: &State, rc: &Card) -> ReviewKind {
-    if subject_of(rc).is_some() || owner_of(state, rc).is_some() { ReviewKind::Inside } else { ReviewKind::Outside }
+    if reviewed_card_id(state, rc).is_some() { ReviewKind::Inside } else { ReviewKind::Outside }
 }
 
-// The existing PR ownership rule also determines its review policy (fac-469).
-fn owner_of<'a>(state: &'a State, rc: &Card) -> Option<&'a Card> {
-    let n = rc.pr.filter(|_| entry(rc))?;
-    crate::queue::approval::owner(state, rc.project.as_str(), n)
+/// The card whose specification a linked branch review or one of our PR reviews uses.
+pub fn reviewed_card_id<'a>(state: &'a State, rc: &'a Card) -> Option<&'a CardId> {
+    subject_of(rc).or_else(|| {
+        let pr = rc.pr.filter(|_| entry(rc))?;
+        crate::queue::approval::owner(state, rc.project.as_str(), pr).map(|owner| &owner.id)
+    })
 }
 
 /// A card's agents, its foreman and its reviewers.
@@ -422,10 +424,7 @@ pub fn ready(p: &mut Poster<'_>, mut rc: Card, c: &Cloned, installed: bool, ctx:
     rc.gates.review_asked = Some(open.commit.clone());
     rc.findings.clear();
     super::threads::keep(&mut rc, &c.threads);
-    let ours = match rc.pr.filter(|_| entry(&rc)) {
-        Some(n) => crate::queue::approval::owner(p.state, rc.project.as_str(), n).and_then(|c| p.card(&c.id)),
-        None => subject_of(&rc).map(|_| subject.clone()),
-    };
+    let ours = reviewed_card_id(p.state, &rc).and_then(|id| p.card(id));
     let text = super::rounds::request(p.state, &rc, &subject, &open, ours.as_ref(), c, ctx);
     p.put_card(rc.clone());
     let id = rc.id.clone();
