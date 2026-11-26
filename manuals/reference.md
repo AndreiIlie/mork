@@ -502,6 +502,9 @@ Example: `mork ctl pin 3f2a9c1`
 
 Switches the running mork to another build without stopping it: the given `target`, or the pin.
 
+Before the hold, the target build reads and validates the live `mork.toml` using its startup parser.
+If the file fails validation or the check cannot run, including on older builds that lack it, `reload` returns the error and the current build keeps running.
+
 After a short hold, and up to 10 s more for outward work in flight, the engine executes the target build in its place.
 The new build keeps the sockets and takes over running turns.
 It moves the pin to itself and says "Reloaded to … (from …)" and what it brought in main, the same text a wake line for Mork project's orchestrator when `[mork] project` is set (Waking, above).

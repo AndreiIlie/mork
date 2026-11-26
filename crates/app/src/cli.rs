@@ -48,6 +48,7 @@ pub fn run(args: &[String]) -> i32 {
             126
         }
         Some("version") => local::version(rest),
+        Some("--check-config") => local::check_config(),
         Some("work") => match rest.first() {
             Some(order) => match jobs::work::run(Path::new(order)) {
                 Ok(()) => 0,
