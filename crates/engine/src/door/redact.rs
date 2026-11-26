@@ -96,7 +96,7 @@ impl Redactor {
         let mut decoded = masked.clone();
         let mut hid = false;
         for _ in 0..DEPTH {
-            let next = unescape_json(&decoded);
+            let next = decode(&decoded, cut);
             if next == decoded {
                 return if hid { decoded } else { masked };
             }
@@ -151,23 +151,31 @@ pub(crate) fn uri_password(v: &str) -> Option<String> {
 
 /// JSON's string escapes decoded wherever they stand, surrogate pairs included.
 pub fn unescape_json(s: &str) -> String {
+    decode(s, false)
+}
+
+// A text cut at a bound drops an escape it ends inside, which spells nothing yet, so its tail
+// still shows the start of a secret.
+fn decode(s: &str, cut: bool) -> String {
     let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars().peekable();
+    let mut chars = s.chars();
     while let Some(c) = chars.next() {
         if c != '\\' {
             out.push(c);
             continue;
         }
+        if cut && cut_inside(chars.as_str()) {
+            break;
+        }
         match chars.next() {
-            Some('u') => {
-                let hex: String = chars.by_ref().take(4).collect();
-                let Ok(hi) = u32::from_str_radix(&hex, 16) else {
-                    out.push_str("\\u");
-                    out.push_str(&hex);
-                    continue;
-                };
-                out.push(surrogate(hi, &mut chars).unwrap_or('\u{fffd}'));
-            }
+            // A malformed `\u` keeps what follows, which may be an escape of its own.
+            Some('u') => match hex4(chars.as_str()) {
+                Some(hi) => {
+                    chars.nth(3);
+                    out.push(surrogate(hi, &mut chars).unwrap_or('\u{fffd}'));
+                }
+                None => out.push_str("\\u"),
+            },
             Some(e @ ('"' | '\\' | '/')) => out.push(e),
             Some('n') => out.push('\n'),
             Some('t') => out.push('\t'),
@@ -184,18 +192,34 @@ pub fn unescape_json(s: &str) -> String {
     out
 }
 
-fn surrogate(hi: u32, chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<char> {
+// Exactly four hex digits, as JSON writes them: no sign, no fewer.
+fn hex4(s: &str) -> Option<u32> {
+    let h = s.get(..4).filter(|h| h.bytes().all(|b| b.is_ascii_hexdigit()))?;
+    u32::from_str_radix(h, 16).ok()
+}
+
+// Whether the text ends inside the escape after this backslash: a lone `\`, a `\u` short of four
+// digits, or a high surrogate short of its low half.
+fn cut_inside(rest: &str) -> bool {
+    let short = |r: &str| r.len() < 5 && r.strip_prefix('u').is_some_and(|h| h.bytes().all(|b| b.is_ascii_hexdigit()));
+    if rest.is_empty() || short(rest) {
+        return true;
+    }
+    let Some(hi) = rest.strip_prefix('u').and_then(hex4) else { return false };
+    let low = rest.get(5..).unwrap_or_default();
+    (0xD800..0xDC00).contains(&hi)
+        && (low.is_empty() || low.strip_prefix('\\').is_some_and(|l| l.is_empty() || short(l)))
+}
+
+fn surrogate(hi: u32, chars: &mut std::str::Chars<'_>) -> Option<char> {
     if !(0xD800..0xDC00).contains(&hi) {
         return char::from_u32(hi);
     }
-    let rest: String = chars.clone().take(6).collect();
-    let lo = rest.strip_prefix("\\u").and_then(|h| u32::from_str_radix(h, 16).ok())?;
+    let lo = chars.as_str().strip_prefix("\\u").and_then(hex4)?;
     if !(0xDC00..=0xDFFF).contains(&lo) {
         return None;
     }
-    for _ in 0..6 {
-        chars.next();
-    }
+    chars.nth(5);
     char::from_u32(0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00))
 }
 
@@ -274,6 +298,31 @@ mod tests {
         let masked = r.mask_json(&lines);
         assert!(!unescape_json(&masked).contains("SENTINEL-key"), "{masked}");
         assert_eq!(unescape_json(r#"\ud83d\ude00 \u0053"#), "\u{1f600} S");
+    }
+
+    // fac-748 review r1 (findings 5, 6): a malformed `\u` swallows no escape after it, and a text cut
+    // inside an escape still masks the secret it began.
+    #[test]
+    fn fac748_malformed_and_cut_escapes_hide_no_secret() {
+        let mut r = Redactor::default();
+        r.add("SENTINEL-key-99");
+        for t in [r"C:\usr\u0053ENTINEL-key-99", r"\u12\u0053ENTINEL-key-99", r#"\u"\u0053ENTINEL-key-99""#] {
+            assert!(r.mask_text(t, false).contains(MASK), "unmasked: {t}");
+        }
+        assert!(r.mask_json(r#"{"msg":"C:\\usr\\u0053ENTINEL-key-99"}"#).contains(MASK));
+        for t in [r#"{"pw": "\u0053ENTINEL-key\u00"#, r#"{"pw": "SENTINEL-key\u"#, r#"{"pw": "SENTINEL-key\"#] {
+            assert_eq!(r.mask_text(t, true), format!(r#"{{"pw": "{MASK}"#), "{t}");
+        }
+        let mut r = Redactor::default();
+        r.add("SENTINEL-\u{1f511}-99");
+        for t in [r"SENTINEL-\ud83d", r"SENTINEL-\ud83d\", r"SENTINEL-\ud83d\udd"] {
+            assert_eq!(r.mask_text(t, true), MASK, "{t}");
+        }
+        assert_eq!(
+            unescape_json(r"\u12\u0053 \u+053 \ud83d"),
+            "\\u12S \\u+053 \u{fffd}",
+            "uncut text keeps what it can't decode"
+        );
     }
 
     fn decoded_fully(text: &str) -> String {

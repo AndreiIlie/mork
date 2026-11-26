@@ -9,7 +9,7 @@ const MAX_QUERY: usize = 16 * 1024;
 /// One token.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Tok {
-    /// A bare word: a keyword or a name, as written; a number running into letters is one.
+    /// A bare word: a keyword or a name, as written; an integer running into letters is one.
     Word(String),
     /// A name in backticks.
     Quoted(String),
@@ -55,6 +55,16 @@ pub(super) fn tokens(q: &str) -> Result<Vec<Token>, String> {
 
 /// Reads a fragment starting after `offset` characters of the original query (fac-417).
 pub(super) fn fragment(q: &str, offset: usize) -> Result<Vec<Token>, String> {
+    walk(q, offset, false)
+}
+
+/// As `fragment`, for an executable comment's body: a line comment there must end inside it.
+pub(super) fn executed(q: &str, offset: usize) -> Result<Vec<Token>, String> {
+    walk(q, offset, true)
+}
+
+// A server running an executable comment reads a `#` or `-- ` comment in it on past its `*/`.
+fn walk(q: &str, offset: usize, closed_lines: bool) -> Result<Vec<Token>, String> {
     let b = q.as_bytes();
     let mut out: Vec<Token> = Vec::new();
     let (mut i, mut spaced) = (0, false);
@@ -65,6 +75,11 @@ pub(super) fn fragment(q: &str, offset: usize) -> Result<Vec<Token>, String> {
         }
         let located = |e| format!("{e} at character {}", offset + q[..i].chars().count() + 1);
         if let Some(end) = comment(q, i).map_err(located)? {
+            if closed_lines && !q[i..].starts_with("/*") && !q[i..end].ends_with('\n') {
+                return Err(located(
+                    "a line comment in an executable comment isn't read: the server reads it past `*/`".into(),
+                ));
+            }
             (i, spaced) = (end, true);
             continue;
         }
@@ -100,11 +115,18 @@ fn comment(q: &str, i: usize) -> Result<Option<usize>, String> {
 fn token(q: &str, i: usize) -> Result<(Tok, usize), String> {
     if q[i..].starts_with("/*+") {
         let end = q[i + 3..].find("*/").ok_or("an optimizer hint isn't closed")?;
+        if open_quote(&q[i + 3..i + 3 + end]) {
+            return Err("a quote in an optimizer hint isn't closed before its `*/`".into());
+        }
         let at = i + 3 + end + 2;
         return Ok((Tok::Hint(q[i..at].to_owned()), at));
     }
     if q[i..].starts_with("/*!") || q[i..].starts_with("/*M!") {
         let end = q[i + 2..].find("*/").ok_or("an executable comment isn't closed")?;
+        // A server skipping a newer version's comment closes one nested `/*` first.
+        if q[i + 2..i + 2 + end].contains("/*") {
+            return Err("a comment inside an executable comment isn't read: the server may end it later".into());
+        }
         let at = i + 2 + end + 2;
         return Ok((Tok::Exec(q[i..at].to_owned()), at));
     }
@@ -122,6 +144,20 @@ fn token(q: &str, i: usize) -> Result<(Tok, usize), String> {
         }
         _ => sym(q, i),
     }
+}
+
+// MySQL's hint parser reads quotes, doubled but never escaped, and no comments: a `*/` inside one
+// of its quotes doesn't end the hint.
+fn open_quote(body: &str) -> bool {
+    let mut open = None;
+    for c in body.chars() {
+        match open {
+            None if matches!(c, '\'' | '"' | '`') => open = Some(c),
+            Some(o) if c == o => open = None,
+            None | Some(_) => {}
+        }
+    }
+    open.is_some()
 }
 
 // MySQL's unquoted names: ASCII letters, digits, `_`, `$`, and any character beyond ASCII.
@@ -145,8 +181,8 @@ fn sym(q: &str, i: usize) -> Result<(Tok, usize), String> {
     Err(format!("`{}` isn't read in a query", ch.escape_debug()))
 }
 
-// As MySQL reads it: digits running into a name's characters (`1abc`, `0x1f`) are a name to the
-// gate, never a number followed by a keyword.
+// As MySQL reads it: an integer running into a name's characters (`1abc`, `0x1f`) is a name to the
+// gate, while a fraction or an exponent ends the number before a keyword (`1.5FOR`, `1e0INTO`).
 fn number(q: &str, i: usize) -> (Tok, usize) {
     let b = q.as_bytes();
     let digits = |mut j: usize| {
@@ -156,6 +192,7 @@ fn number(q: &str, i: usize) -> (Tok, usize) {
         j
     };
     let mut j = digits(i);
+    let integer = j;
     if b.get(j) == Some(&b'.') {
         j = digits(j + 1);
     }
@@ -165,7 +202,7 @@ fn number(q: &str, i: usize) -> (Tok, usize) {
             j = digits(k);
         }
     }
-    if q[j..].chars().next().is_some_and(ident) {
+    if j == integer && q[j..].chars().next().is_some_and(ident) {
         let end = word_end(q, j);
         return (Tok::Word(q[i..end].to_owned()), end);
     }
@@ -274,6 +311,20 @@ mod tests {
                 }
             }
         }
+    }
+
+    // fac-748 review r1 (finding 2): MySQL ends a fraction or an exponent at its last digit.
+    #[test]
+    fn fac748_a_fraction_or_an_exponent_ends_before_a_keyword() {
+        let num = |n: &str| Tok::Num(n.into());
+        let word = |w: &str| Tok::Word(w.into());
+        assert_eq!(
+            toks("SELECT 1.0INTO, .5FOR, 1e+0LOCK, 1.e5x")[1..],
+            [num("1.0"), word("INTO"), Tok::Sym(","), num(".5"), word("FOR"), Tok::Sym(",")]
+                .into_iter()
+                .chain([num("1e+0"), word("LOCK"), Tok::Sym(","), num("1.e5"), word("x")])
+                .collect::<Vec<_>>()
+        );
     }
 
     // Unclosed literals or a NUL could hide a statement boundary from the client or the gate.

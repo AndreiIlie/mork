@@ -3,7 +3,7 @@
 
 use std::ops::Range;
 
-use super::lex::{Tok, Token, fragment, tokens};
+use super::lex::{Tok, Token, executed, fragment, tokens};
 
 // The words a read begins with; a leading `(` is a SELECT's too.
 const LEADS: &[&str] = &["SELECT", "WITH", "TABLE", "VALUES", "SHOW", "DESCRIBE", "DESC", "EXPLAIN"];
@@ -12,21 +12,27 @@ const LEADS: &[&str] = &["SELECT", "WITH", "TABLE", "VALUES", "SHOW", "DESCRIBE"
 /// every database's tables and can overload or crash the server.
 pub(super) const SCHEMA_REFUSED: &str = "refused: reading information_schema or the sys schema is not allowed because it scans metadata across every database on the server.";
 
-// Reserved words can be identifiers after a period or function names before `(`.
+// Reserved words can be identifiers after a period; INSERT and REPLACE are function names before `(`.
 const WRITES: &[&str] = &["INSERT", "UPDATE", "DELETE", "REPLACE"];
 
-/// A query past the read gate, parsed once: its tokens and every view its executable comments give.
+/// A query past the read gate, parsed once: its tokens, every view its executable comments give,
+/// and its optimizer hints, which no view holds.
 pub struct Read<'q> {
     query: &'q str,
     toks: Vec<Token>,
     views: Vec<Vec<Token>>,
+    hints: Vec<Token>,
 }
 
 /// Reads `query`, or says why it isn't a read: one statement that leads as a read, with no write,
 /// INTO, lock (but under a plain EXPLAIN) or (inside an executable comment) hidden statement of any of these.
 pub fn read(query: &str) -> Result<Read<'_>, String> {
     let toks = tokens(query)?;
-    let views: Vec<Vec<Token>> = Scan::new(query, &toks)?.views().collect();
+    let scan = Scan::new(query, &toks)?;
+    for t in &scan.hints {
+        hint(&query[t.at.clone()], query[..t.at.start].chars().count())?;
+    }
+    let views: Vec<Vec<Token>> = scan.views().collect();
     for parts in &views {
         let Some(first) = parts.first() else { continue };
         let leads = first.tok == Tok::Sym("(")
@@ -42,17 +48,15 @@ pub fn read(query: &str) -> Result<Read<'_>, String> {
         for (n, t) in parts.iter().enumerate() {
             refused(t, parts[..n].last(), parts.get(n + 1), plans)?;
             schema(parts, n)?;
-            match &t.tok {
-                Tok::Hint(body) => hint(body, query[..t.at.start].chars().count())?,
-                Tok::Sym(";") => return Err("more than one statement: one read at a time".into()),
-                Tok::Word(_) | Tok::Quoted(_) | Tok::Num(_) | Tok::Str(_) | Tok::Exec(_) | Tok::Sym(_) => {}
+            if t.tok == Tok::Sym(";") {
+                return Err("more than one statement: one read at a time".into());
             }
         }
     }
     if views.iter().all(Vec::is_empty) {
         return Err("the query is empty".into());
     }
-    Ok(Read { query, toks, views })
+    Ok(Read { query, toks, views, hints: scan.hints })
 }
 
 impl Read<'_> {
@@ -104,10 +108,8 @@ impl Read<'_> {
 
     /// Whether the query's hints keep its server's time limit, the call's `timeout_ms` (fac-183).
     pub fn timed(&self, timeout_ms: u64) -> Result<(), String> {
-        for t in self.views.iter().flatten() {
-            if let Tok::Hint(body) = &t.tok {
-                hint_time(body, self.query[..t.at.start].chars().count(), timeout_ms)?;
-            }
+        for t in &self.hints {
+            hint_time(&self.query[t.at.clone()], self.query[..t.at.start].chars().count(), timeout_ms)?;
         }
         Ok(())
     }
@@ -219,7 +221,8 @@ fn refused(t: &Token, previous: Option<&Token>, next: Option<&Token>, plans: boo
     if plans && after_for && up == "UPDATE" {
         return Ok(());
     }
-    if WRITES.contains(&up.as_str()) && !next.is_some_and(|n| n.tok == Tok::Sym("(")) {
+    let function = matches!(up.as_str(), "INSERT" | "REPLACE") && next.is_some_and(|n| n.tok == Tok::Sym("("));
+    if WRITES.contains(&up.as_str()) && !function {
         return Err(format!("`{up}` writes: the door only reads"));
     }
     if up == "INTO" {
@@ -248,18 +251,24 @@ fn schema(parts: &[Token], n: usize) -> Result<(), String> {
     Ok(())
 }
 
-// Executable guards must not hide a write or a LIMIT from the read gate.
+// Executable guards must not hide a write or a LIMIT from the read gate. A hint stands outside
+// every view: the server reads it as no SQL, so it may not split a lock, a schema or a LIMIT.
 struct Scan {
     parts: Vec<(Token, Option<(bool, u64)>)>,
     versions: std::collections::BTreeSet<u64>,
+    hints: Vec<Token>,
 }
 
 impl Scan {
     fn new(query: &str, toks: &[Token]) -> Result<Self, String> {
-        let mut scan = Self { parts: Vec::new(), versions: [0].into() };
+        let mut scan = Self { parts: Vec::new(), versions: [0].into(), hints: Vec::new() };
         for t in toks {
             let Tok::Exec(whole) = &t.tok else {
-                scan.parts.push((t.clone(), None));
+                if matches!(t.tok, Tok::Hint(_)) {
+                    scan.hints.push(t.clone());
+                } else {
+                    scan.parts.push((t.clone(), None));
+                }
                 continue;
             };
             let maria = whole.starts_with("/*M!");
@@ -269,7 +278,7 @@ impl Scan {
             let version = body[..skip].parse::<u64>().unwrap_or(0);
             scan.versions.insert(version);
             let offset = query[..t.at.start + start + skip].chars().count();
-            for mut inner in fragment(&body[skip..], offset)? {
+            for mut inner in executed(&body[skip..], offset)? {
                 if matches!(inner.tok, Tok::Exec(_) | Tok::Sym(";")) {
                     return Err("a statement delimiter or nested executable comment isn't read".into());
                 }
@@ -381,6 +390,37 @@ mod tests {
                 let _ = partial.timed(1000);
             }
         }
+    }
+
+    // fac-748 review r1 (findings 1-4): what the server reads past a comment's `*/`, after a
+    // number's last digit, around a hint or after UPDATE stays in the gate's view.
+    #[test]
+    fn fac748_comments_numbers_hints_and_parentheses_hide_no_write() {
+        refuses(&[
+            "SELECT /*!50000 # */ '\n1 */ INTO OUTFILE \"/tmp/x\" -- '",
+            "SELECT a FROM t /*!50000 -- */ '\n*/ FOR UPDATE -- '",
+            "SELECT 1 /*M!100000 # */ , '\n*/ INTO @v -- '",
+            "SELECT 1 /*!99999 '/*' */ '*/ INTO OUTFILE \"/x\" -- '",
+            "SELECT 1.0INTO OUTFILE '/tmp/x'",
+            "SELECT .5INTO @v",
+            "SELECT 1e+0INTO @v",
+            "SELECT a FROM t WHERE x = 1.5FOR SHARE",
+            "SELECT a FROM t FOR /*+ */ SHARE",
+            "SELECT * FROM sys /*+ */ .version",
+            "SHOW TABLES IN /*+ */ sys",
+            "WITH c AS (SELECT 1) UPDATE (t) SET a = 1",
+            "WITH c AS (SELECT 1) DELETE (t) FROM t",
+            "SELECT /*+ BKA('\\'') */ ' */ 1 INTO @v -- '",
+            "SELECT /*+ # ' */ ' */ 1 INTO @v -- '",
+        ]);
+        for q in ["SELECT 1 /*!50000 # a note\n + 1 */", "SELECT REPLACE(a, 'x', 'y'), INSERT(a, 1, 2, 'z') FROM t"] {
+            assert!(read(q).is_ok(), "refused: {q}");
+        }
+        for q in ["SELECT a FROM t WHERE x = 1.5LIMIT 999999", "SELECT a FROM t LIMIT 0 /*+ */ , 999999"] {
+            assert!(!read(q).unwrap().capped(20).unwrap().contains("999999"), "uncapped: {q}");
+        }
+        assert!(read("SELECT 1 /*+ SET_VAR(sql_mode = '') */").is_err());
+        assert!(read("SELECT /*+ MAX_EXECUTION_TIME(0) */ 1").unwrap().timed(1000).is_err());
     }
 
     #[test]
