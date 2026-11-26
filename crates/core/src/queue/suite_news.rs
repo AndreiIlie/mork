@@ -24,14 +24,14 @@ pub(crate) fn told(p: &mut Poster<'_>, id: &CardId) {
 
 fn to(told: &Told) -> &CardId {
     match told {
-        Told::Operator { card, .. } | Told::Agent { card, .. } | Told::Fix { card, .. } => card,
+        Told::Operator { card, .. } | Told::Foreman { card, .. } | Told::Fix { card, .. } => card,
     }
 }
 
 fn with_text(told: Told, f: impl Fn(&str) -> String) -> Told {
     match told {
         Told::Operator { card, text } => Told::Operator { card, text: f(&text) },
-        Told::Agent { card, role, headline, text } => Told::Agent { card, role, headline, text: f(&text) },
+        Told::Foreman { card, headline, text } => Told::Foreman { card, headline, text: f(&text) },
         Told::Fix { card, mut fix } => {
             fix.text = f(&fix.text);
             Told::Fix { card, fix }
@@ -47,8 +47,8 @@ fn pointed(text: &str, path: &str) -> String {
 fn deliver(p: &mut Poster<'_>, told: Told) {
     match told {
         Told::Operator { card, text } => crate::reviews::cards::to_operator(p, &card, &text),
-        Told::Agent { card, role, headline, text } => {
-            crate::messages::requests::ask_agent(p, &card, role, &headline, &text);
+        Told::Foreman { card, headline, text } => {
+            crate::messages::requests::ask_fix_or_join(p, &card, &headline, &text);
         }
         Told::Fix { card, fix } => super::joins::hold_fix(p, &card, fix),
     }

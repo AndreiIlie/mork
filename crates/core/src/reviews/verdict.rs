@@ -306,5 +306,5 @@ fn back(p: &mut Poster<'_>, c: Card, rc: &Card, round: &Round, said: &str, ctx: 
         let why = format!("its review round {} failed", round.n);
         return crate::queue::members::leave(p, c, &why, &text, ctx);
     }
-    crate::messages::requests::ask_agent(p, &id, Role::Foreman, &format!("Review round {} failed", round.n), &text);
+    crate::messages::requests::ask_fix_or_join(p, &id, &format!("Review round {} failed", round.n), &text);
 }

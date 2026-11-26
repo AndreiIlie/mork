@@ -12,6 +12,7 @@ pub fn new_agent(who: &Who) -> Agent {
         session: None,
         session_started: false,
         needs_specification: false,
+        fix_or_join: None,
         status: AgentStatus::Idle,
         owed: None,
         seen: 0,

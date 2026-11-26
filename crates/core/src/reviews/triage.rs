@@ -6,7 +6,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use mork_types::ask::{AskKind, Color};
 use mork_types::card::{Card, Landing, Stage};
 use mork_types::landing::HeldRound;
-use mork_types::reply::Role;
 use mork_types::review::{PendingTriage, Raised, Round, TriageItem, Verdict};
 use mork_types::state::Sender;
 use mork_types::suites::Told;
@@ -393,12 +392,7 @@ fn send_chosen(
     if pending.from_verification {
         crate::queue::members::send_return_request(p, &c, pending.tip.clone(), &text, ctx);
     } else {
-        let told = Told::Agent {
-            card: id.clone(),
-            role: Role::Foreman,
-            headline: format!("Review round {} failed", pending.round),
-            text,
-        };
+        let told = Told::Foreman { card: id.clone(), headline: format!("Review round {} failed", pending.round), text };
         crate::queue::suite_news::send(p, &id, told);
     }
     crate::queue::suite_news::told(p, &id);

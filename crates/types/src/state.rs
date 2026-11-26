@@ -199,6 +199,9 @@ pub struct Agent {
     /// Compaction requires the next prompt to restore the card specification (fac-737).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub needs_specification: bool,
+    /// Latest fix or join request awaiting a turn of news. A retry reads its own prompt first.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix_or_join: Option<u64>,
     pub status: AgentStatus,
     pub owed: Option<Owed>,
     /// The last message seq the agent has seen, for its news.
@@ -296,6 +299,9 @@ pub struct Agent {
 pub struct Ran {
     pub turns: u32,
     pub tools: bool,
+    /// A reported compaction stays relevant across ordinary turns until this session ends.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub compacted: bool,
     /// `turns` when its latest closing turn was answered (fac-670).
     #[serde(default)]
     pub closed: u32,
