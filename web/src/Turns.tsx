@@ -37,7 +37,7 @@ function DetailRow({ d }: { d: Detail }) {
 
 function StepRow({ st, before, runs, nowMs }: { st: StepView; before: number; runs: boolean; nowMs: number }) {
   const [open, setOpen] = useState(false);
-  const raw = st.command && st.command.text + (st.command.cut ? "…" : "");
+  const raw = st.command?.text ? st.command.text + (st.command.cut ? "…" : "") : undefined;
   return (
     <li>
       <button
