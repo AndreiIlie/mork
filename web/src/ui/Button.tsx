@@ -4,11 +4,13 @@ const BASE =
   "inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap border font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 const SIZE = {
+  control: "h-7 px-3 text-label-13",
   md: "h-[30px] px-3 text-label-13",
   sm: "h-[26px] px-[10px] text-label-12",
 } as const;
 
 const SQUARE = {
+  control: "h-7 w-7 text-label-13",
   md: "h-[30px] w-[30px] text-label-13",
   sm: "h-[26px] w-[26px] text-label-12",
 } as const;
@@ -37,7 +39,7 @@ export interface ButtonProps extends AriaAttributes {
 
 const PRESSED = "border-gray-1000 bg-gray-200 text-gray-1000";
 
-/** Symmetric sharp-corner button in three tiers and two sizes, optionally square. */
+/** Symmetric sharp-corner button in three tiers and three sizes, optionally square. */
 export function Button({
   tier,
   size = "md",

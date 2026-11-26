@@ -162,7 +162,7 @@ function turnNote(turn: ChatTurn, nowMs: number): string {
 }
 
 /** One ended turn folded like a marker line where it ran in its stream; clicking unfolds its latest 8 steps. */
-export function EndedTurnRow({ turn, tzOffsetMin, nowMs }: { turn: ChatTurn; tzOffsetMin: number; nowMs: number }) {
+export function EndedTurnRow({ reviewForeman, turn, tzOffsetMin, nowMs }: { reviewForeman?: string; turn: ChatTurn; tzOffsetMin: number; nowMs: number }) {
   const [open, setOpen] = useState(false);
   const { end } = turnBounds(turn, nowMs);
   return (
@@ -173,7 +173,7 @@ export function EndedTurnRow({ turn, tzOffsetMin, nowMs }: { turn: ChatTurn; tzO
         aria-expanded={open}
         className="flex w-full cursor-pointer items-center gap-3 text-left text-label-12 text-gray-700 hover:text-gray-900"
       >
-        <span className="shrink-0 font-mono">{agentSeatName(turn.agent)} worked</span>
+        <span className="shrink-0 font-mono">{turn.agent === reviewForeman ? "review foreman" : agentSeatName(turn.agent)} worked</span>
         <span className="min-w-0 truncate">{turnNote(turn, nowMs)}</span>
         <span className="h-px min-w-6 flex-1 bg-gray-400" />
         {end !== undefined && <span className="shrink-0 font-mono tabular-nums">{clockTime(end, tzOffsetMin)}</span>}
@@ -188,7 +188,7 @@ export function EndedTurnRow({ turn, tzOffsetMin, nowMs }: { turn: ChatTurn; tzO
 }
 
 /** The live turn shows three recent actions until expanded. */
-export function ActivityTracker({ turn, nowMs }: { turn: ChatTurn; nowMs: number }) {
+export function ActivityTracker({ reviewForeman, turn, nowMs }: { reviewForeman?: string; turn: ChatTurn; nowMs: number }) {
   const [open, setOpen] = useState(false);
   const steps = turn.turn.steps;
   const thinking = thinkingMs(turn, nowMs);
@@ -202,7 +202,7 @@ export function ActivityTracker({ turn, nowMs }: { turn: ChatTurn; nowMs: number
         className="flex h-9 w-full cursor-pointer items-center gap-3 text-left text-label-12 text-gray-900 hover:text-gray-1000"
       >
         <Dot color="green" pulse />
-        <span className="shrink-0 font-mono text-gray-1000">{agentSeatName(turn.agent)}</span>
+        <span className="shrink-0 font-mono text-gray-1000">{turn.agent === reviewForeman ? "review foreman" : agentSeatName(turn.agent)}</span>
         <span className="min-w-0 flex-1 truncate">{open ? "" : status}</span>
         <span className="shrink-0 font-mono tabular-nums text-gray-700">{turnNote(turn, nowMs)}</span>
         <ChevronIcon open={open} className="text-gray-700" />

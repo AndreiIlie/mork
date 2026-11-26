@@ -1,6 +1,7 @@
 //! A project on auto (fac-381): the operator's switch saves a default, each card that starts in the project starts delegated.
 //! It changes no card that exists, and asks follow each card's own toggle (fac-172).
 
+use mork_types::card::Card;
 use mork_types::orchestrator::Auto;
 use mork_types::view::Offer;
 use mork_types::{Command, ProjectId};
@@ -22,6 +23,14 @@ pub(super) fn toggle(project: &ProjectId, off: bool, ctx: Ctx<'_>) -> Decision {
 
 pub fn on(state: &State, project: &ProjectId) -> bool {
     state.autos.get(project).is_some_and(|a| a.on)
+}
+
+/// A new run keeps its prior delegation when set, otherwise it takes the project's auto setting.
+pub(crate) fn inherited(state: &State, project: &ProjectId, prior: Option<&Card>) -> (bool, bool) {
+    match prior.filter(|c| c.delegated) {
+        Some(c) => (true, c.self_sustained),
+        None => (on(state, project), false),
+    }
 }
 
 /// Main's toggle of each project's auto, worded as what a click does.

@@ -45,3 +45,23 @@ export function quotaReading(w: Share, nowMs: number, signedOut = w.signed_out =
     !stale && w.window !== "fable" && w.reset_ms != null && w.reset_ms > nowMs ? countdown(w.reset_ms - nowMs) : null;
   return { stale, reached, percent, ends, hot, words, barPercent, tone, tick, resetLeft };
 }
+
+const WINDOW_WORDS: Record<string, string> = { "5h": "5h", week: "wk" };
+
+function poolLabel(cli: string): string {
+  const words = cli.split(" ");
+  const name = words[0] === "claude" ? "claude" : (words[words.length - 1] ?? cli);
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+}
+
+// The hottest window: an over-pace one first, then the highest percent used.
+export function hottest(shares: Share[], nowMs: number): { label: string; words: string; hot: boolean } | null {
+  const rows = shares
+    .filter((w) => w.signed_out !== true && WINDOW_WORDS[w.window] !== undefined)
+    .map((w) => ({ w, q: quotaReading(w, nowMs, false) }))
+    .filter(({ q }) => q.words !== "?");
+  if (rows.length === 0) return null;
+  rows.sort((a, b) => Number(b.q.hot) - Number(a.q.hot) || (b.q.barPercent) - (a.q.barPercent));
+  const { w, q } = rows[0];
+  return { label: `${poolLabel(w.cli)} ${WINDOW_WORDS[w.window]}`, words: q.words, hot: q.hot };
+}

@@ -200,7 +200,16 @@ export interface MergeQueue {
   in_line: number;
 }
 
+export interface StartDefaults {
+  level: number;
+  from: "run" | "project";
+  visual: boolean;
+  carries: string[];
+  modes: { full: boolean; report: boolean };
+}
+
 export interface BoardView {
+  auto: boolean;
   project: string;
   live: BoardGroup;
   merge: MergeQueue;
@@ -265,6 +274,9 @@ export type Stage =
   | "closed";
 
 export interface CardAbout {
+  preview?: { on: boolean; url: string; enabled: boolean };
+  actions?: string[];
+  switches?: { name: string; position: number; positions: { label: string; command?: Offer["command"] }[] }[];
   project: string;
   branch?: string;
   base: string;
@@ -321,6 +333,7 @@ export interface Setting {
 }
 
 export interface AgentRow {
+  parent?: string;
   agent: string;
   role: Role;
   label: string;
@@ -526,6 +539,8 @@ export interface ChatTurn {
 }
 
 export interface PlaceView {
+  decisions?: string[];
+  start?: StartDefaults;
   place: string;
   kind: PlaceKind;
   revision: number;

@@ -43,6 +43,11 @@ pub fn place(state: &State, place: &str, tail: Option<u64>, outside: &Outside, c
         place: PlaceId::new(place),
         revision: state.revision,
         card: card.map(|c| header(state, c, outside, ctx)),
+        decisions: card
+            .filter(|c| c.id.as_str() == place)
+            .map(|c| super::overview::standing(state, c))
+            .unwrap_or_default(),
+        start: super::offers::start_defaults(state, place, ctx),
         agents,
         messages,
         earlier,
@@ -105,6 +110,7 @@ fn lists(state: &State, place: &str, outside: &Outside) -> Vec<AgentList> {
 fn row(state: &State, a: &Agent, outside: &Outside, ctx: Ctx<'_>) -> AgentRow {
     let setting = crate::agents::models::setting(state, ctx.config, a);
     AgentRow {
+        parent: a.parent.clone(),
         agent: a.key.clone(),
         role: a.role,
         label: setting.as_ref().map(|s| s.model.label.clone()).unwrap_or_else(|| a.seat.to_string()),

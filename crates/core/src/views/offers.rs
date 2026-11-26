@@ -3,7 +3,7 @@
 
 use mork_types::about::{Switch, SwitchPosition};
 use mork_types::ask::{Ask, AskKind};
-use mork_types::card::{Card, Mode};
+use mork_types::card::{Card, Mode, Stage};
 use mork_types::state::{Agent, Sender};
 use mork_types::view::Offer;
 use mork_types::{AgentKey, CardId, Command};
@@ -68,29 +68,13 @@ fn by_room(state: &State, place: &str, card: &CardId) -> impl Fn(&str) -> bool {
 
 fn card_actions(state: &State, card: &CardId, ctx: Ctx<'_>) -> Vec<Offer> {
     let c = || card.clone();
-    // A later run carries what the last one did unless it landed them (fac-563): unlanded work goes on with no other set.
-    let last = state.cards.get(card).filter(|x| x.stage != mork_types::card::Stage::Done);
-    let carries = last.map(|x| x.carries.iter().map(|k| k.id.clone()).collect()).unwrap_or_default();
     let candidates = [
         ("approve", Command::Approve { card: c() }),
         ("mock", Command::Mock { card: c() }),
         ("merge", Command::Merge { card: c() }),
         ("done", Command::Done { card: c() }),
         ("post", Command::Post { card: c() }),
-        (
-            "start",
-            Command::Start {
-                card: c(),
-                mode: None,
-                visual: None,
-                model: None,
-                effort: None,
-                delegated: None,
-                self_sustained: None,
-                no_planner: None,
-                carries,
-            },
-        ),
+        ("start", start_command(card, None, restart_carries(state.cards.get(card)))),
     ];
     candidates.into_iter().filter(|(_, cmd)| accepted(state, cmd, ctx)).map(|(l, cmd)| offer(l, cmd)).collect()
 }
@@ -213,4 +197,72 @@ fn session_missing<'s, 'a>(agent: impl Fn(&AgentKey) -> Option<&'s Agent>, ask: 
     let status = &agent(k)?.status;
     let missing = matches!(status, mork_types::state::AgentStatus::Error { words } if crate::agents::fresh::session_missing(words));
     missing.then_some(k)
+}
+
+fn restart_carries(prior: Option<&Card>) -> Vec<CardId> {
+    prior
+        .filter(|c| c.stage != Stage::Done)
+        .map(|c| c.carries.iter().map(|k| k.id.clone()).collect())
+        .unwrap_or_default()
+}
+
+fn start_command(card: &CardId, mode: Option<Mode>, carries: Vec<CardId>) -> Command {
+    Command::Start {
+        card: card.clone(),
+        mode,
+        visual: None,
+        model: None,
+        effort: None,
+        delegated: None,
+        self_sustained: None,
+        no_planner: None,
+        carries,
+    }
+}
+
+pub(super) fn start_defaults(state: &State, place: &str, ctx: Ctx<'_>) -> Option<mork_types::about::StartDefaults> {
+    let id = CardId::new(place);
+    let board = state.board.get(&id)?;
+    let prior = state.cards.get(&id);
+    if prior.is_some_and(|c| c.stage.is_live()) {
+        return None;
+    }
+    let carries = restart_carries(prior);
+    let takes = |mode, members| accepted(state, &start_command(&id, Some(mode), members), ctx);
+    let modes = mork_types::about::StartModes {
+        full: takes(Mode::Full, carries.clone()),
+        report: takes(Mode::Report, Vec::new()),
+    };
+    let (delegated, self_sustained) = crate::messages::auto::inherited(state, &board.project, prior);
+    (modes.full || modes.report).then(|| mork_types::about::StartDefaults {
+        level: u8::from(delegated) + u8::from(self_sustained),
+        from: if prior.is_some_and(|c| c.delegated) { "run" } else { "project" }.into(),
+        visual: crate::lifecycle::visual::inherited(Mode::Full, prior),
+        carries,
+        modes,
+    })
+}
+
+pub(super) fn preview(state: &State, card: &Card, ctx: Ctx<'_>) -> Option<mork_types::about::PreviewControl> {
+    let (_, port) = crate::lifecycle::preview::serves(card, ctx.config)?;
+    let action = if card.preview { "stop" } else { "start" };
+    let command = Command::Preview { card: card.id.clone(), action: Some(action.into()) };
+    Some(mork_types::about::PreviewControl {
+        on: card.preview,
+        url: crate::lifecycle::preview::url(&card.id, port),
+        enabled: accepted(state, &command, ctx),
+    })
+}
+
+pub(super) fn header_actions(state: &State, c: &Card, ctx: Ctx<'_>) -> Vec<String> {
+    let id = || c.id.clone();
+    [
+        Command::Brief { card: id(), words: None },
+        Command::Mock { card: id() },
+        Command::Close { card: id(), why: "close".into() },
+    ]
+    .into_iter()
+    .filter(|cmd| accepted(state, cmd, ctx))
+    .map(|cmd| cmd.name().to_owned())
+    .collect()
 }

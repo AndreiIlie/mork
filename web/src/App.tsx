@@ -115,13 +115,12 @@ export function App() {
         live={state.link === "live"}
       />
     );
-  } else page = <Board screen={state.screen} burn={burn} nowMs={nowMs} live={state.link === "live"} />;
+  } else page = <Board screen={state.screen} views={state.views} burn={burn} nowMs={nowMs} live={state.link === "live"} />;
 
   return (
     <div className="flex h-screen bg-background-100 text-label-14 text-gray-1000">
       <Sidebar
         screen={state.screen}
-        burn={burn}
         link={state.link}
         build={state.build}
         activeCard={activeCard}

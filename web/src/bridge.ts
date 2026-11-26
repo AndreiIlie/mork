@@ -42,16 +42,15 @@ let watchedCardId: string | null = null;
 let watchedExtraPlace: string | null = null;
 
 function watchedPlaces(cardId: string | null, extraPlace: string | null): string[] {
-  if (cardId === null) return ["screen"];
-  const places = ["screen", cardId, `${cardId}/spec`];
+  const places = cardId === null ? ["screen"] : ["screen", cardId, `${cardId}/spec`];
   if (extraPlace !== null && !places.includes(extraPlace)) places.push(extraPlace);
   return places;
 }
 
 function watchCommand(cardId: string | null, extraPlace: string | null): unknown {
-  return cardId === null
-    ? { watch: { places: ["screen"] } }
-    : { watch: { places: watchedPlaces(cardId, extraPlace), tail: WATCH_TAIL, full: true } };
+  const places = watchedPlaces(cardId, extraPlace);
+  if (places.length === 1) return { watch: { places } };
+  return { watch: { places, tail: cardId === null ? 0 : WATCH_TAIL, full: true } };
 }
 
 function keepWatched(
@@ -274,7 +273,7 @@ export function watchCard(cardId: string | null): void {
   activeDial?.rewatch();
 }
 
-/** Watches one extra place (an open seat DM) beside the open card's rooms, or drops it when `null`. */
+/** Watches the selected seat or backlog card beside the current page, or drops it when `null`. */
 export function watchPlace(place: string | null): void {
   if (place === watchedExtraPlace) return;
   watchedExtraPlace = place;

@@ -20,10 +20,11 @@ export function useHandOffers() {
   const [pending, setPending] = useState<Record<string, string>>({});
   const [refusals, setRefusals] = useState<Record<string, string>>({});
 
-  const press = (ask: string, offer: Offer) => {
+  const press = (ask: string, offer: Offer, onSuccess?: () => void) => {
     setPending((p) => ({ ...p, [ask]: offer.label }));
     setRefusals((r) => without(r, ask));
     sendCommand(offer.command)
+      .then(onSuccess)
       .catch((e: unknown) => {
         const why = e instanceof Error ? e.message : String(e);
         setRefusals((r) => ({ ...r, [ask]: `${offer.label}: ${why}` }));

@@ -38,6 +38,8 @@ pub(super) fn header(state: &State, card: &Card, outside: &Outside, ctx: Ctx<'_>
 fn about(state: &State, card: &Card, outside: &Outside, ctx: Ctx<'_>) -> CardAbout {
     let project = ctx.config.projects.get(&card.project);
     CardAbout {
+        preview: super::offers::preview(state, card, ctx),
+        actions: super::offers::header_actions(state, card, ctx),
         project: card.project.clone(),
         branch: card.branch.clone(),
         base: project.map(|p| p.base.clone()).unwrap_or_default(),

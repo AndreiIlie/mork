@@ -1,17 +1,14 @@
 import { useEffect, useState } from "react";
 import { ownHands } from "./alerts";
-import { Overview } from "./Overview";
-import { Pipeline } from "./Pipeline";
-import { HandIcon } from "./icons";
-import { SeatChat, SeatDot } from "./SeatChat";
+import { CardControls } from "./CardControls";
+import { CardTree, lastKey, stageNodes } from "./CardTree";
+import { StageDetail } from "./StageDetail";
+import { SeatChat } from "./SeatChat";
 import { watchPlace } from "./bridge";
-import { agentSeatName, seatPlace, thousands } from "./format";
+import { agentSeatName, seatPlace } from "./format";
 import { cardPath, navigate, replaceRoute } from "./route";
 import type { AgentRow, CardHeader, Color, HandView, PlaceView, Screen } from "./types";
 import { Button } from "./ui/Button";
-import { PageHeader } from "./ui/Page";
-import { SplitPane } from "./ui/SplitPane";
-import { TextLink } from "./ui/TextLink";
 
 // A hand sent to an orchestrator opens whole only when picked; by default the oldest hand waiting on the operator does.
 function pickHand(hands: HandView[], own: HandView[], picked: string | null): HandView | undefined {
@@ -38,38 +35,6 @@ function seatRoomLabel(seat: string, place: string, card: CardHeader, reviewCard
   if (place === card.id) return ownRoomLabel(card);
   if (reviewCard !== undefined && (place === reviewCard || seat.startsWith(`${reviewCard}/`))) return "Review";
   return "";
-}
-
-function SeatSwitcher({
-  seats,
-  open,
-  nameOf,
-  markOf,
-  onOpen,
-}: {
-  seats: AgentRow[];
-  open: string;
-  nameOf: (agent: string) => string;
-  markOf: (agent: string) => string | undefined;
-  onOpen: (agent: string) => void;
-}) {
-  if (seats.length === 0) return null;
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <span className="text-label-12 text-gray-700">Seats</span>
-      {seats.map((s) => (
-        <Button key={s.agent} tier="secondary" size="sm" pressed={s.agent === open} onClick={() => onOpen(s.agent)}>
-          <SeatDot light={s.light} />
-          {markOf(s.agent) && <span aria-label="Raised Hand" className={markOf(s.agent)}><HandIcon /></span>}
-          <span className="font-mono font-medium text-gray-1000">{nameOf(s.agent)}</span>
-          <span className="font-normal text-gray-700">
-            {s.label}
-            {s.context !== null ? ` · ${thousands(s.context[0])}` : ""}
-          </span>
-        </Button>
-      ))}
-    </div>
-  );
 }
 
 interface LoadedProps {
@@ -100,9 +65,14 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
   const cardHands = screen.hands.filter((h) => h.card === card.id);
   const own = ownHands(cardHands);
   const [pickedSeat, setPickedSeat] = useState<string | null>(null);
+  const [pickedStage, setPickedStage] = useState<string | null>(null);
   useEffect(() => {
-    if (handAsk !== null) setPickedSeat(null);
+    if (handAsk !== null) {
+      setPickedSeat(null);
+      setPickedStage(null);
+    }
   }, [handAsk]);
+  const nodes = stageNodes(buildView, card);
   const linked = cardHands.find((h) => h.ask === handAsk);
   const waiting = pickHand(cardHands, own, handAsk);
   const seatAt = (place: string) => {
@@ -119,8 +89,10 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
     return here.every((h) => h.given) ? "text-gray-700" : "text-gray-1000";
   };
 
-  const onPickSeat = (agent: string) => {
-    setPickedSeat(agent);
+  const pick = (selection: string) => {
+    const stage = selection.startsWith("stage ");
+    setPickedStage(stage ? selection.slice(6) : null);
+    if (!stage) setPickedSeat(selection.slice(5));
     if (handAsk !== null) replaceRoute(cardPath(card.id));
   };
 
@@ -142,44 +114,19 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
     return () => watchPlace(null);
   }, [extraPlace]);
 
-  const ownRoom = ownRoomLabel(card);
+  const stage = !linked && nodes.find((n) => n.key === pickedStage);
+  const status = overviewStatus(own, seats);
+  const steps = (buildView.overview?.live ?? []).filter((r) => !r.seat);
   const hands = cardHands.filter((h) => h.message_place === openPlace);
   const answering = hands.some((h) => h.kind === "answer" || h.kind === "blocked" && h.role !== null);
 
   return (
     <main className="flex min-w-0 flex-1 flex-col">
-      <PageHeader
-        crumbs={
-          <>
-            <TextLink to="/">Board</TextLink>
-            {card.about.project !== "" && (
-              <>
-                <span>/</span>
-                <span>{card.about.project}</span>
-              </>
-            )}
-            <span>/</span>
-            <span className="font-mono text-gray-1000">{card.id}</span>
-            {card.paused && <span className="font-mono text-label-12 text-gray-700">paused</span>}
-          </>
-        }
-        title={card.title}
-      >
-        {card.pipeline.length > 0 && <Pipeline steps={card.pipeline} />}
-        <SeatSwitcher seats={seats} open={openSeat} nameOf={seatName} markOf={markOf} onOpen={onPickSeat} />
-      </PageHeader>
-      <SplitPane
-        left={
-          <Overview
-            overview={buildView.overview}
-            plan={buildView.plan}
-            triageRound={buildView.triage?.round}
-            tzOffsetMin={screen.tz_offset_min}
-            status={overviewStatus(own, seats)}
-            nowMs={nowMs}
-          />
-        }
-        right={
+      <CardControls card={card} status={status} live={live} />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <CardTree card={card} nodes={nodes} seats={seats} review={review?.card} steps={steps} status={status}
+          selected={stage ? `stage ${stage.key}` : `seat ${openSeat}`} pick={pick} seatName={seatName} markOf={markOf} />
+        <div className={stage ? "hidden" : "flex min-w-0 flex-1 flex-col overflow-hidden"}>
           <SeatChat
             seat={seats.find((s) => s.agent === openSeat)}
             place={openPlace}
@@ -192,13 +139,18 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
             nowMs={nowMs}
             live={live}
           />
-        }
-      />
+        </div>
+        {stage && <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <StageDetail node={stage} status={status} decisions={buildView.decisions ?? []} triageRound={buildView.triage?.round}
+            plan={stage.key === lastKey(nodes, "build", true) ? buildView.plan : undefined}
+            steps={stage.at === "current" ? steps : []} tzOffsetMin={screen.tz_offset_min} nowMs={nowMs} />
+        </div>}
+      </div>
     </main>
   );
 }
 
-/** `/cards/<id>`: 50/50 split Card Room with Overview on the left and active Seat Chat on the right. */
+/** `/cards/<id>`: the card’s stage tree and selected conversation or stage detail. */
 export function CardRoom({
   screen,
   views,

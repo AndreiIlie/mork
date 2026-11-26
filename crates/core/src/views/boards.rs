@@ -36,6 +36,7 @@ fn board(state: &State, project: &ProjectId, outside: &Outside, ctx: Ctx<'_>) ->
     let any = state.board.values().find(|b| b.project == *project);
     let done_name = any.map_or_else(|| "Done".to_owned(), |b| b.done_status.clone());
     BoardView {
+        auto: crate::messages::auto::on(state, project),
         project: project.clone(),
         live: group("Live".to_owned(), live.iter().flat_map(|c| with_carried(state, c, row(&c.id))).collect()),
         merge: merge_queue(state, project, outside, ctx),
