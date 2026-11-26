@@ -19,11 +19,15 @@ pub(crate) fn mkdir(root: &Path, rel: &Path) -> io::Result<()> {
     Ok(())
 }
 
-pub(crate) fn git_identity(author: &str) -> String {
+pub(crate) fn git_user(author: &str) -> (&str, &str) {
     let author = author.trim();
-    let (name, email) =
-        author.split_once('<').map_or((author, ""), |(n, e)| (n.trim(), e.trim_end_matches('>').trim()));
-    format!("[user]\n\tname = {name}\n\temail = {email}\n")
+    author.split_once('<').map_or((author, ""), |(n, e)| (n.trim(), e.trim_end_matches('>').trim()))
+}
+
+pub(crate) fn git_identity(author: &str) -> String {
+    let (name, email) = git_user(author);
+    let escape = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
+    format!("[user]\n\tname = \"{}\"\n\temail = \"{}\"\n", escape(name), escape(email))
 }
 
 /// Applies the home after configured environment overrides, for each job that shares logins.
@@ -107,6 +111,13 @@ pub(crate) fn caches(root: &Path, dir: &Path, config: &MorkConfig, places: &mut 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn git_author_preserves_gitconfig_punctuation() {
+        let identity = git_identity(r#"A "B" \ C <tag#work@example.org>"#);
+        assert_eq!(identity, "[user]\n\tname = \"A \\\"B\\\" \\\\ C\"\n\temail = \"tag#work@example.org\"\n");
+    }
+
     #[test]
     fn login_paths_refuse_a_link_in_the_parent() -> io::Result<()> {
         let root = std::env::temp_dir().join(crate::random::uuid());

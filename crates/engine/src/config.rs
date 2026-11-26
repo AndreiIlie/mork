@@ -299,6 +299,18 @@ mod tests {
                                [projects.\"example.com\"]\nrepo = \"/repo\"\nboard = { kind = \"markdown\", path = \"/board\" }\ntest = \"true\"\n";
 
     #[test]
+    fn project_git_author_falls_back_to_global() -> Result<(), ConfigError> {
+        let config = parse(&format!(
+            "{WAKE_PROJECT}\n[projects.work]\nrepo = '/work'\nboard = {{ kind = 'markdown', path = '/board' }}\n\
+             test = 'true'\ngit_author = 'Work Name <work@example.org>'"
+        ))?;
+        assert_eq!(config.git_author(Some("work")), "Work Name <work@example.org>");
+        assert_eq!(config.git_author(Some("example.com")), "A <a@b>");
+        assert_eq!(config.git_author(None), "A <a@b>");
+        Ok(())
+    }
+
+    #[test]
     fn wake_keys_are_mutually_exclusive() {
         for waits in [true, false] {
             let text = format!("{WAKE_PROJECT}orchestrator_waits = {waits}\norchestrator_session = \"session\"\n");

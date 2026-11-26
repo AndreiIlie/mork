@@ -113,7 +113,7 @@ impl Engine {
     pub(super) fn launch_work(&mut self, purpose: &Purpose, plan: Plan, now: i64) -> bool {
         let id = mork_core::state::names::job_id(now, &plan.owner, random::salt());
         let io = self.opts.home.job(id.as_str()).join("io");
-        let mut job = match job_of_plan(&self.ctx, plan, &id, &io, now) {
+        let mut job = match job_of_plan(&self.ctx, purpose, plan, &id, &io, now) {
             Ok(job) => job,
             Err(e) => {
                 self.work_refused(purpose, &e, now);
@@ -232,13 +232,22 @@ pub(super) fn owner_of(purpose: &Purpose) -> AgentKey {
 
 // Shared job construction keeps I/O substitution and wall selection consistent across plans.
 // The host phase needs an isolated temporary folder because its /tmp is shared (fac-65).
-pub(super) fn job_of_plan(ctx: &Context, plan: Plan, id: &JobId, io: &Path, now: i64) -> Result<Job, String> {
+fn job_of_plan(ctx: &Context, purpose: &Purpose, plan: Plan, id: &JobId, io: &Path, now: i64) -> Result<Job, String> {
     let io_s = io.display().to_string();
     let argv: Vec<String> = plan.argv.iter().map(|a| a.replace("{io}", &io_s)).collect();
     let files: BTreeMap<String, String> = plan.files.into_iter().map(|(k, v)| (k, v.replace("{io}", &io_s))).collect();
     let cwd = plan.cwd.replace("{io}", &io_s);
     let toolchains = ctx.project_toolchains(plan.project.as_deref());
     let mut env = ctx.env(id, &plan.owner, None, &toolchains, io);
+    if matches!(purpose, Purpose::Candidate { .. })
+        && let Some(author) = ctx.config.project_git_author(plan.project.as_deref())
+    {
+        let (name, email) = crate::seat_homes::git_user(author);
+        env.insert("GIT_AUTHOR_NAME".into(), name.into());
+        env.insert("GIT_AUTHOR_EMAIL".into(), email.into());
+        env.insert("GIT_COMMITTER_NAME".into(), name.into());
+        env.insert("GIT_COMMITTER_EMAIL".into(), email.into());
+    }
     if plan.unwalled {
         env.insert("TMPDIR".into(), io.join("tmp").display().to_string());
     }

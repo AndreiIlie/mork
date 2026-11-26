@@ -53,6 +53,7 @@ impl TurnIo {
 #[derive(Debug, Default)]
 struct TurnPlace {
     cwd: String,
+    project: Option<mork_types::ProjectId>,
     read_only: Vec<String>,
     read_write: Vec<String>,
     env: BTreeMap<String, String>,
@@ -230,7 +231,8 @@ impl Engine {
             self.ctx.unwalled_places(&io.seat, ro, rw, credentials, &place.toolchains)
         };
         folder::make_seat_io(&io.seat).map_err(|e| e.to_string())?;
-        crate::seat_homes::prepare(&self.opts.home, &io.home, seat.cli, &self.ctx.config.git.author, &mut places)
+        let author = self.ctx.config.git_author(place.project.as_deref());
+        crate::seat_homes::prepare(&self.opts.home, &io.home, seat.cli, author, &mut places)
             .map_err(|e| format!("seat home: {e}"))?;
         if walled {
             crate::seat_homes::caches(&self.opts.home.caches(), &io.home, &self.ctx.config.mork, &mut places)

@@ -59,7 +59,7 @@ fn inherited(opts: &Options) -> Option<(File, RawFd, RawFd)> {
     Some((lock, f, a))
 }
 
-// Commits are authored as `[git] author` (3.10.4), with no trailer.
+// Jobs without a project override inherit the shared home's Git identity.
 fn git_identity(home: &Home, config: &mork_types::config::Config) -> Result<(), String> {
     let text = crate::seat_homes::git_identity(&config.git.author);
     let path = home.agent_home().join(".gitconfig");

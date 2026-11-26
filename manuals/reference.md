@@ -36,6 +36,12 @@ Each project requires a `[projects.<name>.board]` table with `kind = "markdown"`
 An absent `[projects.<name>.forge]` table selects `local`.
 A forge with `kind = "bitbucket"` requires `workspace` and `slug` and accepts an optional `review_tag`.
 
+### git_author
+
+Set `git_author = "Alex Smith <alex@example.org>"` in `[projects.<name>]` to choose that project's Git identity.
+The project's seats use it in their `.gitconfig`, and the merge queue uses it as both author and committer for merges it creates.
+Projects that omit `git_author` and seats without a project use the required `[git] author`.
+
 ### backup
 
 In `mork.toml`, `backup = "origin"` in a `[projects.<name>.forge]` table with `kind = "local"` names a remote in the project's `repo` for a project without pull requests.

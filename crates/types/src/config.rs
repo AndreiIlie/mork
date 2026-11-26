@@ -138,6 +138,14 @@ impl Default for Internals {
 }
 
 impl Config {
+    pub fn project_git_author(&self, project: Option<&str>) -> Option<&str> {
+        self.projects.get(project?)?.git_author.as_deref()
+    }
+
+    pub fn git_author(&self, project: Option<&str>) -> &str {
+        self.project_git_author(project).unwrap_or(&self.git.author)
+    }
+
     pub fn forge_label(&self, project: &crate::ProjectId) -> &'static str {
         self.projects.get(project).filter(|p| p.forge.hosted()).map_or("the forge", |p| p.forge.label())
     }
@@ -298,6 +306,7 @@ impl TicketsConfig {
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
     pub repo: String,
+    pub git_author: Option<String>,
     #[serde(default = "d_base")]
     pub base: String,
     #[serde(default)]

@@ -3,8 +3,10 @@ use super::*;
 impl Engine {
     pub(super) fn turn_place(&self, a: &mork_types::state::Agent) -> Result<TurnPlace, String> {
         use mork_types::reply::Role;
-        let mut place = if closing::ending_turn(a) { self.closing_place(a)? } else { self.running_place(a)? };
         let card = mork_core::messages::places::card_of(&self.state, &a.place);
+        let record = card.as_ref().and_then(|id| self.state.cards.get(id));
+        let mut place = if closing::ending_turn(a) { self.closing_place(a)? } else { self.running_place(a, record)? };
+        place.project = record.map(|c| c.project.clone());
         let key = match card.as_ref() {
             None => a.key.as_str(),
             Some(id) if matches!(a.role, Role::Foreman | Role::Planner | Role::Researcher) => id.as_str(),
@@ -17,8 +19,11 @@ impl Engine {
     }
 
     // The handoff stays available to seats whose work must leave the clone read-only.
-    fn running_place(&self, a: &mork_types::state::Agent) -> Result<TurnPlace, String> {
-        let card = mork_core::messages::places::card_of(&self.state, &a.place).and_then(|c| self.state.cards.get(&c));
+    fn running_place(
+        &self,
+        a: &mork_types::state::Agent,
+        card: Option<&mork_types::card::Card>,
+    ) -> Result<TurnPlace, String> {
         let Some(card) = card else {
             let work = self.opts.home.work().join(a.key.as_str());
             return Ok(TurnPlace { cwd: work.display().to_string(), ..TurnPlace::default() });
@@ -64,7 +69,7 @@ impl Engine {
         }
         let toolchains = project.map(|p| p.toolchains.clone()).unwrap_or_default();
         let data = project.and_then(|p| p.data.clone());
-        Ok(TurnPlace { cwd, read_only, read_write, env, toolchains, empty: None, data })
+        Ok(TurnPlace { cwd, read_only, read_write, env, toolchains, data, ..TurnPlace::default() })
     }
 
     // Where a closing turn runs: where its session ran, as Claude finds a session by its folder
