@@ -63,9 +63,16 @@ function StartForm({ card, defaults, live, onDone }: { card: BoardRow; defaults:
   const full = mode === "Full";
   const { pending, refusals, press } = useHandOffers();
   const start = () => {
-    const delegation = level === defaults.level ? {} : level === 2 ? { "self-sustained": true } : { delegated: true };
-    const options = full ? { visual: visual && !defaults.visual || undefined, "no-planner": noPlanner || undefined, carries: defaults.carries } : {};
-    press("start", { label: "Start", command: { start: { card: card.id, mode: full ? "full" : "report", ...options, ...delegation } } }, onDone);
+    const command = {
+      card: card.id,
+      mode: full ? "full" : "report",
+      visual: full && visual && !defaults.visual || undefined,
+      "no-planner": full && noPlanner || undefined,
+      carries: full ? defaults.carries : undefined,
+      delegated: level !== defaults.level && level === 1 || undefined,
+      "self-sustained": level !== defaults.level && level === 2 || undefined,
+    };
+    press("start", { label: "Start", command: { start: command } }, onDone);
   };
   const kept = [
     defaults.from === "run" && defaults.level > 0 ? LEVELS[defaults.level] : null,

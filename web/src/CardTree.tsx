@@ -58,7 +58,6 @@ const STAGE_TONE: Record<StageNode["at"], string> = {
   "to-come": "text-gray-700",
 };
 
-
 interface TreeProps {
   nodes: StageNode[];
   seats: AgentRow[];

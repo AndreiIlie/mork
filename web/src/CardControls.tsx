@@ -26,16 +26,33 @@ export function CardControls({ card, status, live }: { card: CardHeader; status:
   const flipVisual = visual?.positions[visual.position === 1 ? 0 : 1]?.command;
   const brief = card.stage === "starting" || card.stage === "brief";
   const stage = card.pipeline.find((p) => p.at === "current");
-  const stageWords = [stage && [stage.label, stage.count].filter(Boolean).join(" "), stage?.sub, card.paused && "paused"].filter(Boolean).join(" · ");
-  const open = (name: "brief" | "close") => { setWords(""); setStrip(name); };
+  const stageLabel = stage
+    ? [stage.label, stage.count].filter(Boolean).join(" ")
+    : card.stage.charAt(0).toUpperCase() + card.stage.slice(1);
+  const stageWords = [stageLabel, stage?.sub, card.paused && "paused"].filter(Boolean).join(" · ");
+  const open = (name: "brief" | "close") => {
+    setWords("");
+    setStrip(name);
+  };
   const close = strip === "close";
+  const submitStrip = () => {
+    if (!strip || !has(strip) || (close && !words.trim())) return;
+    const command = close ? { close: { card: card.id, why: words } } : { brief: { card: card.id, words } };
+    send(close ? "Close card" : "Back to brief", command, () => setStrip(null));
+  };
   return (
     <>
       <header className="shrink-0 border-b border-gray-400 px-gutter py-4">
         <div className="flex min-h-7 flex-wrap items-center gap-2 text-label-13 text-gray-900">
-          <TextLink to="/">Board</TextLink><span>/</span><span>{card.about.project}</span><span>/</span>
+          <TextLink to="/">Board</TextLink>
+          <span>/</span>
+          <span>{card.about.project}</span>
+          <span>/</span>
           <span className="font-mono text-gray-1000">{card.id}</span>
-          {stageWords && <span className="ml-3 flex items-center gap-2 font-mono text-label-12 text-gray-1000"><Dot color={status} pulse={status === "green"} />{stageWords}</span>}
+          <span className="ml-3 flex items-center gap-2 font-mono text-label-12 text-gray-1000">
+            <Dot color={status} pulse={status === "green"} />
+            {stageWords}
+          </span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <span className="text-label-12 text-gray-700">Delegation</span>
             <Segmented height={28} options={LEVELS} value={LEVELS[delegation?.position ?? 0]}
@@ -57,8 +74,7 @@ export function CardControls({ card, status, live }: { card: CardHeader; status:
       </header>
       {strip && <form className="flex shrink-0 items-center gap-3 border-b border-gray-400 bg-background-200 px-gutter py-3" onSubmit={(e) => {
         e.preventDefault();
-        if (!has(strip) || (close && !words.trim())) return;
-        send(close ? "Close card" : "Back to brief", close ? { close: { card: card.id, why: words } } : { brief: { card: card.id, words } }, () => setStrip(null));
+        submitStrip();
       }}>
         <label htmlFor="card-action-words" className="shrink-0 text-label-13 text-gray-1000">{close ? "Close this card" : "Send back to brief"}</label>
         <TextInput id="card-action-words" autoFocus value={words} onChange={(e) => setWords(e.target.value)} placeholder={close ? "Why it is closed" : "What the new plan should change (optional)"} />

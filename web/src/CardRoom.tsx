@@ -65,10 +65,13 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
   const cardHands = screen.hands.filter((h) => h.card === card.id);
   const own = ownHands(cardHands);
   const [pickedSeat, setPickedSeat] = useState<string | null>(null);
-  useEffect(() => {
-    if (handAsk !== null) { setPickedSeat(null); setPickedStage(null); }
-  }, [handAsk]);
   const [pickedStage, setPickedStage] = useState<string | null>(null);
+  useEffect(() => {
+    if (handAsk !== null) {
+      setPickedSeat(null);
+      setPickedStage(null);
+    }
+  }, [handAsk]);
   const nodes = stageNodes(buildView, card);
   const linked = cardHands.find((h) => h.ask === handAsk);
   const waiting = pickHand(cardHands, own, handAsk);
