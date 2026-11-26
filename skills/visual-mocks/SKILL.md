@@ -32,21 +32,19 @@ A mock sets no `<base>`; a project file's address is written in full, starting `
 The baseline seat renders each page it reproduced once at its path under the mock link before it reports.
 Once the baseline step ends, the planner (or the foreman on a no-planner card) holds the visual brief in two steps.
 
-1. **Agree the direction**
+1. **Read the card against the baseline**
 
-   Render and inspect the existing baseline as it stands, and attach the screenshot to your design question.
-   Use short questions to settle the design direction, what the reader should see first, and the concrete changes to make.
+   Render and inspect the existing baseline. When the card specifies the design, go straight to the first draft.
+   Ask about direction, information hierarchy or concrete changes only for a real tradeoff or proposed departure. Attach the baseline screenshot to that design ask.
    Use an ASCII layout sketch in the conversation when it helps.
    Record decisions on the card as they settle.
-   Leave everything in `.git/mork-mock/` untouched until the proposed direction, hierarchy and changes are confirmed.
-   With delegation off, ask the operator directly in your flagged hand message.
-   On a delegated card, state in the design ask that it needs the operator's own answer so the orchestrator brings it to him while handling technical questions itself.
-   On a self-sustained card, the orchestrator answers all questions, including design, and its confirmation releases the first edit.
+   When a design ask is needed, wait for its answer before editing `.git/mork-mock/`.
+   With delegation off, the operator answers the design ask in your room. On a delegated card, mark the ask as needing his own answer so the orchestrator brings it to him. On a self-sustained card, the orchestrator answers it.
 
 2. **Make the first draft**
 
-   Apply the confirmed changes together in one focused pass.
-   Settle refinements under the card's current delegation level and record each change to the mock or plan as a decision on the card.
+   Apply the specified design and any answered decisions together in the first draft.
+   Show convention-following details in the recap with the mock for plan approval. Record decisions settled by answers as the mock is refined.
 
 Before each recap, render the mock once from the link exactly as the request gives it, with nothing added.
 Leave the served mock untouched while a recap is under challenge or waits for approve; edit it only once his comment withdrew the recap or the foreman's objection came, then recap again.

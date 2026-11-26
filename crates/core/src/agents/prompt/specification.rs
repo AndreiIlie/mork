@@ -9,6 +9,7 @@ use mork_types::state::Agent;
 
 use super::card_of;
 use super::held::Sections;
+use crate::lifecycle::start::BRIEF_ASKS;
 use crate::state::State;
 
 pub(super) const FOREMAN_SPECIFICATION: &str = "On a full card the planner settles specification questions. Send those questions to `planner` as requests, including any finding you hold contradicts the plan, and any words from the operator that change the specification. Raise your other asks to the operator in your hand.";
@@ -23,9 +24,9 @@ const WITHDRAWN: &str = "A recap waiting for `approve` is withdrawn by the opera
 
 const UNCHALLENGED_RECAPS: &str = "This card has no planner, and no seat challenges your recap: it is offered once made. Write, edit and commit nothing before approval. Approval releases your brief researchers, and the build request comes to you in this session.";
 
-const UNCHALLENGED_VISUAL_RECAPS: &str = "This card has no planner, and no seat challenges your recap: it is offered once made. Edit no tracked repository files before approval. Edit `.git/mork-mock/` only after the visual direction is confirmed. Approval releases your brief researchers, and the build request comes to you in this session.";
+const UNCHALLENGED_VISUAL_RECAPS: &str = "This card has no planner, and no seat challenges your recap: it is offered once made. Edit no tracked repository files before approval. Follow the visual brief for edits to `.git/mork-mock/` after the baseline step. Approval releases your brief researchers, and the build request comes to you in this session.";
 
-const ALONE_BASELINE: &str = "\n## The baseline\n\nThis visual card is at its baseline step. Read the card and the code, name the pages the card changes, and spawn its baseline seat (`mork ctl spawn <card> baseline '<task>'`, naming no model or effort) to reproduce them as they stand today in `.git/mork-mock/`. Write nothing yourself. Once its report says the baseline is done, end `built` to release the seat and begin agreeing the visual direction; with no existing page to reproduce, spawn nothing and end `built` at once.\n";
+const ALONE_BASELINE: &str = "\n## The baseline\n\nThis visual card is at its baseline step. Read the card and the code, name the pages the card changes, and spawn its baseline seat (`mork ctl spawn <card> baseline '<task>'`, naming no model or effort) to reproduce them as they stand today in `.git/mork-mock/`. Write nothing yourself. Once its report says the baseline is done, end `built` to release the seat and begin the visual brief; with no existing page to reproduce, spawn nothing and end `built` at once.\n";
 
 const DISPUTE: &str = "\n## The specification\n\nFor this dispute, read the card and its recorded decisions. Never decide a specification question alone: raise any open question in your flagged hand message under the current delegation level, record each settled decision and answer whoever asked. Leave the card at its current stage.\n";
 
@@ -76,7 +77,7 @@ pub(super) fn specification(state: &State, a: &Agent, s: &mut Sections<'_>, out:
         (true, false) => UNCHALLENGED_RECAPS,
         (false, _) => CHALLENGED_RECAPS,
     };
-    let _ = write!(rule, "\n{SPECIFICATION} {recaps} {WITHDRAWN}\n\n");
+    let _ = write!(rule, "\n{SPECIFICATION} {BRIEF_ASKS} {recaps} {WITHDRAWN}\n\n");
     out.push_str(if s.sends("specification", &rule) { &rule } else { "\n## The specification\n\n" });
     out.push_str("Where it stands: ");
     stands(state, a, c, (alone, s), out);

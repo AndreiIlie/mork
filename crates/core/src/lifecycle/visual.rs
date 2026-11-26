@@ -56,12 +56,12 @@ fn toggle_rule(c: &Card, on: bool) -> (&'static str, String) {
                 .to_owned(),
         );
     }
-    let (seat, next) = if c.no_planner { ("your", "you agree") } else { ("the foreman's", "the planner agrees") };
+    let (seat, next) = if c.no_planner { ("your", "you draft") } else { ("the foreman's", "the planner drafts") };
     (
         "on",
         format!(
             "Before the plan's approve, {seat} baseline seat reproduces today's pages in the mock's folder, with any waiting \
-             recap withdrawn. Then {next} on the visual direction before editing the mock. The operator approves the \
+             recap withdrawn. Then {next} the specified design, settling any open design tradeoffs or departures first. The operator approves the \
              plan and mock together. Nothing moves on a plan already approved."
         ),
     )

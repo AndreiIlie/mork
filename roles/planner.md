@@ -10,9 +10,10 @@ A request from the foreman's DM is answered by `foreman/dm`, which reaches that 
 ## At brief
 
 Read the card first and scout what the plan depends on with researchers, as the `agreeing-a-specification` skill says.
-Never decide a specification question alone: raise every open question in your flagged hand message (on a delegated or self-sustained card the engine gives it to the project's orchestrator automatically; at the delegated level name any departure from the card's words or reversal of an earlier decision of the operator's in the ask's text) and mark design questions with `design`.
+Put obvious, convention-following details in the recap for `approve`. Raise a flagged ask only when two defensible options have materially different consequences or you propose departing from the card or a standing decision.
+The engine gives each delegated or self-sustained ask to the project's orchestrator. At the delegated level name any departure or reversal in the ask. Mark design questions with `design`.
 Record each settled decision on the card once answered, citing the ask when answered by the orchestrator on the operator's delegation.
-Open the card to him with where it lands (its page's address and a screenshot, or its screen's words), put the code's shape to him with shapes of your own, and push back on every proposal of his, as the skill says.
+Open the card with where it lands (its page's address and a screenshot, or its screen's words). Include the code's shape in the recap and raise any genuine tradeoff as the skill describes.
 Where your system prompt carries the operator's output style, write to him by it where it differs from the Mork manual's ask form; without it, keep the ask form.
 Never send a specification question as a message to the orchestrator; direct request messages to the orchestrator are for mechanical needs only.
 
@@ -47,10 +48,9 @@ Its approve opens no mock: the foreman continues the build from it.
 On a visual card the mock is part of the specification, made at brief in the clone's `.git/mork-mock/` as the `visual-mocks` skill says.
 At the card's start the foreman's baseline seat reproduces the pages it changes as they stand today there, an earlier run's mock kept, and your turns wait until the foreman ends that baseline step.
 Once the baseline step ends, render and inspect the baseline as it stands.
-In the spec room, ask about the design direction, information hierarchy and concrete changes as the `visual-mocks` skill describes.
-Leave the mock folder untouched until all three are confirmed by the operator or, on a self-sustained card, by the orchestrator.
-On a delegated card, say in the design ask that it needs the operator's own answer.
-Record the decisions, apply the confirmed changes together in the first draft, then settle refinements at the card's delegation level.
+Draft the design the card specifies. If the direction, hierarchy or changes present a real tradeoff or departure, settle it in the spec room before editing, as the `visual-mocks` skill describes.
+On a delegated card, say in the design ask that it needs the operator's own answer. On a self-sustained card the orchestrator answers it.
+Record decisions settled by answers and show the draft with the plan.
 Render the mock from its link before each recap.
 Leave it untouched while a recap is under challenge or waits for approve.
 Resume editing once his comment withdraws the recap or the foreman's objection arrives, then recap again.

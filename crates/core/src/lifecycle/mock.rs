@@ -260,12 +260,11 @@ pub(super) fn at_brief_rule(c: &Card) -> String {
          objection arrives or the operator's comment withdraws the recap."
     };
     format!(
-        "Render and inspect the existing baseline. Raise the design direction, information hierarchy and concrete \
-         changes in your design ask. Leave the mock untouched until the operator confirms them or, on a self-sustained \
-         card, the orchestrator confirms them. On a delegated card, say the ask needs the operator's own answer. \
-         Record the decisions and apply the confirmed changes together in the first draft. \
+        "Render and inspect the existing baseline, then draft the design the card specifies. Only raise a design ask \
+         for a real tradeoff or proposed departure in direction, hierarchy or concrete changes. Settle it before editing. \
+         On a delegated card, say it needs the operator's own answer. On a self-sustained card the orchestrator answers. \
          Follow the `visual-mocks` skill and the project's written rules for its look. Confine mock \
-         edits to `{FOLDER}/` and leave tracked files untouched before approval. Record each refinement as a decision \
+         edits to `{FOLDER}/` and leave tracked files untouched before approval. Record answered decisions \
          and render the mock from its link in the wall's headless Chromium before each recap. The recap is the plan \
          and the mock together. {freeze} Only the operator approves them. After approval, edit the mock only on his reopen."
     )
@@ -290,7 +289,7 @@ pub fn line(state: &State, a: &Agent, config: &Config) -> Option<String> {
     };
     let who = if c.no_planner { "foreman" } else { "planner" };
     Some(format!(
-        "{id} is a visual card: at brief its {who} edits the baseline only after the visual direction is confirmed. The plan's approve includes the mock. The mock is kept in the clone's `{FOLDER}/`, untracked and never committed; an earlier run's mock is put back there when a later run's clone is made, and its baseline seat keeps it. The engine {served}. No seat starts or stops its host."
+        "{id} is a visual card: at brief its {who} drafts the specified design after inspecting the baseline and settling any open design tradeoffs or departures. The plan's approve includes the mock. The mock is kept in the clone's `{FOLDER}/`, untracked and never committed; an earlier run's mock is put back there when a later run's clone is made, and its baseline seat keeps it. The engine {served}. No seat starts or stops its host."
     ))
 }
 

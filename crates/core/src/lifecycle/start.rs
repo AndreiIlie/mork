@@ -395,6 +395,9 @@ fn report_request(id: &CardId) -> String {
     )
 }
 
+/// The scope of a specification ask before plan approval, shared by both brief holders.
+pub(crate) const BRIEF_ASKS: &str = "Put in-scope defaults that follow established practice in the recap for `approve`. Raise a specification ask only for two defensible options with a material tradeoff or a proposed departure from the card or a standing decision.";
+
 /// The first request of a full card: scout, agree the specification, then recap the plan for its foreman's challenge,
 /// or, with no planner, for approval.
 pub(super) fn first(card: &Card) -> String {
@@ -404,8 +407,7 @@ pub(super) fn first(card: &Card) -> String {
     }
     format!(
         "Agree {id}'s specification, as the `agreeing-a-specification` skill says. Scout first: read the card \
-         and what it names, and give researcher seats the other questions the plan depends on. Never decide a \
-         specification question alone: raise every open question in your flagged hand message (on a delegated or \
+         and what it names, and give researcher seats the other questions the plan depends on. {BRIEF_ASKS} Raise these asks in your flagged hand (on a delegated or \
          self-sustained card the engine gives it to the project's orchestrator automatically; never send a \
          specification question as a message to the orchestrator). Direct request messages to the orchestrator are \
          for mechanical needs only. Answer a question of his in your flagged hand message, never as a decision nor in a \
@@ -430,15 +432,14 @@ pub(super) fn first(card: &Card) -> String {
 fn alone(card: &Card) -> String {
     let id = &card.id;
     let writes = if card.visual {
-        "Edit no tracked repository files before approval. Edit `.git/mork-mock/` only after the visual direction is confirmed."
+        "Edit no tracked repository files before approval. Follow the visual brief for edits to `.git/mork-mock/` after the baseline step."
     } else {
         "Write, edit and commit nothing before approval."
     };
     format!(
         "{id} has no planner: you hold its specification, at brief and after approval. Agree it as the \
          `agreeing-a-specification` skill says. Scout first: read the card and what it names, and give researcher \
-         seats the other questions the plan depends on. {writes} Never decide a specification question alone: raise \
-         every open question in your flagged hand message \
+         seats the other questions the plan depends on. {writes} {BRIEF_ASKS} Raise these asks in your flagged hand \
          (on a delegated or self-sustained card the engine gives it to the project's orchestrator automatically; \
          never send a specification question as a message to the orchestrator). Direct request messages to the \
          orchestrator are for mechanical needs only. Answer a question of his in your flagged hand message, never as a \

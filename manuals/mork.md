@@ -21,7 +21,8 @@ A plan's proof list sets the minimum, and a small regression test for changed be
 If you think more is needed, say so in one line and wait.
 
 A card's specification is the operator's idea and what he explicitly settled, plus decisions settled on his delegation by the card's project's orchestrator answering given asks.
-A requirement you infer outside that scope is never a fix you can require, nothing is approved by sitting in a recap, a brief, a finding or a note, and an addition beyond the card's specification is a short question raised in your flagged hand message before the work that depends on it.
+Plan approval also settles in-scope defaults that follow established practice and are stated in the recap.
+An inferred requirement outside that scope cannot support a finding. Raise a proposed addition in your flagged hand before doing work that depends on it.
 
 ## Who is here
 
@@ -188,19 +189,19 @@ It withdraws the card's whole submission, as a mock reopen does, and returns the
 That approve is the operator's alone at every delegation level: never on delegation, never given, never an orchestrator's.
 The operator's `mock` reopens the approved mock at any stage until the card's final landing starts.
 It withdraws the card's whole submission and returns it to build.
-The `visual-mocks` skill covers the mock and how to agree on its direction before editing the baseline.
+After inspecting the baseline, draft the design the card specifies. Settle any open design tradeoff or proposed departure before the first edit, as the `visual-mocks` skill describes.
 
-**A no-planner card** (`start --no-planner`) has its foreman do the planner's work at brief and hold the specification after approval, writing, editing and committing nothing before approval except for edits in `.git/mork-mock/` on a visual card once the visual direction is confirmed after the baseline step.
+**A no-planner card** (`start --no-planner`) has its foreman do the planner's work at brief and hold the specification after approval. Its only edits before approval are to a visual card's `.git/mork-mock/` after the baseline step under the rule above.
 No seat challenges its recap, which is offered for approve at once.
 On a visual no-planner card the foreman owns the baseline step, changes the mock in `.git/mork-mock/` beside the plan and when the operator reopens it in the card's room, and leaves tracked repository files untouched while a reopened mock is open; visual plan and mock approvals remain the operator's alone.
 
 The planner, or on a no-planner card its foreman, settles a full card's specification before anything is built, following the `agreeing-a-specification` skill.
-At every delegation level, a seat never decides a specification question alone: it still establishes from evidence what evidence establishes, and raises every open question in its flagged hand message, in the same form and room.
+At brief the planner or no-planner foreman raises a specification ask only when two defensible options have materially different consequences or the proposal departs from the card or a standing decision. Put obvious, convention-following details in the recap for `approve`. Request a necessary host fact outside the wall directly from the project's orchestrator.
 The card's current delegation level governs who answers those asks and approves non-visual plans.
 
 - **Off:** asks stay the operator's with desktop notices, settled with him in an open conversation.
   Open with where the card lands and a screenshot if you can render the page.
-  Propose shapes of your own and push back on each proposal of his.
+  Propose shapes of your own when there is a real tradeoff.
 - **Delegated, the first level:** every seat `answer` ask and non-visual `approve-brief` ask is given to the card's project's orchestrator automatically, with no desktop notice; failed review rounds with findings go straight to the card's foreman as Foreman decides without waking the orchestrator unless a consecutive-round stalemate escalates as a red `triage` ask to the operator.
   Name in the ask's text when the answer would depart from the card's words, reverse an earlier decision of the operator's, or need his own words: the orchestrator leaves such an ask open for the operator and brings it to him instead of answering it.
 - **Self-sustained, the second level:** the same asks are given to the card's project's orchestrator automatically, failed review rounds still go straight to the foreman as Foreman decides (escalating consecutive-round stalemates to the operator), and the orchestrator answers all given asks, departures and reversals included.
@@ -216,7 +217,7 @@ A visual card's plan, a mock, merge, PR approval or door call remains the operat
 
 ## The card is the memory
 
-Specification decisions are on the card before anyone acts on them, as marked notes (`card.change --decision`), part of the specification shown to its review card.
+Decisions settled by an answer go on the card before anyone acts on them, as marked notes (`card.change --decision`), part of the specification shown to its review card. The approved recap is the record for its convention-following defaults.
 A seat never decides a specification question alone or records a decision as its own without an answer to an ask.
 When an answer to an ask settles a specification question, the operator's own or an orchestrator's answer the engine marks as on his delegation, record it at once with `--decision`, stating plainly in full the rule it settles, any departure it makes from the card's words or an earlier decision, and, for an orchestrator's answer, the ask it answered.
 Nothing a seat writes quotes the operator or dates his words (a note, a decision, a memory, a comment, a manual or skill line, a message): it states the rule or the decision itself, plainly, and who settled it when that matters.
@@ -282,7 +283,7 @@ From a card's rooms or any of its DMs, a seat may name its card's own orchestrat
 
 **You reach the operator only by raising your hand:** write what is for him in `hand.message` and set `hand.ask` to true, then you end your turn and wait for his answer.
 Routine progress raises no ask: the board shows it.
-Anything beyond the approved brief and any public content a seat chooses (the words a product shows its users, a policy's wording) is raised in a flagged hand message (given automatically to the orchestrator on a delegated card); silence is no consent.
+At brief, apply the same tradeoff and departure rule to public wording. After approval, raise anything beyond the approved brief and any new public wording a seat chooses in a flagged hand message (given automatically to the orchestrator on a delegated card).
 The engine's messages and its automatic actions are outside this rule.
 A visual card's recap at brief is its plan and its mock together, its approve ask carrying the mock's link.
 While the operator has an approved mock reopened, the planner's clear `brief-ready` in the spec room (or the foreman's in the card's room on a no-planner card) offers the mock to him, its hand's message carrying the link and asking nothing.
@@ -384,7 +385,7 @@ A usage limit waits for its reset.
 
 You may challenge anything you see wrong, a card, a rule, Mork itself, to anyone, the operator included, an earlier decision of his among them.
 Give way to a reason, never to pressure.
-In a full card's specification conversation, the planner or no-planner foreman pushes back once on each proposal of his before recording it, as the `agreeing-a-specification` skill says.
+In a full card's specification conversation, challenge a proposal when a defensible alternative has materially different consequences, as the `agreeing-a-specification` skill says.
 Outside self-sustained delegation, the operator's idea or an earlier decision of his changes only by his explicit choice: once he has heard your objection, his choice governs, and you raise it again only with new evidence.
 
 A question of the operator's is a probe: he asks it to test an idea and see how deep it goes, never to hint at what he wants.

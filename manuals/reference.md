@@ -711,9 +711,9 @@ That seat is the planner on a full card, a visual card's taking its first turn o
 `--no-planner` starts a full run with no planner: its foreman holds the specification at brief and after approval.
 The first turn goes to the foreman, once the clone is made, and its wall is the foreman's.
 On a visual no-planner card, "Build the baseline" comes first, and the foreman's `built` ends the baseline step and begins the specification conversation on the mock; otherwise "Agree the specification" comes first.
-It scouts, may give researchers questions, raises open questions in its flagged hand message under the card's delegation level, records its decisions, and recaps the specification and code shape, its sketch in the hand's `changes` and `code_shape`.
+It scouts, may give researchers questions, raises genuine tradeoffs or departures in its flagged hand under the card's delegation level, records answered decisions, and recaps the specification and code shape, its sketch in the hand's `changes` and `code_shape`.
 It ends `brief-ready`, an outcome offered to this foreman alone at brief past any baseline step and while a reopened mock is open.
-Before approval it writes, edits and commits nothing, except for edits in `.git/mork-mock/` on a visual card once the visual direction is confirmed after the baseline step.
+Before approval it writes, edits and commits nothing, except for edits in `.git/mork-mock/` on a visual card after the baseline step as described under `visual`.
 No seat challenges its recap: it is offered for `approve` at once (never self-approved), its `approve-brief` ask given automatically to the project's orchestrator on a delegated non-visual card, while a visual card's waits for the operator's own approve.
 Approval keeps the same foreman in its same session, releases the foreman's brief researchers and asks the foreman to build.
 The operator's unnamed words in the room reach the foreman at every stage, and `planner` is no recipient on the card.
@@ -737,6 +737,7 @@ Example: `mork ctl start ex-550 --mode full --delegated`, or `mork ctl start ex-
 ### approve
 
 Approves the offered plan: its recap becomes the approved specification, the card moves from brief to build, the card's foreman, the one that challenged it, takes the build in its same session with the approved plan and recorded decisions.
+Approval settles in-scope defaults stated in the recap that follow established practice. A proposed departure from the card or a standing decision requires a separate ask before the recap.
 On a visual card it also ends the mock, approved with the plan.
 The foreman cuts the deliverables, publishes their tasks and builds them.
 Each recap is challenged by the card's foreman before it is offered: with no objection the engine offers that plan; with objections the planner's next recap is challenged again.
@@ -1478,6 +1479,7 @@ When the level changes on a live card, the engine posts an update to the full ca
 The seat reads it in its next turn's news.
 An unchanged level or an ended card posts no update.
 
+At brief, the planner or no-planner foreman puts convention-following defaults in the recap. A specification question calls for two defensible options with a real tradeoff or a proposed departure from the card or a standing decision.
 On a delegated or self-sustained card, seats never decide specification questions alone, never raise an ask to weigh failed review findings, and never send specification questions as direct messages to the orchestrator: every open question and held challenge objection opens as a seat `answer` ask in the seat's room, given to the card's project's orchestrator automatically without a desktop notice (including design-tagged asks), while failed review rounds with findings skip triage and go straight to the card's foreman as Foreman decides (waiting for any candidate suite run so both results travel in one request), except that a consecutive-round stalemate where none of the prior round's unresolved findings were resolved and all repeat opens a red `triage` ask for the operator instead of looping.
 At the first level (`delegated`), the seat names in the ask's text when an answer would depart from the card's words, reverse an earlier decision of the operator's or need his own words, and the orchestrator leaves that ask open for the operator and brings it to him.
 At the second level (`self-sustained`), the orchestrator answers all given asks, departures and reversals included; the wake line carries the card's level (`(delegated)` or `(self-sustained)`).
@@ -1526,9 +1528,8 @@ A stall in the step nudges the foreman.
 A planner already at brief when the step ends, or a no-planner foreman that already received "Agree the specification" in this run, gets "The baseline is ready"; a no-planner foreman that has not yet received "Agree the specification" in this run gets "Agree the specification" once its baseline ends.
 
 At brief the planner writes the mock beside its handoff, the rest of the clone read-only to it; a no-planner foreman keeps the foreman's wall and leaves tracked repository files untouched before approval.
-The holder renders and inspects the baseline, leaving the mock folder untouched until the operator confirms the direction, information hierarchy and concrete changes, or the orchestrator confirms them on a self-sustained card.
-It records the decisions and applies the confirmed changes together in the first draft.
-It records each refinement as a decision and renders the mock from its link before each recap.
+The holder renders and inspects the baseline, then drafts the design the card specifies. An open tradeoff about the direction, hierarchy or concrete changes, or a proposed departure, needs an answer before editing. The operator answers that design ask, or the orchestrator on a self-sustained card.
+The holder records answered decisions and renders the mock from its link before each recap.
 It leaves the mock untouched while a recap is under challenge or waits for approve, editing it only once the operator's comment withdrew the recap or the foreman's objection came.
 A visual recap is the plan and the mock together: one from a turn launched before the step ended is not offered, its holder told why; on a card with a planner the foreman's challenge request names the mock's link, or says nothing serves it, and the plan's `approve-brief` ask shows the sketch, then the link.
 That approve is the operator's alone (`approve`): it ends the mock and asks the foreman for the build.

@@ -166,9 +166,9 @@ pub(crate) fn delegation_rule(c: &Card) -> &'static str {
     if !c.delegated {
         "Settle specification questions with the operator in your flagged hand message."
     } else if c.self_sustained {
-        "Never decide a specification question alone: raise every open question in your flagged hand message as with delegation off, and the engine gives it to the project's orchestrator automatically. The orchestrator answers all given asks, departures included; record each settled rule citing the ask and naming any departure."
+        "Raise open specification questions in your flagged hand as with delegation off. The engine gives each ask to the project's orchestrator automatically. The orchestrator answers all given asks, departures included; record each settled rule citing the ask and naming any departure."
     } else {
-        "Never decide a specification question alone: raise every open question in your flagged hand message as with delegation off, and the engine gives it to the project's orchestrator automatically. Name in the ask's text when the answer would depart from the card's words, reverse an earlier decision of the operator's, or need his own words so the orchestrator leaves it to the operator. Record each settled rule citing the ask."
+        "Raise open specification questions in your flagged hand as with delegation off. The engine gives each ask to the project's orchestrator automatically. Name in the ask's text when the answer would depart from the card's words, reverse an earlier decision of the operator's, or need his own words so the orchestrator leaves it to the operator. Record each settled rule citing the ask."
     }
 }
 

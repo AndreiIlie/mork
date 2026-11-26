@@ -20,9 +20,10 @@ Follow the editing limits in Delegating.
   Your reply counts only for the recap whose request your turn read.
   Settle objections with the planner by messages in the challenge place; an objection it refuses that you still hold, tell it so with your reasons: the planner raises both positions in an ask, one objection at a time, at every delegation level.
 - **Full mode, no planner:** a run the operator or an orchestrator starts with `--no-planner` has no planner, and its first request ("Agree the specification", or "Build the baseline" on a visual card) comes to you once the clone is made.
-  Do the planner's work as the `agreeing-a-specification` skill says: read the card, give researchers the questions the plan depends on, never decide a specification question alone (raise every open question in your flagged hand message, which the engine gives to the orchestrator automatically when delegated), record settled decisions, holding the planner's conversation (the opener, shapes of your own, a pushback on every proposal), and recap with the sketch in the hand's `changes` and `code_shape` and the long plan in its `message`.
+  Follow `agreeing-a-specification` for scouting, opening the conversation and recording answers. Raise a flagged ask only for two defensible options with materially different consequences or a proposed departure from the card or a standing decision. The engine gives the ask to the orchestrator when delegated.
+  Put obvious, convention-following defaults in the recap for `approve`, with the sketch in `changes` and `code_shape` and the long plan in `message`.
   End `brief-ready`.
-  Write, edit and commit nothing before approval, except for edits in `.git/mork-mock/` on a visual card once the visual direction is confirmed after the baseline step.
+  Your only edits before approval are to a visual card's `.git/mork-mock/` after the baseline step, as described below.
   No seat challenges your recap: it is offered for approve at once (never self-approved), its `approve-brief` ask given automatically to the project's orchestrator on a delegated non-visual card, while a visual card's waits for the operator's own approve.
   The operator's unnamed words in the room reach you at every stage.
   The card has no `planner` to message.
@@ -39,10 +40,9 @@ Follow the editing limits in Delegating.
   You spawn a baseline seat in that step alone.
   On a card with a planner, the mock is then the planner's, changed at brief and approved with the plan: you do not make or offer the mock, or relay his comments, and your challenge request names its link, or says nothing serves it: judge the plan and the mock together.
   On a no-planner card, once the baseline step ends, render and inspect the baseline as it stands.
-  In the card's room, ask about the design direction, information hierarchy and concrete changes as the `visual-mocks` skill describes.
-  Leave the mock folder untouched until all three are confirmed by the operator or, on a self-sustained card, by the orchestrator.
-  On a delegated card, say in the design ask that it needs the operator's own answer.
-  Record the decisions, apply the confirmed changes together in the first draft, then settle refinements at the card's delegation level.
+  Draft the design the card specifies. If the direction, hierarchy or changes present a real tradeoff or departure, settle it in the card's room before editing, as the `visual-mocks` skill describes.
+  On a delegated card, say in the design ask that it needs the operator's own answer. On a self-sustained card the orchestrator answers it.
+  Record decisions settled by answers and show the draft with the plan.
   Send no `brief` while a reopened mock is open.
 - **A reopened mock:** the operator's `mock` reopens an approved mock in the same run until the final landing starts.
   It withdraws the card's whole submission and returns it to build.

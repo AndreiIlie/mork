@@ -38,7 +38,7 @@ pub(super) fn open(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>) {
 fn request(c: &Card, config: &Config) -> String {
     let id = &c.id;
     let (wait, after) = if c.no_planner {
-        ("before agreeing the specification", "lets you agree the visual direction")
+        ("before agreeing the specification", "lets you begin the visual brief")
     } else {
         ("the planner's turns wait for it", "lets the planner on")
     };
@@ -147,13 +147,12 @@ pub(super) fn recap_withheld(p: &mut Poster<'_>, c: &Card, who: &Who, job: &Job)
     let early = last.is_some_and(|seq| job.seen.is_none_or(|seen| seen <= seq));
     let text = if mock::baseline(c) {
         if c.no_planner {
-            "End the baseline step with `built`, get the visual direction confirmed, then edit the mock and recap."
+            "End the baseline step with `built`, then follow the visual brief to draft the mock and recap."
         } else {
-            "Once the foreman ends the baseline step, get the visual direction confirmed, then edit the mock and recap."
+            "Once the foreman ends the baseline step, follow the visual brief to draft the mock and recap."
         }
     } else if early {
-        "This turn began before the baseline was ready, so get the visual direction confirmed in your next \
-         turn, then edit the mock and recap."
+        "This turn began before the baseline was ready, so follow the visual brief in your next turn to draft the mock and recap."
     } else {
         return false;
     };
