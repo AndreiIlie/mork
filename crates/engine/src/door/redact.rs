@@ -63,8 +63,10 @@ impl Redactor {
     pub fn mask_cut(&self, text: &str) -> String {
         let mut t = self.mask(text);
         for v in &self.values {
-            let start = t.char_indices().map(|(i, _)| i).find(|i| {
-                let tail = &t[*i..];
+            // A byte bound inside a character leaves U+FFFD after the secret's start.
+            let kept = t.trim_end_matches('\u{fffd}').len();
+            let start = t[..kept].char_indices().map(|(i, _)| i).find(|i| {
+                let tail = &t[*i..kept];
                 tail.len() >= TAIL.min(v.len()) && tail.len() < v.len() && v.starts_with(tail)
             });
             if let Some(i) = start {
@@ -323,6 +325,14 @@ mod tests {
             "\\u12S \\u+053 \u{fffd}",
             "uncut text keeps what it can't decode"
         );
+        // Review r4: a byte bound inside a secret's character leaves U+FFFD, and its start still goes.
+        for (secret, cut) in [("fixture雪42", 15), ("SENTINEL-\u{1f511}-99", 19)] {
+            let mut r = Redactor::default();
+            r.add(secret);
+            let text = format!("public {secret}");
+            let lossy = String::from_utf8_lossy(&text.as_bytes()[..cut]);
+            assert_eq!(r.mask_text(&lossy, true), format!("public {MASK}"), "{secret} cut at {cut}");
+        }
     }
 
     fn decoded_fully(text: &str) -> String {

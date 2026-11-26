@@ -275,6 +275,12 @@ impl Scan {
             let start = if maria { 4 } else { 3 };
             let body = &whole[start..whole.len() - 2];
             let skip = body.bytes().take_while(u8::is_ascii_digit).count();
+            // Both servers read 5 digits, or 6 before a space, as the version; other runs of digits
+            // they split differently, or read as SQL that a capped LIMIT count could run into.
+            let spaced = body.as_bytes().get(skip).is_some_and(|b| matches!(b, b' ' | b'\t' | b'\n' | b'\r'));
+            if !(skip == 0 || skip == 5 || (skip == 6 && spaced)) {
+                return Err("an executable comment's version is 5 digits, or 6 before a space".into());
+            }
             let version = body[..skip].parse::<u64>().unwrap_or(0);
             scan.versions.insert(version);
             let offset = query[..t.at.start + start + skip].chars().count();
@@ -416,7 +422,22 @@ mod tests {
             r#"SELECT /*+ SET_VAR(optimizer_switch = '\') SET_VAR(sql_select_limit = 9) SET_VAR(a = 'a) # ') */ 1"#,
             r#"SELECT /*+ SET_VAR(optimizer_switch = "\") SET_VAR(sql_mode = '') SET_VAR(a = "a) -- ") */ 1"#,
             "SELECT /*+ BKA(t) -- note\n */ 1",
+            // fac-748 review r4: only a version both servers read the same way passes.
+            "SELECT /*!0. */ INTO OUTFILE '/tmp/x'",
+            "SELECT /*!000000. */ INTO OUTFILE '/tmp/x'",
+            "SELECT a FROM t LIMIT /*!00000999999 */",
+            "SELECT a FROM t LIMIT /*!9999 */",
+            "/*!99999999999999999999 SELECT */ DROP TABLE users",
+            "SELECT a FROM t FOR /*!99999999999999999999 x */ SHARE",
         ]);
+        for q in [
+            "SELECT 1 /*!50000 + 1 */",
+            "SELECT 1 /*!100000 + 1 */",
+            "SELECT 1 /*M!100000\t+ 1 */",
+            "SELECT 1 /*! + 1 */",
+        ] {
+            assert!(read(q).is_ok(), "refused: {q}");
+        }
         for q in ["SELECT 1 /*!50000 # a note\n + 1 */", "SELECT REPLACE(a, 'x', 'y'), INSERT(a, 1, 2, 'z') FROM t"] {
             assert!(read(q).is_ok(), "refused: {q}");
         }
