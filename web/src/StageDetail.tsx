@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Markdown } from "./Markdown";
+import { FindingCount } from "./FindingCount";
 import { clockTime, plural, took } from "./format";
 import { ChevronIcon } from "./icons";
 import type { Color, FindingView, LiveRow, Plan, SuiteProgress } from "./types";
@@ -166,7 +167,9 @@ export function StageDetail({
 }) {
   const st = node.stage;
   const findings = st?.round?.n === triageRound ? [] : st?.round?.findings ?? [];
-  const empty = node.at === "to-come" || (node.kind !== "spec" && plan === undefined && findings.length === 0 && steps.length === 0);
+  const round = st?.round;
+  const reviewers = Object.entries(round?.reviewers ?? {});
+  const empty = node.at === "to-come" || (node.kind !== "spec" && plan === undefined && findings.length === 0 && steps.length === 0 && reviewers.length === 0);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-3 border-b border-gray-400 px-gutter py-3">
@@ -211,6 +214,21 @@ export function StageDetail({
             <h3 className={HEAD}>Plan</h3>
             <div className="border-t border-gray-400">
               <PlanRows plan={plan} />
+            </div>
+          </>
+        )}
+        {round && reviewers.length > 0 && (
+          <>
+            <h3 className={HEAD}>Reviewers</h3>
+            <div className="border-t border-gray-400">
+              <PaneList>
+                {reviewers.map(([name, count]) => (
+                  <Row key={name} pane>
+                    <span className="font-mono text-label-13 text-gray-900">{name}</span>
+                    <FindingCount count={count} verdict={round.verdict} />
+                  </Row>
+                ))}
+              </PaneList>
             </div>
           </>
         )}
