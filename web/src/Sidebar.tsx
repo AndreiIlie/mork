@@ -87,6 +87,7 @@ export function Sidebar({
   const hands = ownHands(screen?.hands ?? []);
   const onBoard = activeCard === null && !onUsage;
   const quota = hottest(screen?.top.usage ?? [], nowMs);
+  const resources = screen?.top.resources;
   const updateReady = screen?.top.pin?.ready;
   const { pending, refusals, press } = useHandOffers();
   const busy = pending.reload !== undefined || screen?.top.phase.is === "reloading";
@@ -128,6 +129,17 @@ export function Sidebar({
         >
           Enable alerts
         </button>
+      )}
+
+      {resources && (
+        <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-t border-gray-400 px-edge text-label-12 text-gray-700">
+          <span>CPU <span className="font-mono tabular-nums text-gray-1000">
+            {resources.cpu_percent === null ? "?" : `${resources.cpu_percent}%`}
+          </span></span>
+          <span>RAM <span className="font-mono tabular-nums text-gray-1000">
+            {resources.ram === null ? "?" : `${Math.round(resources.ram.used_mib / 1024)}/${Math.round(resources.ram.total_mib / 1024)} GiB`}
+          </span></span>
+        </div>
       )}
 
       {updateReady && (

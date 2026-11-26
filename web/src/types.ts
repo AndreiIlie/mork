@@ -124,7 +124,10 @@ export interface TopLine {
   pin: PinLine;
   usage: Share[];
   phase: Phase;
-  resources?: unknown;
+  resources?: {
+    cpu_percent: number | null;
+    ram: { used_mib: number; total_mib: number } | null;
+  };
 }
 
 /** A command the engine would accept now, and the word its button shows. */
