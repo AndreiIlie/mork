@@ -76,21 +76,40 @@ fn web() -> bool {
         && run(xtask::web::npm(&dir, &["run", "build"]), "web build")
 }
 
-fn check() -> bool {
+fn rustfmt() -> Command {
     let mut fmt = cargo();
     fmt.args(["fmt", "--all", "--check"]);
-    let mut clippy = cargo();
-    clippy.args(["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]);
-    let a = run(fmt, "rustfmt");
-    // Clippy has no lint for a comment's length: the comment rules fail the check before it runs (fac-2).
-    if !comments() {
-        return verdict("check", &[("rustfmt", a), ("comments", false)]);
+    fmt
+}
+
+const CLIPPY_PASSES: [(&str, &[&str]); 2] =
+    [("clippy", &["--workspace", "--all-targets", "--all-features"]), ("production clippy", &xtask::suite::PRODUCTION)];
+
+fn clippy(targets: &[&str], json: bool) -> Command {
+    let mut cmd = cargo();
+    cmd.arg("clippy").args(targets);
+    if json {
+        cmd.arg("--message-format=json");
     }
-    let c = run(clippy, "clippy");
+    cmd.args(["--", "-D", "warnings"]);
+    cmd
+}
+
+fn check() -> bool {
+    let fmt_ok = run(rustfmt(), "rustfmt");
+    let comments_ok = comments();
+    let mut steps = vec![("rustfmt", fmt_ok), ("comments", comments_ok)];
+    // Clippy has no lint for a comment's length: the comment rules fail the check before it runs (fac-2).
+    if !comments_ok {
+        return verdict("check", &steps);
+    }
+    for (name, targets) in CLIPPY_PASSES {
+        steps.push((name, run(clippy(targets, false), name)));
+    }
     eprintln!("xtask: audits");
-    let d = report(&audits());
-    let w = web();
-    verdict("check", &[("rustfmt", a), ("comments", true), ("clippy", c), ("audits", d), ("web", w)])
+    steps.push(("audits", report(&audits())));
+    steps.push(("web", web()));
+    verdict("check", &steps)
 }
 
 const FAULTS: [&str; 2] = ["--features", "mork-app/faults,mork-engine/faults"];

@@ -48,6 +48,12 @@ impl Rig {
     /// Writes the door's targets, the access file and the fake world; the app reads them at each
     /// request.
     pub fn door(&mut self) {
+        // Slot homes can exceed the SSH socket path limit. Only the alias lives in the wall's /tmp.
+        if super::unwalled() && std::env::var_os("MORK_AGENT_SOCK").is_some() {
+            let alias = super::ShortTemp::new(&self.t.mork_home()).unwrap();
+            self.set_env("MORK_HOME", alias.path().to_str().unwrap());
+            self.door_home = Some(alias);
+        }
         let remote = self.remote();
         std::fs::create_dir_all(remote.join("srv/app/config")).unwrap();
         std::fs::write(remote.join("srv/app/config/app.yml"), "name: app\nmode: staging\n").unwrap();

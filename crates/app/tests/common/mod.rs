@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use mork_engine::jobs::folder::ShortTemp;
 use mork_fakes::TestHome;
 
 pub mod builds;
@@ -35,6 +36,7 @@ pub struct Rig {
     pub t: TestHome,
     pub env: Vec<(String, String)>,
     pub app: Option<Child>,
+    door_home: Option<ShortTemp>,
 }
 
 impl Rig {
@@ -44,7 +46,7 @@ impl Rig {
         std::fs::create_dir_all(t.mork_home().join("agent-home")).unwrap();
         std::fs::create_dir_all(t.root.join("mork-repo")).unwrap();
         std::fs::create_dir_all(t.mork_home().join("fixtures")).unwrap();
-        let mut rig = Self { t, env: Vec::new(), app: None };
+        let mut rig = Self { t, env: Vec::new(), app: None, door_home: None };
         rig.write_config(&rig.config(""));
         // The app's own commands (`notify-send`) find the fakes, and log where the walls' do.
         let path = format!("{}:{}", rig.t.bin().display(), std::env::var("PATH").unwrap_or_default());
@@ -55,7 +57,7 @@ impl Rig {
     }
 
     pub fn fhome(&self) -> PathBuf {
-        self.t.mork_home()
+        self.door_home.as_ref().map_or_else(|| self.t.mork_home(), |alias| alias.path().to_owned())
     }
     pub fn agent_home(&self) -> PathBuf {
         self.fhome().join("agent-home")
