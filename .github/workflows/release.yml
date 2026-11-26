@@ -1,0 +1,53 @@
+name: Linux release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  release:
+    if: github.event.deleted == false
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      BUNDLE: mork-${{ github.ref_name }}-linux-x86_64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build Linux binary and dashboard
+        run: |
+          cargo xtask web
+          cargo build --locked --release -p mork-app
+
+      - name: Package Linux archive
+        run: |
+          mkdir -p "$BUNDLE/web"
+          cp target/release/mork mork.example.toml "$BUNDLE/"
+          cp -R web/dist "$BUNDLE/web/"
+          tar -czf "$BUNDLE.tar.gz" "$BUNDLE"
+
+      - name: Publish archive to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft'); then
+            gh release upload "$GITHUB_REF_NAME" "$BUNDLE.tar.gz" --clobber
+            if [[ "$draft" == true ]]; then
+              gh release edit "$GITHUB_REF_NAME" --draft=false
+            fi
+          else
+            # The tag annotation carries supported upgrade versions and fresh-start guidance.
+            gh release create "$GITHUB_REF_NAME" "$BUNDLE.tar.gz" --verify-tag --notes-from-tag
+          fi
