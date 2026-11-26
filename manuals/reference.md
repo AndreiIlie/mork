@@ -1350,7 +1350,10 @@ A call dropped as busy or because its caller went answers no later request: aski
 A queued non-read call nobody waits on, including an approved `misc.run` or a `sh.run` pending across a restart, has no queue time limit and runs when its target is free.
 
 Each operation keeps to its bounds: `sql.select` runs one read-only statement on any table the operator's login on the target may read, `information_schema` and the `sys` schema refused (appending `[targets.<id>.sql] schema_hint` when configured), a replica (`read_only = true` in its `[sql]`) with its own row cap and timeout; `mongo.find` only finds, its code-executing operators refused; `http.get` runs any GET path at the configured API origin; `file.get` copies one regular file under a named root into the asking seat's `io/` folder (`MORK_IO`), at most 20 MB.
-For `http.get`, `[targets.<id>.http]` sets the HTTPS `origin` and the OAuth2 `client` credential reference. The door obtains a token from `token_path` (default `/oauth2/token`) at that origin and uses it for the GET. It sends `scope` only when configured. Set `scope = "default"` if the service requires that literal value.
+For `http.get`, `[targets.<id>.http]` sets the HTTPS `origin` and the OAuth2 `client` credential reference.
+The door obtains a token from `token_path` (default `/oauth2/token`) at that origin and uses it for the GET.
+It sends `scope` only when configured.
+Set `scope = "default"` if the service requires that literal value.
 An orchestrator's `file.get` outside a turn copies to `<mork home>/door/files/<call id>-<file name>` (`<call id>` is the action id), private to the operator's user and outside every wall.
 It is kept 14 days; the daily prune removes older copies.
 The answer's `file` gives the full path; the caller never chooses a destination.

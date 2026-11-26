@@ -67,8 +67,10 @@ Read it there with your own tools (`pdftotext`, `unzip`).
 
 `http.get` takes any GET path `/…` at the configured API origin, with no ask.
 Optional endpoint names are aliases/templates: parameters fill `{name}` slots and all extra keys and values are encoded into the query.
-The engine handles the OAuth2 client credentials and bearer token. Both requests use the HTTPS origin in `[targets.<id>.http]`.
-The token path defaults to `/oauth2/token`. The door sends `scope` only when configured.
+The engine handles the OAuth2 client credentials and bearer token.
+Both requests use the HTTPS origin in `[targets.<id>.http]`.
+The token path defaults to `/oauth2/token`.
+The door sends `scope` only when configured.
 Output masking and limits apply.
 File roots and named logs keep their location restrictions.
 
