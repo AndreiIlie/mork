@@ -178,17 +178,17 @@ export function TriagePanel({
         ))}
       </ul>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-          <OfferButtons
-            offers={hand.offers}
-            live={live && !sending}
-            pending={pending}
-            onPress={onPress}
-            className="flex flex-wrap items-center gap-2"
-          />
-          <span className="pr-2 font-mono text-label-12 tabular-nums text-gray-900">{tally}</span>
-          <Button tier="primary" size="sm" disabled={!live || left > 0 || sending} onClick={send}>
-            {sending ? "Sending…" : "Send"}
-          </Button>
+        <OfferButtons
+          offers={hand.offers}
+          live={live && !sending}
+          pending={pending}
+          onPress={onPress}
+          className="flex flex-wrap items-center gap-2"
+        />
+        <span className="pr-2 font-mono text-label-12 tabular-nums text-gray-900">{tally}</span>
+        <Button tier="primary" size="sm" disabled={!live || left > 0 || sending} onClick={send}>
+          {sending ? "Sending…" : "Send"}
+        </Button>
       </div>
       <RefusalLine refusal={sendError ?? refusal} className="px-4 py-2" />
     </div>

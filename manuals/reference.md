@@ -168,7 +168,9 @@ With `--full`, each agent row of a card's room and DMs carries its `turn`: read 
 A view keeps only its agents' latest steps: `cut` says some went, and a text's own `cut` that it was cut.
 The card header's `about.seat_costs` gives each seat's current-run `agent`, `cost_cents`, `unknown` flag and four `tokens` sums, including seats already gone.
 Each agent row also carries an optional `cache` (`running`, or `idle` with `cold_at_ms`), and a card's room view carries `summaries` (its card's and each carried card's) and `findings` (its review card's raised findings with their states, without proofs).
-A schema 7 reply uses `hand.message` for its text and `hand.ask` to flag it as a question. A message carrying an open ask names its ID in `open_ask`. Each open hand links back through `seq` and `message_place` and carries the message's headline.
+A schema 7 reply uses `hand.message` for its text and `hand.ask` to flag it as a question.
+A message carrying an open ask names its ID in `open_ask`.
+Each open hand links back through `seq` and `message_place` and carries the message's headline.
 A `screen` event's `hands` carry `cold_at_ms` while their waiting seat's prompt cache is idle, `projects` carries each project's look-back state, and `top.resources` carries the machine's sampled CPU and RAM.
 
 Example: `mork ctl watch main ex-550`, `mork ctl watch main --tail 50`; with turn traces, `mork ctl watch ex-550 --full`

@@ -258,9 +258,9 @@ function MessageRow({ m, tzOffsetMin, nowMs, live, hand, triage, run }: MessageR
   const engine = m.kind === "engine";
   let body = m.text || m.headline;
   if (hand?.kind === "approve-brief") {
-    body = "";
+    body = m.hand?.message ?? "";
   } else if (m.hand !== null) {
-    const options = hand === undefined ? askText(m.hand) : "";
+    const options = hand?.kind === "answer" ? "" : askText(m.hand);
     body = [m.text, options].filter((part) => part.trim() !== "").join("\n\n");
   } else if (hand?.choices) {
     body = hand.choices.ask;

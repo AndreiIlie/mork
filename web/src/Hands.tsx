@@ -27,13 +27,13 @@ export function RaisedHands({ hands, nowMs, live }: { hands: HandView[]; nowMs: 
           const meta = [wherePlace(h), h.role ?? (h.card === null ? null : "engine"), h.design ? "design" : null].filter(Boolean).join(" · ");
           const card = h.card;
           const actions = card === null ? (
-              <OfferButtons
-                offers={h.offers}
-                live={live}
-                pending={pending[h.ask] ?? null}
-                onPress={(o) => press(h.ask, o)}
-                className="flex items-center gap-2"
-              />
+            <OfferButtons
+              offers={h.offers}
+              live={live}
+              pending={pending[h.ask] ?? null}
+              onPress={(o) => press(h.ask, o)}
+              className="flex items-center gap-2"
+            />
           ) : undefined;
           return (
             <Row key={h.ask} to={card !== null ? cardPath(card, h.ask) : undefined} actions={actions}>

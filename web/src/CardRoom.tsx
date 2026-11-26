@@ -168,16 +168,14 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
       </PageHeader>
       <SplitPane
         left={
-          <>
-            <Overview
-              overview={buildView.overview}
-              plan={buildView.plan}
-              triageRound={buildView.triage?.round}
-              tzOffsetMin={screen.tz_offset_min}
-              status={overviewStatus(own, seats)}
-              nowMs={nowMs}
-            />
-          </>
+          <Overview
+            overview={buildView.overview}
+            plan={buildView.plan}
+            triageRound={buildView.triage?.round}
+            tzOffsetMin={screen.tz_offset_min}
+            status={overviewStatus(own, seats)}
+            nowMs={nowMs}
+          />
         }
         right={
           <SeatChat

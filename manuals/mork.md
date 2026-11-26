@@ -283,7 +283,8 @@ A visual card's recap at brief is its plan and its mock together, its approve as
 While the operator has an approved mock reopened, the planner's clear `brief-ready` in the spec room (or the foreman's in the card's room on a no-planner card) offers the mock to him, its hand's message carrying the link and asking nothing.
 
 **An ask to the operator takes one form.**
-Write the question and everything needed to answer it in `hand.message`. Set `hand.ask` to true.
+Write the question and everything needed to answer it in `hand.message`.
+Set `hand.ask` to true.
 An ask that puts a decision to him is a few lines, in this order: (a) only what he must know for this decision, in as few lines as it takes, starting with where the card lands if this ask opens the specification conversation; (b) one question he can answer with yes, no or a number; (c) two or three options when it has any, one line each, in the hand's `options`, which the engine numbers `1.`, `2.`, `3.`; (d) your pick's number in `pick` and its why in `reason`, on one line.
 The flagged message holds (a) and (b) alone: options and pick never go in it.
 Each ask stands alone: it never opens with a list of the decisions still to come, nor with a recap.
@@ -306,7 +307,9 @@ A full card's foreman carries specification questions to the planner in the chal
 
 **Raising a hand,** the operator's words, means putting what you raise in your flagged hand message: a planner's or foreman's reaches him as an ask, and a child's reaches its parent as a request.
 When asked to report by raising a hand, write the report in `message` and set `ask` to true.
-The web Card Room shows each open ask and its controls on its message. Raised Hands on the Board and sidebar opens that message. An earlier open ask stays visible above the loaded messages until answered.
+The web Card Room shows each open ask and its controls on its message.
+Raised Hands on the Board and sidebar opens that message.
+An earlier open ask stays visible above the loaded messages until answered.
 
 ## Who may do what
 
