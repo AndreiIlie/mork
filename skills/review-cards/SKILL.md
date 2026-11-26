@@ -47,9 +47,9 @@ Nothing reviews a review card in turn.
    Performance applies when the change can affect it.
 3. **Task one blind reviewer per topic** with `mork ctl spawn <card> reviewer '<task>' --topic '<topic>'`.
    Use `--task-file <path>` in place of `'<task>'` for a task with quotes or parentheses.
-   Select the tier's effort from the review kind's configured default and its permitted picks.
+   Select the tier's starting effort from the review kind's configured default and its permitted picks.
    Omit selection flags for the default.
-   For an explicit selection at that effort use `--model <model> --effort <effort>` as the "Delegating" skill says.
+   For an explicit selection use `--model <model> --effort <effort>`, following the `delegating` skill for unresolved doubts.
    For a returning reviewer, apply any permitted effort change with `pick` before sending its task.
    Quote a topic of several words so it passes whole (`--topic 'correctness and tests'`, `--topic 'money, permissions or data integrity'`).
    The room list shows it beside the reviewer.
