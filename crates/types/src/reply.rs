@@ -108,10 +108,10 @@ pub struct Hand {
     /// Marks the ask as a design question (fac-233): shown tagged; auto-given like any `answer` ask when delegated.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub design: bool,
-    /// Withdraws the seat's open ask unanswered (fac-271); an empty `ask` alone leaves it open.
+    /// Withdraws the seat's open ask unanswered (fac-271); `ask` false alone leaves it open.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub withdraw_ask: bool,
-    /// Files of the seat's `io/` folder, `$MORK_IO`, shown beside the hand and its ask (fac-278, fac-654).
+    /// Files of the seat's `io/` folder, `$MORK_IO`, shown beside the hand's message (fac-278, fac-654).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<String>,
     /// The ask's numbered options, in order (fac-696): none when it offers no choice.

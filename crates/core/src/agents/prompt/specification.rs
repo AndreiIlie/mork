@@ -19,7 +19,7 @@ const SPECIFICATION: &str = "## The specification\n\nYou hold this card's specif
 
 const CHALLENGED_RECAPS: &str = "Each recap is challenged by the card's `foreman` before it is offered. Settle its objections with it, by messages as long as it takes, and recap once settled: that recap is challenged again. Your messages to `foreman` and its to you pass in the card's challenge place, which no window shows; any disagreement left unsettled opens as your ask (given to the project's orchestrator when delegated). Approval ends your work at brief and hands the build to that foreman.";
 
-const WITHDRAWN: &str = "A recap waiting for `approve` is withdrawn by the operator's words in your room, the card's project's orchestrator's words while its open plan ask is given to it (unless answering your unanswered mechanical request), an `answer` ask you raise, your hand's `ask` or a red headline raised as one; a reply raising none, a `blocked` one included, leaves it waiting. A new recap replaces it and is offered under the card's current delegation.";
+const WITHDRAWN: &str = "A recap waiting for `approve` is withdrawn by the operator's words in your room, the card's project's orchestrator's words while its open plan ask is given to it (unless answering your unanswered mechanical request), an `answer` ask you raise, your flagged hand message or a red headline raised as one; a reply raising none, a `blocked` one included, leaves it waiting. A new recap replaces it and is offered under the card's current delegation.";
 
 const UNCHALLENGED_RECAPS: &str = "This card has no planner, and no seat challenges your recap: it is offered once made. Write, edit and commit nothing before approval. Approval releases your brief researchers, and the build request comes to you in this session.";
 
@@ -27,9 +27,9 @@ const UNCHALLENGED_VISUAL_RECAPS: &str = "This card has no planner, and no seat 
 
 const ALONE_BASELINE: &str = "\n## The baseline\n\nThis visual card is at its baseline step. Read the card and the code, name the pages the card changes, and spawn its baseline seat (`mork ctl spawn <card> baseline '<task>'`, naming no model or effort) to reproduce them as they stand today in `.git/mork-mock/`. Write nothing yourself. Once its report says the baseline is done, end `built` to release the seat and begin agreeing the visual direction; with no existing page to reproduce, spawn nothing and end `built` at once.\n";
 
-const DISPUTE: &str = "\n## The specification\n\nFor this dispute, read the card and its recorded decisions. Never decide a specification question alone: raise any open question in your hand's `ask` under the current delegation level, record each settled decision and answer whoever asked. Leave the card at its current stage.\n";
+const DISPUTE: &str = "\n## The specification\n\nFor this dispute, read the card and its recorded decisions. Never decide a specification question alone: raise any open question in your flagged hand message under the current delegation level, record each settled decision and answer whoever asked. Leave the card at its current stage.\n";
 
-const ALONE_AFTER: &str = "\n## The specification\n\nThis card has no planner: you hold its specification after approval too. Never decide a specification question alone: raise any open question in your hand's `ask` under the current delegation level, including a finding that contradicts the plan or words of the operator's that change it; record each settled decision and answer whoever asked. Leave the card at its current stage.\n";
+const ALONE_AFTER: &str = "\n## The specification\n\nThis card has no planner: you hold its specification after approval too. Never decide a specification question alone: raise any open question in your flagged hand message under the current delegation level, including a finding that contradicts the plan or words of the operator's that change it; record each settled decision and answer whoever asked. Leave the card at its current stage.\n";
 
 /// Whether an agent is a full card's foreman under a planner, which settles its specification questions.
 pub(super) fn planner_foreman(state: &State, a: &Agent) -> bool {
@@ -108,7 +108,7 @@ fn stands(state: &State, a: &Agent, c: &Card, (alone, s): (bool, &mut Sections<'
             } else if c.challenge.is_some() {
                 "the foreman owes its challenge of this recap; no approve is offered yet".to_owned()
             } else {
-                "settle the foreman's objections with it; raise one it still holds in your hand's `ask` with both positions, one at a time (never decide it alone); recap once settled".to_owned()
+                "settle the foreman's objections with it; raise one it still holds in your flagged hand message with both positions, one at a time (never decide it alone); recap once settled".to_owned()
             };
             let _ = writeln!(out, "{now}.{plan}");
         }

@@ -130,7 +130,7 @@ function ApproveBody({ words, brief, decisions }: { words: string; brief?: Brief
 }
 
 // An ask's lines stay apart: a list ends at a plain line, and plain lines break where the seat broke them.
-function keepLines(text: string): string {
+export function keepLines(text: string): string {
   const isItem = (l: string) => /^\s*(\d+\.|[-*])\s+/.test(l);
   const lines = text.split("\n");
   return lines

@@ -107,14 +107,14 @@ pub(super) fn request(c: &Card, config: &Config) -> String {
     )
 }
 
-/// Where the mock is served, or that nothing serves it and the seat raises that in its hand's `ask`.
+/// Where the mock is served, or that nothing serves it and the seat raises that in its flagged hand message.
 pub(super) fn served(c: &Card, config: &Config) -> String {
     match (link(c, config), config.mork.vite.is_some()) {
         (Some(link), _) => format!(
             "which the engine serves with Vite at {link}, its `index.html` first, the clone readable so it can import the project's SASS and files; its output in `{LOG}`"
         ),
-        (None, true) => "but no port of Mork's range was free for its host, so nothing serves it: raise that in your hand's `ask`".to_owned(),
-        (None, false) => "but Mork has no Vite host set (mork.toml's `[mork] vite`), so nothing serves it: raise that in your hand's `ask`".to_owned(),
+        (None, true) => "but no port of Mork's range was free for its host, so nothing serves it: raise that in your flagged hand message".to_owned(),
+        (None, false) => "but Mork has no Vite host set (mork.toml's `[mork] vite`), so nothing serves it: raise that in your flagged hand message".to_owned(),
     }
 }
 

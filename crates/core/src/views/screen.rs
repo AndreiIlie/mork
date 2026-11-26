@@ -153,7 +153,8 @@ fn hands(state: &State, ctx: Ctx<'_>) -> Vec<HandView> {
     open.into_iter()
         .filter_map(|a| {
             let seq = a.seq?;
-            let message = state.messages.iter().rev().find(|m| m.seq == seq)?;
+            let index = state.messages.binary_search_by_key(&seq, |m| m.seq).ok()?;
+            let message = &state.messages[index];
             let card = a
                 .card
                 .as_ref()

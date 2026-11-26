@@ -102,7 +102,14 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
   const [pickedSeat, setPickedSeat] = useState<string | null>(null);
   const linked = cardHands.find((h) => h.ask === handAsk);
   const waiting = pickHand(cardHands, own, handAsk);
-  const handSeat = seats.find((s) => placeOf(s.agent) === waiting?.message_place)?.agent;
+  const seatAt = (place: string) => {
+    const recorded = seats.find((s) => placeOf(s.agent) === place);
+    if (recorded !== undefined) return recorded.agent;
+    if (place.endsWith("/dm")) return place;
+    if (place === card.spec) return `${card.id}/planner`;
+    return `${place}/foreman`;
+  };
+  const handSeat = waiting && seatAt(waiting.message_place);
   const markOf = (agent: string) => {
     const here = cardHands.filter((h) => h.message_place === placeOf(agent));
     if (here.length === 0) return undefined;
@@ -180,7 +187,7 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
             room={seatRoomLabel(openSeat, openPlace, card, review?.card)}
             view={views[openPlace]}
             answering={answering}
-            asks={{ hands, triage: buildView.triage, jump: linked?.seq, onReached: () => onPickSeat(openSeat) }}
+            asks={{ hands, triage: buildView.triage, jump: linked?.seq }}
             tzOffsetMin={screen.tz_offset_min}
             nowMs={nowMs}
             live={live}
@@ -191,7 +198,7 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
   );
 }
 
-/** `/cards/<id>`: 50/50 split Card Room with Overview and Raised Hands on the left and active Seat Chat on the right. */
+/** `/cards/<id>`: 50/50 split Card Room with Overview on the left and active Seat Chat on the right. */
 export function CardRoom({
   screen,
   views,

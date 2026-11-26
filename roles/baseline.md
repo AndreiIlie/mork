@@ -15,6 +15,6 @@ The planner (or the foreman on a no-planner card) changes that baseline at brief
   When the request gives a link, render each page you reproduced once at its path under that link with the wall's headless Chromium before you report, and put a screenshot in your seat's `io/` folder (`MORK_IO`).
 - **One writer at a time.**
   No turn of yours starts while the card's mock holder (its planner, or its foreman on a no-planner card once the mock is open) runs, nor its turn while yours does.
-- **Your `built` or `blocked` reports to the foreman** through the engine in the card's room: `built` once the baseline is done, naming each page and its path under the link; `blocked` saying what you need in your hand's `ask`.
+- **Your `built` or `blocked` reports to the foreman** through the engine in the card's room: `built` once the baseline is done, naming each page and its path under the link; `blocked` saying what you need in your flagged hand message.
   A message to `foreman` reaches it in the room; one to `orchestrator` stays in your DM; none reaches the operator.
   The foreman's `built` ends the baseline step and releases you.

@@ -151,16 +151,8 @@ fn open(p: &mut Poster<'_>, mut c: Card, rc: &Card, mut pending: PendingTriage, 
             ("findings wait for triage", format!("Review round {} failed: {count} {word} for triage.", pending.round))
         }
     };
-    let seq = p.post(
-        id.as_str(),
-        Sender::Engine,
-        Some("operator"),
-        mork_types::state::MessageKind::Engine,
-        headline,
-        &notice,
-    );
     let mut raise = Raise::new(id.as_str(), AskKind::Triage, color, text);
-    raise.seq = Some(seq);
+    raise.seq = Some(crate::queue::members::say(p, &id, headline, &notice));
     pending.ask = asks::raise(p, raise);
     c.triage = Some(pending);
     p.put_card(c);

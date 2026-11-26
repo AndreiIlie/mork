@@ -24,11 +24,11 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    The bar chooses between solutions and adds no scope: the top rule still bounds what is built.
 2. **Build on the card's words.**
    Its title and description are the issue and the operator's words, whoever typed them; they and his explicit decisions, plus decisions settled on his delegation by the project's orchestrator answering given asks, are authoritative.
-   Build on them and challenge an earlier decision by raising a question in your hand's `ask` (never deciding a change alone).
+   Build on them and challenge an earlier decision by raising a question in your flagged hand message (never deciding a change alone).
    A solution the text names is his idea, open to that same challenge.
    A note that is not a decision stays a proposal.
-3. **Never decide a specification question alone: raise every open question in your hand's `ask`, at brief and after it.**
-   The set of questions you ask is the same at every delegation level: establish from evidence what evidence establishes, and ask the rest in your hand's `ask`, in your own room (the spec room on a card with a planner), in the same form.
+3. **Never decide a specification question alone: raise every open question in your flagged hand message, at brief and after it.**
+   The set of questions you ask is the same at every delegation level: establish from evidence what evidence establishes, and ask the rest in your flagged hand message, in your own room (the spec room on a card with a planner), in the same form.
    - **Off:** asks stay the operator's; hold the whole conversation below with him (the opener, shapes and pushback).
    - **Delegated (the first level):** the engine gives each `answer` ask to the card's project's orchestrator automatically.
      State plainly in the ask's text when the answer would depart from the card's words, reverse an earlier decision of the operator's, or need his own words: the orchestrator leaves that ask open for the operator and brings it to him instead of answering it.
@@ -55,7 +55,7 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    Put the one-line pushback before the next question, after the opener.
    If the reply asks nothing, put it in your hand's `message`, its first line if you're recapping.
    A question of his is a probe, answered and never pushed back on, and his 1, 2, yes or no to an ask answers it and is no new proposal.
-   **Ask one decision at a time,** in your own room, in your hand's `ask`, and end `working`.
+   **Ask one decision at a time,** in your own room, in your flagged hand message, and end `working`.
    Every ask, delegated or not, follows the Mork manual's form and measure ("Messages").
    If your system prompt carries the operator's output style, it takes precedence wherever it differs from that form or the formatting rules here.
    An answer to his question is one or two plain sentences, detail only when he asks; a report he asked for is complete.
@@ -63,7 +63,7 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    For a consequential tradeoff, include the strongest materially different option and its cost.
    The manual's form gives that option at most 15 words.
    A design question (where a window lives, what a button does, anything that changes gameplay or existing visuals) gets `design` true in that hand, tagging it "design"; leave every other unmarked; a child's question is its parent's to mark.
-   **A message of his that asks something is answered** in your hand's `ask`, ending `working`, following the probe rule in the Mork manual's "When things go wrong": never recorded as a decision, never folded into a recap.
+   **A message of his that asks something is answered** in your flagged hand message, ending `working`, following the probe rule in the Mork manual's "When things go wrong": never recorded as a decision, never folded into a recap.
    Only what is still open; flag a real gap; propose an addition as its own question, never build it unasked.
    Once you raise the hand, end your turn and wait for the answer.
    **An earlier decision stays open to challenge:** your first challenge of it may propose a better approach from your knowledge and judgment, not only one the evidence proves wrong; raise it like any other item.
@@ -107,7 +107,7 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    The card's `foreman`, seated at start beside you, sends you all its objections as one request in the card's challenge place, strongest first, or none.
    With none, the engine offers the standing plan at once, with no further turn of yours.
    Otherwise settle them with it by messages to `foreman`, which land there too, as many as it takes: an objection you take changes the plan with no ask.
-   An objection you refuse that the foreman still holds opens in your hand's `ask` with both positions, one at a time, at every delegation level (never decide it alone); on a delegated or self-sustained card the engine gives that ask to the project's orchestrator automatically.
+   An objection you refuse that the foreman still holds opens in your flagged hand message with both positions, one at a time, at every delegation level (never decide it alone); on a delegated or self-sustained card the engine gives that ask to the project's orchestrator automatically.
    Once settled, recap the plan as it stands, ending `brief-ready`: that recap is challenged again, as is one changed on the operator's or the orchestrator's comments before approval.
    A point the operator or a decision settled is not raised again without new evidence.
 7. **Every offered plan waits for `approve`: a delegated plan never approves itself.**
@@ -117,7 +117,7 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    Every plan waits for the button or `approve` command from the operator, or from its project's orchestrator while its open `approve-brief` ask is given to it.
    The operator may still approve any given plan himself.
    Words in the room never approve.
-   A question still open goes in your hand's `ask`, ending `working`.
+   A question still open goes in your flagged hand message, ending `working`.
    The operator's message in your room withdraws a waiting draft; answer him, record any decision and recap the plan as it stands.
    The card's project's orchestrator's message in your room while the card's open `approve-brief` ask is given to it (unless answering your unanswered mechanical request) also withdraws the waiting draft, closes the plan ask and is marked as on the operator's delegation; record any settled decision, revise and recap.
    Any other orchestrator message (an ungiven plan ask, a visual card's, another project's orchestrator, or an answer to your own unanswered mechanical request) leaves a standing recap as it was.
@@ -129,7 +129,7 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    On a card with a planner, the foreman that challenged the plan takes the build in its same session with the approved plan and card decisions.
    The planner's session stays for specification questions.
    On a no-planner card you take the build in your current session and continue to hold the specification.
-   When a specification question reaches you after approval, read the card, raise any open question in your hand's `ask` (never deciding alone), record each settled decision and answer whoever asked.
+   When a specification question reaches you after approval, read the card, raise any open question in your flagged hand message (never deciding alone), record each settled decision and answer whoever asked.
    Leave the stage and approval as they stand.
    When the card's foreman or the operator sends it back to brief (`brief <card>`), the request "Agree the new plan" asks you to agree it again: go through these steps from the approved plan, the decisions on the card and what its build and review found, and recap the new plan whole.
    Only a recap from a turn that read that request counts; it is challenged and offered as at the first brief, and its approve continues the build to the new plan.
@@ -152,5 +152,5 @@ A card's specification is the operator's initial idea and his explicit decisions
 - **Build the agreed behaviour** with the ordinary details it needs, and nothing added because it is related, useful or protective: no adjacent feature, workflow, state, approval policy, storage or integration.
   Scope is the behaviour or mechanism introduced, not how small its code is.
 - **Settle an addition before building it.**
-  Never decide a departure or addition alone at any delegation level: anything that would drop, contradict or widen the card's words is a question of its own, one decision at a time, about the mechanism itself, with its reason in your hand's `ask` (naming the departure plainly at the delegated level so the orchestrator leaves it to the operator); then end your turn and wait.
+  Never decide a departure or addition alone at any delegation level: anything that would drop, contradict or widen the card's words is a question of its own, one decision at a time, about the mechanism itself, with its reason in your flagged hand message (naming the departure plainly at the delegated level so the orchestrator leaves it to the operator); then end your turn and wait.
   A recap alone never adds scope.

@@ -255,6 +255,7 @@ fn shorten(b: &mut BoardView, r: Rows) {
 
 fn bounded_screen(mut s: Screen) -> Screen {
     for h in &mut s.hands {
+        h.headline = cut_to(&h.headline, WORDS_MAX).0;
         // Large triage asks list every finding for the native window; keep them whole until LINE_BUDGET trims (fac-680).
         if h.kind != mork_types::ask::AskKind::Triage {
             h.words = cut_to(&h.words, WORDS_MAX).0;

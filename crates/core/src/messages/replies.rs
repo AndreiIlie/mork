@@ -116,7 +116,7 @@ fn companion(p: &Poster<'_>, who: &Who, reply: &Reply, m: &ReplyMessage, target:
     final_reply && !asks && m.kind != Some(Intent::Request) && parent.as_ref() == Some(&target.key)
 }
 
-// An agent has at most one `answer` ask open: it stays until answered, replaced by this reply's `ask` or
+// An agent has at most one `answer` ask open: it stays until answered, replaced by this reply's flagged message or
 // withdrawn (fac-271); a red hand's headline is raised only when none is pending or withdrawn.
 fn answer_ask(p: &mut Poster<'_>, who: &Who, reply: &Reply, gate: bool, seq: u64) {
     let h = &reply.hand;

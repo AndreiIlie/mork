@@ -1,5 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AskLabel, InlineAsk } from "./InlineAsk";
+import { AskLabel, InlineAsk, keepLines } from "./InlineAsk";
 import { Markdown } from "./Markdown";
 import { ActivityTracker, EndedTurnRow } from "./Turns";
 import { fetchImage, requestCommand } from "./bridge";
@@ -256,12 +256,16 @@ function MessageRow({ m, tzOffsetMin, nowMs, live, hand, triage, run }: MessageR
   }
   const operator = m.kind === "operator";
   const engine = m.kind === "engine";
-  const body = hand?.kind === "approve-brief" ? "" :
-    m.hand !== null
-      ? [m.text, hand !== undefined ? "" : askText(m.hand)].filter((part) => part.trim() !== "").join("\n\n")
-      : hand?.choices !== undefined ? hand.choices.ask : m.text !== ""
-        ? m.text
-        : m.headline;
+  let body = m.text || m.headline;
+  if (hand?.kind === "approve-brief") {
+    body = "";
+  } else if (m.hand !== null) {
+    const options = hand === undefined ? askText(m.hand) : "";
+    body = [m.text, options].filter((part) => part.trim() !== "").join("\n\n");
+  } else if (hand?.choices) {
+    body = hand.choices.ask;
+  }
+  if (hand?.kind === "answer") body = keepLines(body);
   const head = (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       {m.hand !== null && m.hand.color !== "yellow" && <Dot color={m.hand.color} />}
@@ -277,7 +281,7 @@ function MessageRow({ m, tzOffsetMin, nowMs, live, hand, triage, run }: MessageR
   );
   if (operator) {
     return (
-      <article data-seq={m.seq} className="py-3">
+      <article id={hand?.ask} data-seq={m.seq} className="py-3">
         <div className="w-fit max-w-full border border-gray-400 bg-gray-100 px-3 py-2">
           {head}
           {body !== "" && (
@@ -291,7 +295,7 @@ function MessageRow({ m, tzOffsetMin, nowMs, live, hand, triage, run }: MessageR
     );
   }
   return (
-    <article data-seq={m.seq} className="py-3">
+    <article id={hand?.ask} data-seq={m.seq} className="py-3">
       {head}
       {m.hand !== null && m.hand.headline !== "" && (
         <p className="mt-1 text-label-14 font-medium text-gray-1000">{m.hand.headline}</p>
@@ -353,7 +357,6 @@ export interface ChatAsks {
   hands: HandView[];
   triage?: TriageView;
   jump?: number;
-  onReached: () => void;
 }
 
 interface StreamProps extends ChatAsks {
@@ -364,7 +367,7 @@ interface StreamProps extends ChatAsks {
 }
 
 /** One seat's scrollable conversation stream, interleaved with ended turns and inline live activity trackers. */
-export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, live, hands, triage, jump, onReached }: StreamProps) {
+export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, live, hands, triage, jump }: StreamProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const keepRef = useRef(false);
   const { messages, earlier, turns, loading, error, loadEarlier, prependHeightRef } = useStreamHistory(view, live);
@@ -391,18 +394,23 @@ export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, l
       hand={bySeq.get(m.seq)} triage={triage} live={live} />
   );
 
+  const reached = useRef<number | undefined>(undefined);
   useLayoutEffect(() => {
-    if (jump === undefined) return;
+    if (jump === undefined) {
+      reached.current = undefined;
+      return;
+    }
+    if (jump === reached.current) return;
     const box = scrollRef.current;
     const target = box?.querySelector<HTMLElement>(`[data-seq="${jump}"]`);
     if (box && target) {
       keepRef.current = true;
       target.scrollIntoView({ block: "center" });
-      onReached();
+      reached.current = jump;
     } else if (earlier > 0 && messages.length > 0 && jump < messages[0].seq && !error && !loading) {
       loadEarlier(box);
     }
-  }, [jump, earlier, messages, loading, error, loadEarlier, onReached]);
+  }, [jump, earlier, messages, loading, error, loadEarlier]);
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
@@ -426,7 +434,7 @@ export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, l
               )}
             </div>
           )}
-          {entries.length === 0 ? (
+          {entries.length === 0 && pinned.length === 0 ? (
             <p className="py-4 text-label-13 text-gray-700">No messages yet.</p>
           ) : (
             entries.map((entry) =>

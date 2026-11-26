@@ -128,7 +128,7 @@ pub(super) fn command(
 /// What a demo asks of the foreman, its preview served at `link`.
 pub(super) fn reply_request(link: &str) -> String {
     format!(
-        "Put the direct link to the changed page on {link} and a brief reminder of the change in your hand's `ask`. Skip the walkthrough. Use existing data when it shows the change. Create data only when the change needs it and no existing data shows it. You can use SQL, the server's API, or a browser on the preview."
+        "Put the direct link to the changed page on {link} and a brief reminder of the change in your flagged hand message. Skip the walkthrough. Use existing data when it shows the change. Create data only when the change needs it and no existing data shows it. You can use SQL, the server's API, or a browser on the preview."
     )
 }
 

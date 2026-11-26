@@ -64,6 +64,11 @@ fn an_asks_options_and_pick_are_kept_typed_and_composed_for_readers_of_words() {
     let hand = sc.hands.iter().find(|h| h.ask == ask.id).expect("the ask's hand");
     assert_eq!(hand.choices.as_ref(), Some(&choices));
     assert_eq!(hand.words, ask.text);
+    let view = mork_core::views::conversation::messages(&s.state, CARD, Some(0));
+    let pinned = view.pinned.iter().find(|m| m.open_ask.as_ref() == Some(&ask.id)).expect("pinned question");
+    assert_eq!(pinned.seq, hand.seq);
+    assert_eq!(hand.message_place.as_str(), CARD);
+    assert_eq!(pinned.text, choices.ask);
 }
 
 #[test]
@@ -87,6 +92,7 @@ fn a_recaps_typed_sketch_heads_its_plan_and_shows_on_its_approve_hand() {
     assert_eq!(ask.text, format!("approve the plan\n\n{sketch}"));
     assert_eq!(s.card(CARD).draft.as_deref(), Some(format!("{sketch}\n\nThe long plan.").as_str()));
     let posted = s.messages(CARD).into_iter().rfind(|m| m.hand.is_some()).expect("the recap's hand");
+    assert_eq!(ask.seq, Some(posted.seq));
     assert_eq!(posted.text, format!("{sketch}\n\nThe long plan."), "the room shows the sketch with the plan");
     let sc = screen(&s.state, &Outside::default(), s.ctx());
     let brief = sc.hands.iter().find(|h| h.ask == ask.id).and_then(|h| h.brief.clone()).expect("its sections");

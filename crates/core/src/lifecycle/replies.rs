@@ -60,12 +60,12 @@ fn owed_turn(a: &Agent, job: &Job) -> bool {
 fn waiting_for(card: &Card) -> Option<(&'static str, &'static str)> {
     match card.stage {
         Stage::Brief if card.no_planner && super::mock::baseline(card) => {
-            Some(("brief", "`built` to end the baseline step, or a question in the hand's `ask`"))
+            Some(("brief", "`built` to end the baseline step, or a question in a flagged hand message"))
         }
-        Stage::Brief => Some(("brief", "`brief-ready` with a recap, or a question in the hand's `ask`")),
-        Stage::Build if super::mock::open(card) => {
-            card.no_planner.then_some(("build", "`brief-ready` with a mock offer, or a question in the hand's `ask`"))
-        }
+        Stage::Brief => Some(("brief", "`brief-ready` with a recap, or a question in a flagged hand message")),
+        Stage::Build if super::mock::open(card) => card
+            .no_planner
+            .then_some(("build", "`brief-ready` with a mock offer, or a question in a flagged hand message")),
         Stage::Build => Some(("build", "`built`")),
         Stage::Report if card.mode == Mode::Report => Some(("report", "`report-ready`")),
         Stage::Starting
