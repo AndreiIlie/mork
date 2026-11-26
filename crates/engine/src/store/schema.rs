@@ -23,6 +23,12 @@ CREATE INDEX pa_events_project ON pa_events (project, seq);
 INSERT INTO meta (key, value) VALUES ('revision', '0');
 ";
 
+pub(super) const STARTUP_INDEXES: &str = "
+CREATE INDEX IF NOT EXISTS jobs_id_settled_ms ON jobs (id, settled_ms);
+CREATE INDEX IF NOT EXISTS jobs_unsettled ON jobs (id) WHERE status <> 'settled';
+CREATE INDEX IF NOT EXISTS actions_id_key_status ON actions (id, natural_key, status);
+";
+
 /// Creates the newest version's tables, the baseline's, in an empty database.
 pub fn create(tx: &Transaction<'_>) -> rusqlite::Result<()> {
     tx.execute_batch(V31)
