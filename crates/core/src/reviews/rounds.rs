@@ -260,8 +260,7 @@ fn own_pr(rc: &Card, ours: &Card, forge: &str, landing: &str) -> String {
     out
 }
 
-const REVIEW_TIER: &str =
-    "Use the `review-cards` skill to choose Quick, Standard or Deep review and assign that tier's topics and reviewer effort.";
+const REVIEW_TIER: &str = "Use the `review-cards` skill to choose Quick, Standard or Deep review and assign that tier's topics and reviewer effort.";
 
 fn orchestrate(rc: &Card, id: &CardId, forge: &str) -> String {
     let tagged = tagged(forge);

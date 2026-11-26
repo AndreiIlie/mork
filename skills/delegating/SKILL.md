@@ -48,7 +48,8 @@ Use the least work that answers the task.
   - For a bounded research question, choose a model at the highest effort on the researcher's allowed list (Sol at xhigh today).
     For a short "where is X" lookup, choose a model at the lowest effort on that list (Sol at high today).
   - **A reviewer** spawned without a selection takes its configured inside or outside default; explicit spawns and later picks use only `picks.reviewer.inside` or `picks.reviewer.outside` for its review card's kind.
-    Choose the effort for the round as the `review-cards` skill says. For any topic that touches money, permissions or migrations, use a stronger allowed model at that effort from the start when available.
+    Choose the effort for the round as the `review-cards` skill says.
+    For any topic that touches money, permissions or migrations, use a stronger allowed model at that effort from the start when available.
     Do the same for a topic where a reviewer left a doubt unresolved.
   - Going up, for a reviewer alone: when a reviewer's work comes back wrong (wrong logic, a missed case, a lost requirement; never for style or scope), take the next allowed step on its current selection: a higher allowed effort, else a stronger allowed model; with neither left, it stays as it is.
   - Equal fit: the lower effort, then the cheaper model.

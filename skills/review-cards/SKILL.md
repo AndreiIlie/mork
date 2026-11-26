@@ -28,21 +28,28 @@ Nothing reviews a review card in turn.
    Judge risk from the paths, what the change does, the card's risk tags and the merged base's effects on the changed code.
    Apply the first matching tier to our branches and PRs and to colleagues' branches and PRs.
 
-   - **Deep** applies at 300 or more changed lines, to architectural changes, and to changes touching a sensitive path or behavior of any size. Examples include `crates/sys`, the wall, the door, authentication, permissions, billing, money and state migrations.
-     Always run **Correctness** and **Design and simplicity**. Add **Money, permissions or data integrity** and **Performance** when each applies.
-     Run every applicable topic at `xhigh`. If unavailable, use the highest effort available for that review kind and state the effort used in the verdict.
+   - **Deep** applies at 300 or more changed lines, to architectural changes, and to changes of any size touching a sensitive path or behavior.
+     Examples include `crates/sys`, the wall, the door, authentication, permissions, billing, money and state migrations.
+     Always run **Correctness** and **Design and simplicity**.
+     Add **Money, permissions or data integrity** and **Performance** when each applies.
+     Run every applicable topic at `xhigh`.
+     If unavailable, use the highest effort available for that review kind and state the effort used in the verdict.
    - **Quick** applies to low-risk, behavior-preserving changes of 30 lines or fewer, such as a documentation typo or a local rename.
      Run correctness alone at `high` when available, otherwise at the review kind's configured default.
-   - **Standard** covers every remaining change, including a one-line bug fix. Use the review kind's configured default effort.
-     On our changes run correctness, add design and simplicity above 30 lines, and add each applicable specialist. On colleagues' changes run correctness and add performance when it applies.
+   - **Standard** covers every remaining change, including a one-line bug fix.
+     Use the review kind's configured default effort.
+     On our changes run correctness, add design and simplicity above 30 lines, and add each applicable specialist.
+     On colleagues' changes run correctness and add performance when it applies.
 
-   Correctness includes tests on our cards. Reuse the kept correctness reviewer when present.
+   Correctness includes tests on our cards.
+   Reuse the kept correctness reviewer when present.
    Money, permissions or data integrity applies when risk tags name it or the change touches money, permissions, SQL, schema, stored data or security.
    Performance applies when the change can affect it.
 3. **Task one blind reviewer per topic** with `mork ctl spawn <card> reviewer '<task>' --topic '<topic>'`.
    Use `--task-file <path>` in place of `'<task>'` for a task with quotes or parentheses.
    Select the tier's effort from the review kind's configured default and its permitted picks.
-   Omit selection flags for the default. For an explicit selection at that effort use `--model <model> --effort <effort>` as the "Delegating" skill says.
+   Omit selection flags for the default.
+   For an explicit selection at that effort use `--model <model> --effort <effort>` as the "Delegating" skill says.
    For a returning reviewer, apply any permitted effort change with `pick` before sending its task.
    Quote a topic of several words so it passes whole (`--topic 'correctness and tests'`, `--topic 'money, permissions or data integrity'`).
    The room list shows it beside the reviewer.
