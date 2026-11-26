@@ -55,8 +55,10 @@ pub(super) fn port(p: &Poster<'_>, ctx: Ctx<'_>) -> Option<u16> {
     let (from, to) = ctx.config.mork.port_range.split_once('-')?;
     let (from, to): (u16, u16) = (from.trim().parse().ok()?, to.trim().parse().ok()?);
     let live = p.state.cards.values().filter(|c| c.stage.is_live());
-    // A mock host's port is taken too (fac-258).
-    let used: Vec<u16> = live.flat_map(|c| [c.port, c.mock.and_then(|m| m.port)]).flatten().collect();
+    let mut used: std::collections::BTreeSet<_> =
+        live.flat_map(|c| [c.port, c.mock.and_then(|m| m.port)]).flatten().collect();
+    used.extend(ctx.config.mork.web_port);
+    used.extend(ctx.config.tunnels.values().map(|t| t.port));
     (from..=to).find(|n| !used.contains(n))
 }
 

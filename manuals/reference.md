@@ -89,8 +89,9 @@ Both lists default to empty.
 Configure the hosts for the model APIs and package registries your seats use before starting their turns.
 
 `[projects.<name>] host_ports` lists host loopback ports as numbers or inclusive ranges, for example `host_ports = [3306, "6300-6302"]`.
-It defaults to empty.
+Each port must be at least 1024, including the first port in a range. The list defaults to empty.
 A card also gets its preview and mock ports.
+When assigning these, Mork skips live cards’ preview and mock ports, the configured web port and every local tunnel port. With `web_port = 0` it skips the port assigned by the OS.
 The bound web bridge port and every configured tunnel port are excluded even when listed.
 Each bridged port appears at the same port on the turn's private loopback, alongside its own test servers.
 

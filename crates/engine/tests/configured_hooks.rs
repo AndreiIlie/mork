@@ -27,6 +27,16 @@ fn parse_with(extra: &str) -> Result<mork_types::config::Config, ConfigError> {
 }
 
 #[test]
+fn project_host_ports_must_be_at_least_1024() {
+    for ports in ["[1023]", "[2048, \"1023-1025\"]"] {
+        let text = format!("{BASE}\nhost_ports = {ports}");
+        assert!(matches!(parse(&text), Err(ConfigError::Value { line, message })
+            if line == text.lines().count() && message.contains("host_ports") && message.contains("1023")));
+    }
+    assert!(parse_with(r#"host_ports = [1024, "1024-65535"]"#).is_ok());
+}
+
+#[test]
 fn config_parse_accepts_all_configured_tables_and_values() {
     let text = r#"
 [mork]
