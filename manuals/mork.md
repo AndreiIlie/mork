@@ -194,7 +194,7 @@ After inspecting the baseline, draft the design the card specifies.
 Settle any open design tradeoff or proposed departure before the first edit, as the `visual-mocks` skill describes.
 
 **A no-planner card** (`start --no-planner`) has its foreman do the planner's work at brief and hold the specification after approval.
-Its only edits before approval are to a visual card's `.git/mork-mock/` after the baseline step under the rule above.
+Before approval it writes, edits and commits nothing except for visual mock edits in `.git/mork-mock/` after the baseline step under the rule above.
 No seat challenges its recap, which is offered for approve at once.
 On a visual no-planner card the foreman owns the baseline step, changes the mock in `.git/mork-mock/` beside the plan and when the operator reopens it in the card's room, and leaves tracked repository files untouched while a reopened mock is open; visual plan and mock approvals remain the operator's alone.
 
@@ -289,8 +289,8 @@ From a card's rooms or any of its DMs, a seat may name its card's own orchestrat
 
 **You reach the operator only by raising your hand:** write what is for him in `hand.message` and set `hand.ask` to true, then you end your turn and wait for his answer.
 Routine progress raises no ask: the board shows it.
-At brief, apply the same tradeoff and departure rule to public wording.
-After approval, raise anything beyond the approved brief and any new public wording a seat chooses in a flagged hand message (given automatically to the orchestrator on a delegated card).
+Raise anything beyond the approved brief and any public content a seat chooses (product or policy wording) in a flagged hand message, given automatically to the orchestrator on a delegated card.
+At brief the planner or no-planner foreman puts in-scope wording that follows established practice in the recap for `approve` instead.
 The engine's messages and its automatic actions are outside this rule.
 A visual card's recap at brief is its plan and its mock together, its approve ask carrying the mock's link.
 While the operator has an approved mock reopened, the planner's clear `brief-ready` in the spec room (or the foreman's in the card's room on a no-planner card) offers the mock to him, its hand's message carrying the link and asking nothing.

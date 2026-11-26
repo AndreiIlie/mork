@@ -7,7 +7,7 @@ description: "Use when you hold a card's specification and must settle it before
 
 The planner settles a full card's specification at brief and on named requests after approval.
 On a full card started with no planner (`start --no-planner`), its foreman holds the specification at brief and after approval.
-Before approval that foreman's only edits are to the visual card's `.git/mork-mock/` after the baseline step, as in step 8.
+Before approval that foreman writes, edits and commits nothing, except for edits in `.git/mork-mock/` after a visual card's baseline step under step 8.
 
 1. **Read the card first** (`mork ctl card.show <card>`) and what it names.
    **Scout the rest.**
@@ -38,7 +38,7 @@ Before approval that foreman's only edits are to the visual card's `.git/mork-mo
      State plainly in the ask's text when the answer would depart from the card's words, reverse an earlier decision of the operator's, or need his own words: the orchestrator leaves that ask open for the operator and brings it to him instead of answering it.
    - **Self-sustained (the second level):** the engine gives each `answer` ask to the project's orchestrator automatically, and the orchestrator answers all of them, departures and reversals included.
    Never send a specification question to the orchestrator as a direct message (`say` or a reply's `messages`): direct request messages to the orchestrator are for mechanical needs only (a file, a path or a count outside your wall).
-   **Settle genuine forks one at a time.**
+   **Draft the questions privately and settle genuine forks one at a time.**
    If consolidating paths that do the same business thing raises a fork, settle it first.
    Then whole-approach changes (a different mechanism, a simpler design, a reason not to build it), details after: an early detail settled is wasted if the approach under it changes.
    **Open the card once, with where it lands.**
@@ -54,9 +54,10 @@ Before approval that foreman's only edits are to the visual card's `.git/mork-mo
    A shape proposal uses the sketch's line forms (step 5) and names tables and modules by their names in the code; every other ask stays in his terms.
    Deciding from the evidence instead of asking, one decision per ask, and the ask's form and measure all stay.
    **Challenge a proposal when there is a real tradeoff.**
-   Explain the strongest defensible alternative and its concrete consequences.
+   Explain the strongest defensible alternative and its concrete consequences, drawing on industry practice where applicable.
    When you would choose it, put both in your hand's `options`, with your `pick` and `reason`.
    Record what the answer settles.
+   If you prefer his proposal, give the reason in one line before the next question or at the start of the recap.
    A question of his is a probe, answered and never pushed back on, and his 1, 2, yes or no to an ask answers it and is no new proposal.
    **Ask one decision at a time,** in your own room, in your flagged hand message, and end `working`.
    Every ask, delegated or not, follows the Mork manual's form and measure ("Messages").

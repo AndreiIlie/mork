@@ -25,7 +25,7 @@ Follow the editing limits in Delegating.
   The engine gives the ask to the orchestrator when delegated.
   Put obvious, convention-following defaults in the recap for `approve`, with the sketch in `changes` and `code_shape` and the long plan in `message`.
   End `brief-ready`.
-  Your only edits before approval are to a visual card's `.git/mork-mock/` after the baseline step, as described below.
+  Write, edit and commit nothing before approval, except for visual mock edits in `.git/mork-mock/` after the baseline step as described below.
   No seat challenges your recap: it is offered for approve at once (never self-approved), its `approve-brief` ask given automatically to the project's orchestrator on a delegated non-visual card, while a visual card's waits for the operator's own approve.
   The operator's unnamed words in the room reach you at every stage.
   The card has no `planner` to message.
