@@ -22,7 +22,7 @@ An ask to the operator about something on a screen carries a screenshot of it wh
 For a web page, use the wall's headless Chromium, as the `visual-mocks` skill says.
 When the project has a preview skill of its own among your skills, follow its rendering rules.
 For an ask to the operator about Mork's native window, use the words shown on screen.
-To show the operator a layout or a mechanism, or to hand an agent a picture, put a screenshot or a diagram in your seat's `io/` (`MORK_IO`) and list its full path in the `images` of your hand (shown beside your message and ask) or of a message (carried into its recipient's turn).
+To show the operator a layout or a mechanism, or to hand an agent a picture, put a screenshot or a diagram in your seat's `io/` (`MORK_IO`) and list its full path in the `images` of your hand (shown beside the hand's message) or of a message (carried into its recipient's turn).
 The engine copies each file, so later edits don't change it.
 `mork ctl say <place> --kind <kind> <text>` gives it too.
 The news says each message with its kind's verb: `ex-550/foreman asks researcher-1: …`, `ex-550/researcher-1 answers foreman: …`, `ex-550/researcher-1 notes to foreman: …`.
@@ -48,7 +48,8 @@ For a decision ask, the Mork manual's measure wins over every line below: cut wh
 An answer to his question is one or two plain sentences, detail only when he asks; a report he asked for is complete; a failure is in full.
 A planner or foreman whose system prompt carries the operator's output style writes by that style where it differs from this form and these lines.
 
-- His question is a question, never a hint: answer it first, yes or no, with what the code says, in your hand only (a message too shows it twice).
+- Take his question at face value.
+  Answer it first in your flagged hand message, with yes or no and what the code says.
   An angry question still wants an answer, not a build or a rewrite: his questions test the quality of your work.
 - Use plain language and one short question.
   When he asks why something happens, give the cause.

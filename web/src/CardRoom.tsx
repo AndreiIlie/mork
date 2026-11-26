@@ -100,6 +100,9 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
   const cardHands = screen.hands.filter((h) => h.card === card.id);
   const own = ownHands(cardHands);
   const [pickedSeat, setPickedSeat] = useState<string | null>(null);
+  useEffect(() => {
+    if (handAsk !== null) setPickedSeat(null);
+  }, [handAsk]);
   const linked = cardHands.find((h) => h.ask === handAsk);
   const waiting = pickHand(cardHands, own, handAsk);
   const seatAt = (place: string) => {
@@ -113,8 +116,7 @@ function CardRoomLoaded({ screen, views, buildView, card, handAsk, nowMs, live }
   const markOf = (agent: string) => {
     const here = cardHands.filter((h) => h.message_place === placeOf(agent));
     if (here.length === 0) return undefined;
-    if (here.every((h) => h.given)) return "text-gray-700";
-    return here.some((h) => !h.given && h.color === "red") ? "text-red-700" : "text-amber-700";
+    return here.every((h) => h.given) ? "text-gray-700" : "text-gray-1000";
   };
 
   const onPickSeat = (agent: string) => {

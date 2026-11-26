@@ -15,8 +15,8 @@ impl App {
     }
 }
 
-/// The message's headline where it shows and its words don't start with it, its words, its
-/// hand's ask and its findings, each proof and fix with it.
+/// Copies the message with its ask options, findings and proofs, including the visible headline
+/// when it adds to the message.
 pub fn text(m: &MessageView) -> String {
     let words = m.text.trim();
     // A block or a bubble shows its words alone, a hand's headline never; a divider copies its note.

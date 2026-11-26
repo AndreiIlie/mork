@@ -13,7 +13,7 @@ pub enum Shape {
     Divider,
     /// The operator's words: a bubble on the right.
     Bubble,
-    /// Words for the operator: a header, the words whole under it, a hand's ask, what it folds.
+    /// Words for the operator appear in full under the header, above any folded details.
     Block,
     /// The traffic around him: a header and one dim line that unfolds.
     Preview,
@@ -58,7 +58,7 @@ pub fn words(m: &MessageView) -> String {
 }
 
 /// What a block folds: findings' proofs, or the engine's cut.
-/// A hand's message and ask are never folded.
+/// A hand's message stays visible whether or not it asks a question.
 pub fn folds(m: &MessageView) -> bool {
     m.findings.iter().any(|f| !f.proof.is_empty()) || m.cut
 }

@@ -306,10 +306,8 @@ The planner and foreman may raise asks to the operator within their roles, each 
 A full card's foreman carries specification questions to the planner in the challenge place, unless the card has none.
 
 **Raising a hand,** the operator's words, means putting what you raise in your flagged hand message: a planner's or foreman's reaches him as an ask, and a child's reaches its parent as a request.
+With `ask` false, the words in `message` alone raise nothing, however they are phrased.
 When asked to report by raising a hand, write the report in `message` and set `ask` to true.
-The web Card Room shows each open ask and its controls on its message.
-Raised Hands on the Board and sidebar opens that message.
-An earlier open ask stays visible above the loaded messages until answered.
 
 ## Who may do what
 
