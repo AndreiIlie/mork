@@ -1,12 +1,12 @@
-//! The comment rules (fac-2, fac-195): no run over 2 lines, doc comments only on items marked `pub`
-//! (`pub(crate)` and `pub(super)` count), and no unfinished-work marker without a card id.
+//! The comment rules (fac-2, fac-195): at most 2 lines unless marked for safety or an invariant, doc comments
+//! only on items marked `pub` (including `pub(crate)` and `pub(super)`), and a card id for unfinished-work markers.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::{visibility, walk};
 
-/// The longest run of comment lines allowed, documentation included.
+/// The longest unmarked comment run allowed, documentation included.
 pub const CAP: usize = 2;
 /// What marks a generated file, rustfmt's marker.
 pub const GENERATED: &str = "@generated";
@@ -100,7 +100,8 @@ pub fn check_text(rel: &str, text: &str, public: &HashSet<usize>) -> Vec<String>
     for run in runs(&all) {
         let first = run[0];
         let lines: usize = run.iter().map(|c| c.lines).sum();
-        if lines > CAP {
+        let marked = first.text.starts_with("// SAFETY:") || first.text.starts_with("// INVARIANT:");
+        if lines > CAP && !marked {
             out.push(format!("{rel}:{}: a `{}` comment of {lines} lines, over {CAP}", first.line, first.marker()));
         }
         if first.kind != Kind::Plain {

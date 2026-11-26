@@ -1,7 +1,9 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use mork_types::CardId;
 use mork_types::card::{Card, Mode};
 use mork_types::review::{
-    FindingState, FindingView, Raised, Review, Round, RoundView, TriageFindingView, TriageView, Verdict,
+    FindingState, FindingView, Raised, Review, ReviewerCounts, Round, RoundView, TriageFindingView, TriageView, Verdict,
 };
 use serde_json::{Value, json};
 
@@ -85,7 +87,28 @@ pub(super) fn round_view(review: &Review, r: &Round) -> RoundView {
         None => "under way",
     };
     let findings: Vec<FindingView> = round_findings(review, r).into_iter().map(to_view).collect();
-    RoundView { n: r.n, commit: r.commit.short().to_owned(), verdict: verdict.to_owned(), findings }
+    let reviewers = reviewer_counts(r, &findings);
+    RoundView { n: r.n, commit: r.commit.short().to_owned(), verdict: verdict.to_owned(), findings, reviewers }
+}
+
+fn reviewer_counts(r: &Round, findings: &[FindingView]) -> BTreeMap<String, ReviewerCounts> {
+    let decided = matches!(r.verdict, Some(Verdict::Passed | Verdict::Failed));
+    let mut counts: BTreeMap<_, _> = r
+        .reviewers
+        .iter()
+        .map(|(name, report)| {
+            (name.clone(), ReviewerCounts { reported: report.findings.len(), kept: decided.then_some(0) })
+        })
+        .collect();
+    if r.verdict == Some(Verdict::Failed) {
+        let mut seen = BTreeSet::new();
+        for f in findings.iter().filter(|f| seen.insert(f.n)) {
+            if let Some(kept) = counts.get_mut(&f.by).and_then(|c| c.kept.as_mut()) {
+                *kept += 1;
+            }
+        }
+    }
+    counts
 }
 
 /// Open failed-round triage data attached to the parent card's room view (fac-680).
@@ -137,7 +160,7 @@ pub(super) fn findings(state: &State, card: &str) -> Decision {
 #[cfg(test)]
 mod tests {
     use mork_types::card::{Card, Mode};
-    use mork_types::review::{Raised, Review, Round, Verdict};
+    use mork_types::review::{Raised, ReportedFinding, Review, ReviewerCounts, ReviewerVerdict, Round, Verdict};
     use mork_types::{ActionId, CardId, Sha};
     use serde_json::{Value, json};
 
@@ -199,7 +222,10 @@ mod tests {
             raised(3, 1, true, true, false),
             raised(4, 2, true, false, true),
         ];
-        let rounds = vec![round(1, Verdict::Failed, vec![1, 2, 3]), round(2, Verdict::Failed, vec![1, 4])];
+        let mut second = round(2, Verdict::Failed, vec![1, 4]);
+        second.reviewers.insert("reviewer-1".into(), report(3));
+        second.reviewers.insert("reviewer-2".into(), report(0));
+        let rounds = vec![round(1, Verdict::Failed, vec![1, 2, 3]), second];
         let review = Review { of: Some(ours.id.clone()), raised, rounds, ..Review::default() };
         let rc = Card {
             id: CardId::new("branch-mork-fac-1"),
@@ -213,6 +239,32 @@ mod tests {
             state.cards.insert(c.id.clone(), c);
         }
         state
+    }
+
+    fn report(n: usize) -> ReviewerVerdict {
+        let findings = (0..n)
+            .map(|i| ReportedFinding { file: "a.rs".into(), line: i as i64 + 1, summary: "bug".into() })
+            .collect();
+        ReviewerVerdict { passed: n == 0, findings }
+    }
+
+    #[test]
+    fn only_a_foreman_verdict_sets_kept_and_each_named_finding_counts_once() {
+        let mut r = round(2, Verdict::Failed, vec![1, 1]);
+        r.reviewers.insert("reviewer-1".into(), report(2));
+        r.reviewers.insert("reviewer-2".into(), report(0));
+        let review = Review { raised: vec![raised(1, 1, true, true, false)], ..Review::default() };
+        for (verdict, expected) in [
+            (None, None),
+            (Some(Verdict::Superseded), None),
+            (Some(Verdict::Failed), Some(1)),
+            (Some(Verdict::Passed), Some(0)),
+        ] {
+            r.verdict = verdict;
+            let view = super::round_view(&review, &r);
+            assert_eq!(view.reviewers["reviewer-1"], ReviewerCounts { reported: 2, kept: expected });
+            assert_eq!(view.reviewers["reviewer-2"], ReviewerCounts { reported: 0, kept: expected.map(|_| 0) });
+        }
     }
 
     fn answer(card: &str) -> Result<Value, String> {
@@ -280,6 +332,9 @@ mod tests {
         );
 
         let (r1, r2) = (build_rounds[0].1, build_rounds[1].1);
+        assert!(r1.reviewers.is_empty(), "a round predating reviewer reports has no counts");
+        assert_eq!(r2.reviewers["reviewer-1"], ReviewerCounts { reported: 3, kept: Some(2) });
+        assert_eq!(r2.reviewers["reviewer-2"], ReviewerCounts { reported: 0, kept: Some(0) });
         let r1_states: Vec<FindingState> = r1.findings.iter().map(|f| f.state).collect();
         assert_eq!((r1.n, r1_states), (1, vec![FindingState::Open, FindingState::Resolved, FindingState::Declined]));
         let r2_ns: Vec<u32> = r2.findings.iter().map(|f| f.n).collect();

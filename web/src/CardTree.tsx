@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { HandIcon } from "./icons";
-import { thousands } from "./format";
+import { ContextRing } from "./ContextRing";
+import { FindingCount } from "./FindingCount";
 import { SeatDot } from "./SeatChat";
 import { Dot } from "./ui/Dot";
 import type { AgentRow, CardHeader, Color, LiveRow, OverviewStage, PlaceView, StageMark } from "./types";
@@ -52,10 +53,10 @@ function StageMarkCell({ at, status }: { at: StageNode["at"]; status: Color }) {
 }
 
 const STAGE_TONE: Record<StageNode["at"], string> = {
-  passed: "text-gray-900",
-  failed: "text-gray-900",
+  passed: "text-gray-950",
+  failed: "text-gray-950",
   current: "font-medium text-gray-1000",
-  "to-come": "text-gray-700",
+  "to-come": "text-gray-600",
 };
 
 interface TreeProps {
@@ -107,6 +108,7 @@ export function CardTree({ nodes, card, seats, review, steps, status, selected, 
     <nav aria-label="Card Tree" className="w-[360px] shrink-0 overflow-y-auto border-r border-gray-400">
       {nodes.map((n) => {
         const on = selected === `stage ${n.key}`;
+        const round = n.stage?.round;
         return (
           <div key={n.key} className="border-b border-gray-400">
             <button
@@ -115,7 +117,7 @@ export function CardTree({ nodes, card, seats, review, steps, status, selected, 
               className={`flex h-9 w-full cursor-pointer items-center gap-2 pl-gutter pr-edge text-left text-label-13 transition-colors ${on ? "bg-gray-200" : "hover:bg-gray-100"}`}
             >
               <StageMarkCell at={n.at} status={status} />
-              <span className={`shrink-0 ${on ? "font-medium text-gray-1000" : STAGE_TONE[n.at]}`}>{n.label}</span>
+              <span className={`shrink-0 ${on && n.at !== "to-come" ? "font-medium text-gray-1000" : STAGE_TONE[n.at]}`}>{n.label}</span>
               <span className="ml-auto min-w-0 truncate font-mono text-label-12 tabular-nums text-gray-700">{n.note}</span>
             </button>
             {n.at === "current" && n.kind === "verify" &&
@@ -139,6 +141,8 @@ export function CardTree({ nodes, card, seats, review, steps, status, selected, 
               const seatOn = selected === `seat ${row.agent}`;
               const lit = row.light !== "idle";
               const mark = markOf(row.agent);
+              const name = seatName(row.agent);
+              const count = row.role === "reviewer" ? round?.reviewers?.[name] : undefined;
               return (
                 <button
                   key={row.agent}
@@ -149,7 +153,8 @@ export function CardTree({ nodes, card, seats, review, steps, status, selected, 
                   } ${seatOn ? "bg-gray-200" : "hover:bg-gray-100"}`}
                 >
                   <SeatDot light={row.light} />
-                  <span className={`shrink-0 font-mono ${seatOn || lit ? "font-medium text-gray-1000" : "text-gray-900"}`}>{seatName(row.agent)}</span>
+                  <span className={`shrink-0 font-mono ${seatOn || lit ? "font-medium text-gray-1000" : "text-gray-900"}`}>{name}</span>
+                  {count && round && <FindingCount count={count} verdict={round.verdict} />}
                   {mark !== undefined && (
                     <span aria-label="Raised Hand" className={mark}>
                       <HandIcon className="h-3 w-3" />
@@ -159,7 +164,7 @@ export function CardTree({ nodes, card, seats, review, steps, status, selected, 
                     <span className="min-w-0 [overflow-wrap:anywhere]">
                       {row.label}{row.effort && ` · ${row.effort}`}
                     </span>
-                    {row.context !== null && <span className="w-9 shrink-0 font-mono tabular-nums">{thousands(row.context[0])}</span>}
+                    <ContextRing context={row.context} />
                   </span>
                 </button>
               );
