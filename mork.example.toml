@@ -29,15 +29,15 @@ author = "Your Name <you@example.com>"
 # The planner and reviewers use Codex. The work foreman uses Claude.
 [seats.planner]
 cli = "codex"
-model = "gpt-5.3-codex"
+model = "gpt-6.2-sol"
 effort = "high"
 
 [seats.foreman]
-report = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
+report = { cli = "codex", model = "gpt-6.2-sol", effort = "high" }
 work = { cli = "claude", model = "claude-sonnet-4-5", effort = "high" }
 
 [seats.researcher]
-work = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
+work = { cli = "codex", model = "gpt-6.2-sol", effort = "high" }
 
 [seats.review-foreman]
 work = { cli = "claude", model = "claude-opus-4-5", effort = "high" }
@@ -45,9 +45,9 @@ inside = { cli = "claude", model = "claude-opus-4-5", effort = "high" }
 outside = { cli = "claude", model = "claude-opus-4-5", effort = "high" }
 
 [seats.reviewer]
-work = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
-inside = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
-outside = { cli = "codex", model = "gpt-5.3-codex", effort = "high" }
+work = { cli = "codex", model = "gpt-6.2-sol", effort = "high" }
+inside = { cli = "codex", model = "gpt-6.2-sol", effort = "high" }
+outside = { cli = "codex", model = "gpt-6.2-sol", effort = "high" }
 
 [projects.my-app]
 repo = "/path/to/my-app"
