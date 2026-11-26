@@ -139,7 +139,10 @@ pub fn run(args: &[String]) -> WallExecError {
 fn bridge(cmd: &mut Command, ports: &[u16]) -> std::io::Result<()> {
     use std::io::Read;
     use std::net::{Ipv4Addr, Shutdown, TcpListener};
-    let mut pair = mork_sys::wall_bridge::inherited_bridge()?;
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::UnixStream;
+    let fd = mork_sys::file_from_fd(mork_sys::wall_bridge::BRIDGE_FD)?;
+    let mut pair = UnixStream::from(OwnedFd::from(fd));
     for port in ports {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, *port))?;
         mork_sys::wall_bridge::send_listener(&pair, &listener, 1)?;
@@ -147,12 +150,14 @@ fn bridge(cmd: &mut Command, ports: &[u16]) -> std::io::Result<()> {
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
     let url = format!("http://{}", listener.local_addr()?);
     mork_sys::wall_bridge::send_listener(&pair, &listener, 0)?;
+    drop(listener);
     pair.shutdown(Shutdown::Write)?;
     let mut ready = [0];
     pair.read_exact(&mut ready)?;
     if ready != [1] {
         return Err(std::io::Error::other("wall proxy did not accept its listeners"));
     }
+    drop(pair);
     for name in ["HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy"] {
         cmd.env(name, &url);
     }

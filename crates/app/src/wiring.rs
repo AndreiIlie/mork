@@ -127,7 +127,7 @@ fn web_url(url: &str) -> bool {
 /// Reports the window's owned forwards over its inbox, without exposing a socket command.
 pub fn tunnels(
     home: Home,
-    configured: std::collections::BTreeMap<String, mork_types::config::TunnelConfig>,
+    configured: mpsc::Receiver<mork_engine::jobs::web_tunnels::Configured>,
     tx: fmpsc::UnboundedSender<Msg>,
 ) -> mpsc::Sender<mork_engine::jobs::web_tunnels::Request> {
     mork_engine::jobs::web_tunnels::start(home, configured, move |name, status| {

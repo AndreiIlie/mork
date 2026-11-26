@@ -7,22 +7,6 @@ use std::os::unix::net::UnixStream;
 /// The wall bootstrap's inherited socket, next to bwrap's status pipe.
 pub const BRIDGE_FD: i32 = 4;
 
-/// Duplicates the bootstrap socket. Both descriptors close when the CLI starts.
-pub fn inherited_bridge() -> io::Result<UnixStream> {
-    // SAFETY: fcntl validates the integer descriptor and duplicates it to a fresh owned descriptor.
-    let fd = unsafe { libc::fcntl(BRIDGE_FD, libc::F_DUPFD_CLOEXEC, BRIDGE_FD + 1) };
-    if fd < 0 {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: the successful duplication returned a fresh owned descriptor.
-    let stream = unsafe { UnixStream::from_raw_fd(fd) };
-    // SAFETY: marks the original inherited descriptor close-on-exec without taking ownership.
-    if unsafe { libc::fcntl(BRIDGE_FD, libc::F_SETFD, libc::FD_CLOEXEC) } < 0 {
-        return Err(io::Error::last_os_error());
-    }
-    Ok(stream)
-}
-
 struct Message {
     // cmsghdr requires native alignment.
     control: [usize; 4],

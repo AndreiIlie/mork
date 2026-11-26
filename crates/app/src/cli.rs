@@ -149,12 +149,12 @@ fn app(home: &Home, args: &[String], reloaded: Option<String>) -> i32 {
         mode_args,
     };
     if no_window {
-        return runtime::run(opts);
+        return runtime::run(opts, None);
     }
     // The engine says what is wrong with a bad config.
     let settings = config::read(&config_path)
         .map_or(mork_ui::app::Settings { editor: String::new(), animations: true, tunnels: Default::default() }, |c| {
             mork_ui::app::Settings { editor: c.mork.editor, animations: c.mork.animations, tunnels: c.tunnels }
         });
-    crate::window::run(home, settings, move || runtime::run(opts))
+    crate::window::run(home, settings, move |tx| runtime::run(opts, Some(tx)))
 }

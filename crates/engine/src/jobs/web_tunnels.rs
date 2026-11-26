@@ -22,15 +22,21 @@ use crate::{clock, paths::Home};
 /// The window's explicit open or close request, never an engine command available to a seat.
 pub type Request = (String, bool);
 
+pub type Configured = BTreeMap<String, TunnelConfig>;
+
 /// Starts the tracker off the window thread. Dropping its sender closes its owned forwards;
 /// `changed` returning false closes them too. The process guard also ends them when the app dies.
 pub fn start(
     home: Home,
-    configured: BTreeMap<String, TunnelConfig>,
+    configured: Receiver<Configured>,
     changed: impl Fn(String, Status) -> bool + Send + 'static,
 ) -> Sender<Request> {
     let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || run(&home, &configured, rx, changed));
+    std::thread::spawn(move || {
+        if let Ok(configured) = configured.recv() {
+            run(&home, &configured, rx, changed);
+        }
+    });
     tx
 }
 

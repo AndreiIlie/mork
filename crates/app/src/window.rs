@@ -23,8 +23,13 @@ struct Shell {
 }
 
 /// Runs the engine and the window; returns only if the window couldn't run.
-pub fn run(home: &Home, settings: Settings, engine: impl FnOnce() -> i32 + Send + 'static) -> i32 {
-    std::thread::spawn(move || std::process::exit(engine()));
+pub fn run(
+    home: &Home,
+    settings: Settings,
+    engine: impl FnOnce(mpsc::Sender<mork_engine::jobs::web_tunnels::Configured>) -> i32 + Send + 'static,
+) -> i32 {
+    let (ports, configured) = mpsc::channel();
+    std::thread::spawn(move || std::process::exit(engine(ports)));
     let (tx, rx) = fmpsc::unbounded();
     let _ = INBOX.set(Mutex::new(Some(rx)));
     let (out, outs) = mpsc::channel();
@@ -32,7 +37,7 @@ pub fn run(home: &Home, settings: Settings, engine: impl FnOnce() -> i32 + Send 
     let place = session.place.clone();
     let window = mork_ui::window::settings_at(session.position);
     wiring::link(home.clone(), tx.clone(), outs, place);
-    let tunnels = wiring::tunnels(home.clone(), settings.tunnels.clone(), tx.clone());
+    let tunnels = wiring::tunnels(home.clone(), configured, tx.clone());
     clock(tx);
     let home = home.clone();
     let boot = move || {

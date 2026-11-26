@@ -748,7 +748,10 @@ sys.exit(subprocess.run(args[1:], pass_fds=(4,)).returncode)
         assert_eq!(r["abstract_dgram"]["wall-dgram"], "EPERM", "{r}");
         assert_ne!(r["abstract_stream"][&stream], "CONNECTED", "{r}");
         assert_ne!(r["abstract_dgram"][&dgram], "CONNECTED", "{r}");
-        assert_eq!(r["tcp"][&off], "ECONNREFUSED", "{r}");
+        // The private proxy can have the same port number. Only a connection queued here reached the machine.
+        assert!(matches!(r["tcp"][&off].as_str(), Some("ECONNREFUSED" | "CONNECTED")), "{r}");
+        tcp.set_nonblocking(true).unwrap();
+        assert_eq!(tcp.accept().unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
         assert_eq!(r["tcp"][external], "ENETUNREACH", "{r}");
         assert_eq!(r["exec"][0]["code"], 0, "{r}");
         Ok(())
@@ -1338,14 +1341,15 @@ exit:
             "read": [key_path.display().to_string()],
             "search_hex": key_hex_bytes,
             "search_roots": ["$HOME", rig.fhome().join("logins").display().to_string(), rig.fhome().join("run").display().to_string()],
-            "tcp": [&addr],
+            "tcp_send": [{"addr": &addr, "send": "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"}],
             "exec": [[common::exe().display().to_string(), "web"]],
         });
         let r = card_probe(&rig, spec);
         assert_eq!(r["exists"][key_path.display().to_string()], false, "{r}");
         assert!(!r["read"][key_path.display().to_string()].as_str().unwrap().starts_with("READ"), "{r}");
         assert_eq!(r["found"], json!([]), "key bytes found inside wall: {r}");
-        assert_eq!(r["tcp"][&addr], "ECONNREFUSED", "{r}");
+        // A same-number wall proxy returns 403 for GET. The fixture's web bridge has no assets and returns 404.
+        assert!(matches!(r["tcp_send"][0].as_str(), Some("ECONNREFUSED" | "HTTP/1.1 403 Forbidden")), "{r}");
         assert_ne!(r["exec"][0]["code"], 0, "mork web succeeded inside wall: {r}");
         assert!(r["exec"][0]["err"].as_str().unwrap().contains("refused inside a wall"), "{r}");
     }

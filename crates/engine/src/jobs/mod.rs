@@ -28,6 +28,7 @@ pub mod supervisor;
 pub mod waker;
 pub mod wall;
 pub mod wall_exec;
+pub(crate) mod wall_ports;
 pub mod wall_proxy;
 pub mod web_tunnels;
 pub mod work;

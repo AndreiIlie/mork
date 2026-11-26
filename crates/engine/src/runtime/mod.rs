@@ -255,9 +255,12 @@ pub enum Input {
 }
 
 /// Runs the engine until a clean shutdown; returns the exit code.
-pub fn run(opts: Options) -> i32 {
+pub fn run(opts: Options, tunnels: Option<Sender<crate::jobs::web_tunnels::Configured>>) -> i32 {
     match startup::start(opts) {
         Ok((mut engine, rx)) => {
+            if let Some(tx) = tunnels {
+                let _ = tx.send(engine.ctx.config.tunnels.clone());
+            }
             let code = engine.serve(&rx);
             engine.shutdown();
             code
