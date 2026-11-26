@@ -272,6 +272,62 @@ mod tests {
     }
 
     #[test]
+    fn seeded_fragmented_text_obeys_the_assembled_byte_limit() {
+        for seed in 0..128 {
+            eprintln!("fragment seed {seed}");
+            let mut rng = fastrand::Rng::with_seed(seed);
+            let text: String = (0..rng.usize(1..160)).map(|_| rng.choice(['a', ' ', '雪', '🙂']).unwrap()).collect();
+            let split = rng.usize(0..=text.len());
+            let (first, last) = text.as_bytes().split_at(split);
+            let ping = rng.u32(..).to_le_bytes();
+            let mut wire = client_frame(false, OP_TEXT, true, first);
+            wire.extend(client_frame(true, OP_PING, true, &ping));
+            wire.extend(client_frame(true, OP_CONT, true, last));
+            let mut stream = wire.as_slice();
+            let mut reader = MessageReader::new(text.len());
+            assert_eq!(reader.read(&mut stream).unwrap(), Some(Message::Ping(ping.to_vec())), "seed {seed}");
+            assert_eq!(reader.read(&mut stream).unwrap(), Some(Message::Text(text.clone())), "seed {seed}");
+            assert_eq!(reader.read(&mut stream).unwrap(), None, "seed {seed}");
+
+            let mut stream = wire.as_slice();
+            let mut reader = MessageReader::new(text.len() - 1);
+            let mut result = reader.read(&mut stream);
+            if matches!(result, Ok(Some(Message::Ping(_)))) {
+                result = reader.read(&mut stream);
+            }
+            assert!(matches!(result, Err(ReadError::Protocol(1009))), "seed {seed}");
+        }
+    }
+
+    #[test]
+    fn seeded_wire_bytes_and_partial_frames_stay_bounded() {
+        for seed in 0..256 {
+            eprintln!("frame seed {seed}");
+            let mut rng = fastrand::Rng::with_seed(seed);
+            let cap = rng.usize(1..=256);
+            let mut bytes = vec![0; rng.usize(0..=256)];
+            rng.fill(&mut bytes);
+            let mut stream = bytes.as_slice();
+            let mut reader = MessageReader::new(cap);
+            while let Ok(Some(message)) = reader.read(&mut stream) {
+                match message {
+                    Message::Text(s) => assert!(s.len() <= cap && !s.contains('\n'), "seed {seed}"),
+                    Message::Ping(p) | Message::Pong(p) => assert!(p.len() <= 125, "seed {seed}"),
+                    Message::Close => break,
+                }
+            }
+
+            let frame = client_frame(true, OP_TEXT, true, &bytes);
+            let cut = rng.usize(1..frame.len());
+            let result = MessageReader::new(bytes.len()).read(&mut &frame[..cut]);
+            assert!(
+                matches!(result, Err(ReadError::Io(e)) if e.kind() == io::ErrorKind::UnexpectedEof),
+                "seed {seed}, cut {cut}"
+            );
+        }
+    }
+
+    #[test]
     fn reads_masked_text_and_rejects_unmasked() {
         let good = client_frame(true, OP_TEXT, true, br#"{"id":1}"#);
         let mut r = MessageReader::new(1024);

@@ -223,6 +223,37 @@ mod tests {
     }
 
     #[test]
+    fn seeded_request_heads_preserve_fields_and_require_a_complete_head() {
+        for seed in 0..128 {
+            eprintln!("HTTP seed {seed}");
+            let mut rng = fastrand::Rng::with_seed(seed);
+            let method = rng.choice(["GET", "HEAD", "POST"]).unwrap();
+            let path = format!("/items/{}", rng.u32(..));
+            let query = rng.bool().then(|| format!("page={}&sort=name", rng.u16(..)));
+            let target = query.as_ref().map_or_else(|| path.clone(), |q| format!("{path}?{q}"));
+            let version = rng.u8(0..=1);
+            let value = format!("test-{}", rng.u64(..));
+            let prefix = format!("{method} {target} HTTP/1.{version}\r\nX-Item: ");
+            let wire = format!("{prefix}{value}\r\n\r\n");
+            let parsed = parse_head(wire.as_bytes()).unwrap();
+            assert_eq!((parsed.method.as_str(), parsed.version), (method, version), "seed {seed}");
+            assert_eq!((&parsed.path, &parsed.query), (&path, &query), "seed {seed}");
+            assert_eq!(parsed.header("x-item"), Some(value.as_str()), "seed {seed}");
+            let cut = rng.usize(..wire.len());
+            assert!(parse_head(&wire.as_bytes()[..cut]).is_none(), "seed {seed}, cut {cut}");
+
+            let mut bytes = vec![0; rng.usize(1..=64)];
+            rng.fill(&mut bytes);
+            let _ = parse_head(&bytes);
+            let mut malformed = prefix.into_bytes();
+            malformed.push(0);
+            malformed.extend(bytes);
+            malformed.extend(b"\r\n\r\n");
+            assert!(parse_head(&malformed).is_none(), "seed {seed}");
+        }
+    }
+
+    #[test]
     fn key_check_covers_missing_wrong_and_right_in_query_and_header() {
         let missing = head("GET /ws HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
         assert!(!key_matches(&missing, KEY));
