@@ -326,6 +326,43 @@ fn overview_labels(o: &mork_types::view::OverviewView) -> Vec<&str> {
 }
 
 #[test]
+fn overview_marks_interrupted_land_visits_and_the_eventual_landing() {
+    use mork_core::views::timeline::{Mark, Point};
+    use mork_types::view::OverviewStageAt::{Current, Failed, Passed};
+
+    let mut s = Sim::new();
+    s.through_brief(CARD, "web");
+    let mut card = s.card(CARD);
+    let mut outside = timeline_outside(&s);
+    let mut advance = |mark, stage| {
+        s.now += 1000;
+        outside.timelines.get_mut(&card.id).unwrap().push(Point { at: s.now, mark });
+        card.stage = stage;
+        s.state.cards.insert(card.id.clone(), card.clone());
+        place(&s.state, CARD, None, &outside, s.ctx()).overview.unwrap().stages
+    };
+
+    for (exit, stage, label) in
+        [(Mark::Stage(Stage::Build), Stage::Build, "Build"), (Mark::Reverify, Stage::Merging, "Verify")]
+    {
+        advance(Mark::Stage(Stage::Merging), Stage::Merging);
+        advance(Mark::Verified, Stage::Merging);
+        let rows = advance(exit, stage);
+        let current = rows.last().unwrap();
+        let interrupted = &rows[rows.len() - 2];
+        assert_eq!((current.label.as_str(), current.at), (label, Current));
+        assert_eq!((interrupted.label.as_str(), interrupted.at), ("Land", Failed));
+        assert_eq!(interrupted.end_ms, Some(current.start_ms));
+    }
+
+    let queued = advance(Mark::Verified, Stage::Merging);
+    assert_eq!(queued.last().unwrap().at, Current);
+    let done = advance(Mark::End, Stage::Done);
+    let visits: Vec<_> = done.iter().filter(|row| row.label == "Land").map(|row| row.at).collect();
+    assert_eq!(visits, [Failed, Failed, Passed]);
+}
+
+#[test]
 fn overview_stages_carry_a_failed_round_and_its_successor() {
     use mork_types::view::OverviewStageAt;
 
