@@ -121,7 +121,6 @@ export function App() {
     <div className="flex h-screen bg-background-100 text-label-14 text-gray-1000">
       <Sidebar
         screen={state.screen}
-        burn={burn}
         link={state.link}
         build={state.build}
         activeCard={activeCard}
