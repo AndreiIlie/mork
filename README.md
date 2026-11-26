@@ -51,7 +51,7 @@ Mork is an 8-crate Rust workspace with a dependency graph and boundary rules enf
 ## Security Model and Current Limitations
 
 - **Filesystem, syscall, and per-seat isolation:** File isolation is enforced by Bubblewrap mounts (`--ro-bind / /`, tmpfs over host home directories, read-write only inside the card's clone and scratch paths) with `--unshare-user/pid/ipc`, `--cap-drop ALL`, a minimal seccomp-bpf filter denying x32 ABI, `io_uring_setup`, `userfaultfd`, and `ptrace`, and private per-seat home directories (`homes/`).
-- **Network egress (on the roadmap):** The network namespace is not yet unshared because CLIs need HTTPS access to model APIs; Landlock restricts outbound TCP connect ports (default `443`, `80`, `53` in `crates/types/src/config.rs`). Replacing port allowlists with `--unshare-net` and a host-bridged domain-allowlist proxy is on the roadmap.
+- **Network egress:** Walled agent turns run with `--unshare-net` and private loopback. Configure `domains` for the model APIs and registries your seats use. A host-side CONNECT proxy checks the requested host and port before DNS. Project `host_ports` and card preview and mock ports are bridged, excluding the web bridge and SSH tunnels.
 - **Autonomous CLI execution:** Inside the sandbox, seats run with CLI permission prompts disabled so work does not stall waiting on interactive shell prompts. The sandbox wall, fail-closed `PreToolUse` hooks, and door allowlists are the enforcement boundary.
 - **Hosted forge support:** Local git merge-queue landings work with any git repository. Hosted PR automation currently implements Bitbucket behind the `ForgeRead`/`ForgeWrite` traits; a GitHub Issues + Pull Requests provider is next on the roadmap.
 
