@@ -117,7 +117,7 @@ fn stands(state: &State, a: &Agent, c: &Card, (alone, s): (bool, &mut Sections<'
             let last = state
                 .messages_in(a.place.as_str())
                 .filter(|m| m.seq >= c.first_seq && m.from == me)
-                .filter_map(|m| m.hand.as_deref().filter(|h| !h.ask.is_empty()))
+                .filter_map(|m| m.hand.as_deref().filter(|h| h.ask))
                 .last();
             match last {
                 Some(h) => {

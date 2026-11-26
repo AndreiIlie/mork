@@ -48,7 +48,6 @@ fn trimmed(mut m: MessageView) -> MessageView {
     if let Some(h) = m.hand.as_mut() {
         h.message = cut_to(&h.message, TEXT_MAX).0;
         h.headline = cut_to(&h.headline, WORDS_MAX).0;
-        h.ask = cut_to(&h.ask, WORDS_MAX).0;
     }
     for f in &mut m.findings {
         f.proof = cut_to(&f.proof, WORDS_MAX).0;

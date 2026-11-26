@@ -83,7 +83,7 @@ pub fn replied(p: &mut Poster<'_>, c: &mut Card, who: &Who, r: &Reply, job: &Job
         return false;
     }
     let objected = objected(p.state, who, r, job);
-    if !objected && (!r.hand.ask.trim().is_empty() || r.hand.color == Color::Red) {
+    if !objected && (r.hand.ask || r.hand.color == Color::Red) {
         return false;
     }
     c.challenge = None;

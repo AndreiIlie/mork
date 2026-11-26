@@ -232,7 +232,7 @@ pub fn replied(p: &mut Poster<'_>, card: &Card, who: &Who, r: &Reply, job: &Job)
         return true;
     }
     let finished = matches!(r.outcome, Outcome::Built | Outcome::Reported | Outcome::ReviewPass | Outcome::ReviewFail);
-    let asks = !r.hand.ask.trim().is_empty() || r.hand.color == Color::Red;
+    let asks = r.hand.ask || r.hand.color == Color::Red;
     let done = match r.outcome {
         Outcome::Built | Outcome::Reported => "finished its task",
         Outcome::ReviewPass => "passed its topic",
@@ -263,7 +263,7 @@ pub fn replied(p: &mut Poster<'_>, card: &Card, who: &Who, r: &Reply, job: &Job)
     }
     // A finished report is a completion (fac-314), a reviewer's also covered by its round's verdict (fac-277);
     // a question never is, but a verdict's red hand alone asks nothing (fac-358).
-    let verdict = matches!(r.outcome, Outcome::ReviewPass | Outcome::ReviewFail) && r.hand.ask.trim().is_empty();
+    let verdict = matches!(r.outcome, Outcome::ReviewPass | Outcome::ReviewFail) && !r.hand.ask;
     if finished && (!asks || verdict) {
         // A sibling still at work holds it, so its foreman wakes once for them all (fac-528).
         if !super::held::hold(p, &recipient, &who.key, round) {
@@ -277,11 +277,11 @@ pub fn replied(p: &mut Poster<'_>, card: &Card, who: &Who, r: &Reply, job: &Job)
 
 fn report_text(name: &str, done: &str, r: &Reply) -> String {
     let mut text = format!("{name} {done}: {}", r.hand.headline);
-    if !r.hand.message.is_empty() {
+    if !r.hand.ask && !r.hand.message.is_empty() {
         text.push_str(&format!("\n\n{}", r.hand.message));
     }
     // Its question is its foreman's to answer or carry to the operator, so it travels whole.
-    if !r.hand.ask.trim().is_empty() {
+    if r.hand.ask {
         text.push_str(&format!("\n\nIt asks: {}", r.hand.ask_words().trim()));
     }
     if !r.findings.is_empty() {

@@ -49,9 +49,9 @@ pub fn config() -> Config {
 /// A whole reply of a role, with its outcome and its hand's headline.
 pub fn reply(outcome: &str, headline: &str) -> Value {
     json!({
-        "hand": {"color": "grey", "headline": headline, "message": "A message.", "ask": ""},
+        "hand": {"color": "grey", "headline": headline, "message": "A message.", "ask": false},
         "messages": [], "findings": [], "risks": [],
-        "outcome": outcome, "schema": 6
+        "outcome": outcome, "schema": 7
     })
 }
 

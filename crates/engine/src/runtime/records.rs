@@ -96,7 +96,7 @@ fn whole_hand(m: &Message) -> String {
         let word = |v: serde_json::Value| v.as_str().map(str::to_owned).unwrap_or_default();
         let color = word(serde_json::json!(h.color));
         let _ = write!(out, "\nA {color} hand.\n");
-        if !h.ask.is_empty() {
+        if h.ask {
             let _ = write!(out, "\nAsks: {}\n", h.ask_words());
         }
     }

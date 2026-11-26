@@ -36,7 +36,8 @@ fn open_ask(s: &Sim, kind: AskKind) -> Ask {
 
 fn asking(pick: u32) -> Value {
     let mut r = reply("working", "Which one?");
-    r["hand"]["ask"] = json!("The list shows the total twice.\nRemove the one above?");
+    r["hand"]["message"] = json!("The list shows the total twice.\nRemove the one above?");
+    r["hand"]["ask"] = json!(true);
     r["hand"]["options"] = json!(["Yes: keep the one below.", "No: keep both."]);
     r["hand"]["pick"] = json!(pick);
     r["hand"]["reason"] = json!("the one below sits next to its rows.");

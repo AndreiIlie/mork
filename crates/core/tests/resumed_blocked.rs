@@ -45,7 +45,8 @@ fn resume_wakes_foreman_blocked_during_plan_challenge() {
     assert!(s.owed(&foreman), "foreman should be asked to challenge the plan");
 
     let mut blk = reply("blocked", "Need access");
-    blk["hand"]["ask"] = json!("Need credentials");
+    blk["hand"]["message"] = json!("Need credentials");
+    blk["hand"]["ask"] = json!(true);
     s.turn(&foreman, blk);
     assert_eq!(open_blocked(&s, CARD), 1);
     assert!(s.card(CARD).challenge.is_some());
@@ -73,7 +74,8 @@ fn resume_wakes_planner_at_brief_and_foreman_at_build() {
     let spec = format!("{CARD}/spec");
 
     let mut blk = reply("blocked", "Need spec");
-    blk["hand"]["ask"] = json!("Clarify requirement");
+    blk["hand"]["message"] = json!("Clarify requirement");
+    blk["hand"]["ask"] = json!(true);
     s.turn(&planner, blk);
     assert_eq!(open_blocked(&s, CARD), 1);
     assert!(!s.owed(&planner));
@@ -92,7 +94,8 @@ fn resume_wakes_planner_at_brief_and_foreman_at_build() {
     assert_eq!(s.stage(CARD), Stage::Build);
 
     let mut build_blk = reply("blocked", "Missing tool");
-    build_blk["hand"]["ask"] = json!("Install tool");
+    build_blk["hand"]["message"] = json!("Install tool");
+    build_blk["hand"]["ask"] = json!(true);
     s.turn(&foreman, build_blk);
     assert_eq!(open_blocked(&s, CARD), 1);
     assert!(!s.owed(&foreman));
@@ -111,7 +114,8 @@ fn resume_does_not_double_wake_blocked_seat_already_owed_a_turn() {
     let spec = format!("{CARD}/spec");
 
     let mut blk = reply("blocked", "Blocked");
-    blk["hand"]["ask"] = json!("Need help");
+    blk["hand"]["message"] = json!("Need help");
+    blk["hand"]["ask"] = json!(true);
     s.turn(&planner, blk);
     assert_eq!(open_blocked(&s, CARD), 1);
 
@@ -136,7 +140,8 @@ fn resume_wakes_blocked_seat_with_stale_wake_after() {
     let spec = format!("{CARD}/spec");
 
     let mut blk = reply("blocked", "Blocked");
-    blk["hand"]["ask"] = json!("Need help");
+    blk["hand"]["message"] = json!("Need help");
+    blk["hand"]["ask"] = json!(true);
     s.turn(&planner, blk);
     assert_eq!(open_blocked(&s, CARD), 1);
 

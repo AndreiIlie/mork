@@ -187,7 +187,7 @@ pub(super) fn clear_offer(p: &Poster<'_>, c: &Card, who: &Who, r: &Reply, job: &
         && who.place.as_str() == crate::messages::places::room_of(&c.id, holder)
         && r.outcome == Outcome::BriefReady
         && open(c)
-        && super::brief::clear(&r.hand.ask)
+        && !r.hand.ask
         && r.hand.color != Color::Red
         && !r.hand.message.trim().is_empty()
         && read_request(p, who.place.as_str(), HEADLINE, 0, job)

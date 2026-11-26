@@ -9,7 +9,7 @@ use crate::card::Sketch;
 use crate::config::Cli;
 
 /// The reply schemas' version, sent in each reply (3.5) and listed in a build's manifest.
-pub const SCHEMA_VERSION: u32 = 6;
+pub const SCHEMA_VERSION: u32 = 7;
 
 /// What a seat does (3.2). `Echo` is the tests' role (1.10.4), known only with `faults`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -97,14 +97,14 @@ impl Outcome {
     }
 }
 
-/// The part of a reply addressed to the operator: an ask is a non-empty `ask`.
+/// The part of a reply addressed to the operator: `ask` flags its message as a question.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Hand {
     pub color: Color,
     pub headline: String,
     pub message: String,
-    pub ask: String,
+    pub ask: bool,
     /// Marks the ask as a design question (fac-233): shown tagged; auto-given like any `answer` ask when delegated.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub design: bool,
@@ -138,12 +138,12 @@ fn is_zero(n: &u32) -> bool {
 impl Hand {
     /// Its ask's options and pick, when it offers a choice; a pick naming no option is dropped.
     pub fn choices(&self) -> Option<Choices> {
-        if self.ask.trim().is_empty() || self.options.is_empty() {
+        if !self.ask || self.options.is_empty() {
             return None;
         }
         let named = usize::try_from(self.pick).is_ok_and(|n| (1..=self.options.len()).contains(&n));
         Some(Choices {
-            ask: self.ask.trim().to_owned(),
+            ask: self.message.trim().to_owned(),
             options: self.options.iter().map(|o| o.trim().to_owned()).collect(),
             pick: named.then_some(self.pick),
             reason: if named { self.reason.trim().to_owned() } else { String::new() },
@@ -152,7 +152,7 @@ impl Hand {
 
     /// Its ask as one text, its options and pick in it, for every reader that reads words.
     pub fn ask_words(&self) -> String {
-        self.choices().map_or_else(|| self.ask.clone(), |c| c.words())
+        if self.ask { self.choices().map_or_else(|| self.message.clone(), |c| c.words()) } else { String::new() }
     }
 
     /// A recap's typed sketch, when it gave one.
@@ -293,7 +293,7 @@ pub fn schema_offering(role: Role, child: bool, cli: Cli, outcomes: &[Outcome]) 
         "color": {"type": "string", "enum": ["grey", "green", "yellow", "red"]},
         "headline": string(),
         "message": string(),
-        "ask": string(),
+        "ask": {"type": "boolean"},
         "images": array_of(string()),
         "options": array_of(string()),
         "pick": {"type": "integer"},

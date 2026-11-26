@@ -92,10 +92,10 @@ pub(super) fn source_hand(state: &State, a: &mork_types::ask::Ask, hands: &[&Mes
             if a.kind == AskKind::Answer {
                 // A hand after the ask's raising can't be its source; the red fallback is a red hand
                 // with an empty `ask`, not withdrawing.
-                let red = h.ask.is_empty() && h.color == Color::Red && !h.withdraw_ask && h.headline == a.text;
+                let red = !h.ask && h.color == Color::Red && !h.withdraw_ask && h.headline == a.text;
                 m.time <= a.raised_ms && (h.ask_words().trim() == a.text || red)
             } else {
-                !h.ask.trim().is_empty()
+                h.ask
             }
         })
     };

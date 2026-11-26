@@ -108,7 +108,7 @@ fn effective(p: &Poster<'_>, card: &Card, who: &Who, r: &Reply, job: &Job) -> bo
 }
 
 fn brings_turn(p: &Poster<'_>, who: &Who, r: &Reply, routes: &[Route]) -> bool {
-    if !r.hand.ask.is_empty() || (r.hand.color == Color::Red && !r.hand.withdraw_ask) {
+    if r.hand.ask || (r.hand.color == Color::Red && !r.hand.withdraw_ask) {
         return true;
     }
     r.messages.iter().zip(routes).any(|(m, route)| {
@@ -134,7 +134,7 @@ pub fn raises_gate(p: &Poster<'_>, who: &Who, r: &Reply) -> bool {
 }
 
 pub(super) fn joined(base: &str, who: &Who, r: &Reply) -> String {
-    if r.hand.ask.is_empty() {
+    if !r.hand.ask {
         base.to_owned()
     } else {
         format!("{base} · {}: {}", who.role.as_str(), r.hand.ask_words())

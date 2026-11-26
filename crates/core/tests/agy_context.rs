@@ -179,7 +179,8 @@ fn foreman_cut_resends_challenge_plan_and_sections_through_retry_and_second_cut(
 
     // Foreman reads the waiting challenge and raises an ask, keeping the challenge open and the plan held.
     let mut ask_reply = reply("working", "Question");
-    ask_reply["hand"]["ask"] = json!("Clarify one detail?");
+    ask_reply["hand"]["message"] = json!("Clarify one detail?");
+    ask_reply["hand"]["ask"] = json!(true);
     let f1 = run_agy_turn(&mut s, FOREMAN, ask_reply, agy_session("conv-f1"));
     assert!(f1.contains(PLAN_TEXT), "initial challenge missing plan:\n{f1}");
     assert_eq!(s.state.agents[FOREMAN].held.get("plan").map(String::as_str), Some(PLAN_TEXT));

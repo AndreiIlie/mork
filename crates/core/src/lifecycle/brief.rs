@@ -129,11 +129,6 @@ fn build(p: &mut Poster<'_>, c: Card) {
     crate::messages::requests::ask_build(p, &cid, &text);
 }
 
-/// Whether a reply asks nothing of the operator.
-pub(super) fn clear(ask: &str) -> bool {
-    ask.trim().is_empty()
-}
-
 /// The approver's name and any delegation.
 pub(crate) fn approval_label(by: &Sender) -> String {
     match by {
@@ -147,7 +142,7 @@ pub(crate) fn approval_label(by: &Sender) -> String {
 pub(super) fn recaps(who: &Who, r: &Reply, card: &Card) -> bool {
     r.outcome == Outcome::BriefReady
         && holds_spec(who, card)
-        && clear(&r.hand.ask)
+        && !r.hand.ask
         && r.hand.color != Color::Red
         && !r.hand.message.trim().is_empty()
 }

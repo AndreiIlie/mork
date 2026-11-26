@@ -111,7 +111,7 @@ fn message(
 fn companion(p: &Poster<'_>, who: &Who, reply: &Reply, m: &ReplyMessage, target: &Who) -> bool {
     let h = &reply.hand;
     let final_reply = matches!(reply.outcome, Outcome::ReviewPass | Outcome::ReviewFail);
-    let asks = !h.ask.trim().is_empty();
+    let asks = h.ask;
     let parent = p.agent(&who.key).and_then(|a| a.parent);
     final_reply && !asks && m.kind != Some(Intent::Request) && parent.as_ref() == Some(&target.key)
 }
@@ -121,14 +121,14 @@ fn companion(p: &Poster<'_>, who: &Who, reply: &Reply, m: &ReplyMessage, target:
 fn answer_ask(p: &mut Poster<'_>, who: &Who, reply: &Reply, gate: bool) {
     let h = &reply.hand;
     let pending = p.all_asks().any(|a| a.kind == AskKind::Answer && a.open && a.agent.as_ref() == Some(&who.key));
-    let raised = if !h.ask.is_empty() {
+    let raised = if h.ask {
         Some((Color::Yellow, h.ask_words()))
     } else if h.color == Color::Red && !gate && !pending && !h.withdraw_ask {
         Some((Color::Red, h.headline.clone()))
     } else {
         None
     };
-    if !h.ask.is_empty() || h.withdraw_ask {
+    if h.ask || h.withdraw_ask {
         p.close_answer(&who.key);
     }
     let Some((color, text)) = raised.filter(|_| !gate) else { return };
