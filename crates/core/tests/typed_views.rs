@@ -153,16 +153,21 @@ fn room_controls_parent_and_standing_decisions_follow_the_card() {
     assert_eq!(preview.url, format!("http://web-1.localhost:{port}/"));
 }
 
-#[test]
-fn first_run_and_restart_offer_only_the_modes_and_defaults_the_engine_applies() {
-    use mork_core::decide::Event;
-    use mork_core::state::unloaded::{Records, wanted};
-    use mork_types::card::{Card, Carried, Mode};
+fn board_with_two_cards() -> Sim {
     let mut s = Sim::new();
     s.board("web-2", "web");
     let carried = s.state.board["web-2"].clone();
     s.board(CARD, "web");
     s.state.board.insert(carried.id.clone(), carried);
+    s
+}
+
+#[test]
+fn first_run_and_restart_offer_only_the_modes_and_defaults_the_engine_applies() {
+    use mork_core::decide::Event;
+    use mork_core::state::unloaded::{Records, wanted};
+    use mork_types::card::{Card, Carried, Mode};
+    let mut s = board_with_two_cards();
     s.operator(json!({"auto":{"project":"web"}})).unwrap();
     let fresh = room(&s, CARD);
     assert!(fresh.card.is_none());
@@ -179,7 +184,7 @@ fn first_run_and_restart_offer_only_the_modes_and_defaults_the_engine_applies() 
     let start = room(&s, CARD).start.unwrap();
     assert_eq!((start.level, start.from.as_str()), (1, "project"));
     assert_eq!(start.carries, [mork_types::CardId::new("web-2")]);
-    assert!(start.modes.full && !start.modes.report);
+    assert!(start.modes.full && start.modes.report);
 
     s.state.cards.remove(&id);
     prior.head = Some("commit".into());
@@ -195,4 +200,21 @@ fn first_run_and_restart_offer_only_the_modes_and_defaults_the_engine_applies() 
     assert_eq!((start.level, start.from.as_str()), (2, "run"));
     assert!(start.visual && start.modes.full && !start.modes.report);
     assert_eq!(start.carries, [mork_types::CardId::new("web-2")]);
+}
+
+#[test]
+fn report_restart_is_available_when_a_formerly_carried_card_is_running() {
+    let mut s = board_with_two_cards();
+    s.operator(json!({"start": {"card": CARD, "carries": ["web-2"]}})).unwrap();
+    s.operator(json!({"close": {"card": CARD, "why": "Restart separately"}})).unwrap();
+    for id in s.open_jobs(|p| matches!(p, Purpose::Bundle { .. })) {
+        s.end_job(&id, json!({"branch": CARD, "bundle": false, "head": null, "clean": true, "dirty": []}));
+    }
+    s.settle_actions();
+    s.operator(json!({"start": {"card": "web-2"}})).unwrap();
+
+    let start = room(&s, CARD).start.expect("the report start is available");
+    assert!(!start.modes.full && start.modes.report);
+    s.operator(json!({"start": {"card": CARD, "mode": "report"}})).unwrap();
+    assert!(s.card(CARD).carries.is_empty());
 }

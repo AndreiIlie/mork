@@ -76,8 +76,8 @@ function StartForm({ card, defaults, live, onDone }: { card: BoardRow; defaults:
   };
   const kept = [
     defaults.from === "run" && defaults.level > 0 ? LEVELS[defaults.level] : null,
-    defaults.visual ? "Visual" : null,
-    defaults.carries.length > 0 ? `carrying ${defaults.carries.join(" ")}` : null,
+    full && defaults.visual ? "Visual" : null,
+    full && defaults.carries.length > 0 ? `carrying ${defaults.carries.join(" ")}` : null,
   ].filter(Boolean);
   const inherited = [
     kept.length > 0 ? `From its last run: ${kept.join(", ")}` : null,
@@ -96,7 +96,7 @@ function StartForm({ card, defaults, live, onDone }: { card: BoardRow; defaults:
         />
       </span>
       <span className="flex items-center gap-2">
-        <Button tier="secondary" size="control" pressed={full && visual} disabled={!full || defaults.visual} onClick={() => setVisual((v) => !v)} title={defaults.visual ? "Its last run was visual: this one is too" : undefined}>
+        <Button tier="secondary" size="control" pressed={full && visual} disabled={!full || defaults.visual} onClick={() => setVisual((v) => !v)} title={full && defaults.visual ? "Its last run was visual: this one is too" : undefined}>
           Visual
         </Button>
         <Button tier="secondary" size="control" pressed={full && noPlanner} disabled={!full} onClick={() => setNoPlanner((v) => !v)}>

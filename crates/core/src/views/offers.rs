@@ -228,8 +228,11 @@ pub(super) fn start_defaults(state: &State, place: &str, ctx: Ctx<'_>) -> Option
         return None;
     }
     let carries = restart_carries(prior);
-    let takes = |mode| accepted(state, &start_command(&id, Some(mode), carries.clone()), ctx);
-    let modes = mork_types::about::StartModes { full: takes(Mode::Full), report: takes(Mode::Report) };
+    let takes = |mode, members| accepted(state, &start_command(&id, Some(mode), members), ctx);
+    let modes = mork_types::about::StartModes {
+        full: takes(Mode::Full, carries.clone()),
+        report: takes(Mode::Report, Vec::new()),
+    };
     let (delegated, self_sustained) = crate::messages::auto::inherited(state, &board.project, prior);
     (modes.full || modes.report).then(|| mork_types::about::StartDefaults {
         level: u8::from(delegated) + u8::from(self_sustained),
