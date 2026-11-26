@@ -4,46 +4,12 @@ import { Markdown } from "./Markdown";
 import { ActivityTracker, EndedTurnRow } from "./Turns";
 import { fetchImage, readHistory } from "./bridge";
 import { authorName, clockTime, plural } from "./format";
-import type { ChatTurn, HandView, HistoryPage, ImageView, MessageView, PlaceView, ReplyHand, TriageView } from "./types";
+import type { ChatTurn, HandView, ImageView, MessageView, PlaceView, ReplyHand, TriageView } from "./types";
+import { useRetainedStream } from "./streamHistory";
 import { Dot } from "./ui/Dot";
 import { PinnedScroll } from "./ui/PinnedScroll";
 
-interface RetainedStream {
-  messages: MessageView[];
-  earlier: number;
-  turns: ChatTurn[];
-}
-
 type StreamEntry = { kind: "message"; m: MessageView; run?: MessageView[] } | { kind: "turn"; t: ChatTurn };
-
-function prependHistory(prev: RetainedStream, page: HistoryPage): RetainedStream {
-  const bySeq = new Map(prev.messages.map((m) => [m.seq, m]));
-  for (const m of page.messages) {
-    if (!bySeq.has(m.seq)) bySeq.set(m.seq, m);
-  }
-  const byJob = new Map(prev.turns.map((t) => [t.turn.job, t]));
-  for (const t of page.turns ?? []) {
-    if (!byJob.has(t.turn.job)) byJob.set(t.turn.job, t);
-  }
-  const messages = [...bySeq.values()].sort((a, b) => a.seq - b.seq);
-  return { messages, earlier: Math.min(prev.earlier, page.earlier), turns: [...byJob.values()] };
-}
-
-// Keep messages and ended turns that scroll off the moving tail while open, letting live turns supersede stale running state.
-function reconcileTail(prev: RetainedStream, view: PlaceView): RetainedStream {
-  const liveTurns = view.turns ?? [];
-  if (prev.messages.length === 0 || prev.earlier + prev.messages.length < view.earlier) {
-    return { messages: view.messages, earlier: view.earlier, turns: liveTurns };
-  }
-  const bySeq = new Map(prev.messages.map((m) => [m.seq, m]));
-  for (const m of view.messages) bySeq.set(m.seq, m);
-  const byJob = new Map(prev.turns.filter((t) => !t.running).map((t) => [t.turn.job, t]));
-  for (const t of liveTurns) byJob.set(t.turn.job, t);
-  const messages = [...bySeq.values()].sort((a, b) => a.seq - b.seq);
-  const firstView = view.messages[0]?.seq;
-  const earlier = firstView !== undefined && firstView <= prev.messages[0].seq ? view.earlier : prev.earlier;
-  return { messages, earlier, turns: [...byJob.values()] };
-}
 
 // Matches crates/ui/src/activity.rs `entries`: ended turns before the first message with a greater seq, rest at the end.
 function interleaveEntries(messages: MessageView[], turns: ChatTurn[]): StreamEntry[] {
@@ -306,39 +272,28 @@ function MessageRow({ m, reviewForeman, tzOffsetMin, nowMs, live, hand, triage, 
 }
 
 function useStreamHistory(view: PlaceView, live: boolean) {
-  const [lastView, setLastView] = useState(view);
-  const [stream, setStream] = useState<RetainedStream>(() => ({
-    messages: view.messages,
-    earlier: view.earlier,
-    turns: view.turns ?? [],
-  }));
+  const { messages, earlier, turns, firstSeq, prepend } = useRetainedStream(view);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const prependHeightRef = useRef<number | null>(null);
 
-  if (lastView !== view) {
-    setLastView(view);
-    setStream((prev) => reconcileTail(prev, view));
-  }
-
   const loadEarlier = (el: HTMLDivElement | null) => {
-    const firstSeq = stream.messages[0]?.seq;
     if (!live || loading || firstSeq === undefined) return;
     setLoading(true);
     setError(null);
     readHistory(view.place, firstSeq, true)
       .then((page) => {
         if (el !== null) prependHeightRef.current = el.scrollHeight;
-        setStream((prev) => prependHistory(prev, page));
+        prepend(page);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   };
 
   return {
-    messages: stream.messages,
-    earlier: stream.earlier,
-    turns: stream.turns,
+    messages,
+    earlier,
+    turns,
     loading,
     error,
     loadEarlier,

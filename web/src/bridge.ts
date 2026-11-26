@@ -249,7 +249,8 @@ export function requestCommand(command: unknown): Promise<unknown> {
   return liveDial.send(command);
 }
 
-export async function readHistory(place: string, before: number, turns = false): Promise<HistoryPage> {
+// A size-limited view can omit its entire tail. Read the newest page when it supplies no cursor.
+export async function readHistory(place: string, before = Number.MAX_SAFE_INTEGER, turns = false): Promise<HistoryPage> {
   const answer = await requestCommand({ history: { place, before, count: 100, turns } });
   const page = (answer as { history?: HistoryPage } | null)?.history;
   if (page?.place !== place || !Array.isArray(page.messages) || typeof page.earlier !== "number") {
