@@ -110,17 +110,20 @@ pub fn prepare_wall_spawn(cmd: &mut std::process::Command, keep: Option<i32>, ow
 /// Guard for a short command (M3.34): SIGTERM on caller death kills its whole group; a subreaper
 /// (M4.6), so a descendant that left the group by `setsid` is still ended.
 pub fn prepare_guard_spawn(cmd: &mut std::process::Command) {
-    prepare_spawn(cmd, None, None, true, libc::SIGTERM);
-    // SAFETY: prctl with integers, in the child between fork and exec: async-signal-safe. The
-    // attribute is kept across exec.
+    // SAFETY: signal with SIG_DFL and prctl with integer arguments are safe in the forked child.
     unsafe {
         cmd.pre_exec(|| {
+            // The parent's flag-only handler would consume a death signal arriving before exec.
+            if libc::signal(libc::SIGTERM, libc::SIG_DFL) == libc::SIG_ERR {
+                return Err(io::Error::last_os_error());
+            }
             if libc::prctl(libc::PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0 {
                 return Err(io::Error::last_os_error());
             }
             Ok(())
         });
     }
+    prepare_spawn(cmd, None, None, true, libc::SIGTERM);
 }
 
 /// Preserves both the bwrap status pipe and the wall's bootstrap socket until exec.
