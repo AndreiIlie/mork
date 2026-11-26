@@ -147,7 +147,8 @@ For Cargo and npm, use `caches = [".cargo/registry", ".npm/_cacache"]` and `cach
 
 In `mork.toml`, `[mork] skills` names an optional absolute folder path (with no `.` or `..` component) whose regular files are merged with the built-in skills at startup into the same content-named folder mounted in every wall.
 Symlinks and non-regular files inside it are skipped, and a missing folder uses the built-in skills alone.
-Any other error opening the folder, a path under `.claude-plugin`, or a path colliding with a built-in skill fails startup.
+At the top level, `.claude-plugin`, `hooks`, `commands`, `agents` and `.mcp.json` are reserved plugin paths.
+Any other error opening the folder, a regular file or directory at a reserved path, or a file colliding with a built-in skill fails startup.
 
 ### tickets and review_tag
 

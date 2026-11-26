@@ -242,11 +242,32 @@ fn skills_materialize_merges_skips_links_and_refuses_bad_roots_and_collisions() 
 
     // Collision with a built-in skill path fails startup.
     let collide_extra = root.join("collide-extra");
-    std::fs::create_dir_all(collide_extra.join("commands")).unwrap();
-    std::fs::write(collide_extra.join("commands/SKILL.md"), "override").unwrap();
+    std::fs::create_dir_all(collide_extra.join("delegating")).unwrap();
+    std::fs::write(collide_extra.join("delegating/SKILL.md"), "override").unwrap();
     let err = materialize_into(&out, Some(&collide_extra)).unwrap_err();
     assert!(err.to_string().contains("collides"), "{err}");
 
+    cleanup(&root);
+}
+
+#[test]
+fn configured_skills_reserve_plugin_paths_only_at_the_root() {
+    let root = fresh_root("plugin-paths");
+    let out = root.join("out");
+    let extra = root.join("extra");
+    let nested = extra.join("custom-skill");
+    std::fs::create_dir_all(&nested).unwrap();
+    for path in ["hooks/example", "commands/example", "agents/example", ".mcp.json"] {
+        let file = extra.join(path);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, "fixture").unwrap();
+        let reserved = path.split('/').next().unwrap();
+        let error = materialize_into(&out, Some(&extra)).unwrap_err();
+        assert!(error.to_string().contains(&format!("`{reserved}` is reserved")), "{error}");
+        std::fs::rename(extra.join(reserved), nested.join(reserved)).unwrap();
+        let merged = materialize_into(&out, Some(&extra)).unwrap().unwrap();
+        assert_eq!(std::fs::read_to_string(merged.join("custom-skill").join(path)).unwrap(), "fixture");
+    }
     cleanup(&root);
 }
 

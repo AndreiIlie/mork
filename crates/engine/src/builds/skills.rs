@@ -32,7 +32,7 @@ pub fn materialize_into(root: &Path, extra: Option<&Path>) -> io::Result<Option<
 }
 
 // Reads regular files under a configured skills root without following any symlink; a missing root
-// adds nothing, while any other root error or built-in/.claude-plugin collision fails startup.
+// adds nothing, while any other root error, reserved plugin path or built-in collision fails startup.
 fn read_extra(root: &Path) -> io::Result<Vec<(String, Vec<u8>)>> {
     let dir = match mork_sys::open_no_symlinks(root) {
         Ok(f) => f,
@@ -65,8 +65,8 @@ fn walk_dir(
         if !kind.is_dir() && !kind.is_file() {
             continue;
         }
-        if next == Path::new(".claude-plugin") {
-            return Err(io::Error::other("configured skill path `.claude-plugin` is reserved"));
+        if matches!(next.to_str(), Some(".claude-plugin" | "hooks" | "commands" | "agents" | ".mcp.json")) {
+            return Err(io::Error::other(format!("configured skill path `{}` is reserved", next.display())));
         }
         if kind.is_dir() {
             match mork_sys::open_dir_beneath(cur, Path::new(&name)) {
