@@ -9,7 +9,7 @@ use crate::card::Sketch;
 use crate::config::Cli;
 
 /// The reply schemas' version, sent in each reply (3.5) and listed in a build's manifest.
-pub const SCHEMA_VERSION: u32 = 6;
+pub const SCHEMA_VERSION: u32 = 7;
 
 /// What a seat does (3.2). `Echo` is the tests' role (1.10.4), known only with `faults`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -97,21 +97,21 @@ impl Outcome {
     }
 }
 
-/// The part of a reply addressed to the operator: an ask is a non-empty `ask`.
+/// The part of a reply addressed to the operator: `ask` flags its message as a question.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Hand {
     pub color: Color,
     pub headline: String,
     pub message: String,
-    pub ask: String,
+    pub ask: bool,
     /// Marks the ask as a design question (fac-233): shown tagged; auto-given like any `answer` ask when delegated.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub design: bool,
-    /// Withdraws the seat's open ask unanswered (fac-271); an empty `ask` alone leaves it open.
+    /// Withdraws the seat's open ask unanswered (fac-271); `ask` false alone leaves it open.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub withdraw_ask: bool,
-    /// Files of the seat's `io/` folder, `$MORK_IO`, shown beside the hand and its ask (fac-278, fac-654).
+    /// Files of the seat's `io/` folder, `$MORK_IO`, shown beside the hand's message (fac-278, fac-654).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<String>,
     /// The ask's numbered options, in order (fac-696): none when it offers no choice.
@@ -138,12 +138,12 @@ fn is_zero(n: &u32) -> bool {
 impl Hand {
     /// Its ask's options and pick, when it offers a choice; a pick naming no option is dropped.
     pub fn choices(&self) -> Option<Choices> {
-        if self.ask.trim().is_empty() || self.options.is_empty() {
+        if !self.ask || self.options.is_empty() {
             return None;
         }
         let named = usize::try_from(self.pick).is_ok_and(|n| (1..=self.options.len()).contains(&n));
         Some(Choices {
-            ask: self.ask.trim().to_owned(),
+            ask: self.message.trim().to_owned(),
             options: self.options.iter().map(|o| o.trim().to_owned()).collect(),
             pick: named.then_some(self.pick),
             reason: if named { self.reason.trim().to_owned() } else { String::new() },
@@ -152,7 +152,18 @@ impl Hand {
 
     /// Its ask as one text, its options and pick in it, for every reader that reads words.
     pub fn ask_words(&self) -> String {
-        self.choices().map_or_else(|| self.ask.clone(), |c| c.words())
+        if self.ask { self.with_options(&self.message) } else { String::new() }
+    }
+
+    /// Renders the displayed body with any options and recommendation, including its sketch when present.
+    pub fn with_options(&self, body: &str) -> String {
+        self.choices().map_or_else(
+            || body.to_owned(),
+            |mut c| {
+                body.clone_into(&mut c.ask);
+                c.words()
+            },
+        )
     }
 
     /// A recap's typed sketch, when it gave one.
@@ -293,7 +304,7 @@ pub fn schema_offering(role: Role, child: bool, cli: Cli, outcomes: &[Outcome]) 
         "color": {"type": "string", "enum": ["grey", "green", "yellow", "red"]},
         "headline": string(),
         "message": string(),
-        "ask": string(),
+        "ask": {"type": "boolean"},
         "images": array_of(string()),
         "options": array_of(string()),
         "pick": {"type": "integer"},

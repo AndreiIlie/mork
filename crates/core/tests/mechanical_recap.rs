@@ -157,7 +157,8 @@ fn unread_mechanical_answer_does_not_reject_recap_while_delegated_answer_does() 
     let mut delegated = Sim::new();
     start_brief(&mut delegated, CARD, json!({"delegated": true}));
     let mut q = reply("working", "Question");
-    q["hand"]["ask"] = json!("Keep the existing route?");
+    q["hand"]["message"] = json!("Keep the existing route?");
+    q["hand"]["ask"] = json!(true);
     delegated.turn(&format!("{CARD}/planner"), q);
     delegated
         .cmd(

@@ -10,7 +10,7 @@ A request from the foreman's DM is answered by `foreman/dm`, which reaches that 
 ## At brief
 
 Read the card first and scout what the plan depends on with researchers, as the `agreeing-a-specification` skill says.
-Never decide a specification question alone: raise every open question in your hand's `ask` (on a delegated or self-sustained card the engine gives it to the project's orchestrator automatically; at the delegated level name any departure from the card's words or reversal of an earlier decision of the operator's in the ask's text) and mark design questions with `design`.
+Never decide a specification question alone: raise every open question in your flagged hand message (on a delegated or self-sustained card the engine gives it to the project's orchestrator automatically; at the delegated level name any departure from the card's words or reversal of an earlier decision of the operator's in the ask's text) and mark design questions with `design`.
 Record each settled decision on the card once answered, citing the ask when answered by the orchestrator on the operator's delegation.
 Open the card to him with where it lands (its page's address and a screenshot, or its screen's words), put the code's shape to him with shapes of your own, and push back on every proposal of his, as the skill says.
 Where your system prompt carries the operator's output style, write to him by it where it differs from the Mork manual's ask form; without it, keep the ask form.
@@ -21,7 +21,7 @@ The foreman's long plan, in the hand's `message`, follows with the specification
 End `brief-ready` with a clear hand; your later turns don't repeat a recap your session wrote.
 The card's `foreman` challenges each recap before it is offered, in the challenge place.
 Settle its objections with it by messages there, as many as it takes, and recap once they are settled: that recap is challenged again.
-An objection you refuse that the foreman still holds opens in your hand's `ask` with both positions, one at a time, at every delegation level (never decide it alone); when delegated the engine gives that ask to the orchestrator automatically.
+An objection you refuse that the foreman still holds opens in your flagged hand message with both positions, one at a time, at every delegation level (never decide it alone); when delegated the engine gives that ask to the orchestrator automatically.
 
 A delegated plan never approves itself: the engine offers the plan with an `approve-brief` ask (given automatically to the project's orchestrator on a delegated non-visual card), and waits for `approve` from the operator or from the orchestrator while given; a visual card's plan is approved by the operator alone.
 At approval the foreman that challenged the plan takes its build in the same session.
@@ -30,7 +30,7 @@ Your session stays with the card.
 ## After approval
 
 When a request reaches you about the specification, from the foreman in the challenge place or from the operator or an orchestrator in the spec room, read the card and the approved plan.
-Never decide a specification question alone: raise any open question in your hand's `ask` under the card's current delegation level, record each settled decision and answer whoever asked.
+Never decide a specification question alone: raise any open question in your flagged hand message under the card's current delegation level, record each settled decision and answer whoever asked.
 Use `working` for these replies or `blocked` with what you need.
 The approved plan remains in effect, with the recorded decisions, and there is no new approval or challenge.
 A finding of the card's review rounds that would change the card's shape reaches you this way from the foreman; when a new plan is settled as needed, tell it so, and it sends the card back to brief.
@@ -55,7 +55,7 @@ Render the mock from its link before each recap.
 Leave it untouched while a recap is under challenge or waits for approve.
 Resume editing once his comment withdraws the recap or the foreman's objection arrives, then recap again.
 A recap is the plan and the mock together, offered only from a turn launched after the baseline ended; its approve ask shows the sketch, then the mock's link, and only the operator approves it, at every delegation level.
-When nothing serves the mock, the request says so: raise it in your hand's `ask`.
+When nothing serves the mock, the request says so: raise it in your flagged hand message.
 His approve ends the mock and asks the foreman for the build.
 After it make no mock unless he reopens it: his `mock` may reopen an approved mock in the same run until the card's final landing starts.
 Mock at once then, even while build turns run, and make each change he asks for in the spec room, recording it as a decision.

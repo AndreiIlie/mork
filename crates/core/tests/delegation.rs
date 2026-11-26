@@ -73,7 +73,8 @@ fn answer_asks_are_auto_given_without_notice_when_delegated_and_notified_when_of
         let mut s = Sim::new();
         start_brief(&mut s, CARD, extra);
         let mut r = reply("working", "Question");
-        r["hand"]["ask"] = json!("Should we keep the existing route?");
+        r["hand"]["message"] = json!("Should we keep the existing route?");
+        r["hand"]["ask"] = json!(true);
         let d = s.turn(&format!("{CARD}/planner"), r);
         let ask = open_ask(&s, AskKind::Answer);
         let givens = given_events(&d);
@@ -229,7 +230,8 @@ fn blocked_and_engine_asks_are_not_auto_given() {
     let mut s = Sim::new();
     start_brief(&mut s, CARD, json!({"delegated": true}));
     let mut blocked = reply("blocked", "Need credentials");
-    blocked["hand"]["ask"] = json!("Please add the staging key");
+    blocked["hand"]["message"] = json!("Please add the staging key");
+    blocked["hand"]["ask"] = json!(true);
     let d = s.turn(&format!("{CARD}/planner"), blocked);
     let ask = open_ask(&s, AskKind::Blocked);
     assert!(!ask.given, "blocked asks must never be auto-given");
@@ -455,7 +457,8 @@ fn orchestrator_plan_correction_marks_approve_brief_over_other_given_asks() {
     let mut s = Sim::new();
     start_brief(&mut s, CARD, json!({"delegated": true}));
     let mut question = reply("working", "Question");
-    question["hand"]["ask"] = json!("Keep the existing route?");
+    question["hand"]["message"] = json!("Keep the existing route?");
+    question["hand"]["ask"] = json!(true);
     s.turn(&format!("{CARD}/planner"), question);
     let answer_id = open_ask(&s, AskKind::Answer).id.clone();
     assert!(s.state.asks[&answer_id].given);
@@ -475,7 +478,8 @@ fn orchestrator_plan_correction_marks_approve_brief_over_other_given_asks() {
     )
     .unwrap();
     let mut blocked = reply("blocked", "Need access");
-    blocked["hand"]["ask"] = json!("Grant access");
+    blocked["hand"]["message"] = json!("Grant access");
+    blocked["hand"]["ask"] = json!(true);
     s.turn(&format!("{CARD}/planner"), blocked);
     let blocked_id = open_ask(&s, AskKind::Blocked).id.clone();
     s.operator(json!({"give": {"ask": blocked_id.as_str()}})).unwrap();

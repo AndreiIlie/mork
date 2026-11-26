@@ -20,7 +20,7 @@ fn tagged(forge: &str) -> String {
 }
 
 // Review verdicts use the normal result routing; only a need from the operator raises an ask.
-const HANDS: &str = " Findings and a clean verdict are normal results, never reasons to raise a hand to the operator. Keep hand.ask empty unless you need something from him; use no red hand just to report findings. The engine posts a colleague's PR findings on it and reports a colleague's branch's; ours go back to the implementing foreman. No ask to approve or finish the review follows your verdict.";
+const HANDS: &str = " Findings and a clean verdict are normal results, never reasons to raise a hand to the operator. Keep hand.ask false unless you need something from him; use no red hand just to report findings. The engine posts a colleague's PR findings on it and reports a colleague's branch's; ours go back to the implementing foreman. No ask to approve or finish the review follows your verdict.";
 
 const TRACE: &str = " Start with the list below, then trace fixes and merged base changes into affected callers and dependents, including approved and carried files. Findings on unlisted files count like any other:";
 

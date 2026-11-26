@@ -6,7 +6,7 @@ use rusqlite::Transaction;
 pub const OLDEST: u32 = 55;
 
 /// The newest state version this build writes.
-pub const NEWEST: u32 = 55;
+pub const NEWEST: u32 = 56;
 
 const V31: &str = "
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);

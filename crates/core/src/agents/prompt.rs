@@ -149,10 +149,10 @@ fn delegation(state: &State, a: &Agent, s: &mut Sections<'_>, out: &mut String) 
     let objection = if c.no_planner {
         ""
     } else {
-        " An objection of the foreman's you refuse and it still holds opens in your hand's `ask` with both positions, one at a time, at every level; never decide it alone."
+        " An objection of the foreman's you refuse and it still holds opens in your flagged hand message with both positions, one at a time, at every level; never decide it alone."
     };
     let text = format!(
-        "\n## Delegation\n\nCurrent level: {}. {rule}{objection} Never send a specification question as a message to the orchestrator: raise it in your hand's `ask`, which the engine gives automatically when delegated. Direct request messages to the orchestrator are for mechanical needs only.\n",
+        "\n## Delegation\n\nCurrent level: {}. {rule}{objection} Never send a specification question as a message to the orchestrator: raise it in your flagged hand message, which the engine gives automatically when delegated. Direct request messages to the orchestrator are for mechanical needs only.\n",
         c.delegation()
     );
     if s.sends("delegation", &text) {
@@ -163,11 +163,11 @@ fn delegation(state: &State, a: &Agent, s: &mut Sections<'_>, out: &mut String) 
 /// The specification rule for the card's current delegation level.
 pub(crate) fn delegation_rule(c: &Card) -> &'static str {
     if !c.delegated {
-        "Settle specification questions with the operator in your hand's `ask`."
+        "Settle specification questions with the operator in your flagged hand message."
     } else if c.self_sustained {
-        "Never decide a specification question alone: raise every open question in your hand's `ask` as with delegation off, and the engine gives it to the project's orchestrator automatically. The orchestrator answers all given asks, departures included; record each settled rule citing the ask and naming any departure."
+        "Never decide a specification question alone: raise every open question in your flagged hand message as with delegation off, and the engine gives it to the project's orchestrator automatically. The orchestrator answers all given asks, departures included; record each settled rule citing the ask and naming any departure."
     } else {
-        "Never decide a specification question alone: raise every open question in your hand's `ask` as with delegation off, and the engine gives it to the project's orchestrator automatically. Name in the ask's text when the answer would depart from the card's words, reverse an earlier decision of the operator's, or need his own words so the orchestrator leaves it to the operator. Record each settled rule citing the ask."
+        "Never decide a specification question alone: raise every open question in your flagged hand message as with delegation off, and the engine gives it to the project's orchestrator automatically. Name in the ask's text when the answer would depart from the card's words, reverse an earlier decision of the operator's, or need his own words so the orchestrator leaves it to the operator. Record each settled rule citing the ask."
     }
 }
 

@@ -47,7 +47,7 @@ Nothing reviews a review card in turn.
    For a colleague's change, AGENTS.md conformance and our test style are no finding.
    If any reviewer report is still outstanding, end your turn `working` as soon as your independent work is done.
    A reviewer reads its task, the specification and the code, runs a test only to prove a finding or, when reading doesn't settle it, to check that a new test fails with its fix reverted, times the ordinary reads the change adds or changes on the replica, judges locking reads from their plain `EXPLAIN` plans and says a write stays unmeasured; its pass or fail and findings reach you in the room, and move nothing.
-   A verdict with an empty ask that arrives between turns waits while another of your children is at work.
+   A verdict with `ask` false that arrives between turns waits while another of your children is at work.
    Held verdicts wake you once when your last child at work stops.
    An ask wakes you at once.
 4. **Weigh what comes back.**
@@ -81,8 +81,8 @@ Nothing reviews a review card in turn.
    The engine runs none of them itself.
 5. **Give the verdict for the round alone.**
    Findings and a clean verdict are normal results, not asks.
-   Never decide an open question alone: raise it in `hand.ask` (on a delegated or self-sustained card, the engine gives it to the project's orchestrator automatically).
-   Keep `hand.ask` empty for the verdict itself, use no red hand just for findings, and ask for no approval, no `/done` and no finish of the review, nor to announce a clean verdict.
+   Never decide an open question alone: raise it in `hand.message` with `hand.ask` true (on a delegated or self-sustained card, the engine gives it to the project's orchestrator automatically).
+   Keep `hand.ask` false for the verdict itself, use no red hand just for findings, and ask for no approval, no `/done` and no finish of the review, nor to announce a clean verdict.
    Once your round and its suite both ended, the engine posts a colleague's PR findings and reports a colleague's branch's; our card's failed round with findings opens a `triage` ask in its room when delegation is off or on a delegated consecutive-round stalemate (otherwise going straight to its foreman as Foreman decides on a delegated or self-sustained card, waiting with any suite failure in either case), while a failed round with no findings returns straight to its foreman and our PR gets only “No findings.” when clean.
    A standalone branch review with no linked implementation card keeps its ordinary report, without a hand.
    `review-pass` approves each of the round's files as the commit has them; `review-fail`, with the proven findings, holds them for triage when delegation is off or on a delegated stalemate, and otherwise sends them straight to our card's foreman as Foreman decides when delegated.

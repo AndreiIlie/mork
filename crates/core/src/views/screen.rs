@@ -151,7 +151,10 @@ fn hands(state: &State, ctx: Ctx<'_>) -> Vec<HandView> {
     let mut open: Vec<&mork_types::ask::Ask> = state.asks.values().filter(|a| a.open).collect();
     open.sort_by_key(|a| (a.color != Color::Red, a.raised_ms, a.id.clone()));
     open.into_iter()
-        .map(|a| {
+        .filter_map(|a| {
+            let seq = a.seq?;
+            let index = state.messages.binary_search_by_key(&seq, |m| m.seq).ok()?;
+            let message = &state.messages[index];
             let card = a
                 .card
                 .as_ref()
@@ -161,7 +164,10 @@ fn hands(state: &State, ctx: Ctx<'_>) -> Vec<HandView> {
                     .then(|| card.as_ref().map(|c| AgentKey::new(format!("{c}/foreman"))))
                     .flatten()
             });
-            HandView {
+            Some(HandView {
+                seq,
+                headline: message.headline.clone(),
+                message_place: message.place.clone(),
                 ask: a.id.clone(),
                 place: a.place.clone(),
                 card,
@@ -187,7 +193,7 @@ fn hands(state: &State, ctx: Ctx<'_>) -> Vec<HandView> {
                     .unwrap_or_default(),
                 choices: a.choices.clone(),
                 brief: brief(state, a, ctx),
-            }
+            })
         })
         .collect()
 }

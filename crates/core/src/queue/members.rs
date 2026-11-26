@@ -160,8 +160,8 @@ pub fn drop_landing_actions(p: &mut Poster<'_>, card: &CardId, words: &str, obso
 }
 
 /// Said in the card's room, to the operator, waking nobody.
-pub fn say(p: &mut Poster<'_>, id: &mork_types::CardId, headline: &str, text: &str) {
-    p.post(id.as_str(), Sender::Engine, Some("operator"), MessageKind::Engine, headline, text);
+pub fn say(p: &mut Poster<'_>, id: &mork_types::CardId, headline: &str, text: &str) -> u64 {
+    p.post(id.as_str(), Sender::Engine, Some("operator"), MessageKind::Engine, headline, text)
 }
 
 /// A new head while the card is merging: its code changed, so it leaves for its gates and is verified again once they

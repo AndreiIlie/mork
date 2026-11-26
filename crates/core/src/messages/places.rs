@@ -259,13 +259,13 @@ pub(super) fn planner_sender(state: &State, from: &Sender, to: &Who) -> bool {
 // The names that once posted for the operator or a room, and its aliases: he is reached only by a raised hand (fac-390).
 const TO_OPERATOR: [&str; 4] = ["operator", "room", "runner", "mork"];
 
-/// Why an agent's words for the operator go nowhere: where its hand's `ask` takes them instead (fac-390).
+/// Why an agent's words for the operator go nowhere: where its flagged hand message takes them instead (fac-390).
 pub fn hand_only(child: bool) -> String {
     if child {
-        "you never reach the operator: your hand's `ask` reaches your foreman as a request, and it carries what needs him"
+        "you never reach the operator: your flagged hand message reaches your foreman as a request, and it carries what needs him"
             .into()
     } else {
-        "an agent reaches the operator only by raising its hand: put it in your hand's `ask`, end your turn and wait for his answer".into()
+        "an agent reaches the operator only by raising its hand: put it in your flagged hand message, end your turn and wait for his answer".into()
     }
 }
 

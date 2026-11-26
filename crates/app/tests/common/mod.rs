@@ -419,9 +419,9 @@ impl Rig {
 /// A whole reply (3.5), valid for a role with `outcome`, its hand's headline `headline`.
 pub fn reply(outcome: &str, headline: &str, messages: Value) -> Value {
     json!({
-        "hand": {"color": "grey", "headline": headline, "message": "A message.", "ask": ""},
+        "hand": {"color": "grey", "headline": headline, "message": "A message.", "ask": false},
         "messages": messages, "findings": [], "risks": [],
-        "outcome": outcome, "schema": 6
+        "outcome": outcome, "schema": 7
     })
 }
 

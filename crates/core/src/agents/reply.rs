@@ -102,7 +102,7 @@ fn scrub(s: &str) -> String {
 
 fn clean(r: &mut Reply) {
     let h = &mut r.hand;
-    for s in [&mut h.headline, &mut h.message, &mut h.ask, &mut h.reason] {
+    for s in [&mut h.headline, &mut h.message, &mut h.reason] {
         *s = scrub(s);
     }
     for s in h.options.iter_mut().chain(&mut h.changes).chain(&mut h.code_shape) {

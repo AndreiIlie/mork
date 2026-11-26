@@ -25,7 +25,7 @@ The foreman names the pages the card changes and spawns its baseline seat, which
 The foreman's `built` ends the step and releases the seat, and the folder is then the specification holder's (the planner's, or the foreman's on a no-planner card), writable to the planner at brief and on a reopen while a no-planner foreman leaves tracked repository files untouched; one writer at a time.
 Its host reads the clone and writes only `.git/mork-mock-host/`, its log in `host.log` there.
 When the request gives a link, the engine serves it there from the step's opening; no seat starts or stops its host.
-When it gives none, nothing serves the mock: the specification holder raises that in its hand's `ask`.
+When it gives none, nothing serves the mock: the specification holder raises that in its flagged hand message.
 Follow the project's written rules for its look (`web/DESIGN.md` for Mork web pages), and keep any mock already in the folder, an earlier run's included: a baseline fills only the surfaces it lacks.
 A mock sets no `<base>`; a project file's address is written in full, starting `/@fs/<the clone's path>/`.
 
@@ -39,7 +39,7 @@ Once the baseline step ends, the planner (or the foreman on a no-planner card) h
    Use an ASCII layout sketch in the conversation when it helps.
    Record decisions on the card as they settle.
    Leave everything in `.git/mork-mock/` untouched until the proposed direction, hierarchy and changes are confirmed.
-   With delegation off, ask the operator directly in your hand's `ask`.
+   With delegation off, ask the operator directly in your flagged hand message.
    On a delegated card, state in the design ask that it needs the operator's own answer so the orchestrator brings it to him while handling technical questions itself.
    On a self-sustained card, the orchestrator answers all questions, including design, and its confirmation releases the first edit.
 
@@ -76,7 +76,7 @@ A project may add its own mock rules in a preview skill of its own among your sk
 
 ## Mork web pages
 
-A Mork web page mock needs `web/node_modules` in the clone, made by the project's `install`; when it is missing, raise it in your hand's `ask`.
+A Mork web page mock needs `web/node_modules` in the clone, made by the project's `install`; when it is missing, raise it in your flagged hand message.
 Follow `web/DESIGN.md` for tokens, type scale and where colour is allowed.
 To show a page as it stands, import its workspace components (`Sidebar`, `Board`, `RaisedHands`, `CardRoom`) by their `/@fs/` address and mount them with fixture props written in the mock, the props their callers in `web/src` pass (`App.tsx` for most, `Board.tsx` for `RaisedHands`; `CardRoom` needs a `views` map holding its card's `PlaceView` beside the `Screen`, or it shows only its loading screen), never `/@fs/<the clone's path>/web/src/main.tsx`, which dials the bridge and shows "Not connected" on the mock host.
 Give the mock's `index.html` the `<body>` classes of `web/index.html`, because `web/src/index.css` does not set `font-sans` on `body`.

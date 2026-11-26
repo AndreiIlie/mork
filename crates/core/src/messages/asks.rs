@@ -34,6 +34,7 @@ pub fn word(k: AskKind) -> &'static str {
 
 #[derive(Debug, Clone)]
 pub struct Raise {
+    pub seq: Option<u64>,
     pub place: mork_types::PlaceId,
     pub kind: AskKind,
     pub color: Color,
@@ -50,6 +51,7 @@ pub struct Raise {
 impl Raise {
     pub fn new(place: &str, kind: AskKind, color: Color, text: impl Into<String>) -> Self {
         Self {
+            seq: None,
             place: place.into(),
             kind,
             color,
@@ -66,23 +68,35 @@ impl Raise {
 /// Whether a planner or foreman's own hand marks its ask a design question (fac-233).
 pub fn marked(state: &State, who: &super::places::Who, r: &mork_types::reply::Reply) -> bool {
     let child = state.agents.get(&who.key).is_some_and(crate::agents::children::is_child);
-    r.hand.design && matches!(who.role, mork_types::reply::Role::Planner | mork_types::reply::Role::Foreman) && !child
+    r.hand.ask
+        && r.hand.design
+        && matches!(who.role, mork_types::reply::Role::Planner | mork_types::reply::Role::Foreman)
+        && !child
 }
 
 /// Reuses an open headline, matching the action too for door approvals; otherwise notifies once.
 /// Returns the ask's `<place>/<kind>/<n>` id (2.6.4, fac-124).
 pub fn raise(p: &mut Poster<'_>, r: Raise) -> mork_types::AskId {
-    if let Some(same) = p.all_asks().find(|a| {
-        a.open
-            && a.place == r.place
-            && a.kind == r.kind
-            && a.text == r.text
-            && (r.kind != AskKind::Answer || a.agent == r.agent)
-            && (r.kind != AskKind::Door || a.action == r.action)
-            && a.design == r.design
-            && a.choices == r.choices
-    }) {
-        return same.id.clone();
+    let same = p
+        .all_asks()
+        .find(|a| {
+            a.open
+                && a.place == r.place
+                && a.kind == r.kind
+                && a.text == r.text
+                && (r.kind != AskKind::Answer || a.agent == r.agent)
+                && (r.kind != AskKind::Door || a.action == r.action)
+                && a.design == r.design
+                && a.choices == r.choices
+        })
+        .cloned();
+    if let Some(mut ask) = same {
+        let id = ask.id.clone();
+        if r.seq.is_some() && r.seq != ask.seq {
+            ask.seq = r.seq;
+            p.put_ask(ask);
+        }
+        return id;
     }
     // Above every number stored, the unloaded asks' included (fac-336): a count would reuse one.
     let prefix = format!("{}/{}", r.place, word(r.kind));
@@ -92,6 +106,16 @@ pub fn raise(p: &mut Poster<'_>, r: Raise) -> mork_types::AskId {
     let id = mork_types::AskId::new(format!("{prefix}/{n}"));
     let card = super::places::card_of(p.state, &r.place);
     let mut a = Ask::new(id.clone(), &r.place, card.clone(), r.kind, r.color, &r.text);
+    a.seq = Some(r.seq.unwrap_or_else(|| {
+        p.post(
+            &r.place,
+            mork_types::state::Sender::Engine,
+            Some("operator"),
+            mork_types::state::MessageKind::Engine,
+            word(r.kind),
+            &r.text,
+        )
+    }));
     a.agent = r.agent;
     a.action = r.action;
     a.detail = r.detail;
