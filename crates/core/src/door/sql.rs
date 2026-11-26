@@ -255,10 +255,7 @@ fn view(query: &str, toks: &[Token], maria: bool) -> Result<Vec<Token>, String> 
     let mut parts = Vec::with_capacity(toks.len());
     for (n, t) in toks.iter().enumerate() {
         if let Tok::Hint(whole) = &t.tok {
-            let previous = toks[..n].last().map(|p| &p.tok);
-            let after_select = matches!(previous, Some(Tok::Word(w)) if w.eq_ignore_ascii_case("SELECT"));
-            let qualified = matches!(parts.as_slice(), [.., Token { tok: Tok::Sym("."), .. }, _]);
-            if !after_select || qualified {
+            if !after_select(toks, n, &parts) {
                 return Err("an optimizer hint is only read immediately after SELECT".into());
             }
             hint(whole, query[..t.at.start].chars().count())?;
@@ -283,6 +280,50 @@ fn view(query: &str, toks: &[Token], maria: bool) -> Result<Vec<Token>, String> 
         }
     }
     Ok(parts)
+}
+
+fn word(t: &Token, k: &str) -> bool {
+    matches!(&t.tok, Tok::Word(w) if w.eq_ignore_ascii_case(k))
+}
+
+fn set_op(t: &Token) -> bool {
+    ["UNION", "INTERSECT", "EXCEPT"].iter().any(|k| word(t, k))
+}
+
+// A hint is read only right after a SELECT keyword, never after `@select`, `t.select` or a stray word.
+fn after_select(toks: &[Token], n: usize, parts: &[Token]) -> bool {
+    if !toks[..n].last().is_some_and(|t| word(t, "SELECT")) {
+        return false;
+    }
+    let Some((_, before)) = parts.split_last() else { return false };
+    match before {
+        [] => true,
+        [.., Token { tok: Tok::Sym("(" | ")"), .. }] => true,
+        [.., t] if set_op(t) => true,
+        [.., op, m] if set_op(op) && (word(m, "ALL") || word(m, "DISTINCT")) => true,
+        _ => explain_prefix(before),
+    }
+}
+
+fn explain_prefix(mut rest: &[Token]) -> bool {
+    if !rest.first().is_some_and(|t| ["EXPLAIN", "DESCRIBE", "DESC"].iter().any(|k| word(t, k))) {
+        return false;
+    }
+    rest = &rest[1..];
+    while !rest.is_empty() {
+        if ["ANALYZE", "EXTENDED", "PARTITIONS"].iter().any(|k| word(&rest[0], k)) {
+            rest = &rest[1..];
+        } else if let [f, eq, val, tail @ ..] = rest
+            && word(f, "FORMAT")
+            && eq.tok == Tok::Sym("=")
+            && matches!(val.tok, Tok::Word(_) | Tok::Str(_))
+        {
+            rest = tail;
+        } else {
+            return false;
+        }
+    }
+    true
 }
 
 fn hint(whole: &str, offset: usize) -> Result<(), String> {
@@ -333,6 +374,13 @@ mod tests {
     fn refuses(queries: &[&str]) {
         for q in queries {
             assert!(read(q).is_err(), "read: {q}");
+        }
+    }
+
+    fn refuses_with(cases: &[(&str, &str)]) {
+        for (q, needle) in cases {
+            let err = read(q).err().unwrap_or_else(|| panic!("read: {q}"));
+            assert!(err.contains(needle), "query: {q}\nerror: {err}\nexpected: {needle}");
         }
     }
 
@@ -425,12 +473,51 @@ mod tests {
     }
 
     #[test]
+    fn unnumbered_executable_comments_keep_body_and_explain_checks() {
+        refuses_with(&[
+            // Unclosed line comments in unnumbered executable comments still fail in lex::executed.
+            ("SELECT /*! # */ '\n1 */ INTO OUTFILE \"/tmp/x\" -- '", "line comment"),
+            ("SELECT a FROM t /*! -- */ '\n*/ FOR UPDATE -- '", "line comment"),
+            ("SELECT 1 /*M! # */ , '\n*/ INTO @v -- '", "line comment"),
+            ("SELECT 1 /*M! -- */ '\n*/ FOR UPDATE -- '", "line comment"),
+            // Nested `/*` and overlapping `/*/` in unnumbered executable comments fail in lex::token.
+            ("SELECT 1 /*! '/*' */ '*/ INTO OUTFILE \"/x\" -- '", "comment inside an executable comment"),
+            ("SELECT 1 /*M! '/*' */ '*/ INTO OUTFILE \"/x\" -- '", "comment inside an executable comment"),
+            ("SELECT 1 /*! /*! 2 */ */", "comment inside an executable comment"),
+            ("SELECT 1 /*!/*/ 1 '*/ INTO OUTFILE \"/tmp/x\" */ -- '", "comment inside an executable comment"),
+            ("SELECT 1 /*! /*/ 1 '*/ INTO OUTFILE \"/tmp/x\" */ -- '", "comment inside an executable comment"),
+            ("SELECT a FROM t /*M!/*/ 1 '*/ FOR UPDATE */ -- '", "comment inside an executable comment"),
+            ("SELECT a FROM t /*M! /*/ 1 '*/ LIMIT 999999 */ -- '", "comment inside an executable comment"),
+            // Statement delimiters inside unnumbered executable comments fail in view().
+            ("SELECT 1 /*! ; */", "statement delimiter"),
+            ("SELECT 1 /*M! ; DROP TABLE t */", "statement delimiter"),
+            // Writes, ANALYZE and locks inside unnumbered executable comments stay refused.
+            ("/*! EXPLAIN */ DELETE FROM t", "`DELETE` writes"),
+            ("EXPLAIN /*! ANALYZE */ SELECT a FROM t FOR UPDATE", "locking read"),
+            ("EXPLAIN /*M! ANALYZE */ SELECT a FROM t FOR SHARE", "locking read"),
+            ("/*M! EXPLAIN */ SELECT a FROM t FOR UPDATE", "locking read"),
+            ("SELECT 1 /*! FOR UPDATE */", "locking read"),
+            ("SELECT 1 /*M! FOR UPDATE */", "locking read"),
+        ]);
+        for q in ["SELECT 1 /*! / */ 2", "SELECT 1 /*M! # a note\n + 1 */", "/*! EXPLAIN */ SELECT a FROM t FOR UPDATE"]
+        {
+            assert!(read(q).is_ok(), "refused: {q}");
+        }
+    }
+
+    #[test]
     fn hints_follow_the_select_keyword_in_each_query_block() {
         for q in [
             "sElEcT /*+ BKA(t) */ a FROM t",
             "EXPLAIN SELECT /*+ BKA(t) */ a FROM t",
+            "EXPLAIN ANALYZE SELECT /*+ BKA(t) */ a FROM t",
+            "EXPLAIN FORMAT=JSON SELECT /*+ BKA(t) */ a FROM t",
+            "EXPLAIN FORMAT='TREE' SELECT /*+ BKA(t) */ a FROM t",
+            "DESCRIBE SELECT /*+ BKA(t) */ a FROM t",
             "WITH q AS (SELECT /*+ BKA(t) */ a FROM t) SELECT /*+ BKA(q) */ a FROM q",
             "SELECT (SELECT /*+ MAX_EXECUTION_TIME(100) */ 1)",
+            "SELECT 1 UNION SELECT /*+ BKA(t) */ 2",
+            "SELECT 1 UNION ALL SELECT /*+ BKA(t) */ 2",
         ] {
             let read = read(q).unwrap();
             assert_eq!(read.text(), q);
@@ -443,6 +530,16 @@ mod tests {
             "SELECT a FROM t /*+ BKA(t) */",
             "SELECT t.select /*+ BKA(t) */ FROM t",
             "SELECT `select` /*+ BKA(t) */ FROM t",
+            "SELECT @select /*+ BKA(t) */",
+            "SELECT @@select /*+ BKA(t) */",
+            "SELECT a FROM t WHERE @select /*+ BKA(t) */ = 1",
+            "SELECT @select /*+ MAX_EXECUTION_TIME(100) */ FROM t",
+            "SELECT @@global.select /*+ BKA(t) */",
+            "SELECT select /*+ BKA(t) */",
+            "SELECT DISTINCT select /*+ BKA(t) */",
+            "EXPLAIN SELECT @select /*+ BKA(t) */",
+            "EXPLAIN t.select /*+ BKA(t) */",
+            "SELECT /*M! @ */ select /*+ BKA(t) */",
             "/*! SELECT */ /*+ BKA(t) */ a FROM t",
             "SELECT /*M! DISTINCT */ /*+ BKA(t) */ a FROM t",
         ]);

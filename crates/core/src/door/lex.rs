@@ -125,7 +125,8 @@ fn token(q: &str, i: usize) -> Result<(Tok, usize), String> {
             return Err("versioned executable comments aren't read".into());
         }
         let (sql, tail) = body.split_once("*/").ok_or("an executable comment isn't closed")?;
-        if sql.contains("/*") {
+        // `/*/` shares its `*` with `*/`, yet MySQL and MariaDB open a nested regular comment at `/*`.
+        if sql.contains("/*") || sql.ends_with('/') {
             return Err("a comment inside an executable comment isn't read: the server may end it later".into());
         }
         let at = q.len() - tail.len();
@@ -344,6 +345,8 @@ mod tests {
         for q in [
             "SELECT /*+ BKA(t) ", // an unclosed hint
             "SELECT /*! 1 ",      // an unclosed executable comment
+            "SELECT /*!/*/ 1 */",
+            "SELECT /*M! /*/ 1 */",
             "SELECT /*!40101 1 */",
             "SELECT /*M!100000 1 */",
             "SELECT 1 /* open",
