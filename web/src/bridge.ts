@@ -1,4 +1,4 @@
-import type { ErrorBody, Frame, PlaceView, Screen } from "./types";
+import type { ErrorBody, Frame, HistoryPage, PlaceView, Screen } from "./types";
 
 /** Where the link to the engine stands: `reconnecting` keeps the last screen it had. */
 export type Link = "connecting" | "live" | "reconnecting" | "disconnected";
@@ -40,25 +40,24 @@ let activeDial: Dial | null = null;
 let activeUpdate: Update | null = null;
 let watchedCardId: string | null = null;
 let watchedExtraPlace: string | null = null;
+let watchingMain = false;
 
-function watchedPlaces(cardId: string | null, extraPlace: string | null): string[] {
+function watchedPlaces(): string[] {
+  const cardId = watchedCardId;
   const places = cardId === null ? ["screen"] : ["screen", cardId, `${cardId}/spec`];
-  if (extraPlace !== null && !places.includes(extraPlace)) places.push(extraPlace);
+  if (watchedExtraPlace !== null && !places.includes(watchedExtraPlace)) places.push(watchedExtraPlace);
+  if (watchingMain) places.push("main");
   return places;
 }
 
-function watchCommand(cardId: string | null, extraPlace: string | null): unknown {
-  const places = watchedPlaces(cardId, extraPlace);
+function watchCommand(): unknown {
+  const places = watchedPlaces();
   if (places.length === 1) return { watch: { places } };
-  return { watch: { places, tail: cardId === null ? 0 : WATCH_TAIL, full: true } };
+  return { watch: { places, tail: watchedCardId !== null || watchingMain ? WATCH_TAIL : 0, full: true } };
 }
 
-function keepWatched(
-  views: Record<string, PlaceView>,
-  cardId: string | null,
-  extraPlace: string | null,
-): Record<string, PlaceView> {
-  const allowed = new Set(watchedPlaces(cardId, extraPlace));
+function keepWatched(views: Record<string, PlaceView>): Record<string, PlaceView> {
+  const allowed = new Set(watchedPlaces());
   const next: Record<string, PlaceView> = {};
   for (const [place, view] of Object.entries(views)) {
     if (allowed.has(place)) next[place] = view;
@@ -173,7 +172,7 @@ class Dial {
         this.update({ link: "live", recovering: null, screen: frame.event.screen, screenAt: Date.now() });
       } else if (isPlaceView(frame.event?.view)) {
         const view = frame.event.view;
-        if (!watchedPlaces(watchedCardId, watchedExtraPlace).includes(view.place)) return;
+        if (!watchedPlaces().includes(view.place)) return;
         liveDial = this;
         this.update((s) => ({ views: { ...s.views, [view.place]: view } }));
       }
@@ -185,7 +184,7 @@ class Dial {
   }
 
   rewatch(): void {
-    this.write(WATCH_ID, watchCommand(watchedCardId, watchedExtraPlace));
+    this.write(WATCH_ID, watchCommand());
   }
 
   send(command: unknown): Promise<unknown> {
@@ -250,7 +249,15 @@ export function requestCommand(command: unknown): Promise<unknown> {
   return liveDial.send(command);
 }
 
-/** Sends one command as the operator over the live socket; rejects with the engine's words on refusal or a drop. */
+export async function readHistory(place: string, before: number, turns = false): Promise<HistoryPage> {
+  const answer = await requestCommand({ history: { place, before, count: 100, turns } });
+  const page = (answer as { history?: HistoryPage } | null)?.history;
+  if (page?.place !== place || !Array.isArray(page.messages) || typeof page.earlier !== "number") {
+    throw new Error("unexpected history response");
+  }
+  return page;
+}
+
 /** A message's image from the bridge, fetched with the key, as an object URL its caller revokes (fac-696). */
 export async function fetchImage(url: string): Promise<string> {
   const key = resolveKey();
@@ -264,20 +271,29 @@ export function sendCommand(command: unknown): Promise<void> {
   return requestCommand(command).then(() => undefined);
 }
 
-/** Watches the open card's Build and Spec rooms beside the screen, or the screen alone when `null`. */
+/** Watches the selected card's Build and Spec rooms alongside the screen. */
 export function watchCard(cardId: string | null): void {
   if (cardId === watchedCardId && watchedExtraPlace === null) return;
   watchedCardId = cardId;
   watchedExtraPlace = null;
-  activeUpdate?.((s) => ({ views: keepWatched(s.views, cardId, null) }));
-  activeDial?.rewatch();
+  rewatch();
 }
 
 /** Watches the selected seat or backlog card beside the current page, or drops it when `null`. */
 export function watchPlace(place: string | null): void {
   if (place === watchedExtraPlace) return;
   watchedExtraPlace = place;
-  activeUpdate?.((s) => ({ views: keepWatched(s.views, watchedCardId, place) }));
+  rewatch();
+}
+
+export function watchMain(open: boolean): void {
+  if (watchingMain === open) return;
+  watchingMain = open;
+  rewatch();
+}
+
+function rewatch(): void {
+  activeUpdate?.((s) => ({ views: keepWatched(s.views) }));
   activeDial?.rewatch();
 }
 

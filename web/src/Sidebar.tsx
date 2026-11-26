@@ -1,3 +1,4 @@
+import { ReloadChangelog } from "./ReloadChangelog";
 import type { Link } from "./bridge";
 import { useHandOffers, RefusalLine } from "./offers";
 import { useState } from "react";
@@ -6,7 +7,7 @@ import { cardTarget, workingSeats } from "./format";
 import { BoardIcon, ChevronIcon, HandIcon, MorkMark } from "./icons";
 import { hottest } from "./quota";
 import { PageLink, cardPath } from "./route";
-import type { BoardView, Screen } from "./types";
+import type { BoardView, PlaceView, Screen } from "./types";
 import { Button } from "./ui/Button";
 import { Dot, StatusDot } from "./ui/Dot";
 
@@ -72,6 +73,7 @@ export function Sidebar({
   link,
   notifications,
   build,
+  mainView,
   activeCard,
   onUsage,
   nowMs,
@@ -80,6 +82,7 @@ export function Sidebar({
   link: Link;
   notifications: AlertPermission;
   build: string | null;
+  mainView: PlaceView | undefined;
   activeCard: string | null;
   onUsage: boolean;
   nowMs: number;
@@ -96,7 +99,11 @@ export function Sidebar({
       <div className="flex h-12 shrink-0 items-center gap-[10px] border-b border-gray-400 px-edge">
         <MorkMark />
         <span className="text-heading-14 text-gray-1000">Mork</span>
-        <span className="ml-auto font-mono text-label-12 text-gray-700">{build?.slice(0, 8) ?? "offline"}</span>
+        {build === null ? (
+          <span className="ml-auto font-mono text-label-12 text-gray-700">offline</span>
+        ) : (
+          <ReloadChangelog build={build} view={mainView} live={link === "live"} tzOffsetMin={screen?.tz_offset_min ?? 0} />
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

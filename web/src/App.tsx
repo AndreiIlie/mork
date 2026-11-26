@@ -123,6 +123,7 @@ export function App() {
         screen={state.screen}
         link={state.link}
         build={state.build}
+        mainView={state.views.main}
         activeCard={activeCard}
         onUsage={route.page === "usage"}
         nowMs={nowMs}

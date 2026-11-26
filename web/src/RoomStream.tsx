@@ -2,13 +2,11 @@ import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AskLabel, InlineAsk, keepLines } from "./InlineAsk";
 import { Markdown } from "./Markdown";
 import { ActivityTracker, EndedTurnRow } from "./Turns";
-import { fetchImage, requestCommand } from "./bridge";
+import { fetchImage, readHistory } from "./bridge";
 import { authorName, clockTime, plural } from "./format";
 import type { ChatTurn, HandView, HistoryPage, ImageView, MessageView, PlaceView, ReplyHand, TriageView } from "./types";
 import { Dot } from "./ui/Dot";
 import { PinnedScroll } from "./ui/PinnedScroll";
-
-const HISTORY_COUNT = 100;
 
 interface RetainedStream {
   messages: MessageView[];
@@ -17,12 +15,6 @@ interface RetainedStream {
 }
 
 type StreamEntry = { kind: "message"; m: MessageView; run?: MessageView[] } | { kind: "turn"; t: ChatTurn };
-
-function isHistoryAnswer(value: unknown): value is { history: HistoryPage } {
-  if (typeof value !== "object" || value === null) return false;
-  const h = (value as { history?: Partial<HistoryPage> }).history;
-  return h !== undefined && typeof h === "object" && h !== null && Array.isArray(h.messages) && typeof h.earlier === "number";
-}
 
 function prependHistory(prev: RetainedStream, page: HistoryPage): RetainedStream {
   const bySeq = new Map(prev.messages.map((m) => [m.seq, m]));
@@ -334,11 +326,10 @@ function useStreamHistory(view: PlaceView, live: boolean) {
     if (!live || loading || firstSeq === undefined) return;
     setLoading(true);
     setError(null);
-    requestCommand({ history: { place: view.place, before: firstSeq, count: HISTORY_COUNT, turns: true } })
-      .then((ok) => {
-        if (!isHistoryAnswer(ok)) throw new Error("unexpected history response");
+    readHistory(view.place, firstSeq, true)
+      .then((page) => {
         if (el !== null) prependHeightRef.current = el.scrollHeight;
-        setStream((prev) => prependHistory(prev, ok.history));
+        setStream((prev) => prependHistory(prev, page));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
