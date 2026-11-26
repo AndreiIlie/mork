@@ -61,11 +61,31 @@ Mork is an 8-crate Rust workspace with a dependency graph and boundary rules enf
 ### Prerequisites
 
 - **Linux** with user namespaces enabled, `bwrap` (Bubblewrap), and Landlock ABI 6+
-- **Rust** toolchain (`cargo`, `rustc`)
-- **Node.js 22+** (for building `web/`)
+- **Git** for managing project repositories
 - One or more supported agent CLIs installed and signed in (`claude`, `codex`, etc.)
 
-### Build and Run
+### Install a prebuilt release (x86_64 Linux)
+
+Each release includes the `mork` executable built on Ubuntu 24.04, the dashboard in `web/dist`, and a matching example config. Choose a version and check its release notes for supported upgrades and when to start fresh. [GitHub Releases](https://github.com/AndreiIlie/mork/releases)
+
+```bash
+tag=v0.1.0  # Replace with the release tag you chose
+bundle="mork-${tag}-linux-x86_64"
+curl -fLO "https://github.com/AndreiIlie/mork/releases/download/$tag/$bundle.tar.gz"
+mkdir -p ~/.local/opt ~/.config/mork
+tar -xzf "$bundle.tar.gz" -C ~/.local/opt
+cd ~/.local/opt/"$bundle"
+cp -n mork.example.toml ~/.config/mork/mork.toml
+realpath web/dist
+```
+
+Edit `~/.config/mork/mork.toml`. Under `[mork]`, set `web_assets` to the absolute path printed by `realpath` and `web_port` to a free, fixed port (the example uses `41900`). Set your Git author and replace the example repository, board, and toolchain paths with your own.
+
+Run `./mork --no-window` in the extracted directory. In a second terminal in that directory, run `./mork web` and open the printed URL.
+
+### Build and run from source
+
+Building from source also requires the Rust toolchain (`cargo`, `rustc`) and Node.js 22+.
 
 ```bash
 # 1. Clone the repository
