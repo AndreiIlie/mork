@@ -78,19 +78,25 @@ pub(super) fn tool_item(st: &mut StreamState, it: &Value, completed: bool) {
     if id.is_empty() {
         return;
     }
-    let said =
-        it.get("command").and_then(Value::as_str).and_then(|c| super::said::words(st.seat.as_deref(), unwrap_shell(c)));
-    let words = said.unwrap_or_else(|| step_words(it, &st.folder, &st.home));
+    let is_command = matches!(it["type"].as_str(), Some("command_execution" | "commandExecution"));
+    let raw = it.get("command").and_then(Value::as_str).filter(|c| !c.trim().is_empty());
+    let (words, command) = match raw {
+        Some(c) => super::command::display(st.seat.as_deref(), c, None),
+        None => (step_words(it, &st.folder, &st.home), None),
+    };
     let words: String = words.chars().take(100).collect();
     // An item seen only complete starts and ends at once (fac-206).
     match st.steps.iter_mut().find(|s| s.id == id) {
         // Its completion may say what its start didn't, as a search's query.
-        Some(s) if completed => s.words = words,
+        Some(s) if completed && (raw.is_some() || !is_command) => {
+            s.words = words;
+            s.command = command;
+        }
         Some(_) => {}
         None => {
             // Commentary says what the seat is doing until the next step.
             st.doing = None;
-            turn::step(st, None, id, words);
+            turn::step(st, None, id, words, command);
         }
     }
     if completed {
@@ -111,9 +117,6 @@ fn step_words(it: &Value, folder: &str, home: &str) -> String {
     let field = |k: &str| it.get(k).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
     let kind = field("type").unwrap_or("");
     let words = match kind {
-        "command_execution" | "commandExecution" => {
-            field("command").and_then(|c| unwrap_shell(c).lines().next()).map(str::to_owned)
-        }
         "file_change" | "fileChange" => {
             let changes = it.get("changes").and_then(Value::as_array).into_iter().flatten();
             let paths: Vec<String> = changes
@@ -129,19 +132,6 @@ fn step_words(it: &Value, folder: &str, home: &str) -> String {
         _ => field("tool").map(str::to_owned),
     };
     words.unwrap_or_else(|| kind.to_owned())
-}
-
-fn unwrap_shell(cmd: &str) -> &str {
-    let Some(rest) = ["/bin/bash -lc ", "bash -lc ", "/bin/sh -c "].iter().find_map(|p| cmd.strip_prefix(p)) else {
-        return cmd;
-    };
-    let rest = rest.trim();
-    for q in ['\'', '"'] {
-        if let Some(inner) = rest.strip_prefix(q).and_then(|r| r.strip_suffix(q)) {
-            return inner;
-        }
-    }
-    rest
 }
 
 /// The words of an error event, or of its `error`.

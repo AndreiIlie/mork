@@ -6,6 +6,7 @@ pub mod appserver;
 pub mod claude;
 pub mod claude_hooks;
 pub mod codex;
+mod command;
 pub mod history;
 pub mod limits;
 pub mod live;
@@ -91,6 +92,7 @@ pub struct StreamState {
 pub struct Step {
     pub id: String,
     pub words: String,
+    pub command: Option<mork_types::seen::CommandView>,
     /// The text and thinking its thread gave since its step before (fac-96).
     pub details: Vec<mork_types::seen::Detail>,
     /// The subagent's tool call it ran under; none for the turn's own.

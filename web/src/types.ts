@@ -501,6 +501,7 @@ export interface Detail {
 export interface StepView {
   id: string;
   words: string;
+  command?: { text: string; cut?: boolean };
   start_ms?: number;
   end_ms?: number;
   thought_ms?: number;

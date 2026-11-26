@@ -214,12 +214,14 @@ fn tool_step(st: &mut StreamState, thread: Option<&str>, b: &Value) {
         return;
     }
     let input = b.get("input").cloned().unwrap_or(Value::Null);
-    let said = input.get("command").and_then(Value::as_str).filter(|_| name == "Bash");
-    let said = said.and_then(|c| super::said::words(st.seat.as_deref(), c));
-    let words = said.unwrap_or_else(|| tool_words(name, &input, &st.folder, &st.home));
+    let raw = input.get("command").and_then(Value::as_str).filter(|c| name == "Bash" && !c.trim().is_empty());
+    let (words, command) = match raw {
+        Some(c) => super::command::display(st.seat.as_deref(), c, input.get("description").and_then(Value::as_str)),
+        None => (tool_words(name, &input, &st.folder, &st.home), None),
+    };
     let words = words.lines().next().unwrap_or("").trim().to_owned();
     let words = if thread.is_some() { format!("↳ {words}") } else { words };
-    turn::step(st, thread, id, words.chars().take(100).collect());
+    turn::step(st, thread, id, words.chars().take(100).collect(), command);
 }
 
 // The words the operator approved for each tool (fac-206); a tool they don't name, or one missing what
@@ -228,7 +230,7 @@ fn tool_words(name: &str, input: &Value, folder: &str, home: &str) -> String {
     let field = |k: &str| input.get(k).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
     let path = || field("file_path").or_else(|| field("notebook_path")).map(|p| path_words(p, folder, home));
     let words = match name {
-        "Bash" => field("description").or_else(|| field("command")).map(str::to_owned),
+        "Bash" => field("description").map(str::to_owned),
         "Read" => path().map(|p| format!("Read {p}")),
         "Write" => path().map(|p| format!("Wrote {p}")),
         "Edit" | "MultiEdit" | "NotebookEdit" => path().map(|p| format!("Changed {p}")),

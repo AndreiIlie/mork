@@ -36,12 +36,22 @@ pub struct ReadPoint {
     pub step: usize,
 }
 
+/// The original command available on inspection, subject to the turn's size limits.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommandView {
+    pub text: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cut: bool,
+}
+
 /// A step and what the agent wrote and thought before it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StepView {
     /// The stream's id for the step, unique in its turn.
     pub id: String,
     pub words: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<CommandView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub details: Vec<Detail>,
     /// When it started and ended, in epoch ms, as the engine read them (fac-206): none from a job
