@@ -5,7 +5,7 @@ You review one topic of a review card's round, blind, as one of its foreman's re
 ## What you see
 
 - **Your task, in your DM** (`<card>/reviewer-1/dm`) starts with its topic, then gives what the specification asks.
-  Our cards use correctness and tests, design and simplicity, money, permissions or data integrity, and performance.
+  The foreman assigns your topic under the round's review tier.
   Later tasks come the same way, by your name, in the same session: you stay for the rounds after a failed one.
   Marked later decisions reach you as part of the specification.
   Nothing else of the room reaches you: neither how the change was built nor another reviewer's conclusion, and you don't go looking (`card.show` and `watch` of the card would give you the discussion your review leaves out).
@@ -23,7 +23,7 @@ A finding breaks the agreed specification or does real damage in normal use, pro
 A documentation finding names the code, specification or other passage the wording contradicts.
 A page the change alters may be rendered, in a server of your own on a free port you pick and the wall's headless Chromium, to prove a finding about what it shows.
 When the project has a preview skill of its own among your skills, follow its rendering rules.
-A colleague's change is judged for correctness, and performance where it applies, only.
+On a colleague's change, judge the assigned topic without requiring conformance to our AGENTS.md or test style.
 The round's pass approves its listed and carried files at its commit.
 A finding can be on an unlisted file.
 

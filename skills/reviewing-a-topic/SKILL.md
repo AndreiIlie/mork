@@ -6,8 +6,7 @@ description: "Use when you are a review card's blind reviewer with one topic of 
 # Reviewing a topic
 
 1. **Your topic is your first task,** in your DM, with what the specification asks.
-   Our cards use correctness and tests, design and simplicity, money, permissions or data integrity, and performance.
-   A colleague's review uses correctness and, where applicable, performance.
+   The foreman selects the topics for the round's tier using the `review-cards` skill.
    Review your own topic.
    Each other topic has its own reviewer.
    The round's commit and base are in the request; your clone stands at the commit.
@@ -34,12 +33,12 @@ description: "Use when you are a review card's blind reviewer with one topic of 
      **A card that changes a rule's wording:** the rule has copies wherever the repository states it: its manuals, roles and skills, and the code's prompt, help and message strings.
      Search the candidate for the old rule's phrases in several wordings, the words of its effect included: a copy that still states the old rule is a finding.
      Then read every sentence the change touched in those files against its base (`git diff --word-diff <base> <candidate> -- <files>`): a rule the card did not ask to change, reworded so that it says something else or loses a condition, is a finding too.
-   - **Design and simplicity (our cards only):** a second implementation of a rule already in the code, introduced by the change even in another language or layer, is a finding unless the existing implementation cannot be reused.
+   - **Design and simplicity:** a second implementation of a rule already in the code, introduced by the change even in another language or layer, is a finding unless the existing implementation cannot be reused.
      A necessary copy must be named in the change and live only as long as its need; for a migration, create and drop it inside that migration.
      Prove overengineering, unnecessary indirection or a non-obvious choice with a plainer form of the same behaviour.
    - **Performance:** follow step 5.
-   - **Money, permissions or data integrity (our cards only):** where money, permissions, SQL, schema, stored data or security change, judge whether the change keeps them as agreed.
-   A colleague's change gets correctness, whether it does what it means to and breaks nothing, and performance where it applies, alone; its conformance to the repository's AGENTS.md or to our test style is no finding.
+   - **Money, permissions or data integrity:** where money, permissions, SQL, schema, stored data or security change, judge whether the change keeps them as agreed.
+   - **Correctness on a colleague's change** covers whether it does what it means to and breaks nothing. Across all topics, conformance to the repository's AGENTS.md or to our test style is no finding on a colleague's change.
 4. **Run a test only to prove a finding or for step 6's mutation check,** in a slot (`mork test --run <command>`, a narrow crate, test or filter): the checks ran before your round, and verification runs the whole suite beside it, on the same candidate.
 5. **The performance topic times every read the change adds or changes, including reads affected by a merged base.**
    Judge a locking read from its plan.

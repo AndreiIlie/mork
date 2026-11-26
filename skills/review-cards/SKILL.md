@@ -19,24 +19,31 @@ Nothing reviews a review card in turn.
    An entry's failed checks accompany its round: our PR keeps them in full; a colleague's keeps correctness lint and layers, omitting known style, copies and words findings with dropped counts.
    Your session's "Under review" is the card's agreed specification, its marked later decisions included; the rest of its room stays out.
    A pull request comes against its destination, merged into it, a branch against the base, after their checks, its whole suite running beside your round.
-2. **Choose the topics.**
+2. **Choose the review tier, topics and effort.**
    Read the diff (`git diff <base> <commit>`), the plan when given, and the reviewed card's risk tags when named in the request.
    On a pushed PR, use the source-head endpoints the request names to read changes since the last completed review, failed rounds included, even after a rebase, force-push or revert.
    In a later round, read the preceding-round comparison the request names: `git diff refs/rounds/<n>-on-base <commit>` for the card's own changes without the merged base (when the request provides it) plus `git diff <prev-base> <curr-base>` for the base's own changes, or `git diff refs/rounds/<n> <commit>` when the base did not move or no projected ref was built.
    If the preceding round was superseded, also compare the last reviewed base to the current base when reachable.
-   Consider the merged base's effects on the card's code when choosing conditional topics.
-   For our card's branch or PR, give each applicable topic its own reviewer.
-   - **Correctness and tests** always runs.
-     A kept correctness reviewer takes it.
-   - **Design and simplicity** runs when the whole diff against the current base has more than 30 changed lines.
-     Read the insertions plus deletions from `git diff --shortstat <base> <commit>`.
-   - **Money, permissions or data integrity** runs when risk tags name the topic or the change touches money, permissions, SQL, schema, stored data or security.
-   - **Performance** runs when the change can affect it.
-   A colleague's pull request or branch gets correctness, plus performance when it applies, and no other topic.
+   Each round, count additions plus deletions across the whole diff with `git diff --shortstat <base> <commit>`.
+   Judge risk from the paths, what the change does, the card's risk tags and the merged base's effects on the changed code.
+   Apply the first matching tier to our branches and PRs and to colleagues' branches and PRs.
+
+   - **Deep** applies at 300 or more changed lines, to architectural changes, and to changes touching a sensitive path or behavior of any size. Examples include `crates/sys`, the wall, the door, authentication, permissions, billing, money and state migrations.
+     Always run **Correctness** and **Design and simplicity**. Add **Money, permissions or data integrity** and **Performance** when each applies.
+     Run every applicable topic at `xhigh`. If unavailable, use the highest effort available for that review kind and state the effort used in the verdict.
+   - **Quick** applies to low-risk, behavior-preserving changes of 30 lines or fewer, such as a documentation typo or a local rename.
+     Run correctness alone at `high` when available, otherwise at the review kind's configured default.
+   - **Standard** covers every remaining change, including a one-line bug fix. Use the review kind's configured default effort.
+     On our changes run correctness, add design and simplicity above 30 lines, and add each applicable specialist. On colleagues' changes run correctness and add performance when it applies.
+
+   Correctness includes tests on our cards. Reuse the kept correctness reviewer when present.
+   Money, permissions or data integrity applies when risk tags name it or the change touches money, permissions, SQL, schema, stored data or security.
+   Performance applies when the change can affect it.
 3. **Task one blind reviewer per topic** with `mork ctl spawn <card> reviewer '<task>' --topic '<topic>'`.
    Use `--task-file <path>` in place of `'<task>'` for a task with quotes or parentheses.
-   The reviewer uses the configured default for the review's kind.
-   To choose from that kind's pick list, use `--model <model> --effort <effort>` as the "Delegating" skill says.
+   Select the tier's effort from the review kind's configured default and its permitted picks.
+   Omit selection flags for the default. For an explicit selection at that effort use `--model <model> --effort <effort>` as the "Delegating" skill says.
+   For a returning reviewer, apply any permitted effort change with `pick` before sending its task.
    Quote a topic of several words so it passes whole (`--topic 'correctness and tests'`, `--topic 'money, permissions or data integrity'`).
    The room list shows it beside the reviewer.
    Name the topic first, then what the specification asks, including later decisions from "Under review".
@@ -115,7 +122,7 @@ Nothing reviews a review card in turn.
    Spawn a reviewer only for a topic nobody holds, with the first-pass task in step 3.
 
    The engine keeps the reviewers whose findings are open: a round after a failed one lists each finding not yet verified with its raiser.
-   Give each reviewer, by name, its own findings and their thread data from the round's request.
+   Give each reviewer, by name, its own findings and their thread data from the round's request, even when the current tier skips its topic.
    Each verifies its findings' fixes in a turn of that round, in the clone at its commit, and resolves each one fixed: `mork ctl resolve <card> <n>`, which resolves its comment's thread on the pull request, or one a standing decision on the card (the operator's or one recorded on the orchestrator's delegated answer) rules out with `--declined`, which first replies on that thread that it was declined.
    A round with nothing left to review, its change reverted, still lists them: ask each raiser to verify, since the run isn't clean while one waits, and our card's pass while one waits counts for nothing.
    Verify and resolve your own findings alone; a reviewer's are its own, and the operator or an orchestrator may resolve any at any time.
