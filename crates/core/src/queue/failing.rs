@@ -5,10 +5,36 @@ use std::collections::BTreeMap;
 
 use mork_types::work::Failing;
 
-use super::suite_log::{JestMarker, XTASK, jest_marker};
-
 /// What a Rust binary that failed without naming a failing test, killed or crashed, is listed as.
 pub const NO_TEST: &str = "(the binary failed, naming no failing test)";
+
+pub const XTASK: &str = "xtask: ";
+
+/// The name and verdict from an xtask per-test update, before the binary repeats its output.
+pub fn live_result(said: &str) -> Option<(&str, &str)> {
+    said.split_once(": test ")?.1.rsplit_once(" ... ")
+}
+
+pub enum JestMarker<'a> {
+    Pass(&'a str),
+    Fail(&'a str),
+    Summary,
+    Totals,
+}
+
+/// Recognizes Jest's file headers and the two markers around its repeated failure list.
+pub fn jest_marker(line: &str) -> Option<JestMarker<'_>> {
+    let line = line.trim();
+    if let Some(rest) = line.strip_prefix("PASS ") {
+        Some(JestMarker::Pass(rest))
+    } else if let Some(rest) = line.strip_prefix("FAIL ") {
+        Some(JestMarker::Fail(rest))
+    } else if line == "Summary of all failing tests" {
+        Some(JestMarker::Summary)
+    } else {
+        line.starts_with("Test Suites: ").then_some(JestMarker::Totals)
+    }
+}
 
 /// The failing tests `whole` names, each once, by file; none when no reader recognises it.
 /// `packages` gives each Rust package's folder in the repository, for its binaries' files.
@@ -63,6 +89,9 @@ fn xtask(whole: &str, packages: &BTreeMap<String, String>) -> Option<Vec<Failing
     for l in whole.lines() {
         if let Some(said) = l.strip_prefix(XTASK) {
             seen = true;
+            if live_result(said).is_some() {
+                continue;
+            }
             if let Some(f) = file.take().filter(|_| !named) {
                 out.push(Failing { file: f, test: NO_TEST.to_owned() });
             }

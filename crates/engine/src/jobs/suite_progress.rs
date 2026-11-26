@@ -5,8 +5,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
-use mork_core::queue::failing::{path, unstyled};
-use mork_core::queue::suite_log::{JestMarker, XTASK, jest_marker, live_result};
+use mork_core::queue::failing::{JestMarker, XTASK, jest_marker, live_result, path, unstyled};
 use mork_types::view::SuiteProgress;
 
 /// A suite run's output file as read so far.
