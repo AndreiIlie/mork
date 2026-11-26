@@ -186,6 +186,7 @@ impl Watched {
 }
 
 pub struct Engine {
+    bound_web_port: Option<u16>,
     pub opts: Options,
     pub ctx: Context,
     pub store: Store,

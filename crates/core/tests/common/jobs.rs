@@ -23,6 +23,7 @@ impl Sim {
             mounts: Vec::new(),
             env: BTreeMap::new(),
             ports: None,
+            net: None,
             wall: WallMode::Full,
             mork_bin: "/f".into(),
             bwrap: "/b".into(),

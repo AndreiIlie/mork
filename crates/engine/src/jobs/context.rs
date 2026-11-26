@@ -324,6 +324,7 @@ impl Context {
             mounts: wall::mounts(places),
             env,
             ports,
+            net: None,
             wall: self.mode,
             mork_bin: self.bin.display().to_string(),
             bwrap: self.bwrap.clone(),

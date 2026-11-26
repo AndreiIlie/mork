@@ -66,6 +66,8 @@ pub struct MorkConfig {
     pub max_test_runs: u64,
     #[serde(default = "d_ports")]
     pub ports: Vec<u16>,
+    #[serde(default)]
+    pub domains: Vec<String>,
     #[serde(default = "d_port_range")]
     pub port_range: String,
     #[serde(default)]
@@ -386,6 +388,10 @@ pub struct ProjectConfig {
     /// Ports its walls may reach besides the config's: numbers and `"<from>-<to>"` ranges (4.1).
     #[serde(default)]
     pub ports: Vec<Ports>,
+    #[serde(default)]
+    pub domains: Vec<String>,
+    #[serde(default)]
+    pub host_ports: Vec<Ports>,
     #[serde(default)]
     pub toolchains: Vec<Toolchain>,
     #[serde(default = "d_slots")]

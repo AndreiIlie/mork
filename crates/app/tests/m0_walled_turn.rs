@@ -88,6 +88,7 @@ fn echo_spec(t: &TestHome, id: &str) -> (JobSpec, PathBuf) {
         mounts: wall::mounts(&places),
         env,
         ports: None,
+        net: None,
         wall: WallMode::Full,
         mork_bin: mork_exe().display().to_string(),
         bwrap: "/usr/bin/bwrap".into(),

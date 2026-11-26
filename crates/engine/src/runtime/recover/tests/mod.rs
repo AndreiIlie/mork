@@ -45,6 +45,7 @@ impl Fixture {
             mounts: vec![],
             env: Default::default(),
             ports: None,
+            net: None,
             wall: WallMode::Full,
             mork_bin: "mork".into(),
             bwrap: "/usr/bin/bwrap".into(),
@@ -98,6 +99,7 @@ impl Fixture {
         let state = store.load().unwrap();
         // Recovery needs the store and job files. The app's listeners and event loop never start.
         Engine {
+            bound_web_port: None,
             opts,
             ctx,
             store,

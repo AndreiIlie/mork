@@ -9,6 +9,10 @@ use crate::config::{ConfigError, key_line, table_line};
 pub(crate) fn check(text: &str, config: &Config) -> Result<(), ConfigError> {
     check_skills(text, config)?;
     check_claude_accounts(text, config)?;
+    check_domains(text, "mork", &config.mork.domains)?;
+    for (name, project) in &config.projects {
+        check_domains(text, &format!("projects.{name}"), &project.domains)?;
+    }
     check_projects(text, config)?;
     check_tunnels(text, config)?;
     Ok(())
@@ -183,4 +187,61 @@ pub(crate) fn caches(text: &str, config: &mut mork_types::config::MorkConfig) ->
         entries.dedup();
     }
     Ok(())
+}
+
+fn check_domains(text: &str, table: &str, entries: &[String]) -> Result<(), ConfigError> {
+    for entry in entries {
+        if destination(entry, Some(443)).is_none() {
+            return Err(ConfigError::Value {
+                line: key_line(text, Some(table), "domains"),
+                message: format!("invalid domains entry {entry:?} in {table}: expected host or host:port"),
+            });
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn destination(entry: &str, default: Option<u16>) -> Option<(&str, u16)> {
+    let (host, suffix) = if let Some(rest) = entry.strip_prefix('[') {
+        let (ip, port) = rest.split_once(']')?;
+        ip.parse::<std::net::Ipv6Addr>().ok()?;
+        (ip, port)
+    } else {
+        let cut = entry.find(':').unwrap_or(entry.len());
+        let (host, suffix) = entry.split_at(cut);
+        if !hostname(host) {
+            return None;
+        }
+        (host, suffix)
+    };
+    if suffix.is_empty() {
+        return Some((host, default?));
+    }
+    let digits = suffix.strip_prefix(':')?;
+    if !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some((host, digits.parse::<u16>().ok().filter(|p| *p > 0)?))
+}
+
+fn hostname(host: &str) -> bool {
+    let name = host.strip_suffix('.').unwrap_or(host);
+    name.len() <= 253 && name.split('.').all(|label| {
+        !label.is_empty() && label.len() <= 63 && !label.starts_with('-') && !label.ends_with('-')
+            && label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    })
+}
+
+#[cfg(test)]
+mod domain_tests {
+    use super::*;
+
+    #[test]
+    fn validates_configured_domains() {
+        let valid = ["registry.example", "registry.example:8443", "[::1]:443"].map(str::to_owned);
+        assert!(check_domains("", "mork", &valid).is_ok());
+        for bad in ["", "bad host", "*.example", "name:0", "name:65536", "a/b", "https://name", "[bad]"] {
+            assert!(check_domains("", "mork", &[bad.to_owned()]).is_err(), "{bad}");
+        }
+    }
 }

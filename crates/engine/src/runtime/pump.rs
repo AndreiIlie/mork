@@ -197,11 +197,11 @@ impl Engine {
             &place.cwd,
             &places,
             env,
-            // Any port: a test the agent runs serves on loopback ports of its own (fac-93).
             None,
             now,
         );
         spec.wall = self.ctx.wall_of(&seat);
+        spec.net = (spec.wall != WallMode::None).then(|| self.turn_net(a));
         spec.live = live;
         let files = BTreeMap::from([("schema.json".to_owned(), schema.to_string())]);
         let (stdin, staged) = short.unwrap_or_else(|| (turn_prompt(plan, carried, &shown, &io_s), plan.staged.clone()));
@@ -214,6 +214,26 @@ impl Engine {
         job.io_copies = copies;
         job.staged = staged;
         Ok((job, session))
+    }
+
+    fn turn_net(&self, agent: &mork_types::state::Agent) -> mork_types::job::Net {
+        let config = &self.ctx.config;
+        let card = mork_core::messages::places::card_of(&self.state, &agent.place)
+            .and_then(|id| self.state.cards.get(&id));
+        let mut domains = config.mork.domains.clone();
+        let mut ports = std::collections::BTreeSet::new();
+        if let Some(card) = card {
+            if let Some(project) = config.projects.get(&card.project) {
+                domains.extend(project.domains.iter().cloned());
+                ports.extend(project.host_ports.iter().flat_map(|range| range.from..=range.to));
+            }
+            ports.extend(card.port);
+            ports.extend(card.mock.and_then(|m| m.port));
+        }
+        for port in config.tunnels.values().map(|t| t.port).chain(self.bound_web_port) {
+            ports.remove(&port);
+        }
+        mork_types::job::Net { domains, host_ports: ports.into_iter().collect() }
     }
 
     // The seat's folder read-write; agy reads its schema by path, so that one file of the job's is read-only (fac-654).

@@ -75,6 +75,13 @@ pub enum WallMode {
     None,
 }
 
+/// Network policy fixed at the start of a walled agent turn.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Net {
+    pub domains: Vec<String>,
+    pub host_ports: Vec<u16>,
+}
+
 /// `job.json`: written by the engine before the supervisor starts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -91,6 +98,8 @@ pub struct JobSpec {
     /// TCP ports the job may connect to; `None`, any port: a turn's, and a suite's or checks'
     /// (fac-93).
     pub ports: Option<Vec<u16>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub net: Option<Net>,
     pub wall: WallMode,
     /// The binary whose `wall-exec` starts the job inside the wall.
     pub mork_bin: String,
