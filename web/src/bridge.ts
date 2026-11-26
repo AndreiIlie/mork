@@ -259,7 +259,7 @@ export async function readHistory(place: string, before = Number.MAX_SAFE_INTEGE
   return page;
 }
 
-/** A message's image from the bridge, fetched with the key, as an object URL its caller revokes (fac-696). */
+/** A message's image from the bridge, fetched with the key, as an object URL its caller revokes. */
 export async function fetchImage(url: string): Promise<string> {
   const key = resolveKey();
   if (key === null) throw new Error("no bridge key");

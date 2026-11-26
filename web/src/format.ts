@@ -1,6 +1,6 @@
 import type { Author, BoardRow, Color, HandView, RoomRow } from "./types";
 
-// fac-670: shown from 10 whole minutes left, gone once cold (crates/ui/src/spans.rs).
+// Match the native countdown in crates/ui/src/spans.rs: show the last ten minutes and hide it once cold.
 export function coldMinutes(coldAtMs: number | undefined, nowMs: number): number | null {
   if (coldAtMs === undefined || coldAtMs <= nowMs) return null;
   const m = Math.ceil((coldAtMs - nowMs) / 60_000);
@@ -113,7 +113,7 @@ export function wherePlace(hand: HandView): string {
   return `Review · ${/-\d+$/.test(seat) ? seat : `dm ${seat}`}`;
 }
 
-// A carried card opens the run carrying it (fac-563).
+// A carried card opens the run carrying it.
 export function cardTarget(row: BoardRow): string {
   return row.room ?? row.id;
 }

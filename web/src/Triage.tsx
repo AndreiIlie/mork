@@ -16,7 +16,7 @@ interface TriageEntry {
 }
 
 const EMPTY_ENTRY: TriageEntry = { choices: {}, sending: false, sendError: null };
-// Choices, sending state, and send error survive folding and leaving the card's page (fac-698).
+// Choices, sending state, and send error survive folding and leaving the card's page.
 const triageStore = new Map<string, TriageEntry>();
 const listeners = new Set<() => void>();
 
@@ -41,7 +41,7 @@ function updateEntry(ask: string, patch: Partial<TriageEntry>) {
   notify();
 }
 
-/** Clears stored triage state for asks that are no longer open (fac-698). */
+/** Clears stored triage state for asks that are no longer open. */
 export function pruneTriageState(openAsks: ReadonlySet<string>) {
   let changed = false;
   for (const [ask, entry] of triageStore) {

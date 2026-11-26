@@ -503,7 +503,7 @@ export interface LiveRow {
   progress?: SuiteProgress;
 }
 
-/** A running suite's counts so far (fac-697): tests, or a Jest suite's test files, with no total. */
+/** A running suite's counts so far: tests, or a Jest suite's test files, with no total. */
 export interface SuiteProgress {
   passed: number;
   failed: number;
