@@ -1,17 +1,11 @@
 //! Typechecking, building, and class-rule scanning for `web/` (fac-672, fac-695).
 
-mod classes;
-mod lexer;
-mod scan;
-
 use std::path::Path;
 use std::process::{Command, Output};
 use std::time::SystemTime;
 
-pub use classes::{check_classes, scan_classes};
-
 /// A single located finding from `tsc --noEmit --pretty false` or the web class check.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct TscError {
     pub file: String,
     pub line: u64,
@@ -53,6 +47,19 @@ fn combined(out: &Output) -> String {
     format!("{stdout}\n{stderr}").trim().to_owned()
 }
 
+/// Returns located class findings, or an error when the web checker could not report them.
+pub fn check_classes(web: &Path) -> Result<Vec<TscError>, String> {
+    let out = Command::new("node")
+        .arg("check-classes.mjs")
+        .current_dir(web)
+        .output()
+        .map_err(|e| format!("couldn't run web class check: {e}"))?;
+    if !out.status.success() {
+        return Err(format!("web class check failed ({})\n{}", out.status, combined(&out)));
+    }
+    serde_json::from_slice(&out.stdout).map_err(|e| format!("invalid web class findings: {e}"))
+}
+
 /// Runs install (when needed), class-rule checks, typecheck, and build for `xtask checks`.
 pub fn check_findings(root: &Path) -> Result<Vec<TscError>, String> {
     let web = root.join("web");
@@ -62,7 +69,7 @@ pub fn check_findings(root: &Path) -> Result<Vec<TscError>, String> {
             return Err(format!("npm ci failed ({})\n{}", out.status, combined(&out)));
         }
     }
-    let mut findings = check_classes(root);
+    let mut findings = check_classes(&web)?;
     let tc = capture(&web, &["run", "typecheck"])?;
     let text = combined(&tc);
     let errors = parse_tsc(&text);

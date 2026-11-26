@@ -59,9 +59,12 @@ fn comments() -> bool {
     report(&xtask::comments::check(&xtask::root()))
 }
 
-fn web_classes() -> bool {
+fn web_classes(web: &std::path::Path) -> bool {
     eprintln!("xtask: web classes");
-    let found = xtask::web::check_classes(&xtask::root());
+    let found = match xtask::web::check_classes(web) {
+        Ok(found) => found,
+        Err(e) => return report(&[e]),
+    };
     let lines: Vec<String> = found.iter().map(|e| format!("web/{}:{}: {}", e.file, e.line, e.summary)).collect();
     report(&lines)
 }
@@ -71,7 +74,7 @@ fn web() -> bool {
     if xtask::web::needs_install(&dir) && !run(xtask::web::npm(&dir, &["ci"]), "web install") {
         return false;
     }
-    web_classes()
+    web_classes(&dir)
         && run(xtask::web::npm(&dir, &["run", "typecheck"]), "web typecheck")
         && run(xtask::web::npm(&dir, &["run", "build"]), "web build")
 }
