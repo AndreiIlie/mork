@@ -193,8 +193,7 @@ fn a_failed_round_goes_back_to_the_foreman() {
     verifying(&mut s, LOCAL);
     s.round_asked(LOCAL);
     let review = s.review_card(LOCAL);
-    foreman_asked(&s, &review, "Always run correctness and tests");
-    foreman_asked(&s, &review, "30 changed lines or fewer");
+    foreman_asked(&s, &review, "Use the `review-cards` skill to choose Quick, Standard or Deep review");
     let unlisted = json!({"file": "src/caller.rs", "line": 3, "summary": "The caller breaks", "proof": "a proof"});
     s.round_ends(LOCAL, &[], &[finding(), unlisted]);
     assert_eq!(s.stage(LOCAL), Stage::Merging);

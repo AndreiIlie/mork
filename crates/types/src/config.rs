@@ -92,6 +92,8 @@ pub struct MorkConfig {
     /// Shared auto-compaction context cap in tokens for Claude and agy seats (fac-681); 0 disables the cap.
     #[serde(default = "d_context_cap")]
     pub context_cap: u64,
+    #[serde(default = "d_fresh_context_percent")]
+    pub fresh_context_percent: u8,
     /// Extra skills folder merged with the built-in skills at start (fac-721).
     #[serde(default)]
     pub skills: Option<String>,
@@ -465,6 +467,10 @@ fn d_base() -> String {
 fn d_slots() -> u64 {
     2
 }
+fn d_fresh_context_percent() -> u8 {
+    70
+}
+
 fn d_context_cap() -> u64 {
     CONTEXT_CAP_DEFAULT
 }

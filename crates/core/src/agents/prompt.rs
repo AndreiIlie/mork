@@ -62,7 +62,8 @@ fn startup(state: &State, a: &Agent, ctx: Ctx<'_>, s: &mut Sections<'_>) -> Stri
         let _ = writeln!(out, "{line}");
     }
     if let Some(c) = card_of(state, a) {
-        card(state, c, a.role == Role::Reviewer, &mut out);
+        let decisions_only = a.role == Role::Reviewer || a.fresh.as_ref().is_some_and(|f| f.by == "engine");
+        card(state, c, decisions_only, &mut out);
         // A gate's review reads the specification of the card it gates, none of its discussion (fac-95).
         if let Some(s) = under_review(state, c) {
             out.push_str("\n## Under review\n\nThe card this review card gates, as its specification was agreed:\n");

@@ -116,14 +116,20 @@ pub struct TurnPlan {
     pub staged: BTreeMap<String, String>,
 }
 
+// The prompt and the recorded launch must agree on the session. A closing turn uses its original one.
+fn launch_session(state: &State, a: &mut Agent, ctx: Ctx<'_>) -> Option<super::models::Switch> {
+    if a.retiring.is_some() {
+        return None;
+    }
+    let switch = super::models::launch(state, ctx.config, a, ctx.now);
+    super::fresh::at_boundary(state, a, ctx);
+    switch
+}
+
 /// The plan of a due agent's turn. A `codex_exec` launch, an unwalled `codex exec`, cannot track compaction.
 pub fn plan(state: &State, key: &AgentKey, ctx: Ctx<'_>, codex_exec: bool) -> Option<TurnPlan> {
     let mut a = state.agents.get(key)?.clone();
-    // Its pending pick is the turn's, across CLIs in a new session (fac-96); else its session's own,
-    // whatever the configuration says since (fac-140). A closing turn asks the session as it ran.
-    if a.retiring.is_none() {
-        super::models::launch(state, ctx.config, &mut a, ctx.now);
-    }
+    launch_session(state, &mut a, ctx);
     let a = &a;
     // An opening request's retry is read against its own reply contract, whatever ran since (fac-626).
     let request = opening_retry(state, a);
@@ -231,8 +237,7 @@ pub fn prepared(state: &State, job: &Job, session: Option<&str>, ctx: Ctx<'_>) -
     }
     // As its plan had it: the pick launches, a switch's fresh session in place (fac-96).
     let mut switched = stored.clone();
-    let switch =
-        stored.retiring.is_none().then(|| super::models::launch(state, ctx.config, &mut switched, ctx.now)).flatten();
+    let switch = launch_session(state, &mut switched, ctx);
     let agent = &switched;
     let mut a = agent.clone();
     if matches!(a.owed, Some(Owed::Wake)) {
@@ -330,8 +335,7 @@ pub fn session_seen(state: &State, id: &JobId, session: &SessionSeen, now: i64) 
     let cost = if job.detached {
         // A detached turn's session can still compact its live seat before exiting (fac-629).
         if session.compacted {
-            a.needs_specification = true;
-            super::prompt::held::cut(&mut a);
+            super::prompt::held::compacted(&mut a);
         }
         None
     } else {

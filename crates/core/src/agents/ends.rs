@@ -94,8 +94,11 @@ fn settle_detached(state: &State, job: &Job, end: &JobEnd, now: i64) -> Decision
     if let JobEnd::Cut { session } = end
         && let Some(mut a) = state.agents.get(&job.owner).filter(|a| session.compacted || !a.held.is_empty()).cloned()
     {
-        a.needs_specification |= session.compacted;
-        super::prompt::held::cut(&mut a);
+        if session.compacted {
+            super::prompt::held::compacted(&mut a);
+        } else {
+            super::prompt::held::cut(&mut a);
+        }
         changes.push(Change::PutAgent(a));
     }
     Decision { changes, ..Decision::default() }

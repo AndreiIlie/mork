@@ -70,14 +70,19 @@ pub(crate) fn launched(a: &mut Agent, job: &Job) {
 /// At settlement: a compacted session holds nothing it was sent before; a prompt its model answered is held.
 pub(crate) fn seen(a: &mut Agent, job: &Job, s: &SessionSeen) {
     if s.compacted {
-        a.needs_specification = true;
-        a.held.clear();
+        compacted(a);
     } else if s.answered {
         a.needs_specification = false;
         if tracks(job) {
             a.held.extend(job.staged.clone());
         }
     }
+}
+
+pub(crate) fn compacted(a: &mut Agent) {
+    a.ran.compacted = true;
+    a.needs_specification = true;
+    a.held.clear();
 }
 
 /// A cut turn's stream may have missed a compaction: clear held sections so the next turn resends them (fac-629).

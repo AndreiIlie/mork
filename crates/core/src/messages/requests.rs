@@ -24,6 +24,15 @@ pub fn ask_agent(p: &mut Poster<'_>, card: &CardId, role: Role, headline: &str, 
     ask(p, card, role, headline, text, false)
 }
 
+/// A full card's foreman can start fresh when its next turn takes this request.
+pub(crate) fn ask_fix_or_join(p: &mut Poster<'_>, card: &CardId, headline: &str, text: &str) {
+    let seq = ask_agent(p, card, Role::Foreman, headline, text);
+    if let Some(mut foreman) = p.agent(&agent_of(card, Role::Foreman).key) {
+        foreman.fix_or_join = Some(seq);
+        p.put_agent(foreman);
+    }
+}
+
 /// The engine's request to a full card's foreman in its challenge place, which no window shows (fac-633), waking it.
 pub(crate) fn ask_challenge(p: &mut Poster<'_>, card: &CardId, headline: &str, text: &str) -> u64 {
     let place = super::places::challenge_place(card);

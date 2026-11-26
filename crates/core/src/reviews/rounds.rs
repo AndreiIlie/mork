@@ -260,13 +260,12 @@ fn own_pr(rc: &Card, ours: &Card, forge: &str, landing: &str) -> String {
     out
 }
 
-// Inside reviews use the whole diff for size and include base changes when judging topic relevance (fac-662).
-const TOPICS: &str = "Always run correctness and tests. Give it to the kept correctness reviewer when there is one. Run design and simplicity unless the whole diff against the current base has 30 changed lines or fewer, added plus removed (`git diff --shortstat <base> <commit>`). Run money, permissions or data integrity when risk tags name it or the change touches money, permissions, SQL, schema, stored data or security. Run performance when the change can affect it. For the conditional topics, include the effect of merged base changes on the card's code.";
+const REVIEW_TIER: &str = "Use the `review-cards` skill to choose Quick, Standard or Deep review and assign that tier's topics and reviewer effort.";
 
 fn orchestrate(rc: &Card, id: &CardId, forge: &str) -> String {
     let tagged = tagged(forge);
     format!(
-        "\n\nOrchestrate it by topic, as the `review-cards` skill says: give each topic to a blind reviewer of its own, `mork ctl spawn {} reviewer '<task>' --topic '<topic>'` on its configured default, adding `--model <model> --effort <effort>` only to choose another from its pick list, the topic in your own words (the room list shows it beside the reviewer), its task naming that topic first, then what the specification asks, never how the change was built nor another reviewer's conclusion. {TOPICS} A reviewer's first pass reads the whole change against the base for its topic. Every topic's proven findings block the round. The card's words, a recorded decision and a tradeoff the approved plan states deliberately are settled, no finding; an unforeseen consequence, regression or broken edge case the plan introduces is a finding, even where the plan's text leads to it. The plan's proof list is a minimum. A small regression test for changed behaviour that the repository's Tests rules permit is no finding. End `review-pass`, or `review-fail` with the proven findings, which go back to {id}'s foreman.{tagged}{HANDS} Each executable proof, yours and your reviewers', is saved in your clone under `{}`, its path kept out of the finding's proof text; for your verdict, put each kept finding's proofs in `{1}round-<n>/`, <n> this round's number (see The round under way), named by the finding's number in that verdict (`1-overflow.sh` proves finding 1): a finding raised again gets its proof there too, copied from the earlier round's folder under its new number. Only that folder is copied into {id}'s clone for its fix, and the earlier rounds' folders stay in your clone for rechecks. {PROOF_RULE} A pass approves this round's listed and carried files at its commit.",
+        "\n\n{REVIEW_TIER} Give each topic to a blind reviewer of its own, `mork ctl spawn {} reviewer '<task>' --topic '<topic>'` on its configured default, adding `--model <model> --effort <effort>` only to choose another from its pick list, the topic in your own words (the room list shows it beside the reviewer), its task naming that topic first, then what the specification asks, never how the change was built nor another reviewer's conclusion. A reviewer's first pass reads the whole change against the base for its topic. Every topic's proven findings block the round. The card's words, a recorded decision and a tradeoff the approved plan states deliberately are settled, no finding; an unforeseen consequence, regression or broken edge case the plan introduces is a finding, even where the plan's text leads to it. The plan's proof list is a minimum. A small regression test for changed behaviour that the repository's Tests rules permit is no finding. End `review-pass`, or `review-fail` with the proven findings, which go back to {id}'s foreman.{tagged}{HANDS} Each executable proof, yours and your reviewers', is saved in your clone under `{}`, its path kept out of the finding's proof text; for your verdict, put each kept finding's proofs in `{1}round-<n>/`, <n> this round's number (see The round under way), named by the finding's number in that verdict (`1-overflow.sh` proves finding 1): a finding raised again gets its proof there too, copied from the earlier round's folder under its new number. Only that folder is copied into {id}'s clone for its fix, and the earlier rounds' folders stay in your clone for rechecks. {PROOF_RULE} A pass approves this round's listed and carried files at its commit.",
         rc.id,
         super::verdict::PROOFS
     )
@@ -413,10 +412,10 @@ fn ruled(rc: &Card, resolved: &[u64]) -> String {
     out
 }
 
-// A colleague judges checks only for correctness and performance; our card keeps its house rules.
+// Colleagues' checks can support a topic finding without making our house rules binding.
 fn checks(rc: &Card, colleague: bool) -> String {
     let scope = if colleague {
-        "count what remains only where it proves a correctness or performance problem"
+        "count what remains only where it proves a finding for this round's topics"
     } else {
         "review its findings against the specification and the repository's AGENTS.md"
     };
@@ -470,7 +469,7 @@ fn colleague(card: &Card, forge: &str, landing: &str) -> String {
         ),
     };
     format!(
-        "\n\n{what}\n\nReview it for correctness, whether it does what it means to and breaks nothing, and for performance where the change or merged base can affect it. No other topic runs. Do not require AGENTS.md conformance from colleagues: its conformance to the repository's AGENTS.md or to our own test style is no finding.\n\nOrchestrate it by topic, as the `review-cards` skill says: a blind reviewer for correctness and, when it applies, one for performance, `mork ctl spawn {} reviewer '<task>' --topic '<topic>'` on its configured default, adding `--model <model> --effort <effort>` only to choose another from its pick list, the topic in your own words (the room list shows it beside the reviewer), its task naming that topic first. A reviewer's first pass reads the whole change against its destination. End `review-pass`, or `review-fail` with the proven findings.{}",
+        "\n\n{what}\n\n{REVIEW_TIER} On correctness, judge whether the change does what it means to and breaks nothing. Conformance to the repository's AGENTS.md or to our own test style is no finding.\n\nGive each topic to a blind reviewer of its own, `mork ctl spawn {} reviewer '<task>' --topic '<topic>'` on its configured default, adding `--model <model> --effort <effort>` only to choose another from its pick list, the topic in your own words (the room list shows it beside the reviewer), its task naming that topic first. A reviewer's first pass reads the whole change against its destination. End `review-pass`, or `review-fail` with the proven findings.{}",
         card.id,
         format_args!("{}{}", tagged(forge), HANDS)
     )
