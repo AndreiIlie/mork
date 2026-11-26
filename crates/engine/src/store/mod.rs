@@ -150,6 +150,9 @@ impl Store {
             Connection::open_with_flags(uri, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI)?
         };
         let version: u32 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+        if version > schema::NEWEST {
+            return Err(StoreError::Version { found: version, oldest: schema::OLDEST, newest: schema::NEWEST });
+        }
         Ok(Self { conn, path: path.to_owned(), version })
     }
 
@@ -420,6 +423,9 @@ mod tests {
         let db = dir.join("state.db");
         let store = Store::open(&db, "test").unwrap();
         assert_eq!(store.version, schema::NEWEST);
+        let future = schema::NEWEST + 1;
+        store.conn.pragma_update(None, "user_version", future).unwrap();
+        assert!(matches!(Store::open_read_only(&db), Err(StoreError::Version { found, .. }) if found == future));
         store.conn.pragma_update(None, "user_version", 54).unwrap();
         drop(store);
 

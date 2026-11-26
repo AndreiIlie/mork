@@ -6,7 +6,7 @@ use mork_types::config::Config;
 
 use crate::config::{ConfigError, key_line, table_line};
 
-pub(crate) fn check(text: &str, config: &Config) -> Result<(), ConfigError> {
+pub(crate) fn check(text: &str, config: &mut Config) -> Result<(), ConfigError> {
     check_skills(text, config)?;
     check_claude_accounts(text, config)?;
     check_domains(text, "mork", &config.mork.domains)?;
@@ -47,6 +47,7 @@ fn check_skills(text: &str, config: &Config) -> Result<(), ConfigError> {
 }
 
 fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError> {
+    let mut headers = BTreeMap::new();
     for (name, header) in &config.claude_accounts {
         let valid_name = !name.is_empty()
             && name != "."
@@ -64,13 +65,26 @@ fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError>
                 message: format!("Claude account `{name}` must have a non-empty header"),
             });
         }
+        if matches!(header.as_str(), "codex" | "agy gemini" | "agy 3p") {
+            return Err(ConfigError::Value {
+                line: key_line(text, Some("claude_accounts"), name),
+                message: format!("Claude account `{name}` uses the built-in pool header `{header}`"),
+            });
+        }
+        if let Some(other) = headers.insert(header, name) {
+            return Err(ConfigError::Value {
+                line: key_line(text, Some("claude_accounts"), name),
+                message: format!("Claude accounts `{other}` and `{name}` share the pool header `{header}`"),
+            });
+        }
     }
     Ok(())
 }
 
-fn check_projects(text: &str, config: &Config) -> Result<(), ConfigError> {
-    for (name, p) in &config.projects {
-        if let mork_types::config::ForgeConfig::Github { token, approver, .. } = &p.forge {
+fn check_projects(text: &str, config: &mut Config) -> Result<(), ConfigError> {
+    for (name, p) in &mut config.projects {
+        let approval = p.forge.merges_on_approval();
+        if let mork_types::config::ForgeConfig::Github { token, approver, .. } = &mut p.forge {
             let table = format!("projects.{name}.forge");
             if !std::path::Path::new(token).is_absolute() {
                 return Err(ConfigError::Value {
@@ -78,7 +92,8 @@ fn check_projects(text: &str, config: &Config) -> Result<(), ConfigError> {
                     message: format!("project {name} forge.token must be an absolute path"),
                 });
             }
-            if p.forge.merges_on_approval() && approver.as_deref().is_none_or(|s| s.trim().is_empty()) {
+            *approver = approver.as_deref().map(|s| s.trim().to_owned());
+            if approval && approver.as_deref().is_none_or(str::is_empty) {
                 return Err(ConfigError::Value {
                     line: key_line(text, Some(&table), "merge"),
                     message: format!("project {name} forge.approver is required for approval merges"),

@@ -43,12 +43,26 @@ fn recovers_comment_kinds_locations_and_replies() {
         .unwrap();
     assert_eq!(reply.parent, issue.id);
     assert_eq!(reply.body.as_deref(), Some("fixed"));
+    let body = "src/lib.rs:12\n\nfixed";
+    let file = json!({"id":12,"path":"src/lib.rs","subject_type":"file","body":body});
+    let root = comments::parse(&file, false).unwrap();
+    assert_eq!(root.body.as_deref(), Some("fixed"));
+    assert_eq!(root.requested.unwrap().line, Some(12));
+    let mut reply = file;
+    reply["in_reply_to_id"] = json!(8);
+    let reply = comments::parse(&reply, false).unwrap();
+    assert_eq!(reply.parent, Some(16));
+    assert_eq!(reply.body.as_deref(), Some(body));
+    assert!(reply.requested.is_none());
 }
 
 #[test]
 fn matches_resolved_threads_using_full_comment_ids() {
     let t = json!({"isResolved":true,"resolvedBy":{"login":"owner"},"comments":{"nodes":[{"fullDatabaseId":"4000000000","author":{"login":"bot"}}]}});
-    let id = threads::root_id(&t).unwrap();
-    assert_eq!(id, 8_000_000_000);
-    assert_eq!(threads::thread(id, &t, &[]).unwrap().resolved.unwrap().by, "owner");
+    let mut roots = std::collections::BTreeMap::new();
+    let page = json!({"nodes":[{"comments":{"nodes":[]}},t,{"comments":{"nodes":[{"fullDatabaseId":123}]}}]});
+    threads::index_page(&page, &mut roots).unwrap();
+    assert_eq!(roots.keys().copied().collect::<Vec<_>>(), [246, 8_000_000_000]);
+    let id = 8_000_000_000;
+    assert_eq!(threads::thread(id, &roots[&id], &[]).unwrap().resolved.unwrap().by, "owner");
 }

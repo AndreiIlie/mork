@@ -10,29 +10,35 @@ use crate::builds;
 use crate::jobs::context::{bwrap_path, wall_mode, wall_unavailable};
 use crate::jobs::procs;
 use crate::paths::Home;
-use crate::store::Store;
+use crate::store::{Store, StoreError};
 
 /// What doctor knows of the state's jobs: settled or not, and when.
 pub type JobsSeen = BTreeMap<String, Option<i64>>;
 
 const DAY: i64 = 86_400_000;
 
-/// The state, read-only; `None` when it can't be read.
-pub fn read_state(home: &Home) -> Option<State> {
-    let store = Store::open_read_only(&home.state_db()).ok()?;
-    store.load().ok().map(|s| with_clones(home, &store, s))
+fn load_state(store: &Store, findings: &mut Vec<String>) -> Option<State> {
+    store.load().inspect_err(|e| findings.push(e.to_string())).ok()
+}
+
+/// A state with complete clone ownership, or a finding explaining why it couldn't be read.
+pub fn read_state(home: &Home, store: &Store, findings: &mut Vec<String>) -> Option<State> {
+    let state = load_state(store, findings)?;
+    with_clones(home, store, state, findings)
 }
 
 // The ended cards a clone is named for, which a start leaves in the store (fac-336): read, so a
 // closed review's proofs are kept (fac-276).
-fn with_clones(home: &Home, store: &Store, mut state: State) -> State {
+fn with_clones(home: &Home, store: &Store, mut state: State, findings: &mut Vec<String>) -> Option<State> {
     let names = std::fs::read_dir(home.clones()).into_iter().flatten().flatten();
     let ids = names.map(|e| mork_types::CardId::new(e.file_name().to_string_lossy()));
     let ended = ids.filter(|c| state.unloaded.cards.contains(c)).collect();
-    for (id, r) in store.cards_records(&ended).unwrap_or_default() {
+    let records =
+        store.cards_records(&ended).inspect_err(|e| findings.push(format!("cannot read ended cards: {e}"))).ok()?;
+    for (id, r) in records {
         state.absorb(&id, r);
     }
-    state
+    Some(state)
 }
 
 /// Every job the store holds, ended cards' included (fac-336), and a settled one whose folder was
@@ -49,6 +55,10 @@ pub fn from_file(home: &Home, findings: &mut Vec<String>) -> (Option<JobsSeen>, 
     }
     let store = match Store::open_read_only(&home.state_db()) {
         Ok(s) => s,
+        Err(e @ StoreError::Version { .. }) => {
+            findings.push(e.to_string());
+            return (None, None);
+        }
         Err(e) => {
             let backup = builds::latest_backup(home).unwrap_or_else(|| "none".into());
             findings.push(format!(
@@ -58,8 +68,9 @@ pub fn from_file(home: &Home, findings: &mut Vec<String>) -> (Option<JobsSeen>, 
             return (None, None);
         }
     };
-    let state = store.load().ok().map(|s| with_clones(home, &store, s));
-    let jobs = every_job(&store);
+    let state = load_state(&store, findings);
+    let jobs = state.as_ref().and_then(|_| every_job(&store));
+    let state = state.and_then(|s| with_clones(home, &store, s, findings));
     if store.pragma("quick_check").ok().as_deref() != Some("ok") {
         let backup = builds::latest_backup(home).unwrap_or_else(|| "none".into());
         findings.push(format!(
@@ -68,7 +79,7 @@ pub fn from_file(home: &Home, findings: &mut Vec<String>) -> (Option<JobsSeen>, 
         ));
         return (None, state);
     }
-    (jobs.filter(|_| state.is_some()), state)
+    (jobs, state)
 }
 
 /// Every finding, given the jobs the state knows and the state (each `None` when it couldn't be read).
@@ -183,5 +194,35 @@ fn test_homes(tmp: &Path, prefix: &str, out: &mut Vec<String>) {
         if name.starts_with(prefix) && old {
             out.push(format!("test home older than an hour: rm -r {}", e.path().display()));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // why: a fixture that cannot be created or read fails the test.
+    #[allow(clippy::unwrap_used)]
+    fn unreadable_ended_card_prevents_clone_advice() {
+        let home = Home::new(std::env::temp_dir().join(format!("mork-doctor-{}", crate::random::uuid())));
+        std::fs::create_dir_all(home.clones().join("ex-1")).unwrap();
+        Store::open(&home.state_db(), "test").unwrap();
+        let row = r#"INSERT INTO entities VALUES ('card', 'ex-1', '{"stage":"done"}')"#;
+        rusqlite::Connection::open(home.state_db()).unwrap().execute(row, []).unwrap();
+
+        let mut offline = Vec::new();
+        let (jobs, state) = from_file(&home, &mut offline);
+        assert!(state.is_none());
+        assert!(jobs.is_some());
+        assert_eq!(offline.len(), 1);
+        assert!(offline[0].contains("cannot read ended cards"));
+
+        let store = Store::open_read_only(&home.state_db()).unwrap();
+        let mut online = Vec::new();
+        assert!(read_state(&home, &store, &mut online).is_none());
+        assert_eq!(online, offline);
+        drop(store);
+        std::fs::remove_dir_all(home.root()).unwrap();
     }
 }

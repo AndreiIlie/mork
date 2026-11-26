@@ -7,7 +7,7 @@ use common::{Sim, reply};
 use mork_core::decide::{Decision, Event, Intent, JobEnd};
 use mork_core::messages::wakes;
 use mork_core::state::Change;
-use mork_types::ask::{Ask, AskKind};
+use mork_types::ask::{Ask, AskKind, Color};
 use mork_types::card::Stage;
 use mork_types::orchestrator::{OrchestratorEvent, OrchestratorWhat};
 use mork_types::protocol::ErrorCode;
@@ -78,7 +78,9 @@ fn answer_asks_are_auto_given_without_notice_when_delegated_and_notified_when_of
         let d = s.turn(&format!("{CARD}/planner"), r);
         let ask = open_ask(&s, AskKind::Answer);
         let givens = given_events(&d);
+        let light = mork_core::views::status::card_light(&s.state, &s.card(CARD));
         if let Some(level) = expected_level {
+            assert_eq!(light, Some(Color::Grey));
             assert!(ask.given, "{level}: answer ask must be auto-given");
             assert!(!ask.notice, "{level}: auto-given ask must not claim a desktop notice");
             assert!(!notifies(&d, ask.id.as_str()), "{level}: auto-given ask must drop Notify intent");
@@ -88,6 +90,7 @@ fn answer_asks_are_auto_given_without_notice_when_delegated_and_notified_when_of
                 Some(format!("ask given to you ({level}): {}", ask.id).as_str())
             );
         } else {
+            assert_eq!(light, Some(Color::Yellow));
             assert!(!ask.given, "off: answer ask must not be given");
             assert!(ask.notice, "off: answer ask must keep desktop notice");
             assert!(notifies(&d, ask.id.as_str()), "off: answer ask must emit Notify intent");

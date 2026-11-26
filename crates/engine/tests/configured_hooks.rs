@@ -93,6 +93,19 @@ url = "http://localhost:4001"
     assert_eq!(c.tunnels["staging"].port, 4001);
 }
 
+#[test]
+fn saved_claude_headers_distinguish_accounts_and_builtin_pools() {
+    for reserved in ["codex", "agy gemini", "agy 3p"] {
+        let err = parse_with(&format!("[claude_accounts]\nwork = \"{reserved}\"")).unwrap_err();
+        assert!(err.to_string().contains(reserved));
+    }
+    let duplicate = parse_with("[claude_accounts]\npersonal = \"Shared\"\nwork = \"Shared\"").unwrap_err().to_string();
+    for word in ["personal", "work", "Shared"] {
+        assert!(duplicate.contains(word));
+    }
+    assert!(parse_with("[claude_accounts]\npersonal = \"claude max\"\nwork = \"claude team\"").is_ok());
+}
+
 const VALUE_CASES: &[(&str, usize, &str)] = &[
     ("[mork]\nproject = \"mork\"\nskills = \"relative/path\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n", 3, "skills"),
     ("[mork]\nproject = \"mork\"\nskills = \"/srv/../skills\"\n\n[git]\nauthor = \"T <t@e.invalid>\"\n", 3, "skills"),
@@ -311,6 +324,9 @@ token = "{token}"
     assert!(config("relative", "").is_err());
     assert!(config("/token", r#"review_tag = " ""#).is_err());
     assert!(config("/token", r#"merge = "approval""#).is_err());
-    let approved = config("/token", "merge = \"approval\"\napprover = \"operator\"").unwrap();
+    assert!(config("/token", "merge = \"approval\"\napprover = \"  \"").is_err());
+    let approved = config("/token", "merge = \"approval\"\napprover = \"  operator \"").unwrap();
     assert!(approved.projects["example.com"].forge.merges_on_approval());
+    assert!(matches!(&approved.projects["example.com"].forge,
+        mork_types::config::ForgeConfig::Github { approver: Some(login), .. } if login == "operator"));
 }

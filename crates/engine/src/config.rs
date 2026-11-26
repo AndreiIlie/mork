@@ -138,7 +138,7 @@ pub fn parse(text: &str) -> Result<Config, ConfigError> {
     context_settings(text, &config.mork)?;
     crate::config_checks::caches(text, &mut config.mork)?;
     slice(text, &config.slice)?;
-    crate::config_checks::check(text, &config)?;
+    crate::config_checks::check(text, &mut config)?;
     Ok(config)
 }
 

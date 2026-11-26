@@ -11,8 +11,8 @@ use super::outside::Outside;
 use super::pipeline::short_word;
 use crate::state::State;
 
-/// The card's light: none when done or closed; red with a red ask open; yellow with any other
-/// ask open; green merging with nothing waiting; grey otherwise. Includes a folded review's asks.
+/// The card's light reflects open asks held by the operator, including its folded review's.
+/// With none, merging is green, other live stages grey, and ended cards have no light.
 pub fn card_light(state: &State, card: &Card) -> Option<Color> {
     if !card.stage.is_live() {
         return None;
@@ -21,7 +21,8 @@ pub fn card_light(state: &State, card: &Card) -> Option<Color> {
     let open: Vec<Color> = state
         .asks
         .values()
-        .filter(|a| a.open && (a.card.as_ref() == Some(&card.id) || (folded.is_some() && a.card.as_ref() == folded)))
+        .filter(|a| a.open && !a.given)
+        .filter(|a| a.card.as_ref() == Some(&card.id) || (folded.is_some() && a.card.as_ref() == folded))
         .map(|a| a.color)
         .collect();
     Some(if open.contains(&Color::Red) {
