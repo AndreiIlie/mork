@@ -119,11 +119,13 @@ impl Poster<'_> {
     }
 
     pub(crate) fn token_project(&self, what: &ActionWhat) -> Option<mork_types::ProjectId> {
-        match what {
-            ActionWhat::Fetch { project, .. } | ActionWhat::OpenPr { project, .. } => Some(project.clone()),
-            w if w.forge() => Some(self.card(w.card()?)?.project),
-            _ => None,
+        if let ActionWhat::Fetch { project, .. } | ActionWhat::OpenPr { project, .. } = what {
+            return Some(project.clone());
         }
+        if !what.forge() {
+            return None;
+        }
+        Some(self.card(what.card()?)?.project)
     }
 
     /// A new action's id: one above every id there is, stored or not loaded (fac-336), since a count

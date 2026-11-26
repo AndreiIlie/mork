@@ -1,5 +1,4 @@
-//! The Bitbucket token's identity (3.7.2): a refusal holds every Bitbucket action, and its recovery runs again only
-//! what it held.
+//! A refused credential holds only its project's forge actions, including across restarts.
 
 use mork_types::action::{Action, ActionStatus};
 use mork_types::ask::{AskKind, Color};

@@ -30,6 +30,7 @@ pub(crate) struct Comment {
     pub parent: Option<u64>,
     pub body: Option<String>,
     pub inline: Option<Anchor>,
+    pub requested: Option<Anchor>,
 }
 
 pub(crate) struct Anchor {

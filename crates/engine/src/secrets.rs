@@ -70,7 +70,9 @@ impl Secrets {
         for path in config.projects.values().filter_map(|p| p.forge.token_path()) {
             if let Ok(token) = crate::github::read_file(path) {
                 s.add("the GitHub token", &token);
-                s.add("the GitHub token", crate::github::git_header(&token).trim_start_matches("Basic "));
+                let header = crate::github::git_header(&token);
+                s.add("the GitHub token", &header);
+                s.add("the GitHub token", header.trim_start_matches("Basic "));
             }
         }
         for tickets in config.projects.values().filter_map(|p| p.tickets.as_ref()) {
@@ -253,7 +255,8 @@ mod tests {
             let configured = gather(&dir.join("pat"));
             let missing = gather(&dir.join("missing"));
             let git = crate::github::git_header(PAT);
-            assert_eq!(configured.mask(&git), "Basic ‹secret›");
+            assert_eq!(configured.mask(&git), "‹secret›");
+            assert_eq!(configured.mask(git.trim_start_matches("Basic ")), "‹secret›");
             assert_eq!(configured.mask(&format!("Bearer {PAT}")), "Bearer ‹secret›");
             for pat in [PAT, LEGACY] {
                 let header = crate::azure::header(pat);

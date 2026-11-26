@@ -37,7 +37,8 @@ fn recovers_comment_kinds_locations_and_replies() {
     let issue = comments::parse(&json!({"id":10,"body":"file:9\n\nfound"}), true).unwrap();
     assert_ne!(issue.id, review.id);
     assert_eq!(issue.body.as_deref(), Some("found"));
-    assert_eq!(issue.inline.unwrap().path.as_deref(), Some("file"));
+    assert!(issue.inline.is_none());
+    assert_eq!(issue.requested.unwrap().path.as_deref(), Some("file"));
     let reply = comments::parse(&json!({"id":11,"body":"In reply to [this comment](#issuecomment-10)\n\nfixed"}), true)
         .unwrap();
     assert_eq!(reply.parent, issue.id);

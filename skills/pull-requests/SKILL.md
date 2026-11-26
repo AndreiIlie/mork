@@ -5,11 +5,19 @@ description: "Use for projects with Bitbucket or GitHub pull requests, including
 
 # Pull requests
 
-Bitbucket and GitHub projects publish verified cards as pull requests. With the default `merge = "manual"`, the operator merges on the forge and Mork lands the card when it reads that merge. To have Mork merge on the operator’s approval of the verified head, set `merge = "approval"` in the project’s forge table. Existing Bitbucket projects also need this setting to keep merging on approval.
+Bitbucket and GitHub projects publish verified cards as pull requests.
+With the default `merge = "manual"`, the operator merges on the forge and Mork lands the card when it reads that merge.
+To have Mork merge on the operator’s approval of the verified head, set `merge = "approval"` in the project’s forge table.
+Existing Bitbucket projects also need this setting to keep merging on approval.
 
-Bitbucket uses the review bot’s token to push, read and comment. The operator’s token opens pull requests and calls approved merges. Its approver is named in the review bot’s token file.
+Bitbucket uses the review bot’s token to push, read and comment.
+The operator’s token opens pull requests and calls approved merges.
+Its approver is named in the review bot’s token file.
 
-GitHub uses the project’s one token to push, open pull requests, comment, resolve threads and merge. Manual merging allows the operator’s own token. Approval merging requires a separate account’s token and the operator’s GitHub login in `approver`. GitHub’s repository setting controls branch deletion.
+GitHub uses the project’s one token to push, open pull requests, comment, resolve threads and merge.
+Manual merging allows the operator’s own token.
+Approval merging requires a separate account’s token and the operator’s GitHub login in `approver`.
+GitHub’s repository setting controls branch deletion.
 
 **1. Publication.**
 Our card's candidate, its branch with master's tip merged in, is made once its head's checks pass or when none are configured.
@@ -27,7 +35,9 @@ A conflict on master's tip goes to its foreman as a join.
 The card then waits for his merge or approval out of the merge queue, for days if need be, its stage still `merging`, with a message linking the pull request.
 Its turns run meanwhile.
 Its verified pushed head raises an engine `approve-pr` ask in the implementation card's room, with that head and the PR link, asking the operator to review and merge it, or to approve it on approval projects.
-On manual projects it closes on merge. On approval projects it closes on approval. A newer head invalidates it.
+On manual projects it closes on merge.
+On approval projects it closes on approval.
+A newer head invalidates it.
 This ask changes no merge authority, and the review foreman raises none.
 A new head (a fix, a join) takes it back through its gates and its verification, and its publication updates the same pull request, which waits again.
 Merged by hand on the forge, it lands.
@@ -45,7 +55,9 @@ At completion of every run, its round and its suite both ended, automatic or exp
 A failed suite also gets a neutral comment listing the failing tests by file when available.
 A review of our card's pull request, an older build's or of a head no verification passed, sends its findings, failed run and conflict to its foreman alone, the operator told nothing, posting only a clean result.
 Once result posting finishes the review closes, retaining its history, unresolved findings, threads and original reviewers for the next eligible head.
-On GitHub a finding outside the diff can land on a file or on the whole PR. Whole-PR comments have no resolvable thread. A reply points back to the original comment.
+On GitHub a finding outside the diff can land on a file or on the whole PR.
+Whole-PR comments have no resolvable thread.
+A reply points back to the original comment.
 A finding verified fixed has its thread resolved (`resolve`), and one a decision on the card (the operator's or one recorded on the orchestrator's delegated answer) rules out gets “This finding was declined.” on its thread before it is resolved (`resolve --declined`).
 When the operator or the project's orchestrator declines a finding of our card's failed PR review, its foreman records that decision on the card, then runs `mork ctl rereview <card>`: a new round of the same head, where its raiser resolves it.
 At each PR review round, the engine reads every page of the comments and each open finding’s own comment for its thread’s resolution.

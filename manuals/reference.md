@@ -34,10 +34,18 @@ When `hide` is `false`, none of those refuse anything; secret scanning and refus
 
 Each project requires a `[projects.<name>.board]` table with `kind = "markdown"` and `path` pointing to the folder that contains `backlog/`.
 An absent `[projects.<name>.forge]` table selects `local`.
-A forge with `kind = "bitbucket"` requires `workspace` and `slug` and accepts an optional `review_tag`. Bitbucket keeps the review token, its `approver=` line and the separate operator merge token.
-A forge with `kind = "github"` requires `owner`, `repo` and `token`, the absolute path to a file containing only its token. The engine uses it for Git and all API calls. Walls mask the configured file and logs redact the credential.
-Both hosted forges accept `merge = "manual"` (the default) or `merge = "approval"`. In manual mode the operator merges on the forge and the card lands when the poller reads the merge. To keep automatic merging on approval, existing Bitbucket projects must explicitly select `approval`.
-GitHub approval merges require `approver`, the operator’s login, and a token owned by a different account. Manual mode permits the operator's own token. GitHub also accepts `review_tag`. GitHub PRs from forks appear in `prs` and are excluded from review and merge.
+A forge with `kind = "bitbucket"` requires `workspace` and `slug` and accepts an optional `review_tag`.
+Bitbucket keeps the review token, its `approver=` line and the separate operator merge token.
+A forge with `kind = "github"` requires `owner`, `repo` and `token`, the absolute path to a file containing only its token.
+The engine uses it for Git and all API calls.
+Walls mask the configured file and logs redact the credential.
+Both hosted forges accept `merge = "manual"` (the default) or `merge = "approval"`.
+In manual mode the operator merges on the forge and the card lands when the poller reads the merge.
+To keep automatic merging on approval, existing Bitbucket projects must explicitly select `approval`.
+GitHub approval merges require `approver`, the operator’s login, and a token owned by a different account.
+Manual mode permits the operator's own token.
+GitHub also accepts `review_tag`.
+GitHub PRs from forks appear in `prs` and are excluded from review and merge.
 
 ### git_author
 
@@ -386,7 +394,8 @@ The configured projects, in the order their tables appear in `mork.toml`.
 
 Each entry in `projects.projects` has `name`, `base`, `prefix` (the board's card ID prefix), `local`, `forge` and `auto.on`.
 A local project has `local: true` and `forge: {"kind":"local"}`.
-A Bitbucket project has `local: false` and its `forge` holds `kind`, `workspace` and `slug`. A GitHub project also has `local: false` and exposes `kind`, `owner` and `repo`.
+A Bitbucket project has `local: false` and its `forge` holds `kind`, `workspace` and `slug`.
+A GitHub project also has `local: false` and exposes `kind`, `owner` and `repo`.
 A read.
 
 Example: `mork ctl projects`

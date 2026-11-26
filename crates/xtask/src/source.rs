@@ -32,7 +32,9 @@ impl Kind {
             Self::ProcessStart => &["crates/engine/src/jobs/"],
             Self::ProcessType => &["crates/engine/src/jobs/", "crates/sys/src/"],
             Self::Sqlite => &["crates/engine/src/store/"],
-            Self::Http => &["crates/engine/src/bitbucket/", "crates/engine/src/azure.rs"],
+            Self::Http => {
+                &["crates/engine/src/bitbucket/", "crates/engine/src/azure.rs", "crates/engine/src/github/client.rs"]
+            }
             Self::Clock => &["crates/engine/src/clock.rs"],
             Self::Unsafe => &["crates/sys/src/"],
         }

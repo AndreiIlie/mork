@@ -120,7 +120,7 @@ fn comment(c: &Call, pr: u64, file: &str, line: u64, body: &str) -> Found {
     let theirs = |x: &forge::Comment| x.id.is_some_and(|id| ids.contains(&id));
     let free: Vec<_> =
         all.into_iter().filter(|x| x.body.as_deref() == Some(body) && !theirs(x)).skip(unknown).collect();
-    let at = |x: &&forge::Comment| match &x.inline {
+    let at = |x: &&forge::Comment| match x.requested.as_ref().or(x.inline.as_ref()) {
         None => file.is_empty(),
         Some(a) => a.path.as_deref() == Some(file) && a.line == Some(line),
     };

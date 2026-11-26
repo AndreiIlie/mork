@@ -1,7 +1,40 @@
-use super::Client;
 use crate::forge::Result;
+use mork_types::config::ForgeConfig;
 use mork_types::work::ActionFailure;
 use serde_json::Value;
+
+pub(crate) struct Client {
+    agent: ureq::Agent,
+    pub(super) owner: String,
+    pub(super) repo: String,
+    token: String,
+    pub(super) approver: Option<String>,
+    pub(super) review_tag: Option<String>,
+    login: std::cell::OnceCell<String>,
+}
+
+impl Client {
+    pub fn new(config: &ForgeConfig) -> Result<Self> {
+        let ForgeConfig::Github { owner, repo, token, approver, review_tag, .. } = config else {
+            return Err(failed("Expected a GitHub forge"));
+        };
+        let agent = ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .max_redirects(0)
+            .timeout_global(Some(std::time::Duration::from_secs(60)))
+            .build()
+            .into();
+        Ok(Self {
+            agent,
+            owner: owner.clone(),
+            repo: repo.clone(),
+            token: super::token::read(token)?,
+            approver: approver.clone().filter(|_| config.merges_on_approval()),
+            review_tag: review_tag.clone(),
+            login: Default::default(),
+        })
+    }
+}
 
 pub(super) const API: &str = "https://api.github.com/";
 

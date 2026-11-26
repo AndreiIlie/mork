@@ -8,44 +8,14 @@ mod token;
 
 use crate::forge::{Comment, CommentPost, ForgeRead, ForgeWrite, Identity, Pr, Result};
 use client::failed;
-use mork_types::config::ForgeConfig;
 use mork_types::review::Threads;
 use mork_types::work::{ActionFailure, OpenPr, PrSeen, PrState};
 use serde_json::{Value, json};
 pub(crate) use token::{git_header, pinned, read_file, source};
 
-pub(crate) struct Client {
-    agent: ureq::Agent,
-    owner: String,
-    repo: String,
-    token: String,
-    approver: Option<String>,
-    review_tag: Option<String>,
-    login: std::cell::OnceCell<String>,
-}
+pub(crate) use client::Client;
 
 impl Client {
-    pub fn new(config: &ForgeConfig) -> Result<Self> {
-        let ForgeConfig::Github { owner, repo, token, approver, review_tag, .. } = config else {
-            return Err(failed("Expected a GitHub forge"));
-        };
-        let agent = ureq::Agent::config_builder()
-            .http_status_as_error(false)
-            .max_redirects(0)
-            .timeout_global(Some(std::time::Duration::from_secs(60)))
-            .build()
-            .into();
-        Ok(Self {
-            agent,
-            owner: owner.clone(),
-            repo: repo.clone(),
-            token: token::read(token)?,
-            approver: approver.clone().filter(|_| config.merges_on_approval()),
-            review_tag: review_tag.clone(),
-            login: Default::default(),
-        })
-    }
-
     fn branch_rows(&self, branch: &str, state: &str) -> Result<Vec<Value>> {
         let head = format!("{}:{branch}", self.owner);
         let encoded = percent_encoding::utf8_percent_encode(&head, percent_encoding::NON_ALPHANUMERIC);

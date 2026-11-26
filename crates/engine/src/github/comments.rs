@@ -24,7 +24,8 @@ pub(super) fn parse(row: &Value, issue: bool) -> Result<Comment> {
     let id = key(raw_id(row)?, issue)?;
     let mut body = row["body"].as_str().ok_or_else(|| failed("GitHub comment lacks its body"))?;
     let mut parent = row["in_reply_to_id"].as_u64().map(|id| key(id, false)).transpose()?;
-    let mut inline = row["path"]
+    let mut requested = None;
+    let inline = row["path"]
         .as_str()
         .map(|p| Anchor { path: Some(p.into()), line: row["line"].as_u64().or_else(|| row["original_line"].as_u64()) });
     if (issue || row["subject_type"] == "file")
@@ -40,11 +41,11 @@ pub(super) fn parse(row: &Value, issue: bool) -> Result<Comment> {
         } else if let Some((path, line)) = prefix.rsplit_once(':')
             && let Ok(line) = line.parse()
         {
-            inline = Some(Anchor { path: Some(path.into()), line: Some(line) });
+            requested = Some(Anchor { path: Some(path.into()), line: Some(line) });
             body = rest;
         }
     }
-    Ok(Comment { id: Some(id), parent, body: Some(body.into()), inline })
+    Ok(Comment { id: Some(id), parent, body: Some(body.into()), inline, requested })
 }
 
 pub(super) fn list(client: &Client, pr: u64) -> Result<Vec<Comment>> {
@@ -64,7 +65,13 @@ pub(super) fn list(client: &Client, pr: u64) -> Result<Vec<Comment>> {
 fn issue_comment(client: &Client, pr: u64, body: &str) -> Result<Comment> {
     let url = client.repo_url(&format!("/issues/{pr}/comments"));
     let row = client.send("POST", &url, Some(&json!({"body":body})))?.value()?;
-    Ok(Comment { id: Some(key(raw_id(&row)?, true)?), body: Some(body.into()), parent: None, inline: None })
+    Ok(Comment {
+        id: Some(key(raw_id(&row)?, true)?),
+        body: Some(body.into()),
+        parent: None,
+        inline: None,
+        requested: None,
+    })
 }
 
 pub(super) fn post(client: &Client, pr: u64, post: CommentPost<'_>) -> Result<Comment> {
@@ -88,9 +95,7 @@ pub(super) fn post(client: &Client, pr: u64, post: CommentPost<'_>) -> Result<Co
         let file = json!({"body":fallback,"path":post.file,"commit_id":head,"subject_type":"file"});
         let answer = client.send("POST", &url, Some(&file))?;
         if answer.status != 422 {
-            let mut comment = parse(&answer.value()?, false)?;
-            comment.inline = Some(Anchor { path: Some(post.file.into()), line: None });
-            return Ok(comment);
+            return parse(&answer.value()?, false);
         }
     }
     issue_comment(client, pr, &fallback)

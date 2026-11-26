@@ -326,6 +326,15 @@ fn load_entity(s: &mut State, kind: &str, data: &str) -> Result<()> {
     Ok(())
 }
 
+fn write_token(tx: &rusqlite::Transaction<'_>, project: &mork_types::ProjectId, refused: Option<&str>) -> Result<()> {
+    if let Some(words) = refused {
+        put_entity(tx, "forge-token", project, &serde_json::to_string(&(project, words))?)?;
+    } else {
+        tx.execute("DELETE FROM entities WHERE kind = 'forge-token' AND id = ?1", params![project.as_str()])?;
+    }
+    Ok(())
+}
+
 fn write_change(tx: &rusqlite::Transaction<'_>, c: &Change) -> Result<()> {
     match c {
         Change::PutAgent(a) => put_entity(tx, "agent", a.key.as_str(), &serde_json::to_string(a)?)?,
@@ -374,12 +383,7 @@ fn write_change(tx: &rusqlite::Transaction<'_>, c: &Change) -> Result<()> {
             memory::write(tx, c)?;
         }
         // The token's verdict outlives a restart (3.7.2, M3.2).
-        Change::SetTokenRefused { project, refused: Some(r) } => {
-            put_entity(tx, "forge-token", project, &serde_json::to_string(&(project, r))?)?
-        }
-        Change::SetTokenRefused { project, refused: None } => {
-            tx.execute("DELETE FROM entities WHERE kind = 'forge-token' AND id = ?1", params![project.as_str()])?;
-        }
+        Change::SetTokenRefused { project, refused } => write_token(tx, project, refused.as_deref())?,
         Change::SetBoard { .. } | Change::SetOpenPrs { .. } | Change::SetChecksFolder { .. } => {}
         Change::AddOrchestratorEvent(e) => orchestrators::add(tx, e)?,
         Change::PutNote(_) | Change::RemoveNote { .. } => notes::write(tx, c)?,

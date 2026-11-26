@@ -91,11 +91,7 @@ pub(super) fn request(
     out.push_str(&ruled(rc, &cloned.resolved));
     if super::gate::entry(rc) {
         out.push_str(&checks(rc, ours.is_none()));
-        let landing = if ctx.config.projects.get(&rc.project).is_some_and(|p| p.forge.merges_on_approval()) {
-            format!("The operator's approval on {forge} merges the verified head.")
-        } else {
-            format!("The operator merges the PR manually on {forge}.")
-        };
+        let landing = merge_words(rc, forge, ctx);
         match ours {
             Some(ours) => out.push_str(&own_pr(rc, ours, forge, &landing)),
             None => out.push_str(&colleague(rc, forge, &landing)),
@@ -239,6 +235,14 @@ fn standing_on(state: &State, c: &Card, id: &CardId) -> String {
         return format!("\n\nNo decision of the operator's stands on {id} now: any earlier list of them is void.");
     }
     format!("\n{decisions}\nThis is the complete current set of {id}'s decisions: it replaces any earlier list.")
+}
+
+fn merge_words(card: &Card, forge: &str, ctx: Ctx<'_>) -> String {
+    if ctx.config.projects.get(&card.project).is_some_and(|p| p.forge.merges_on_approval()) {
+        format!("The operator's approval on {forge} merges the verified head.")
+    } else {
+        format!("The operator merges the PR manually on {forge}.")
+    }
 }
 
 // Our PR follows its specification and house rules, as our branch does (fac-220).

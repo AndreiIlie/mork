@@ -88,6 +88,7 @@ fn comment(value: &Value) -> Comment {
         .filter(|v| !v.is_null())
         .map(|anchor| Anchor { path: anchor["path"].as_str().map(str::to_owned), line: anchor["to"].as_u64() });
     Comment {
+        requested: None,
         id: value["id"].as_u64(),
         parent: value.pointer("/parent/id").and_then(Value::as_u64),
         body: value.pointer("/content/raw").and_then(Value::as_str).map(str::to_owned),
