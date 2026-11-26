@@ -1325,7 +1325,7 @@ Example: `mork ctl test.done lease-1760600000000 0`
 Runs an operation on a machine outside your wall, through the engine.
 The engine reaches it over the operator's own access (his ssh alias, his account on the service) with the box's own tools, nothing of Mork's installed there, and reads the credentials itself: none is ever shown to you.
 
-`op` is one of `sql.select {query}`, `mongo.find {collection, filter?, projection?, sort?, limit?}`, `libra.get {endpoint, params?}`, `file.tail {log, lines?}`, `file.cat {root, path}`, `file.get {root, path}`, `sh.run {command, args?}`, `misc.run {argv}`; `mork ctl door --help` lists them, `mork ctl door --target <t> --help` describes a target.
+`op` is one of `sql.select {query}`, `mongo.find {collection, filter?, projection?, sort?, limit?}`, `http.get {endpoint, params?}`, `file.tail {log, lines?}`, `file.cat {root, path}`, `file.get {root, path}`, `sh.run {command, args?}`, `misc.run {argv}`; `mork ctl door --help` lists them, `mork ctl door --target <t> --help` describes a target.
 A request is resolved against the target's allowlist; an allowed call runs when its target is free.
 A `misc.run` becomes the operator's ask, answered with `door.once` or `door.no`.
 It opens in the build room on a two-room card and in your place otherwise.
@@ -1349,7 +1349,11 @@ A started call keeps running, except `sql.select`, which stops when its last cal
 A call dropped as busy or because its caller went answers no later request: asking again, in the same turn too, makes a new call.
 A queued non-read call nobody waits on, including an approved `misc.run` or a `sh.run` pending across a restart, has no queue time limit and runs when its target is free.
 
-Each operation keeps to its bounds: `sql.select` runs one read-only statement on any table the operator's login on the target may read, `information_schema` and the `sys` schema refused (appending `[targets.<id>.sql] schema_hint` when configured), a replica (`read_only = true` in its `[sql]`) with its own row cap and timeout; `mongo.find` only finds, its code-executing operators refused; `libra.get` runs any GET path at the configured API origin; `file.get` copies one regular file under a named root into the asking seat's `io/` folder (`MORK_IO`), at most 20 MB.
+Each operation keeps to its bounds: `sql.select` runs one read-only statement on any table the operator's login on the target may read, `information_schema` and the `sys` schema refused (appending `[targets.<id>.sql] schema_hint` when configured), a replica (`read_only = true` in its `[sql]`) with its own row cap and timeout; `mongo.find` only finds, its code-executing operators refused; `http.get` runs any GET path at the configured API origin; `file.get` copies one regular file under a named root into the asking seat's `io/` folder (`MORK_IO`), at most 20 MB.
+For `http.get`, `[targets.<id>.http]` sets the HTTPS `origin` and the OAuth2 `client` credential reference.
+The door obtains a token from `token_path` (default `/oauth2/token`) at that origin and uses it for the GET.
+It sends `scope` only when configured.
+Set `scope = "default"` if the service requires that literal value.
 An orchestrator's `file.get` outside a turn copies to `<mork home>/door/files/<call id>-<file name>` (`<call id>` is the action id), private to the operator's user and outside every wall.
 It is kept 14 days; the daily prune removes older copies.
 The answer's `file` gives the full path; the caller never chooses a destination.

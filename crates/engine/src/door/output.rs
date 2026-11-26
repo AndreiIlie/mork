@@ -51,7 +51,7 @@ fn body(plan: &Plan, ran: &Ran, b: &Bounds, r: &Redactor) -> Value {
     let mut out = match plan {
         Plan::Sql { .. } => rows(&ran.stdout, ran.truncated, items, r),
         Plan::Mongo { .. } => docs(&r.mask_json(&ran.stdout), ran.truncated, items),
-        Plan::Libra { .. } => {
+        Plan::Http { .. } => {
             let masked = r.mask_json(&ran.stdout);
             match serde_json::from_str::<Value>(&masked) {
                 Ok(v) if !ran.truncated => Output { json: Some(v), ..Output::default() },

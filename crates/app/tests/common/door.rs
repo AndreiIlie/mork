@@ -15,20 +15,20 @@ pub const MONGO_PW: &str = "SENTINEL-host-mongo-55";
 pub const REMOTE_PW: &str = "SENTINEL-app-db-31";
 /// The remote targets' Mongo password, in `[access:app-mongo]`.
 pub const REMOTE_MONGO_PW: &str = "SENTINEL-app-mongo-42";
-/// Libra's OAuth client key, in `[access:libra-api]`.
-pub const LIBRA_KEY: &str = "SENTINEL-libra-consumer-key-99";
-/// Libra's OAuth client secret, in `[access:libra-api]`.
-pub const LIBRA_SECRET: &str = "SENTINEL-libra-consumer-secret-88";
-/// The bearer token Libra's server hands back for the key and secret.
-pub const LIBRA_TOKEN: &str = "SENTINEL-libra-bearer-token-66";
+/// The OAuth client key, in `[access:example-api]`.
+pub const HTTP_KEY: &str = "SENTINEL-http-consumer-key-99";
+/// The OAuth client secret, in `[access:example-api]`.
+pub const HTTP_SECRET: &str = "SENTINEL-http-consumer-secret-88";
+/// The bearer token the API hands back for the key and secret.
+pub const HTTP_TOKEN: &str = "SENTINEL-http-bearer-token-66";
 /// The refresh token it hands back beside it, never used.
-pub const LIBRA_REFRESH: &str = "SENTINEL-libra-refresh-token-44";
+pub const HTTP_REFRESH: &str = "SENTINEL-http-refresh-token-44";
 /// A sudo password elsewhere in the access file: held, never a permission (fac-86).
 pub const SUDO_PW: &str = "SENTINEL-sudo-pw-13";
 
 /// Every sentinel: a leak test looks for each everywhere afterwards.
 pub const SENTINELS: [&str; 9] =
-    [HOST_PW, MONGO_PW, REMOTE_PW, REMOTE_MONGO_PW, LIBRA_KEY, LIBRA_SECRET, LIBRA_TOKEN, LIBRA_REFRESH, SUDO_PW];
+    [HOST_PW, MONGO_PW, REMOTE_PW, REMOTE_MONGO_PW, HTTP_KEY, HTTP_SECRET, HTTP_TOKEN, HTTP_REFRESH, SUDO_PW];
 
 /// The operator's own ssh aliases, each its box's host, login and keys; distinct from the target id.
 pub const STAGING_ALIAS: &str = "ex-staging-box";
@@ -70,7 +70,7 @@ impl Rig {
              [access:host-mongo]\nuser = door_ro\npassword = {MONGO_PW}\n\n\
              [access:app-db]\nuser = door_ro\npassword = {REMOTE_PW}\n\n\
              [access:app-mongo]\nuser = door_ro\npassword = {REMOTE_MONGO_PW}\n\n\
-             [access:libra-api]\nconsumer_key = {LIBRA_KEY}\nconsumer_secret = {LIBRA_SECRET}\n\n\
+             [access:example-api]\nconsumer_key = {HTTP_KEY}\nconsumer_secret = {HTTP_SECRET}\n\n\
              [access:sudo]\nuser = operator\npassword = {SUDO_PW}\n\
              credentials_file = {never}\ntunnel_command = touch {tunnel_ran}\n",
             never = never.display(),
@@ -131,9 +131,9 @@ fn ssh_target(id: &str, alias: &str, r: &std::path::Display) -> String {
          ssh = {{ alias = \"{alias}\" }}\nmisc = true\n\
          [targets.{id}.sql]\ndatabase = \"app\"\nlogin = {{ section = \"app-db\" }}\n\
          [targets.{id}.mongo]\ndatabase = \"logs\"\nlogin = {{ section = \"app-mongo\" }}\n\
-         [targets.{id}.libra]\norigin = \"https://libra.ex.invalid:8243\"\n\
-         client = {{ section = \"libra-api\", key = \"consumer_key\", secret = \"consumer_secret\" }}\n\
-         [targets.{id}.libra.endpoints.invoices]\nabout = \"invoices by date\"\npath = \"/v1/invoices\"\n\
+         [targets.{id}.http]\norigin = \"https://api.example.invalid:8243\"\n\
+         client = {{ section = \"example-api\", key = \"consumer_key\", secret = \"consumer_secret\" }}\n\
+         [targets.{id}.http.endpoints.invoices]\nabout = \"invoices by date\"\npath = \"/v1/invoices\"\n\
          [targets.{id}.file]\nroots = {{ app = \"{r}/srv/app\" }}\nlogs = {{ app = \"{r}/app.log\" }}\n\
          [targets.{id}.sh.echo]\nabout = \"prints its argument\"\nargv = [\"printf\", \"%s\", \"{{path}}\"]\nargs = {{ path = \"path\" }}\n"
     )

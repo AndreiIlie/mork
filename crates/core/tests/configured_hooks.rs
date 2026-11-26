@@ -193,7 +193,7 @@ fn sql_target(database: &str, schema_hint: Option<&str>) -> Target {
             schema_hint: schema_hint.map(str::to_owned),
         }),
         mongo: None,
-        libra: None,
+        http: None,
         file: None,
         sh: BTreeMap::new(),
         misc: false,
