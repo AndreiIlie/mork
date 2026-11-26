@@ -17,10 +17,10 @@ Mork is a local Linux orchestrator (~95k LOC Rust across 8 crates, ~5.5k LOC Rea
    │  mork-ui   │              │ mork-engine │  runtime loop, SQLite journal, bwrap/Landlock/seccomp wall,
    │ (desktop)  │              │             │  per-seat homes, provider traits, CLI drivers, door, web bridge
    └─────┬──────┘              └──────┬──────┘
-         │                      ┌─────┴──────┐
-         ▼                      ▼            ▼
+         │                      ┌─────┘
+         ▼                      ▼
   ┌──────────────┐       ┌────────────┐  ┌─────────────┐
-  │  mork-core   │       │  mork-sys  │  │ mork-fakes  │ (tests only)
+  │  mork-core   │       │  mork-sys  │  │ mork-fakes  │ (mork-app tests only)
   │ (pure logic) │       │  (unsafe)  │  └─────────────┘
   └──────┬───────┘       └────────────┘
          │
