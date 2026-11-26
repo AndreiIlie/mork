@@ -174,12 +174,14 @@ fn first_run_and_restart_offer_only_the_modes_and_defaults_the_engine_applies() 
     let id = mork_types::CardId::new(CARD);
     let mut prior = Card::new(id.clone(), "web", "Earlier run", Mode::Full, 1, s.now);
     prior.stage = Stage::Closed;
+    prior.carries.push(Carried { id: "web-2".into(), ..Default::default() });
     s.state.cards.insert(id.clone(), prior.clone());
     let start = room(&s, CARD).start.unwrap();
     assert_eq!((start.level, start.from.as_str()), (1, "project"));
+    assert_eq!(start.carries, [mork_types::CardId::new("web-2")]);
+    assert!(start.modes.full && !start.modes.report);
 
     s.state.cards.remove(&id);
-    prior.carries.push(Carried { id: "web-2".into(), ..Default::default() });
     prior.head = Some("commit".into());
     prior.delegated = true;
     prior.self_sustained = true;

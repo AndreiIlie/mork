@@ -57,17 +57,14 @@ pub(super) fn start(p: &mut Poster<'_>, project: &str, pr: &OpenPr, review: Revi
     let (n, id) = (pr.pr, card_id(project, pr.pr));
     let prior = p.card(&id);
     let run = prior.as_ref().map_or(1, |c| c.run + 1);
-    let delegated = prior.as_ref().is_some_and(|c| c.delegated);
-    let self_sustained = prior.as_ref().is_some_and(|c| c.delegated && c.self_sustained);
+    let mut c = Card::new(id.clone(), project, &pr.title, Mode::Review, run, p.now);
+    (c.delegated, c.self_sustained) = crate::messages::auto::inherited(p.state, &c.project, prior.as_ref());
     let mut review = match prior.and_then(|c| c.review) {
         Some(r) => Review { merge: review.merge || r.merge, auto: review.auto, dest: review.dest, ..carried(*r) },
         None => review,
     };
     copy_context(&mut review, pr);
-    let mut c = Card::new(id.clone(), project, &pr.title, Mode::Review, run, p.now);
     let into = review.dest.as_deref().unwrap_or("base");
-    c.delegated = delegated || crate::messages::auto::on(p.state, &c.project);
-    c.self_sustained = self_sustained;
     c.description = format!("PR {n} from {} ({} → {into})", pr.author, pr.branch);
     c.head = Some(pr.head.clone());
     c.branch = Some(pr.branch.clone());
@@ -121,8 +118,7 @@ pub(super) fn branch(state: &State, project: &str, branch: &str, ctx: Ctx<'_>) -
     }
     let run = prior.as_ref().map_or(1, |c| c.run + 1);
     let mut c = Card::new(id.clone(), project, &format!("Branch {branch}"), Mode::Review, run, ctx.now);
-    c.delegated = prior.as_ref().is_some_and(|x| x.delegated) || crate::messages::auto::on(p.state, &c.project);
-    c.self_sustained = prior.as_ref().is_some_and(|x| x.delegated && x.self_sustained);
+    (c.delegated, c.self_sustained) = crate::messages::auto::inherited(p.state, &c.project, prior.as_ref());
     c.description = format!("Branch {branch} (→ {})", cfg.base);
     c.branch = Some(branch.to_owned());
     c.first_seq = p.state.next_seq;
@@ -161,8 +157,7 @@ fn carried(mut r: Review) -> Review {
 /// clone; its rounds, findings and raisers carried, its kept seats resumed.
 pub(super) fn reopen(p: &mut Poster<'_>, prior: Card, base: &Sha, ctx: Ctx<'_>) -> Card {
     let mut c = Card::new(prior.id.clone(), prior.project.as_str(), &prior.title, Mode::Review, prior.run + 1, ctx.now);
-    c.delegated = prior.delegated || crate::messages::auto::on(p.state, &c.project);
-    c.self_sustained = prior.delegated && prior.self_sustained;
+    (c.delegated, c.self_sustained) = crate::messages::auto::inherited(p.state, &c.project, Some(&prior));
     c.description = prior.description;
     c.branch = prior.branch;
     c.pr = prior.pr;

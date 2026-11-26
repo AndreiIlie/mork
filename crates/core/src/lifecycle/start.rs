@@ -99,9 +99,7 @@ fn start_in(
         c.delegated = true;
         c.self_sustained = options.self_sustained;
     } else {
-        // Delegated until the operator turns it off, a new run too (fac-172); else by its project's auto (fac-381).
-        c.delegated = prior.as_ref().is_some_and(|c| c.delegated) || crate::messages::auto::on(p.state, &c.project);
-        c.self_sustained = prior.as_ref().is_some_and(|c| c.delegated && c.self_sustained);
+        (c.delegated, c.self_sustained) = crate::messages::auto::inherited(p.state, &c.project, prior.as_ref());
     }
     c.visual = visual;
     c.first_seq = p.state.next_seq;

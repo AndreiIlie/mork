@@ -87,6 +87,10 @@ fn takes(c: &Card) -> Result<(), String> {
     Ok(())
 }
 
+pub(crate) fn inherited(mode: Mode, prior: Option<&Card>) -> bool {
+    mode == Mode::Full && prior.is_some_and(|c| c.visual)
+}
+
 /// A run's visual mode: asked by its start, or carried from the card's last run, on a full card alone.
 pub(super) fn of_run(run: &Card, asked: bool, prior: Option<&Card>) -> Result<bool, String> {
     if asked && run.mode != Mode::Full {
@@ -95,5 +99,5 @@ pub(super) fn of_run(run: &Card, asked: bool, prior: Option<&Card>) -> Result<bo
             crate::lifecycle::facts::mode_word(run.mode)
         ));
     }
-    Ok(run.mode == Mode::Full && (asked || prior.is_some_and(|c| c.visual)))
+    Ok(asked || inherited(run.mode, prior))
 }

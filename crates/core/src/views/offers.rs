@@ -3,7 +3,7 @@
 
 use mork_types::about::{Switch, SwitchPosition};
 use mork_types::ask::{Ask, AskKind};
-use mork_types::card::{Card, Mode};
+use mork_types::card::{Card, Mode, Stage};
 use mork_types::state::{Agent, Sender};
 use mork_types::view::Offer;
 use mork_types::{AgentKey, CardId, Command};
@@ -74,19 +74,7 @@ fn card_actions(state: &State, card: &CardId, ctx: Ctx<'_>) -> Vec<Offer> {
         ("merge", Command::Merge { card: c() }),
         ("done", Command::Done { card: c() }),
         ("post", Command::Post { card: c() }),
-        (
-            "start",
-            start_command(
-                card,
-                None,
-                state
-                    .cards
-                    .get(card)
-                    .filter(|c| c.stage != mork_types::card::Stage::Done)
-                    .map(carried_ids)
-                    .unwrap_or_default(),
-            ),
-        ),
+        ("start", start_command(card, None, restart_carries(state.cards.get(card)))),
     ];
     candidates.into_iter().filter(|(_, cmd)| accepted(state, cmd, ctx)).map(|(l, cmd)| offer(l, cmd)).collect()
 }
@@ -211,12 +199,11 @@ fn session_missing<'s, 'a>(agent: impl Fn(&AgentKey) -> Option<&'s Agent>, ask: 
     missing.then_some(k)
 }
 
-fn carried_ids(card: &Card) -> Vec<CardId> {
-    card.carries.iter().map(|k| k.id.clone()).collect()
-}
-
-fn carried(state: &State, id: &CardId) -> Vec<CardId> {
-    state.cards.get(id).filter(|c| crate::lifecycle::carried::unlanded(state, c)).map(carried_ids).unwrap_or_default()
+fn restart_carries(prior: Option<&Card>) -> Vec<CardId> {
+    prior
+        .filter(|c| c.stage != Stage::Done)
+        .map(|c| c.carries.iter().map(|k| k.id.clone()).collect())
+        .unwrap_or_default()
 }
 
 fn start_command(card: &CardId, mode: Option<Mode>, carries: Vec<CardId>) -> Command {
@@ -240,16 +227,14 @@ pub(super) fn start_defaults(state: &State, place: &str, ctx: Ctx<'_>) -> Option
     if prior.is_some_and(|c| c.stage.is_live()) {
         return None;
     }
-    let carries = carried(state, &id);
+    let carries = restart_carries(prior);
     let takes = |mode| accepted(state, &start_command(&id, Some(mode), carries.clone()), ctx);
     let modes = mork_types::about::StartModes { full: takes(Mode::Full), report: takes(Mode::Report) };
-    let previous = prior.filter(|c| c.delegated);
-    let level = previous
-        .map_or_else(|| u8::from(crate::messages::auto::on(state, &board.project)), |c| 1 + u8::from(c.self_sustained));
+    let (delegated, self_sustained) = crate::messages::auto::inherited(state, &board.project, prior);
     (modes.full || modes.report).then(|| mork_types::about::StartDefaults {
-        level,
-        from: if previous.is_some() { "run" } else { "project" }.into(),
-        visual: prior.is_some_and(|c| c.visual),
+        level: u8::from(delegated) + u8::from(self_sustained),
+        from: if prior.is_some_and(|c| c.delegated) { "run" } else { "project" }.into(),
+        visual: crate::lifecycle::visual::inherited(Mode::Full, prior),
         carries,
         modes,
     })
