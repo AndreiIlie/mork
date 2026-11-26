@@ -444,6 +444,28 @@ token = "{}"
         assert_eq!((size(16), size(20)), (400, 300), "the screenshot isn't the window's size");
     }
 
+    fn remove_peer_at_launch(rig: &mut Rig, peer: &std::path::Path) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::create_dir(peer).unwrap();
+        let wrapper = rig.t.root.join("bwrap-finish-peer");
+        std::fs::write(
+            &wrapper,
+            r#"#!/usr/bin/python3
+import os, sys
+args = sys.argv[1:]
+if "ex-1/foreman" in args:
+    peer = os.environ["PEER_CLONE"]
+    assert peer in args, "peer clone missing from planned mounts"
+    os.rmdir(peer)
+os.execv("/usr/bin/bwrap", ["bwrap", *args])
+"#,
+        )
+        .unwrap();
+        std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+        rig.set_env("PEER_CLONE", peer.to_str().unwrap());
+        rig.set_env("MORK_TEST_BWRAP", wrapper.to_str().unwrap());
+    }
+
     // T1.33, M1.28: its own clone stays writable while the shared clones and data remain read-only.
     #[test]
     fn m1_28_a_card_turn_writes_its_clone() {
@@ -454,6 +476,8 @@ token = "{}"
         let work = listed_folder(&mut rig);
         let f = rig.fhome();
         std::fs::create_dir_all(f.join("clones/other-card")).unwrap();
+        let finished = f.join("clones/finished-card");
+        remove_peer_at_launch(&mut rig, &finished);
         rig.put_cards(vec![rig.card("ex-1", mork_types::card::Mode::Full)]);
         let clone = f.join("clones/ex-1");
         let roots = [work.join("data"), std::path::PathBuf::from("/data")];
@@ -461,7 +485,7 @@ token = "{}"
             roots.iter().flat_map(|p| HIDDEN_NAMES.iter().chain(PUBLIC_NAMES).map(|n| p.join(n))).collect();
         let spec = json!({
             "read": read,
-            "exists": [f.join("clones/other-card"), roots[0].join("ACCESS-private/hidden"), roots[1].join("ACCESS-private/hidden")],
+            "exists": [finished, f.join("clones/other-card"), roots[0].join("ACCESS-private/hidden"), roots[1].join("ACCESS-private/hidden")],
             "writable": [clone.clone(), f.join("agent-home"), f.join("clones/other-card"), roots[1].clone()],
         });
         rig.scenario(json!([{"agent": "ex-1/foreman", "steps": [{"do": "probe", "spec": spec}, {"do": "hang"}]}]));
@@ -474,6 +498,8 @@ token = "{}"
         wait_until("the probe", LONG, || line().is_some());
         let r = line().unwrap();
         assert_eq!(r["writable"][clone.display().to_string()], "WROTE", "{r}");
+        assert!(!finished.exists(), "the peer must be removed at launch");
+        assert_eq!(r["exists"][finished.display().to_string()], false, "{r}");
         assert_eq!(r["exists"][f.join("clones/other-card").display().to_string()], true, "{r}");
         assert_eq!(r["writable"][f.join("clones/other-card").display().to_string()], "EROFS", "{r}");
         assert_eq!(r["writable"]["/data"], "EROFS", "{r}");
