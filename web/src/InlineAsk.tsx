@@ -27,7 +27,7 @@ export function InlineAsk({ hand, triage, live }: { hand: HandView; triage?: Tri
   const refusal = refusals[hand.ask] ?? null;
   const [answering, setAnswering] = useState<string | null>(null);
   const [answerError, setAnswerError] = useState<string | null>(null);
-  // Options and the seat's pick come typed from its hand (fac-696); an ask without them is plain prose.
+  // Options and the seat's pick come typed from its hand; an ask without them is plain prose.
   const choices = hand.kind === "answer" ? hand.choices : undefined;
   const options = (choices?.options ?? []).map((text, i) => ({ n: String(i + 1), text }));
   const pick = choices?.pick !== undefined ? String(choices.pick) : undefined;
@@ -83,7 +83,7 @@ export function InlineAsk({ hand, triage, live }: { hand: HandView; triage?: Tri
 
 const bullets = (lines: string[]) => lines.map((l) => `- ${l}`).join("\n");
 
-// The plan's approve: its typed sketch's changes and the card's decisions; its code shape folds (fac-696).
+// The plan's approve: its typed sketch's changes and the card's decisions; its code shape folds.
 // A recap without the typed sketch shows its words as plain prose, the decisions still under them.
 function ApproveBody({ words, brief, decisions }: { words: string; brief?: BriefView; decisions: string[] }) {
   const [open, setOpen] = useState(false);

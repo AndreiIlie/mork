@@ -1,6 +1,6 @@
 <!--
-Temporary visual reference mock for the Web UI moonshot (fac-695 through fac-701).
-Delete this file once fac-701 lands.
+Temporary visual reference mock for the Web UI moonshot.
+Delete this file once the Web UI rollout is complete.
 
 Known mock quirks already flagged by the operator (do NOT copy these two bugs into web/):
 1. .nav-group had `padding: 6px 0` above its divider, leaving a 6px black gap under an active last row; production bordered containers holding full-bleed rows must have zero vertical padding.
@@ -628,7 +628,7 @@ Known mock quirks already flagged by the operator (do NOT copy these two bugs in
         <button class="nav-card" onclick="showPage('card'); setScenario('ask')">
           <div class="nav-card-top">
             <span class="dot amber"></span>
-            <span class="nav-card-id mono">fac-685</span>
+            <span class="nav-card-id mono">ex-685</span>
             <span class="nav-card-stage mono">Spec</span>
           </div>
           <div class="nav-card-title">Web Board Usage panel, Reload and Look-back triggers</div>
@@ -636,7 +636,7 @@ Known mock quirks already flagged by the operator (do NOT copy these two bugs in
         <button class="nav-card" onclick="showPage('card'); setScenario('triage')">
           <div class="nav-card-top">
             <span class="dot red"></span>
-            <span class="nav-card-id mono">fac-601</span>
+            <span class="nav-card-id mono">ex-601</span>
             <span class="nav-card-stage mono">Round 2</span>
           </div>
           <div class="nav-card-title">A review foreman's working files last across rounds</div>
@@ -1003,28 +1003,28 @@ Known mock quirks already flagged by the operator (do NOT copy these two bugs in
               <div class="wake-item">
                 <span class="wake-kind ok mono">landed</span>
                 <div style="flex:1">
-                  <div><strong>fac-601</strong> landed (<code>6b07a33</code>). Queue stopped per your return; reload waiting for your go-ahead.</div>
+                  <div><strong>ex-601</strong> landed (<code>6b07a33</code>). Queue stopped per your return; reload waiting for your go-ahead.</div>
                   <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">23:42 · delegated</div>
                 </div>
               </div>
               <div class="wake-item">
                 <span class="wake-kind auto mono">answered</span>
                 <div style="flex:1">
-                  <div>Answered <code>fac-601/answer/1</code> with Option 1: preserve all of <code>.git/mork/</code> across round remakes and reopens.</div>
+                  <div>Answered <code>ex-601/answer/1</code> with Option 1: preserve all of <code>.git/mork/</code> across round remakes and reopens.</div>
                   <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">23:25 · delegated</div>
                 </div>
               </div>
               <div class="wake-item">
                 <span class="wake-kind ok mono">reloaded</span>
                 <div style="flex:1">
-                  <div>Reloaded engine to <code>787c862</code> (673ms), bringing <code>fac-509</code>, <code>fac-627</code>, <code>fac-606</code> live.</div>
+                  <div>Reloaded engine to <code>787c862</code> (673ms), bringing <code>ex-509</code>, <code>ex-627</code>, <code>ex-606</code> live.</div>
                   <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">23:23 · idle gap</div>
                 </div>
               </div>
               <div class="wake-item">
                 <span class="wake-kind auto mono">routed</span>
                 <div style="flex:1">
-                  <div>Shifted <code>fac-506</code>..<code>fac-601</code> foremen from <code>Gemini 4 Neon</code> to <code>Opus 5.5 · high</code> after Gemini week pace crossed 2x.</div>
+                  <div>Shifted <code>ex-506</code>..<code>ex-601</code> foremen from <code>Gemini 4 Neon</code> to <code>Opus 5.5 · high</code> after Gemini week pace crossed 2x.</div>
                   <div class="mono" style="font-size:11.5px; color:var(--text-3); margin-top:2px">22:56 · quota policy</div>
                 </div>
               </div>
@@ -1037,7 +1037,7 @@ Known mock quirks already flagged by the operator (do NOT copy these two bugs in
               </div>
               <div class="msg-row">
                 <div class="msg-meta"><strong>orchestrator:mork</strong><span class="mono">23:27</span></div>
-                Queue stopped and auto-reload turned off: 15 cards landed cleanly with zero escalations, all live on build <code>787c862</code>, and <code>fac-601</code> finished right after at <code>6b07a33</code>.
+                Queue stopped and auto-reload turned off: 15 cards landed cleanly with zero escalations, all live on build <code>787c862</code>, and <code>ex-601</code> finished right after at <code>6b07a33</code>.
               </div>
             </div>
           </div>
@@ -1116,7 +1116,7 @@ Known mock quirks already flagged by the operator (do NOT copy these two bugs in
             <div class="slist">
               <div class="srow">
                 <span class="dot amber"></span>
-                <button class="mono" style="font-weight:500; width:80px; text-align:left" onclick="showPage('card'); setScenario('ask')">fac-685</button>
+                <button class="mono" style="font-weight:500; width:80px; text-align:left" onclick="showPage('card'); setScenario('ask')">ex-685</button>
                 <div style="flex:1; min-width:0">
                   <div style="font-size:13.5px">Should the Usage panel show rolling 7 days or calendar week?</div>
                   <div style="font-size:12px; color:var(--text-3); margin-top:2px">planner · Spec · <span style="color:var(--amber)">cold in 4m</span></div>
@@ -1126,7 +1126,7 @@ Known mock quirks already flagged by the operator (do NOT copy these two bugs in
               </div>
               <div class="srow">
                 <span class="dot red"></span>
-                <button class="mono" style="font-weight:500; width:80px; text-align:left" onclick="showPage('card'); setScenario('triage')">fac-601</button>
+                <button class="mono" style="font-weight:500; width:80px; text-align:left" onclick="showPage('card'); setScenario('triage')">ex-601</button>
                 <div style="flex:1; min-width:0">
                   <div style="font-size:13.5px">Verify · Round 2 failed · 2 findings to triage</div>
                   <div style="font-size:12px; color:var(--text-3); margin-top:2px">Verify · Round 2 · 9m ago</div>
@@ -1148,14 +1148,14 @@ Known mock quirks already flagged by the operator (do NOT copy these two bugs in
               </button>
               <button class="srow clickable" onclick="showPage('card'); setScenario('ask')">
                 <span class="dot amber"></span>
-                <span class="mono" style="width:80px; font-weight:500">fac-685</span>
+                <span class="mono" style="width:80px; font-weight:500">ex-685</span>
                 <span style="flex:1">Web Board Usage panel, Reload and Look-back triggers</span>
                 <span class="mono" style="font-size:12px; color:var(--amber)">Spec · waiting</span>
                 <span class="stage-prog"><span style="width:25%; background:var(--amber)"></span></span>
               </button>
               <button class="srow clickable" onclick="showPage('card'); setScenario('triage')">
                 <span class="dot red"></span>
-                <span class="mono" style="width:80px; font-weight:500">fac-601</span>
+                <span class="mono" style="width:80px; font-weight:500">ex-601</span>
                 <span style="flex:1">A review foreman's working files last across rounds</span>
                 <span class="mono" style="font-size:12px; color:var(--red)">Verify · Round 2 · triage</span>
                 <span class="stage-prog"><span style="width:80%; background:var(--red)"></span></span>

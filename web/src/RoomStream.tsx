@@ -51,7 +51,7 @@ function collapseRepeats(entries: StreamEntry[]): StreamEntry[] {
   return out;
 }
 
-// A closed ask with its typed options and pick, as its hand gave them (fac-696).
+// A closed ask with its typed options and pick, as its hand gave them.
 function askText(h: ReplyHand): string {
   const options = (h.options ?? []).map((o, i) => `${i + 1}. ${o}`);
   if (!h.ask || options.length === 0) return "";

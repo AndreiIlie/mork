@@ -12,7 +12,7 @@ Boolean flags such as `status --jobs` take no value; JSON commands use `true` or
 Only list fields split items at commas; they also accept a JSON array of strings in one quoted argument.
 `deliverables`' names and `plan`'s tasks never split at commas.
 Give one item per line; `deliverables` also takes one name per argument.
-Arrays preserve spaces, commas and empty items: `mork ctl card.change fac-54 --labels '["Review, then merge","Ready"]'`.
+Arrays preserve spaces, commas and empty items: `mork ctl card.change ex-550 --labels '["Review, then merge","Ready"]'`.
 An argument beginning with `[` is read as an array and rejected if malformed or containing non-string items.
 The same field syntax works in the window's `/` commands.
 
@@ -1100,7 +1100,7 @@ Anyone who may read `card.show` may read it.
 Refused for an unknown card or one no review card reviews.
 A read.
 
-Example: `mork ctl findings fac-120`, or `mork ctl findings pr-web-42`
+Example: `mork ctl findings ex-550`, or `mork ctl findings pr-web-42`
 
 ### triage
 
@@ -1119,7 +1119,7 @@ The operator's; the card's project's orchestrator's only while the card's open `
 Anyone else is buzzed.
 Answers `{"triage": {"card", "round", "fix", "decline", "foreman"}}`.
 
-Example: `mork ctl triage fac-678 --fix 4,5 --decline 6 --foreman 7`
+Example: `mork ctl triage ex-550 --fix 4,5 --decline 6 --foreman 7`
 
 ### resolve
 
