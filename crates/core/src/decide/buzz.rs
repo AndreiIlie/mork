@@ -33,6 +33,10 @@ pub fn buzz(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Option
             "An agent's message carries its kind, as a reply's does: `--kind request`, `response` or `update`.",
         ));
     }
+    if let Command::MessageSendNow { place, seq } = cmd {
+        let target = crate::messages::receipts::posted(state, place, *seq)?;
+        return stopping(state, from, Some(&target.agent.key), true);
+    }
     if let Some(e) = approve_buzz(state, from, cmd) {
         return Some(e);
     }

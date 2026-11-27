@@ -1,31 +1,30 @@
 //! Send now (fac-78): a message cuts its recipient's running turn, and once that turn has settled
 //! its session continues with the message. The card and its other agents run on.
 
-use mork_types::state::{Agent, AgentStatus, Job, Owed, Sender, Settlement};
-use mork_types::{AgentKey, Command};
+use mork_types::AgentKey;
+use mork_types::state::{Agent, AgentStatus, Job, Owed, Settlement};
 use serde_json::json;
 
 use super::receipts;
-use crate::decide::{Ctx, Decision, Intent, buzz};
+use crate::decide::{Ctx, Decision, Intent};
 use crate::post::Poster;
 use crate::state::{Change, State};
 
-pub(super) fn posted(state: &State, from: &Sender, cmd: &Command, place: &str, seq: u64, ctx: Ctx<'_>) -> Decision {
-    let seats = receipts::recipients(state, place);
-    let target = receipts::message(state, place, seq).and_then(|m| receipts::addressed(&seats, m));
-    let Some(target) = target else { return Decision::refused("the message has no recipient seat here") };
-    let key = &target.agent.key;
-    if let Some(e) = buzz::stopping(state, from, Some(key), true) {
-        return buzz::buzzed(from, cmd, e);
-    }
+pub(super) fn posted(state: &State, place: &str, seq: u64, ctx: Ctx<'_>) -> Decision {
+    let Some(target) = receipts::posted(state, place, seq) else {
+        return Decision::refused("the message has no recipient seat here");
+    };
     match target.receipt.pending(seq) {
         None => return Decision::refused("the recipient has already read this message"),
         Some(false) => return Decision::refused("the recipient has no running turn to interrupt"),
         Some(true) => {}
     }
     let mut p = Poster::for_ctx(state, ctx);
-    cut(&mut p, key);
-    let mut d = Decision::ok(json!({"message.send-now": {"seq": seq, "to": key}}));
+    let Some(job) = receipts::current_job(state, target.agent) else {
+        return Decision::refused("the recipient has no running turn to interrupt");
+    };
+    interrupt(&mut p, job);
+    let mut d = Decision::ok(json!({"message.send-now": {"seq": seq, "to": target.agent.key}}));
     p.finish(&mut d);
     d
 }
@@ -42,11 +41,15 @@ pub(super) fn cut(p: &mut Poster<'_>, key: &AgentKey) {
     let Some(job) = p.state.jobs.values().find(|j| &j.owner == key && j.purpose.is_none() && running(j)) else {
         return;
     };
+    interrupt(p, job);
+}
+
+fn interrupt(p: &mut Poster<'_>, job: &Job) {
     let mut j = job.clone();
     j.stop_requested = true;
     j.interrupted = true;
     p.intent(Intent::StopJob { id: j.id.clone() });
-    p.journal("interrupt", None, json!({"agent": key.as_str(), "job": j.id.as_str()}));
+    p.journal("interrupt", None, json!({"agent": j.owner.as_str(), "job": j.id.as_str()}));
     p.other.push(Change::PutJob(Box::new(j)));
 }
 

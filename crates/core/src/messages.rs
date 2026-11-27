@@ -30,7 +30,7 @@ pub fn command(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Dec
     if matches!(cmd, Command::Say { .. }) {
         say::say(state, from, cmd, ctx)
     } else if let Command::MessageSendNow { place, seq } = cmd {
-        interrupts::posted(state, from, cmd, place, *seq, ctx)
+        interrupts::posted(state, place, *seq, ctx)
     } else if let Command::Ack { ask } = cmd {
         asks::ack(state, ask, ctx)
     } else if let Command::Auto { project, off } = cmd {
