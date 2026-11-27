@@ -7,13 +7,11 @@ use std::fs::{self, File};
 use std::io::{self, Read};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use mork_types::config::{BoardConfig, Config};
 
-use crate::jobs::launch;
 use crate::paths::Home;
-use crate::{config, files, seat_homes};
+use crate::{config, files, git, seat_homes};
 
 #[derive(Default)]
 pub struct Options<'a> {
@@ -46,19 +44,6 @@ fn resolved(path: &Path) -> Result<PathBuf, String> {
     let parent = abs.parent().ok_or_else(|| at(path, "missing parent"))?;
     let name = abs.file_name().ok_or_else(|| at(path, "unresolved path"))?;
     Ok(resolved(parent)?.join(name))
-}
-
-fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
-    let mut argv = vec!["git"];
-    argv.extend_from_slice(args);
-    let result =
-        launch::short_unlogged(&argv, dir, Duration::from_secs(20), &[("GIT_TERMINAL_PROMPT".into(), "0".into())])
-            .map_err(|e| at(dir, e))?;
-    if !result.status.success() {
-        return Err(String::from_utf8_lossy(&result.stderr).trim().to_owned());
-    }
-    let line = String::from_utf8(result.stdout).map_err(|_| at(dir, "git returned a non-UTF-8 value"))?;
-    Ok(line.strip_suffix('\n').unwrap_or(&line).to_owned())
 }
 
 struct Existing {
@@ -108,7 +93,7 @@ impl Setup {
         let host = Path::new(&host).canonicalize().map_err(|e| at(Path::new(&host), e))?;
         let tools = detect::installed(&host)?;
         let identity = |key| {
-            git(repo, &["config", "--get", key])
+            git::unlogged(repo, &["config", "--get", key])
                 .ok()
                 .filter(|s| !s.trim().is_empty())
                 .ok_or("set git config user.name and git config user.email before running init")
@@ -208,10 +193,11 @@ struct Registration {
 
 impl Registration {
     fn prepare(home: Home, config: PathBuf, root: PathBuf, opts: &Options<'_>) -> Result<Self, String> {
-        let branch =
-            git(&root, &["symbolic-ref", "--quiet", "HEAD"]).map_err(|_| "check out a branch: HEAD is detached")?;
+        let branch = git::unlogged(&root, &["symbolic-ref", "--quiet", "HEAD"])
+            .map_err(|_| "check out a branch: HEAD is detached")?;
         let base = branch.strip_prefix("refs/heads/").ok_or("HEAD does not name a branch")?.to_owned();
-        git(&root, &["rev-parse", "--verify", "--quiet", "HEAD^{commit}"]).map_err(|_| "the branch needs a commit")?;
+        git::unlogged(&root, &["rev-parse", "--verify", "--quiet", "HEAD^{commit}"])
+            .map_err(|_| "the branch needs a commit")?;
         let name = text::name(&root, opts.name)?;
         if opts.prefix.is_some_and(|s| !text::valid_prefix(s)) {
             return Err("pass --prefix with one or more ASCII letters".into());
@@ -329,8 +315,9 @@ pub fn register(home: &Home, opts: &Options<'_>, bin: &Path) -> Result<String, S
     if path.starts_with(resolved(&home.clones())?) {
         return Err("cannot register a Mork agent clone".into());
     }
-    let root =
-        PathBuf::from(git(&path, &["rev-parse", "--show-toplevel"]).map_err(|_| at(&path, "not a git checkout"))?);
+    let root = PathBuf::from(
+        git::unlogged(&path, &["rev-parse", "--show-toplevel"]).map_err(|_| at(&path, "not a git checkout"))?,
+    );
     let root = root.canonicalize().map_err(|e| at(&root, e))?;
     let existing = Existing::read(&config)?;
     if let Some(message) = existing.as_ref().and_then(|old| old.registered(&root)) {

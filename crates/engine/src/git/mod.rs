@@ -60,14 +60,38 @@ pub fn git_env(
     timeout: Duration,
     env: &[(String, String)],
 ) -> Result<String, GitError> {
+    let stdout = run(Some(home), dir, args, timeout, env)?;
+    Ok(String::from_utf8_lossy(&stdout).trim().to_owned())
+}
+
+/// Reads a UTF-8 value before init can write logs, preserving any whitespace in a checkout path.
+pub(crate) fn unlogged(dir: &Path, args: &[&str]) -> Result<String, GitError> {
+    let mut stdout = run(None, dir, args, SHORT, &[])?;
+    if stdout.last() == Some(&b'\n') {
+        stdout.pop();
+    }
+    String::from_utf8(stdout)
+        .map_err(|_| GitError::Refused(format!("{}: git returned a non-UTF-8 value", dir.display())))
+}
+
+fn run(
+    home: Option<&Home>,
+    dir: &Path,
+    args: &[&str],
+    timeout: Duration,
+    env: &[(String, String)],
+) -> Result<Vec<u8>, GitError> {
     let mut argv = vec!["git"];
     argv.extend_from_slice(args);
     let mut all: Vec<(String, String)> = vec![("GIT_TERMINAL_PROMPT".into(), "0".into())];
     all.extend_from_slice(env);
-    let out = launch::short_env(home.root(), &argv, dir, timeout, &all)
-        .map_err(|source| GitError::Run { args: args.join(" "), source })?;
+    let out = match home {
+        Some(home) => launch::short_env(home.root(), &argv, dir, timeout, &all),
+        None => launch::short_unlogged(&argv, dir, timeout, &all),
+    }
+    .map_err(|source| GitError::Run { args: args.join(" "), source })?;
     if out.status.success() {
-        Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+        Ok(out.stdout)
     } else {
         Err(GitError::Failed { args: args.join(" "), stderr: String::from_utf8_lossy(&out.stderr).trim().to_owned() })
     }
