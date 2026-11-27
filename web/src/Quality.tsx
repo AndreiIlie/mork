@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { dollars } from "./format";
 import { useQuality } from "./quality";
+import { List, Row } from "./ui/List";
 import { SectionHead } from "./ui/Section";
 
 type Cell = string | number;
@@ -16,18 +17,9 @@ function Figures({ title, population, columns, rows, empty }: {
     <section className="mb-gutter">
       <SectionHead title={title} note={population} />
       {rows.length === 0 ? <p className="text-label-13 text-gray-700">{empty}</p> : (
-        <div className="overflow-x-auto border border-gray-400">
-          <table className="w-full text-left text-label-13" aria-label={title}>
-            <thead>
-              <tr>{columns.map(label => <th scope="col" className="whitespace-nowrap px-3 py-2 text-gray-700" key={label}>{label}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-gray-400">
-              {rows.map(row => <tr key={JSON.stringify(row)}>
-                {row.map((cell, i) => <td className="whitespace-nowrap px-3 py-3 tabular-nums" key={columns[i]}>{cell}</td>)}
-              </tr>)}
-            </tbody>
-          </table>
-        </div>
+        <List table={{ label: title, columns }}>
+          {rows.map(row => <Row key={JSON.stringify(row)} cells={row} />)}
+        </List>
       )}
     </section>
   );

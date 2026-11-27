@@ -15,9 +15,32 @@ const PANE_INDENT = {
 
 export type RowIndent = keyof typeof INDENT;
 
-/** A bordered list: its rows own the inner edge padding, the list has none. */
-export function List({ children }: { children: ReactNode }) {
-  return <div className="divide-y divide-gray-400 border border-gray-400">{children}</div>;
+const DIVIDERS = "divide-y divide-gray-400";
+const TABLE_CELL = "whitespace-nowrap px-3 first:pl-edge last:pr-edge";
+
+interface TableHead {
+  label: string;
+  columns: readonly string[];
+}
+
+/** A bordered list whose tabular rows share column widths with their header. */
+export function List({ children, table }: { children: ReactNode; table?: TableHead }) {
+  return (
+    <div className={`${DIVIDERS} border border-gray-400`}>
+      {table ? (
+        <div className="overflow-x-auto">
+          <table aria-label={table.label} className="w-full text-left text-label-13">
+            <thead>
+              <tr>{table.columns.map(label => (
+                <th key={label} scope="col" className={`${TABLE_CELL} py-2 text-gray-700`}>{label}</th>
+              ))}</tr>
+            </thead>
+            <tbody className={DIVIDERS}>{children}</tbody>
+          </table>
+        </div>
+      ) : children}
+    </div>
+  );
 }
 
 /** A full-bleed list for a pane: hairlines run edge to edge, rows own the page gutter. */
@@ -37,7 +60,15 @@ export interface RowProps {
 }
 
 /** A row is plain, a button (`onClick`) or a link (`to`); `actions` sit beside the trigger, never inside it. */
-export function Row({ children, indent = 0, pane = false, onClick, expanded, to, actions, active = false }: RowProps) {
+export function Row(props: RowProps | { cells: readonly (string | number)[] }) {
+  if ("cells" in props) {
+    return (
+      <tr>{props.cells.map((cell, i) => (
+        <td key={i} className={`${TABLE_CELL} py-3 tabular-nums`}>{cell}</td>
+      ))}</tr>
+    );
+  }
+  const { children, indent = 0, pane = false, onClick, expanded, to, actions, active = false } = props;
   const left = pane ? PANE_INDENT[indent] : INDENT[indent];
   const right = pane ? "pr-gutter" : "pr-edge";
   const interactive = onClick !== undefined || to !== undefined;
