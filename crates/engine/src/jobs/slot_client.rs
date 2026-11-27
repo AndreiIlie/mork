@@ -214,8 +214,8 @@ pub fn run(args: &[String], own: &str) -> i32 {
         Err(code) => return code,
     };
     if kind == "walls" {
-        print!("{}", answer["walls"]["stdout"].as_str().unwrap_or_default());
         eprint!("{}", answer["walls"]["stderr"].as_str().unwrap_or_default());
+        print!("{}", answer["walls"]["stdout"].as_str().unwrap_or_default());
         return answer["walls"]["exit"].as_i64().and_then(|c| i32::try_from(c).ok()).unwrap_or(2);
     }
     // `--checks` in a project with no checks: nothing to run, and nothing failed (M5.34).
