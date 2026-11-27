@@ -84,16 +84,13 @@ pub fn aggregate(now: i64, cards: &BTreeMap<String, History>) -> Statistics {
         reviewers::collect(&mut obs, card, &partners, &mut rounds);
     }
     reviewers::catch(&mut obs, &rounds);
-    obs.stats.recent.sort_by_key(|r| std::cmp::Reverse(r.0));
-    obs.stats.recent.truncate(20);
     obs.stats
 }
 
 fn verified(obs: &mut Observer, project: &str, run: &runs::Run<'_>, reviews: &[&Event], builder: Option<&Arm>) {
-    let Some(event) = run.rows.iter().find(|e| e.kind == "merge.tested") else { return };
+    let Some((event, first_pass)) = runs::verified(run, reviews) else { return };
     let weight = decay(obs.now, event.time);
-    let rounds = reviews.iter().filter(|r| r.kind == "review.verdict" && r.seq < event.seq).count();
-    let first = f64::from(rounds == 1);
+    let first = f64::from(first_pass);
     if let Some(builder) = builder {
         obs.add("foreman.work", Metric::Quality, builder, Some(project), weight * first, weight);
     }

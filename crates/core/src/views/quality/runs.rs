@@ -67,6 +67,15 @@ pub(crate) fn builder<'a>(rows: &'a [Event], asked: Option<&Event>) -> Option<&'
     if let [only] = built.as_slice() { *only } else { None }
 }
 
+fn rounds_before(reviews: &[&Event], seq: i64) -> usize {
+    reviews.iter().filter(|e| e.kind == "review.verdict" && e.seq < seq).count()
+}
+
+pub(crate) fn verified<'a>(run: &Run<'a>, reviews: &[&Event]) -> Option<(&'a Event, bool)> {
+    let event = run.rows.iter().find(|e| e.kind == "merge.tested")?;
+    Some((event, rounds_before(reviews, event.seq) == 1))
+}
+
 #[derive(Default)]
 struct Totals {
     builders: BTreeMap<QualityGroup, (FirstPass, Vec<usize>)>,
@@ -75,21 +84,20 @@ struct Totals {
 
 impl Totals {
     fn count(&mut self, since: i64, card: &History, run: &Run<'_>, reviews: &[&Event]) {
-        let verified = run.rows.iter().find(|e| e.kind == "merge.tested").filter(|e| e.time >= since);
+        let verified = verified(run, reviews).filter(|(e, _)| e.time >= since);
         let landed = run.rows.iter().find(|e| e.kind == "card.landed").filter(|e| e.time >= since);
         if verified.is_none() && landed.is_none() {
             return;
         }
         let first = reviews.iter().copied().find(|e| e.kind == "review.asked");
         let key = group(&card.project, "foreman", builder(run.rows, first));
-        let rounds = |at: i64| reviews.iter().filter(|e| e.kind == "review.verdict" && e.seq < at).count();
-        if let Some(e) = verified {
+        if let Some((_, first_pass)) = verified {
             let (row, _) = self.builders.entry(key.clone()).or_default();
             row.verified += 1;
-            row.first_pass += usize::from(rounds(e.seq) == 1);
+            row.first_pass += usize::from(first_pass);
         }
         if let Some(e) = landed {
-            let n = rounds(e.seq);
+            let n = rounds_before(reviews, e.seq);
             if n > 0 {
                 let (row, samples) = self.builders.entry(key).or_default();
                 row.landed += 1;

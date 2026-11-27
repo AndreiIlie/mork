@@ -2,7 +2,7 @@ use super::{Event, Observer, arm, decay, ran, runs::Run};
 use crate::routing::{OVERRIDE, lens, metric};
 use crate::views::burn::role_of;
 use mork_types::routing::{Arm, Metric};
-use serde_json::{Value, json};
+use serde_json::json;
 use std::collections::BTreeMap;
 
 fn role<'a>(mode: &str, agent: &'a str) -> &'a str {
@@ -17,7 +17,7 @@ fn role<'a>(mode: &str, agent: &'a str) -> &'a str {
 #[derive(Default)]
 struct SeatRun<'a> {
     topic: Option<&'a str>,
-    route: Option<(i64, Value)>,
+    route: Option<&'a Event>,
     last: Option<Arm>,
     tools: BTreeMap<Arm, (u64, u64, i64)>,
 }
@@ -34,7 +34,7 @@ pub(super) fn turns(obs: &mut Observer, run: &Run<'_>, project: &str) {
                 if let Some(route) = seat.route.take() {
                     finish_route(obs, route, None);
                 }
-                seat.route = Some((e.seq, e.data.clone()));
+                seat.route = Some(e);
             }
             "cost" if ran(e) => record_turn(obs, seat, role, project, e),
             _ => {}
@@ -80,15 +80,22 @@ fn record_turn(obs: &mut Observer, seat: &mut SeatRun<'_>, role: &str, project: 
     }
 }
 
-fn finish_route(obs: &mut Observer, (seq, mut row): (i64, Value), actual: Option<&Arm>) {
-    row["launched"] = json!(actual);
-    if row["mode"] == "shadow" && actual.is_some() {
-        let role = row["role"].as_str().unwrap_or_default();
+fn finish_route(obs: &mut Observer, route: &Event, actual: Option<&Arm>) {
+    let launched = json!(actual);
+    if route.text("mode") == Some("shadow") && actual.is_some() {
+        let role = route.text("role").unwrap_or_default();
         let count = obs.stats.shadow.entry(role.to_owned()).or_default();
-        count[0] += usize::from(row["pick"] == row["launched"]);
+        count[0] += usize::from(route.data["pick"] == launched);
         count[1] += 1;
     }
-    obs.stats.recent.push((seq, row));
+    let recent = &mut obs.stats.recent;
+    let pos = recent.partition_point(|(seq, _)| *seq > route.seq);
+    if pos < 20 {
+        let mut row = route.data.clone();
+        row["launched"] = launched;
+        recent.insert(pos, (route.seq, row));
+        recent.truncate(20);
+    }
 }
 
 pub(super) fn costs(obs: &mut Observer, run: &Run<'_>, project: &str, builder: Option<&Arm>) {
