@@ -91,18 +91,24 @@ fn name_matches(pattern: &[u8], name: &[u8]) -> bool {
 }
 
 pub fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    write_whole_with(path, bytes, |opts| opts)
+    write_whole_with(path, bytes, None, |opts| opts)
 }
 
 /// As [`write_whole`], creating the temporary file with Unix permissions `mode` before writing.
 pub fn write_whole_mode(path: &Path, bytes: &[u8], mode: u32) -> io::Result<()> {
     use std::os::unix::fs::OpenOptionsExt;
-    write_whole_with(path, bytes, |opts| opts.mode(mode))
+    write_whole_with(path, bytes, None, |opts| opts.mode(mode))
+}
+
+pub(crate) fn write_whole_preserving(path: &Path, bytes: &[u8], permissions: fs::Permissions) -> io::Result<()> {
+    use std::os::unix::fs::OpenOptionsExt;
+    write_whole_with(path, bytes, Some(permissions), |opts| opts.mode(0o600))
 }
 
 fn write_whole_with(
     path: &Path,
     bytes: &[u8],
+    permissions: Option<fs::Permissions>,
     configure: impl Fn(&mut fs::OpenOptions) -> &mut fs::OpenOptions,
 ) -> io::Result<()> {
     let dir = path.parent().ok_or_else(|| io::Error::other("no parent folder"))?;
@@ -113,6 +119,9 @@ fn write_whole_with(
     })?;
     let result = (|| {
         f.write_all(bytes)?;
+        if let Some(permissions) = permissions {
+            f.set_permissions(permissions)?;
+        }
         f.sync_all()?;
         drop(f);
         fs::rename(&tmp, path)

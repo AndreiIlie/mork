@@ -57,6 +57,12 @@ impl Home {
     pub fn seat_io(&self, id: &str) -> PathBuf {
         self.seat_ios().join(id)
     }
+    pub fn boards(&self) -> PathBuf {
+        self.root.join("boards")
+    }
+    pub fn tools(&self) -> PathBuf {
+        self.root.join("tools")
+    }
     pub fn homes(&self) -> PathBuf {
         self.root.join("homes")
     }

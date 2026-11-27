@@ -20,6 +20,7 @@ pub mod files;
 mod forge;
 pub mod git;
 mod github;
+pub mod init;
 pub mod jobs;
 mod lock;
 pub mod login_files;

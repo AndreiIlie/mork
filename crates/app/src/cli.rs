@@ -88,6 +88,7 @@ fn with_home(sub: Option<&str>, args: &[String], rest: &[String]) -> i32 {
         Some("status") => local::status(&home),
         Some("doctor") => local::doctor(&home),
         Some("login") => local::login(&home, rest),
+        Some("init") => local::init(&home, rest),
         Some("install") => local::install(rest),
         Some("web") => local::web(&home),
         Some("live-check") => mork_app::live::run(&home, &bin()),

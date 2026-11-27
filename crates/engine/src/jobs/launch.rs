@@ -53,9 +53,18 @@ pub fn short_env(
     timeout: Duration,
     env: &[(String, String)],
 ) -> io::Result<Output> {
-    let (program, _) = argv.split_first().ok_or_else(|| io::Error::other("empty argv"))?;
     let owned: Vec<String> = argv.iter().map(|s| (*s).to_owned()).collect();
     proclog::record(home_root, "short", &owned, &cwd.display().to_string(), false);
+    short_unlogged(argv, cwd, timeout, env)
+}
+
+pub(crate) fn short_unlogged(
+    argv: &[&str],
+    cwd: &Path,
+    timeout: Duration,
+    env: &[(String, String)],
+) -> io::Result<Output> {
+    let (program, _) = argv.split_first().ok_or_else(|| io::Error::other("empty argv"))?;
     let mut child = guarded(argv, cwd, env).spawn()?;
     // Never 0: a signal to group 0 would reach the app's own group.
     let group = -i32::try_from(child.id()).unwrap_or(i32::MAX);

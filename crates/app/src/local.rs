@@ -295,8 +295,7 @@ pub fn install(rest: &[String]) -> i32 {
 
 /// `mork web` (fac-671): prints the local web bridge's keyed link; refused inside walls.
 pub fn web(home: &Home) -> i32 {
-    let walled = ["MORK_JOB", "MORK_AGENT_SOCK"].iter().any(|k| std::env::var_os(k).is_some_and(|v| !v.is_empty()));
-    if walled {
+    if inside_wall() {
         return fail("mork web is refused inside a wall");
     }
     let port = match web_port(home) {
@@ -334,4 +333,45 @@ fn web_port(home: &Home) -> Result<u16, String> {
         Some(0) => Err("web_port = 0 uses an ephemeral port; start Mork to get its bound port".into()),
         Some(port) => Ok(port),
     }
+}
+
+fn inside_wall() -> bool {
+    ["MORK_JOB", "MORK_AGENT_SOCK"].iter().any(|k| std::env::var_os(k).is_some_and(|v| !v.is_empty()))
+}
+
+pub fn init(home: &Home, rest: &[String]) -> i32 {
+    use mork_engine::init::{Options, register};
+    if inside_wall() {
+        return fail("mork init is refused inside a wall");
+    }
+    let mut opts = Options::default();
+    let mut args = rest.iter().map(String::as_str);
+    while let Some(arg) = args.next() {
+        let field = match arg {
+            "--name" => &mut opts.name,
+            "--prefix" => &mut opts.prefix,
+            "--test" => &mut opts.test,
+            repo if !repo.starts_with('-') && opts.repo.is_none() => {
+                opts.repo = Some(repo);
+                continue;
+            }
+            _ => return init_usage(),
+        };
+        let Some(value) = args.next().filter(|v| !v.starts_with("--")) else { return init_usage() };
+        if field.replace(value).is_some() {
+            return init_usage();
+        }
+    }
+    match register(home, &opts, &bin()) {
+        Ok(message) => {
+            println!("{message}");
+            0
+        }
+        Err(error) => fail(&format!("mork init: {}", error.lines().collect::<Vec<_>>().join(" "))),
+    }
+}
+
+fn init_usage() -> i32 {
+    eprintln!("mork init [<repo>] [--name <project>] [--prefix <letters>] [--test <command>]");
+    2
 }
