@@ -292,6 +292,7 @@ pub fn prepared(state: &State, job: &Job, session: Option<&str>, ctx: Ctx<'_>) -
     // Its first turn names its `io/` folder, kept for the seat's lifetime (fac-654).
     a.io.get_or_insert_with(|| job.id.as_str().to_owned());
     let mut job = job.clone();
+    job.chosen_by = a.choice.as_ref().map(|c| c.by.clone());
     job.head = asked_head(state, agent, &a);
     job.seen = news_reached(state, agent, &a);
     let mut d = Decision::default();

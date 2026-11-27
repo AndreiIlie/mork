@@ -51,11 +51,14 @@ pub fn apply(
     } else {
         answer_ask(p, who, reply, gate, hand_seq);
     }
-    p.journal(
-        "reply",
-        places::card_of(state, &who.place).as_ref().map(|c| c.as_str()),
-        json!({"agent": who.key.as_str(), "outcome": reply.outcome.as_str(), "hand": hand_seq}),
-    );
+    let mut data = json!({"agent": who.key.as_str(), "outcome": reply.outcome.as_str(), "hand": hand_seq});
+    if who.role == mork_types::reply::Role::Reviewer
+        && matches!(reply.outcome, Outcome::ReviewPass | Outcome::ReviewFail)
+    {
+        data["round"] = json!(round);
+        data["job"] = json!(p.ending);
+    }
+    p.journal("reply", places::card_of(state, &who.place).as_ref().map(|c| c.as_str()), data);
 }
 
 // Waking only where it reaches an agent, the sender too, whatever its kind: a label wakes nobody,

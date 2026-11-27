@@ -54,6 +54,7 @@ impl Sim {
             opening: false,
             io_copies: BTreeMap::new(),
             purpose: None,
+            chosen_by: None,
             limits_at: 0,
             head: None,
             checks_at: None,

@@ -367,6 +367,8 @@ pub enum Settlement {
 /// A job's record in the state: its intent, everything its folder holds (1.4.2.3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Job {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chosen_by: Option<String>,
     pub id: JobId,
     pub kind: JobKind,
     pub owner: AgentKey,

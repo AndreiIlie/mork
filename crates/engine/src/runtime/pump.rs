@@ -86,6 +86,7 @@ pub fn job_of(spec: JobSpec, stdin: String, io_files: BTreeMap<String, String>) 
         opening: false,
         io_copies: BTreeMap::new(),
         purpose: None,
+        chosen_by: None,
         limits_at: 0,
         head: None,
         checks_at: None,

@@ -56,7 +56,8 @@ pub(super) fn note(a: &mut Agent, s: &SessionSeen, job: &Job, now: i64) -> Optio
     }
     a.cost_job = Some(job.id.clone());
     let mut line = json!({
-        "agent": a.key.as_str(), "job": job.id, "session": session, "at": now,
+        "ran": s.answered || s.tools || delta.is_some_and(|n| n > 0) || tokens.is_some_and(|t| t != Tokens::default()),
+        "by": job.chosen_by, "agent": a.key.as_str(), "job": job.id, "session": session, "at": now,
         "cli": selection.as_ref().map(|s| s.cli), "model": selection.as_ref().map(|s| s.model.as_str()),
         "effort": selection.as_ref().map(|s| s.effort), "delta": delta.unwrap_or(0), "unknown": delta.is_none(),
     });
