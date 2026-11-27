@@ -65,7 +65,9 @@ description: "Use when you are a review card's blind reviewer with one topic of 
    The plan's proof list sets the minimum.
    A small regression test for changed behaviour is allowed within the repository's Tests rules.
    A new test must fail with the fix it covers disabled: read whether it exercises the path that fix changed.
-   When reading doesn't settle it, run it with the fix reverted in a scratch worktree of your own under `.git/`, never in the clone's tracked files; one that still passes is a finding.
+   When reading doesn't settle it, run it with the fix reverted in a scratch worktree. A test that still passes is a finding.
+   Keep your scratch files and worktrees under `.git/mork/scratch-<seat>/` in the review clone, using your short seat name (for example, `.git/mork/scratch-reviewer-2/`).
+   Clean up only your own scratch folder. Never remove another seat's scratch folder or its parent.
    A test those rules forbid or a missing test they require is a finding.
 7. **Prove every finding,** step by step, with the least evidence that shows it: its file and line, its summary, its proof (the source, a reproduction, a timing).
    When you find a rule broken in one case, check its related cases and report every broken case in the same round.
