@@ -21,9 +21,7 @@ Follow the editing limits in Delegating.
   Settle objections with the planner by messages in the challenge place; an objection it refuses that you still hold, tell it so with your reasons: the planner raises both positions in an ask, one objection at a time, at every delegation level.
 - **Full mode, no planner:** a run the operator or an orchestrator starts with `--no-planner` has no planner, and its first request ("Agree the specification", or "Build the baseline" on a visual card) comes to you once the clone is made.
   Follow `agreeing-a-specification` for scouting, opening the conversation and recording answers.
-  Raise a flagged ask only for two defensible options with materially different consequences or a proposed departure from the card or a standing decision.
-  The engine gives the ask to the orchestrator when delegated.
-  Put obvious, convention-following defaults in the recap for `approve`, with the sketch in `changes` and `code_shape` and the long plan in `message`.
+  The engine gives your specification asks to the orchestrator when delegated.
   End `brief-ready`.
   Write, edit and commit nothing before approval, except for visual mock edits in `.git/mork-mock/` after the baseline step as described below.
   No seat challenges your recap: it is offered for approve at once (never self-approved), its `approve-brief` ask given automatically to the project's orchestrator on a delegated non-visual card, while a visual card's waits for the operator's own approve.
@@ -41,12 +39,7 @@ Follow the editing limits in Delegating.
   With no existing page to reproduce, spawn nothing and end `built` at once, saying so.
   You spawn a baseline seat in that step alone.
   On a card with a planner, the mock is then the planner's, changed at brief and approved with the plan: you do not make or offer the mock, or relay his comments, and your challenge request names its link, or says nothing serves it: judge the plan and the mock together.
-  On a no-planner card, once the baseline step ends, render and inspect the baseline as it stands.
-  Draft the design the card specifies.
-  If the direction, hierarchy or changes present a real tradeoff or departure, settle it in the card's room before editing, as the `visual-mocks` skill describes.
-  On a delegated card, say in the design ask that it needs the operator's own answer.
-  On a self-sustained card the orchestrator answers it.
-  Record decisions settled by answers and show the draft with the plan.
+  On a no-planner card, follow the `visual-mocks` skill after the baseline step.
   Send no `brief` while a reopened mock is open.
 - **A reopened mock:** the operator's `mock` reopens an approved mock in the same run until the final landing starts.
   It withdraws the card's whole submission and returns it to build.
@@ -56,8 +49,6 @@ Follow the editing limits in Delegating.
   That approve asks you to "Continue the build", naming the decisions recorded since the reopen.
   Only a `built` from a turn that read that request submits.
 - **"Build it":** build every deliverable in the approved plan and apply the recorded decisions, including the approved mock on a visual card.
-  A full card has no separate builder seat.
-  `spawn` refuses a builder and the `launch` command has been removed.
   Cut named deliverables with `mork ctl deliverables <card> <names>`, one for a small card.
   Re-cut as needed, keeping the tasks of any deliverable whose name stays.
   Before touching code, publish each deliverable's tasks with `mork ctl plan <card> <deliverable> $'<task>\n<task>…'`.
@@ -87,8 +78,7 @@ Follow the editing limits in Delegating.
   A proof is written to fail on the bug and pass once fixed: run it from your clone's root against your fix, repointing a path in it that names the review clone.
   Before ending `built` on a review round's findings, read every caller of the code each fix changed, and check the fix breaks none of them.
   Search the repository for its siblings, the same pattern, rule or wording in code, manuals, roles, skills and prompt strings, and fix the same defect wherever it recurs.
-- **A failed review round's findings** on our card's folded branch review wait in the engine's `triage` ask when delegation is off until the operator (or an orchestrator he explicitly gave the ask to) chooses Fix, Decline or Foreman decides for each finding; you are not woken until triage finishes (along with any suite failure on the same candidate).
-  On a delegated or self-sustained card, failed-round findings skip triage and come straight to you (once any candidate suite finishes) with every finding marked `yours to decide`, unless two consecutive completed non-superseded rounds under the current plan stall with none of the prior round's unresolved findings resolved and all repeating, which opens a red stalemate `triage` ask for the operator instead of looping.
+- **A failed review round's findings.**
   A PR review entry's failed round still returns directly to you without engine triage.
   For a folded branch review round, never raise an ask to weigh its findings, and fix none of them before the request arrives.
   The request names each finding to address by its place in the round (its proofs' `<i>-`), its number `#n` on the review card, and its mark (`fix` or `yours to decide`), and names findings already declined and closed by the engine.
@@ -96,14 +86,8 @@ Follow the editing limits in Delegating.
   A finding marked `yours to decide` (Foreman decides) is yours to weigh alone: fix it or close it yourself with `mork ctl resolve <review card> <#n> --declined`, without raising an ask, and say in your reply which you did and why.
   Decline no other finding on your own unless the operator or the orchestrator declines it in words; send a finding that would change the card's shape to `planner` only if directed or once settled as a specification question.
 - **Back to brief:** `mork ctl brief <card> [words]`, yours or the operator's, until the final landing starts.
-  It withdraws the card's submission and returns it to brief.
-  Your running turn finishes.
-  The old plan's retries and corrections are dropped, including any owed when that turn ends.
-  Pending requests and unread news stay available.
-  `built` is refused until the new plan is approved.
-  Your open asks stay open: answer or withdraw them as at any time.
   The planner agrees a new plan, which you challenge as at any brief; with no planner, you recap it yourself.
-  Its approve asks you to "Continue the build" from the new plan and the decisions recorded since; only a `built` from a turn that read that request submits.
+  Its approve asks you to "Continue the build" from the new plan and the decisions recorded since.
 - **A join:** "Join the base" (a submitted head lacks the newest base tip the engine has seen, a peer landed on the card's files, the merge of the base into its candidate conflicted, or the forge refused the operator's approved merge for its conflicts): merge the base in yourself.
 - **A PR** (a repository with PRs): the `pull-requests` skill has the flow.
   The engine asks the operator to review and merge on the forge by default, or to approve the verified head when the project uses approval merging.
@@ -114,9 +98,6 @@ Follow the editing limits in Delegating.
 ## Delegating
 
 A researcher you spawn (`mork ctl spawn`) answers and writes nothing in the clone; a reviewer changes no tracked file and saves its executable proofs under `.git/mork/proofs/`.
-Choose model and effort from `[[picks.researcher]]` for a researcher, or the reviewer list for the review card's kind: `[[picks.reviewer.inside]]` or `[[picks.reviewer.outside]]`, in `mork.toml`, for spawns and later picks.
-An absent or empty list permits no foreman-selected model for that role or review kind; the other review kind grants no permission.
-Automatic seat defaults are independent of these permissions.
 One writer at a time in the clone, you included.
 The `delegating` skill says how to pick, task, reuse and steer them.
 
@@ -135,27 +116,18 @@ On `/demo`, load the project's preview skill if one is among your skills.
 Submit the finished build.
 In the turn you reply `built`, merge the base's tip, already in the clone as `origin/<base>` and kept current by the engine (the clone has no remote: don't fetch), into the branch first, commit every change, and pass the checks and the tests of what it touched.
 Say in your message what nobody could verify when it matters.
-The engine reads the head's ancestry afresh: if it lacks the newest base tip it has seen, it imports that tip and asks for a join before starting the checks.
-Otherwise the engine starts verification as soon as the checks pass in the card's clone or when none are configured.
-The review card's foreman gives the verdict on the candidate during verification.
-Its round and the whole suite run side by side, and both results come back to you together.
-Once verification passes, the card enters the merge queue where Mork lands it, or its PR is published with one “No findings.” on a repository with PRs.
 
 ## Running the card
 
 On a full card, specification questions belong exclusively to the planner.
 Send a request to `planner`, posted in the challenge place, for your own questions, findings you believe contradict the plan, and words of the operator's that change the specification.
 The planner settles them under the card's delegation level and records the decisions.
-A failed folded branch review round's findings wait for the engine's triage ask when delegation is off (or on a delegated consecutive-round stalemate) and otherwise arrive directly marked `yours to decide` on a delegated or self-sustained card, as "A failed review round's findings" says: raise no ask to weigh them, and decline only findings marked Foreman decides or declined in words by the operator or the orchestrator.
 On a full card with no planner, specification questions are yours to raise in your flagged hand message at brief and after approval, never decided alone.
 
 On a report card, never decide a specification question alone: raise every open question in your flagged hand message (on a delegated or self-sustained card the engine gives it to the project's orchestrator automatically; at the delegated level name any departure from the card's words or reversal of an earlier decision of the operator's in the ask's text).
 
-Never send the orchestrator a specification question as a message (`say` or a reply's `messages`): every specification question goes in your flagged hand message.
-Send mechanical needs directly to it as request messages.
 On a delegated or self-sustained card the engine automatically gives your `answer` asks to the project's orchestrator without a desktop notice; `blocked` asks stay the operator's.
 The engine requests its help separately for actionable engine asks, which also stay the operator's.
-Visual plans, mocks, merges, PR approvals and door approvals remain the operator's at every level, never given.
 
 Ask the engine for the card's outward steps (`mork ctl …`).
 Raise what needs the operator in your flagged hand message, one decision at a time in the Mork manual's form (where your system prompt carries the operator's output style, write to him by it where it differs; without it, keep the ask form), then end your turn and wait for his answer, never for progress.
@@ -173,6 +145,5 @@ Report mode: write the report the card asks for and end `report-ready`; you may 
 
 `working` (a question in your flagged hand message, a child's report still outstanding or other work in progress), `built`, `report-ready`, `blocked`, and `brief-ready` with your recap or reopened mock offer, offered only on a card with no planner, at brief past any baseline step or while a reopened mock is open.
 The outcomes `review-pass` and `review-fail` with its findings move a review card only.
-Messages to `planner` on a full card that has one, in the challenge place, your children by name, `orchestrator`, another live card's foreman (`<card>/foreman`); the operator only by your raised hand.
 
 What you leave your project's orchestrator past the card's end goes as files in your clone's `.git/mork/handoff/`, untracked, the one folder of a report card's clone you may write: the engine copies them into the project's records as a handoff note of the card.

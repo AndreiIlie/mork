@@ -9,9 +9,6 @@ Each command's signature is the engine's own catalog, shown under its heading; t
 The `commands` skill says how a command's fields are filled, the JSON form, who a command counts as sent by, its answer and exit codes, and the error codes.
 
 Boolean flags such as `status --jobs` take no value; JSON commands use `true` or `false`.
-Only list fields split items at commas; they also accept a JSON array of strings in one quoted argument.
-`deliverables`' names and `plan`'s tasks never split at commas.
-Give one item per line; `deliverables` also takes one name per argument.
 Arrays preserve spaces, commas and empty items: `mork ctl card.change ex-550 --labels '["Review, then merge","Ready"]'`.
 An argument beginning with `[` is read as an array and rejected if malformed or containing non-string items.
 The same field syntax works in the window's `/` commands.
@@ -589,7 +586,6 @@ Example: `mork ctl dm ex-550 foreman`
 ### spawn
 
 Spawns a researcher, reviewer or baseline seat for a card's foreman: a child, named, walled, in a DM of its own.
-`spawn` refuses the retired builder role.
 
 Researchers require `model` and `effort`.
 A reviewer requires `topic`, what it reviews in the foreman's own words, quoted so a topic of several words passes whole (`--topic 'money, permissions or data integrity'`): the window's room list shows it beside the reviewer's name, and it is saved on the seat only, never on the card.

@@ -8,16 +8,6 @@ description: "Use when your work needs something on a machine outside your wall,
 Use the door for the database and machine operations described here: it runs one operation on one target over the operator's own access.
 No credential, host or alias is ever shown to you, and its database operations are read-only.
 
-Calls run one at a time per target, in ask order.
-A queued request prints a waiting line on stderr, and its window step says it waits: the running call's action id, requester, op, elapsed milliseconds and time limit, and how many calls wait ahead, never its query or parameters.
-Each waiting request has its own 60 second limit before its call starts.
-At that limit it answers `busy`, whose `why` carries those same facts, says nothing ran and says to ask again.
-Requests sharing one call each get their own waiting line and limit; the call is dropped unstarted once its last waiter times out.
-A queued read (every op but `sh.run` and `misc.run`) is also dropped at once when its last caller disconnects (a restart included); a started call keeps running, except `sql.select`, which stops when its last caller disconnects.
-A busy or caller-gone call answers no later request: asking again, in the same turn too, makes a new call.
-A non-read call nobody waits on, including an approved `misc.run` or a `sh.run` pending across a restart, has no queue time limit and runs when its target is free.
-Direct calls never post news when disconnected (only asked and held calls do); retrying in the same turn still gets a finished call's result.
-
 1. **Find the target.**
    `mork ctl door.help` lists the targets, their services, reads, logs and limits; `mork ctl door.help <target>` describes one, and says which is a replica (`sql.read_only_server`; `read_only` is true on every SQL target).
    `mork ctl door --help` lists the operations (`sql.select`, `mongo.find`, `file.tail` and the rest), `mork ctl door --target <t> --help` a target's.

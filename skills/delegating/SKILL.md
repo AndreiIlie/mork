@@ -12,26 +12,20 @@ Use the least work that answers the task.
 - **Spawn a researcher, reviewer or baseline seat.**
   Use `mork ctl spawn <card> researcher '<task>' --model <model> --effort <effort>` for a researcher, or `spawn` with `reviewer` on a review card.
   For a task with quotes or parentheses, its `--task-file <path>` option reads the task from a file in place of `'<task>'`, `-` reading stdin.
-  A visual card's `baseline` seat is the foreman's at its baseline step alone, one at a time: `mork ctl spawn <card> baseline '<task>'`, naming no model, effort or CLI, on its configured default (Sonnet 5.5 at high); only the operator picks it later.
+  A visual card's `baseline` seat is the foreman's at its baseline step alone, one at a time: `mork ctl spawn <card> baseline '<task>'`, naming no model, effort or CLI, on its configured default; only the operator picks it later.
   Task it with the pages to reproduce as they stand today, the mock's link, and "keep what the folder holds, fill what it lacks"; end `built` once its report says the baseline is done.
   A planner can spawn researchers at brief or during a specification dispute.
   The planner is no child: a foreman neither spawns nor picks it.
   A researcher spawn requires both model and effort.
   A reviewer requires `--topic '<topic>'`, quoted, what it reviews in your own words, and a researcher takes none.
   A reviewer may omit model, effort and CLI together to use its configured inside or outside default, without allowlist permission.
-  If any selection option is supplied, both model and effort are required, matching `[[picks.researcher]]` or the reviewer list for the review card's kind: `[[picks.reviewer.inside]]` or `[[picks.reviewer.outside]]`, in `mork.toml`.
-  Each entry has `cli`, `model`, `label` and `efforts`; the effort must be allowed for that particular CLI and model.
-  An absent or empty list permits no foreman-selected model for that role or review kind, for spawns and later picks.
-  The other review kind and the catalog grant no permissions.
-  The review foreman's Allowed models and the refusals name `picks.reviewer.inside` or `picks.reviewer.outside`.
-  Automatic defaults and the operator's own picks are independent of these lists.
-  The lists supply the model and effort permissions.
+  For an explicit selection, name both model and effort from your Allowed models section.
   Selections also preserve the seat's wall: an unwalled Claude seat runs Claude models only.
   `--model` takes the full id or its label's first word; name `--cli` to pick another CLI than the model's own, or when the model has no default CLI.
   A refused spawn makes no child.
   It answers its name (`researcher-2`, `reviewer-1`) and its DM (`<card>/<child>/dm`), where your task is its first request.
   It is walled, has a session of its own, and shows nested under you in the window.
-- **Scout with researcher seats** on a model its list allows (GPT-6.2 Sol today).
+- **Scout with researcher seats** on a model its list allows.
   Read the card and what it names yourself.
   Send the rest as bounded questions the plan depends on, with no fixed roster or count.
   You may skip scouting when the card already names the place.
@@ -42,12 +36,9 @@ Use the least work that answers the task.
   A CLI change starts a fresh session.
   Seat defaults and foreman permissions are separate: `[seats.researcher]` sets researchers' defaults, and `[seats.reviewer]` has `inside` and `outside` settings for our work and outside work.
   Each setting may choose any CLI, model and effort, without constraining or granting a foreman's selections.
-  With no overrides, researchers and reviewers, inside and outside, run on GPT-6.2 Sol at xhigh.
-  Fable, Astra and max are offered to the operator's own picks alone.
-  Explicit picks use the configured permissions at high or xhigh.
-  - For a bounded research question, choose a model at the highest effort on the researcher's allowed list (Sol at xhigh today).
-    For a short "where is X" lookup, choose a model at the lowest effort on that list (Sol at high today).
-  - **A reviewer** spawned without a selection takes its configured inside or outside default; explicit spawns and later picks use only `picks.reviewer.inside` or `picks.reviewer.outside` for its review card's kind.
+  - For a bounded research question, choose a model at the highest effort on the researcher's allowed list.
+    For a short "where is X" lookup, choose a model at the lowest effort on that list.
+  - **A reviewer** spawned without a selection takes its configured inside or outside default.
     Choose the starting effort for the round as the `review-cards` skill says.
     For any topic that touches money, permissions or migrations, use a stronger allowed model at that effort from the start when available.
     For a topic where a reviewer left a doubt unresolved, use a stronger allowed model at that effort or higher.
@@ -68,10 +59,6 @@ Use the least work that answers the task.
   As foreman, after you send a task in your reply, with `say` or `spawn`, end `working` as soon as your independent work is done and the child's report is still outstanding.
   Never wait or poll for it in that turn.
 - **Its report is no submission.**
-  The engine's report of a child's finished, blocked, asking or red reply reaches you in your room, in your running turn between tool calls or by waking you for your next turn.
-  Between a foreman's turns, a plain completion or a reviewer's verdict with `ask` false waits while another child is at work.
-  The held reports wake the foreman once when its last child at work stops.
-  A question, `blocked`, or a red hand outside a reviewer's verdict wakes it at once.
   A planner's researchers wake it each time.
   If you read a report during independent work, act on it in that turn.
   A report your turn ends without reading wakes you then; messages the child writes itself to you stay queued for your next turn.

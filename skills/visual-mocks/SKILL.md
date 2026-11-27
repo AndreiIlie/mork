@@ -11,7 +11,6 @@ A headless Chromium is installed outside seat homes, in Mork's `browsers` folder
 The wall also shows the system Chrome, including its target outside `/usr`; use a writable `--user-data-dir` for it too.
 Give a library such as Puppeteer the installed binary as its `executablePath`, with `--no-sandbox`, never its own download.
 A screenshot meant for your reply goes in your seat's `io/` folder (`MORK_IO`).
-If you can render the page an ask to the operator is about, render it and attach the screenshot.
 Render the baseline at the start of the visual brief when there is a page to reproduce.
 Render a mock before each recap or offer of it when the request gives a link, and during review when the round requests it.
 Otherwise, render when seeing the page settles something reading its code leaves open.
