@@ -13,12 +13,7 @@ A researcher's or baseline seat's run takes a project slot and a machine test ru
   Queued, it prints `mork test: waiting for a slot (…)` and says nothing more until it runs: that is a queue, not a hang, and it keeps waiting across a reload of Mork, `--run`, `--file` and `--checks` alike.
 - **One file's tests:** `mork test --file <path>…`, where the project has a one-file command.
 - **One wall-test file of a full card on `[mork] project`:** when `[mork] project` is configured, its full card's foreman may use `mork test --walls [--no-default-features] <file> [<filter>]`.
-  When `[mork] project` is unset, or for any other seat, `--walls` is refused.
-  Name the file alone (`t1_walls`), with no path, extension, wildcard or flag, and at most one nonempty filter word that is no flag.
-  The engine checks these words before a slot, then runs `cargo test -p mork-app --test <file>` in the card's clone outside every wall, with walls enabled and `faults`, or the production build with `--no-default-features` before the file.
-  It prints the output at the job's end and exits with its code; a failure raises no card ask and no pass is remembered.
-  A connection closing, the seat's turn ending, a reload or a restart stops it without replay, freeing the slot once the job is gone: request it again.
-  When `[mork] project` is configured, verification still runs both phases.
+  If a disconnect, turn end, reload or restart stops the run, request it again.
 - **A JavaScript proof kept under `.git/`** runs with plain `node`, written with `node:test` or `assert`, never as a Jest test, which never looks inside `.git/`: `mork test --run node .git/mork/review-proofs/round-<n>/<proof>.js`, from the clone's root.
 - **The checks gate, before you hand on:** `mork test --checks`, the project's checks command on your clone as it stands, uncommitted changes and new files included, so you can run it before you commit.
   The engine also scans committed history for known secrets when it checks the submission.

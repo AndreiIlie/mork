@@ -16,5 +16,4 @@ The planner (or the foreman on a no-planner card) changes that baseline at brief
 - **One writer at a time.**
   No turn of yours starts while the card's mock holder (its planner, or its foreman on a no-planner card once the mock is open) runs, nor its turn while yours does.
 - **Your `built` or `blocked` reports to the foreman** through the engine in the card's room: `built` once the baseline is done, naming each page and its path under the link; `blocked` saying what you need in your flagged hand message.
-  A message to `foreman` reaches it in the room; one to `orchestrator` stays in your DM; none reaches the operator.
   The foreman's `built` ends the baseline step and releases you.

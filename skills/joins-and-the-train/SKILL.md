@@ -7,8 +7,6 @@ description: "Use when the base moved under a card (a join), or when a candidate
 
 **Its entries.**
 Our card's branch enters verification once its head's checks pass or when none are configured.
-GitHub fork PRs appear only in `prs` and Mork never fetches, verifies or merges their heads.
-For eligible PRs, the poller starts verification on a colleague's PR into the base, on our PR into the base at a head no verification passed, or on a PR into any destination whose title contains the project's `forge.review_tag`.
 The operator can request verification of an eligible PR or a branch with `review`, `review.merge` or `review.branch`.
 No `/merge` is waited for.
 Each is verified on a candidate of its own as it comes, `merging` while it runs, none waiting for another: only its suite waits for a test slot.
@@ -44,8 +42,6 @@ With several merge bases `A...B` picks one and the base's changes look new: diff
 The base's tip is in the clone as `origin/<base>` once the engine imported it, and as the local `<base>` beside it, which each import moves with it, so `git log <base>..HEAD` and `git diff <base>...HEAD` read what the gate reads (a review round's clone has neither, nor a local `<base>` beside a branch named so; a later round's clone holds the round before it as `refs/rounds/<n>`, and when the base moved and both candidates contain their bases may also project it onto the current base as `refs/rounds/<n>-on-base`, named in its request); a join request that names a tip the clone doesn't have is the engine's gap: send your project's orchestrator a request.
 
 **What comes back.**
-When our card's review round fails with findings and delegation is off, it waits for triage (along with any suite failure on the same candidate) instead of waking its foreman: `triage` closes each Decline finding, restarts verification directly when all findings are declined and the suite passed, or sends one fix request to the foreman carrying the Fix and Foreman decides findings plus any suite failure.
-On a delegated or self-sustained card, a failed review round with findings skips triage and sends one request straight to the foreman (once any suite run ends) with every finding marked Foreman decides plus any suite failure, unless two consecutive completed non-superseded rounds under the current plan stall with none of the prior round's unresolved findings resolved and all repeating, which opens a red stalemate `triage` ask for the operator.
 A failed suite with no failed review round, failed checks, or a failed round with no findings returns straight to the foreman; a conflict of its candidate returns as a join; the engine resolves none.
 The same goes for a failure or a conflict at the queue's front.
 Fixed and through its gates again, the card is verified again and enters the queue at its back.

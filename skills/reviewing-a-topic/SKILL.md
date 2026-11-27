@@ -49,19 +49,8 @@ description: "Use when you are a review card's blind reviewer with one topic of 
    A locking read (`FOR UPDATE`, `FOR SHARE`, `LOCK IN SHARE MODE`) is judged from its plain `EXPLAIN` through the door, with real values: the keys it uses and the rows it examines.
    That `EXPLAIN`'s `server_us` is its planning, never the statement's own time: claim no timing of the locking read from it.
    Say in your hand that a write stays unmeasured, which is no finding and needs nothing more.
-   `mork ctl door.help` describes the door's targets and their names; on the project's replica target,
-
-```sh
-mork ctl door --target <that name> --op sql.select --params "$(cat <<'JSON'
-{"query": "SELECT id FROM app.users WHERE name = 'O''Neil'"}
-JSON
-)"
-```
-
-   answers with its rows, its `server_us` (the query's own time on the server, in microseconds) and its `elapsed` (the call's milliseconds, its ssh and MySQL connections included).
-   Judge a read's cost from `server_us`; a null one means unmeasured, never cheap: judge no cost from it or from `elapsed`, and say it was unmeasured.
-   It takes any read outside `information_schema` and the `sys` schema, `EXPLAIN`, `SHOW CREATE TABLE` and `SHOW INDEX FROM` included; a replica target (`sql.read_only_server`, as `door.help` says) has the longer timeout and no row cap but its own.
-   Run it cold and warm, with the parameters a real user would give (the largest owner, the busiest month), and compare with the old form of the query when the diff has one.
+   Use the project's replica as the `the-door-and-databases` skill describes.
+   Run the read cold and warm, with the parameters a real user would give (the largest owner, the busiest month), and compare with the old form of the query when the diff has one.
    Say each timing in your hand.
    A query that reads a table or column the replica doesn't have yet (the change adds it) can't be timed or planned there: time or plan the rest of it, `EXPLAIN` the new part where the replica can, and say in your hand which part is untimed and why; that is no finding and needs nothing more.
    The door answers the same request from the same turn with the first call's action, so a repeated call gives back the first timing: to time it warm, change the query's text (a comment or a different spelling is enough).

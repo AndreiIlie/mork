@@ -42,10 +42,6 @@ description: "Use before sending a mork ctl command: how fields are filled, the 
   `replaced`: a `wakes` waiter another `wakes` replaced.
 - **Builds.**
   When the running mork is another build than the `mork` binary you ran, `mork ctl` and `mork test` run the running build's binary instead, so the commands are always the running build's.
-- **Authority.**
-  An orchestrator stops and resumes any card, never one agent; it may send now to any agent.
-  What an orchestrator does shows as `orchestrator:<project>`, never as `operator`.
-  On a repository with PRs neither `merge` nor `review.merge` merges anything: the operator merges on the forge or approves its verified head on approval projects.
 - **Effects.**
   A command's effects are committed with its answer, in one transaction.
   A command naming a card that has ended reads it back first, and acts on it as on any other.

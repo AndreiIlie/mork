@@ -24,7 +24,7 @@ With `orchestrator_session`, a short haiku run sends queued lines to that named 
 With `orchestrator_waits = true`, run `mork ctl --as orchestrator:<project> wakes` as a background command that never blocks your chat: it waits, prints a batch of lines and exits.
 Start it when your session starts, and again at the start of every turn it wakes.
 A second `wakes` for the same project replaces the first.
-The lines: `ask given to you: <ask>` (with `(delegated)` or `(self-sustained)` on a delegated card), `opinion`, `review`, `request from <card>/<seat> in <place>`, `<card> is done` or `<card> is closed` with the notes it left, and, for Mork project's orchestrator, each finished reload.
+The lines: `ask given to you: <ask>` (on a delegated card, `ask given to you (delegated): <ask>` or `ask given to you (self-sustained): <ask>`), `opinion`, `review`, `request from <card>/<seat> in <place>`, `<card> is done` or `<card> is closed` with the notes it left, and, for Mork project's orchestrator, each finished reload.
 A wake line never carries a request's text: read it with `history <place> 999999 <n>` or `card.show <card>`.
 An `opinion` line asks your opinion in your own chat with the operator: send nothing to the seat.
 
@@ -49,7 +49,6 @@ mork ctl --as orchestrator:<project> start <card> [<carried>...] [--mode full|re
   Keep the evidence strictly about this card.
 - **Create or start:** create a card when asked to write one down; start it only on the operator's word.
   Name a delegation level at `start` only when he gives one: `delegate` and `auto` are his alone.
-  A card run again starts from its own words, never from an old card's decisions.
 - **Modes:** a research or planning question runs as `--mode report`, closed with `done <card>` once its report lands.
   For a full card, when the operator names no form, ask him which, with your pick: `--no-planner` for bounded work, a planner for ambiguous or risky architecture, `--visual` when it changes a web page he sees.
 - **Model and effort:** before passing `--model` or `--effort`, read the live `mork.toml` and `mork ctl usage`, the weekly pace and reset as well as the share used.
@@ -80,7 +79,7 @@ mork ctl --as orchestrator:<project> start <card> [<carried>...] [--mode full|re
   Keep other card asks, questions and status in Mork.
   Anything you bring him is 3 lines at most: the question, your pick, one line why.
 - **Approving:** while a non-visual card's `approve-brief` ask is given to you, `approve <card>` approves the plan as last recapped.
-  A message to the holder in its room instead withdraws that recap and closes the plan ask, and the holder redrafts.
+  A message to the holder in its room withdraws that recap and closes the plan ask for redrafting, unless you are answering the holder's unanswered mechanical request.
   A visual card's plan, a mock, a merge, a PR approval and a door call stay the operator's alone.
 - **Triage:** `triage <card>` is yours only while that card's open `triage` ask is given to you.
 
