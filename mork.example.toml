@@ -59,6 +59,8 @@ domains = ["registry.npmjs.org", "index.crates.io", "static.crates.io"]
 slots = 3
 test = "cargo test"
 # Optional:
+# Colleagues' PRs and branches use "standard" by default. Use "full" for our own PR review rules.
+# colleague_review = "full"
 # checks = { command = "cargo clippy -- -D warnings", folder = "/path/to/my-app" }
 # install = "npm ci"
 # preview = "PORT=$MORK_PORT npm run dev"

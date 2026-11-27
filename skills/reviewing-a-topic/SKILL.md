@@ -41,7 +41,10 @@ description: "Use when you are a review card's blind reviewer with one topic of 
    - **Performance:** follow step 5.
    - **Money, permissions or data integrity:** where money, permissions, SQL, schema, stored data or security change, judge whether the change keeps them as agreed.
    - **Correctness on a colleague's change** covers whether it does what it means to and breaks nothing.
-   Across all topics, conformance to the repository's AGENTS.md or to our test style is no finding on a colleague's change.
+     The author and stakeholders decide the intended product and business behavior. Report broken behavior and regressions.
+
+   Use the colleague review bar in your task. Under the standard bar, AGENTS.md conformance and our test style are no finding.
+   Under the full bar, enforce the repository's AGENTS.md, architecture and test style wherever they apply to your topic.
 4. **Run a test only to prove a finding or for step 6's mutation check,** in a slot (`mork test --run <command>`, a narrow crate, test or filter): the checks ran before your round, and verification runs the whole suite beside it, on the same candidate.
 5. **The performance topic times every read the change adds or changes, including reads affected by a merged base.**
    Judge a locking read from its plan.
@@ -54,7 +57,7 @@ description: "Use when you are a review card's blind reviewer with one topic of 
    Say each timing in your hand.
    A query that reads a table or column the replica doesn't have yet (the change adds it) can't be timed or planned there: time or plan the rest of it, `EXPLAIN` the new part where the replica can, and say in your hand which part is untimed and why; that is no finding and needs nothing more.
    The door answers the same request from the same turn with the first call's action, so a repeated call gives back the first timing: to time it warm, change the query's text (a comment or a different spelling is enough).
-6. **Tests, as code,** are part of correctness and tests on our cards.
+6. **Tests, as code,** are part of correctness on our cards and in full colleague reviews.
    For every test change the checks flag, verify an explicit written reason from the author in a commit message, comment or handoff, or in the approved specification or a recorded decision.
    Flagged changes without that justification are correctness findings.
    The plan's proof list sets the minimum.

@@ -158,6 +158,14 @@ Log redaction and outward text checks use those same configured files.
 Projects with `tickets` parse ticket numbers from card notes and PRs, format PR titles, branches, descriptions and room details from them, and require a `PR wording` note before publishing a PR with tickets.
 `[projects.<name>.forge] review_tag` names a non-empty title substring that triggers automatic PR review into any destination branch on a hosted project with an eligible source branch.
 
+### colleague_review
+
+In `[projects.<name>]`, `colleague_review = "standard"` is the default for colleagues' PRs and branches.
+It keeps the lighter topic rules and filters known ESLint style, copies and words findings from the checks report.
+Set `colleague_review = "full"` to send every check finding and use the same topics as our own PRs for the round's tier, including Design and simplicity when applicable.
+Full reviews enforce the repository's AGENTS.md, architecture and test style.
+The author and stakeholders decide product behavior. Reviewers report broken behavior and regressions.
+
 ### claude_accounts
 
 In `mork.toml`, `[claude_accounts]` maps each saved account's name (`[A-Za-z0-9._-]`, not `.` or `..`, matching `<name>.claude.json` and `<name>.credentials.json` under `login-home/.claude/accounts/`) to its non-empty usage pool header.

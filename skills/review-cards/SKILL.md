@@ -14,7 +14,8 @@ Nothing reviews a review card in turn.
    "Review round <n> of <card>" gives its commit, base, starting list of files, bases of earlier rounds with verdicts, kept reviewers with their topics and last reviewed rounds, findings still to verify with their raisers, and, for our card's branch round, its plan by deliverable.
    Your clone is at the round's commit.
    Our card's PR round carries no plan.
-   An entry's failed checks accompany its round: our PR keeps them in full; a colleague's keeps correctness lint and layers, omitting known style, copies and words findings with dropped counts.
+   Our PRs and full colleague reviews receive the complete checks report when checks fail.
+   Standard colleague reviews keep correctness lint and layers, omitting known ESLint style, copies and words findings with dropped counts.
    Your session's "Under review" is the card's agreed specification, its marked later decisions included; the rest of its room stays out.
    A pull request comes against its destination, merged into it, a branch against the base, after their checks, its whole suite running beside your round.
 2. **Choose the review tier, topics and effort.**
@@ -36,10 +37,10 @@ Nothing reviews a review card in turn.
      Run correctness alone at `high` when available, otherwise at the review kind's configured default.
    - **Standard** covers every remaining change, including a one-line bug fix.
      Use the review kind's configured default effort.
-     On our changes run correctness, add design and simplicity above 30 lines, and add each applicable specialist.
-     On colleagues' changes run correctness and add performance when it applies.
+     On our changes and full colleague reviews run correctness, add design and simplicity above 30 lines, and add each applicable specialist.
+     For the standard colleague review bar run correctness and add performance when it applies.
 
-   Correctness includes tests on our cards.
+   Correctness includes tests on our cards and in full colleague reviews.
    Reuse the kept correctness reviewer when present.
    Money, permissions or data integrity applies when risk tags name it or the change touches money, permissions, SQL, schema, stored data or security.
    Performance applies when the change can affect it.
@@ -56,7 +57,10 @@ Nothing reviews a review card in turn.
    Give the correctness reviewer every test change flagged for this round, including on a repeat round.
    If it joins in a later round, also give it the comparisons from step 2 to trace the merged base's effects.
    Keep how the change was built and other reviewers' conclusions out of the task.
-   For a colleague's change, AGENTS.md conformance and our test style are no finding.
+   Give every colleague reviewer the bar named in the round request.
+   With the standard bar, AGENTS.md conformance and our test style are no finding.
+   With the full bar, apply the repository's AGENTS.md, architecture and test style to each assigned topic.
+   Product and business decisions belong to the author and stakeholders. Report behavior that breaks their intent or introduces a regression.
    If any reviewer report is still outstanding, end your turn `working` as soon as your independent work is done.
    A reviewer reads its task, the specification and the code, runs a test only to prove a finding or, when reading doesn't settle it, to check that a new test fails with its fix reverted, times the ordinary reads the change adds or changes on the replica, judges locking reads from their plain `EXPLAIN` plans and says a write stays unmeasured; its pass or fail and findings reach you in the room, and move nothing.
 4. **Weigh what comes back.**
