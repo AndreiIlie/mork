@@ -1,5 +1,6 @@
 // Local composer actions answer on the WebSocket without reaching the operator socket.
 
+use mork_types::Command;
 use mork_types::catalog::{CATALOG, slash_fields};
 use mork_types::input::{self, Parsed};
 use mork_types::protocol::{ComposerAction, ComposerRequest, ErrorBody, ErrorCode, MAX_LINE};
@@ -20,6 +21,9 @@ pub(super) fn route(text: String) -> Destination {
     let parsed = input::submission(&draft.text, &draft.images, &draft.context, draft.now)
         .unwrap_or_else(|note| Parsed::Note(note.into()));
     let action = match parsed {
+        Parsed::Send(Command::Watch { .. }) => {
+            return refuse(ErrorCode::Refused, "Use `mork ctl watch` in a terminal to watch a place.".into());
+        }
         Parsed::Send(cmd) => {
             let line = json!({"id": id, "cmd": cmd}).to_string();
             if line.len() > MAX_LINE {
@@ -44,7 +48,7 @@ pub(super) fn route(text: String) -> Destination {
 fn help() -> Vec<(String, String)> {
     let mut commands: Vec<_> = CATALOG
         .iter()
-        .filter(|spec| !spec.faults_only && spec.name != "usage")
+        .filter(|spec| !spec.faults_only && !matches!(spec.name, "usage" | "watch"))
         .map(|spec| (format!("/{}", spec.name), slash_fields(spec)))
         .collect();
     commands.sort_unstable();
@@ -101,12 +105,24 @@ mod tests {
     }
 
     #[test]
+    fn typed_watch_leaves_the_browsers_subscription_alone() {
+        for text in ["/watch", "/watch main", "/watch screen ex-1 --tail 20 --full"] {
+            let error = &local(text, false)["err"];
+            assert_eq!(error["code"], "refused");
+            assert!(error["message"].as_str().unwrap().contains("mork ctl watch"));
+        }
+        let watch = r#"{"id":1,"cmd":{"watch":{"places":["screen","ex-1"],"tail":100,"full":true}}}"#;
+        assert!(matches!(route(watch.into()), Destination::Socket(line) if line == watch));
+    }
+
+    #[test]
     fn navigation_help_and_errors_answer_without_dispatching() {
         assert_eq!(local("/open ex-2", false)["ok"]["composer"], json!({"action":"open","card":"ex-2"}));
         assert_eq!(local("/usage", false)["ok"]["composer"], json!({"action":"usage"}));
         let help = local("/help", false);
         let commands = help["ok"]["composer"]["commands"].as_array().unwrap();
         assert!(commands.contains(&json!(["/approve", "<card>"])));
+        assert!(!commands.iter().any(|row| row[0] == "/watch"));
         assert!(!commands.iter().any(|row| row[0] == "/debug.sleep"));
         for (text, now) in [
             ("/demo", true),
