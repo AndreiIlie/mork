@@ -106,8 +106,8 @@ fn transitive(deps: &BTreeMap<String, BTreeSet<String>>, start: &str) -> BTreeSe
     seen
 }
 
-/// Every problem with the graph: missing crates, edges outside 1.1.2, `core` reaching a
-/// denied crate, `ui` reaching another workspace crate but `types`.
+/// Reports missing workspace crates, missing or unexpected dependency edges,
+/// and dependencies outside the allowlist reachable from `mork-core`.
 pub fn check_graph(meta: &Value) -> Vec<String> {
     let deps = normal_deps(meta);
     let ours = members(meta);

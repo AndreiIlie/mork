@@ -40,20 +40,18 @@ mod suite_logs;
 mod suite_watch;
 mod turn_images;
 mod unloaded;
-mod usage;
-mod work;
-mod work_end;
-mod work_plan;
-mod work_threads;
-
-pub use views::SCREEN;
 mod updates;
 pub(crate) mod upkeep;
+mod usage;
 mod verdict;
 mod views;
 mod wakes;
 mod wall_runs;
 mod watch;
+mod work;
+mod work_end;
+mod work_plan;
+mod work_threads;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -292,7 +290,8 @@ impl Engine {
         }
         match self.dashboard_port() {
             Ok(port) => {
-                if let Err(e) = crate::jobs::launch::browser(self.opts.home.root(), port) {
+                let address = crate::web::key::address(port);
+                if let Err(e) = crate::jobs::launch::browser(self.opts.home.root(), &address) {
                     eprintln!("mork: couldn't open the dashboard: {e}");
                 }
             }

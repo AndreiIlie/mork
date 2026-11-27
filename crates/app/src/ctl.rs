@@ -335,7 +335,7 @@ pub(super) fn open_dashboard(home: &Home) -> Result<(), String> {
         .and_then(|n| u16::try_from(n).ok())
         .filter(|&p| p != 0)
         .ok_or_else(|| "the running engine did not report a web port".to_owned())?;
-    launch::browser(home.root(), port).map_err(|e| e.to_string())
+    launch::browser(home.root(), &mork_engine::web::key::address(port)).map_err(|e| e.to_string())
 }
 
 fn request_link(mut link: Link, cmd: &Value) -> Result<Value, String> {

@@ -27,8 +27,7 @@ const TEXT_MAX: usize = 64 * 1024;
 // What a view's agents' turns may take of its line, all together, and each text or thinking.
 const TURNS_BUDGET: usize = 192 * 1024;
 const DETAIL_MAX: usize = 8 * 1024;
-/// What `watch` names to get the screen rather than a place (5).
-pub const SCREEN: &str = "screen";
+const SCREEN: &str = "screen";
 
 fn cut_to(text: &str, max: usize) -> (String, bool) {
     if text.len() <= max {

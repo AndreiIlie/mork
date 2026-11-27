@@ -55,9 +55,14 @@ pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     diff == 0
 }
 
+/// The dashboard address shared by browser launch and the printed key link.
+pub fn address(port: u16) -> String {
+    format!("http://127.0.0.1:{port}/")
+}
+
 /// The browser URL carrying the key in its fragment.
 pub fn link(port: u16, key: &str) -> String {
-    format!("http://127.0.0.1:{port}/#key={key}")
+    format!("{}#key={key}", address(port))
 }
 
 #[cfg(test)]

@@ -177,9 +177,9 @@ impl Drain {
     }
 }
 
-/// The system's browser on a web page: `xdg-open`, reaped on its own thread.
-pub fn browser(home_root: &Path, port: u16) -> io::Result<()> {
-    let argv = ["xdg-open".to_owned(), format!("http://127.0.0.1:{port}/")];
+/// Opens the keyless dashboard address in the system browser.
+pub fn browser(home_root: &Path, address: &str) -> io::Result<()> {
+    let argv = ["xdg-open".to_owned(), address.to_owned()];
     proclog::record(home_root, "browser", &argv, "", false);
     let mut child = Command::new(&argv[0]).arg(&argv[1]).stdin(Stdio::null()).spawn()?;
     std::thread::spawn(move || child.wait());
