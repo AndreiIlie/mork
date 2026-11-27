@@ -1,4 +1,4 @@
-//! Composer frames share the native parser. Only engine commands go onto the operator socket.
+// Local composer actions answer on the WebSocket without reaching the operator socket.
 
 use mork_types::Command;
 use mork_types::catalog::{CATALOG, slash_fields};
