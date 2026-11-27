@@ -6,7 +6,8 @@ use rusqlite::params;
 
 use super::{Result, Store};
 
-// Read complete histories for outcomes in the window, including their review costs before its start.
+// A landed run can start before the window and incur closing costs afterward.
+// Read its history by card: probing the kind index here scans years of unrelated turns on every refresh.
 const HISTORY: &str = "WITH subjects AS (
     SELECT DISTINCT card FROM events WHERE kind IN ('card.landed','merge.tested') AND time>=?1
 ), histories AS (
@@ -15,7 +16,7 @@ const HISTORY: &str = "WITH subjects AS (
     UNION SELECT card FROM events WHERE kind IN ('card.start','review.adopted','review.ended')
         AND json_extract(data,'$.of') IN subjects
 )
-SELECT seq,time,card,kind,data FROM events WHERE card IN histories AND kind IN
+SELECT seq,time,card,kind,data FROM events INDEXED BY events_card WHERE card IN histories AND kind IN
  ('card.start','card.stage','cost','card.landed','merge.tested','reply','review.adopted','review.ended',
  'child.spawned','review.asked','review.verdict','review.resolved','review.findings.withdrawn',
  'build.requested','build.submitted')

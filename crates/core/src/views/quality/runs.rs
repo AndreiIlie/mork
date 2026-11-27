@@ -6,9 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 struct Run<'a> {
     rows: &'a [Event],
     mode: &'a str,
-    parent: Option<&'a str>,
+    parent: Option<(&'a str, i64)>,
     start: i64,
-    until: i64,
 }
 
 fn runs(history: &History) -> Vec<Run<'_>> {
@@ -32,12 +31,11 @@ fn runs(history: &History) -> Vec<Run<'_>> {
         .filter_map(|pair| {
             let rows = &history.rows[pair[0]..pair[1]];
             let start = rows.first()?.seq;
-            let until = history.rows.get(pair[1]).map_or(i64::MAX, |r| r.seq);
             if let Some(m) = rows.iter().find(|e| e.kind == "card.start").and_then(|e| e.text("mode")) {
                 mode = m
             }
-            let parent = rows.iter().rev().find_map(|e| parent_of(&e.kind, &e.data));
-            Some(Run { rows, mode, parent, start, until })
+            let parent = rows.iter().find_map(|e| parent_of(&e.kind, &e.data).map(|id| (id, e.seq)));
+            Some(Run { rows, mode, parent, start })
         })
         .collect()
 }
@@ -97,14 +95,14 @@ impl Totals {
                 row.landed += 1;
                 samples.push(n);
             }
-            self.spend(card, run, reviews, e.seq);
+            self.spend(card, run, reviews);
         }
     }
 
-    fn spend(&mut self, card: &History, run: &Run<'_>, reviews: &[&Event], end: i64) {
+    fn spend(&mut self, card: &History, run: &Run<'_>, reviews: &[&Event]) {
         let costs = run.rows.iter().map(|e| (e, false)).chain(reviews.iter().map(|&e| (e, true)));
         let mut worked = BTreeSet::new();
-        for (e, review) in costs.filter(|(e, _)| e.seq < end && e.kind == "cost") {
+        for (e, review) in costs.filter(|(e, _)| e.kind == "cost") {
             let key = cost_group(card, e, review);
             let first = worked.insert(key.clone());
             let (total, cards, unknown) = self.spend.entry(key).or_default();
@@ -139,23 +137,20 @@ impl Totals {
 }
 
 pub(super) fn aggregate(since: i64, cards: &Histories) -> (Vec<BuilderRow>, Vec<SpendRow>) {
-    let runs: BTreeMap<_, _> = cards.iter().map(|(id, history)| (id, runs(history))).collect();
+    let runs: BTreeMap<_, _> = cards.iter().map(|(id, history)| (id.as_str(), runs(history))).collect();
     let mut linked = BTreeMap::<_, Vec<&Event>>::new();
-    for run in runs.values().flatten() {
-        if let Some(parent) = run.parent {
-            linked.entry(parent).or_default().extend(run.rows);
-        }
-    }
-    for rows in linked.values_mut() {
-        rows.sort_by_key(|e| e.seq);
+    for review in runs.values().flatten() {
+        let Some((parent, at)) = review.parent else { continue };
+        let Some(owner) = runs.get(parent).and_then(|all| all.iter().rev().find(|r| r.start <= at)) else { continue };
+        // A review's closing turns can settle after its parent starts another run.
+        linked.entry((parent, owner.start)).or_default().extend(review.rows.iter().filter(|e| e.seq >= owner.start));
     }
     let mut totals = Totals::default();
     for (id, runs) in runs {
         for run in runs.iter().filter(|r| r.mode == "full") {
-            let children = linked.get(id.as_str()).map(Vec::as_slice).unwrap_or_default();
-            let lo = children.partition_point(|r| r.seq < run.start);
-            let hi = children.partition_point(|r| r.seq < run.until);
-            totals.count(since, &cards[id], run, &children[lo..hi]);
+            let mut children = linked.remove(&(id, run.start)).unwrap_or_default();
+            children.sort_by_key(|e| e.seq);
+            totals.count(since, &cards[id], run, &children);
         }
     }
     totals.finish()

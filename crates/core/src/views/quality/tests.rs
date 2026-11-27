@@ -17,6 +17,8 @@ fn build_histories() -> Histories {
     let mut cards = Histories::new();
     let build =
         json!({"agent":"a/foreman","job":"build","cli":"codex","model":"builder","effort":"high","delta":2_000_000});
+    let mut closing = build.clone();
+    closing["job"] = json!("close");
     let tool = json!({"agent":"r/foreman","cli":"claude","model":"review","effort":"high","delta":500_000,"unknown":true,
         "tools":{"calls":4,"failed":1,"by":{"Bash":1}}});
     cards.insert(
@@ -25,7 +27,7 @@ fn build_histories() -> Histories {
             "full",
             &[
                 (1, "card.start", json!({"run":1,"mode":"full"})),
-                (2, "cost", build.clone()),
+                (2, "cost", build),
                 (3, "reply", json!({"agent":"a/foreman","outcome":"built"})),
                 (4, "build.requested", json!({"job":"build"})),
                 (5, "build.submitted", json!({"head":"abc"})),
@@ -33,6 +35,8 @@ fn build_histories() -> Histories {
                 (12, "merge.tested", json!({})),
                 (13, "merge.tested", json!({})),
                 (15, "card.landed", json!({})),
+                (16, "cost", closing),
+                (18, "card.start", json!({"run":2,"mode":"full"})),
             ],
         ),
     );
@@ -46,6 +50,11 @@ fn build_histories() -> Histories {
                 (9, "cost", tool),
                 (10, "review.verdict", json!({"n":1,"passed":false,"named":[{"n":1,"round":1,"by":"foreman"}]})),
                 (11, "review.resolved", json!({"n":1,"declined":true})),
+                (
+                    19,
+                    "cost",
+                    json!({"agent":"r/foreman","cli":"claude","model":"review","effort":"high","delta":250_000}),
+                ),
             ],
         ),
     );
@@ -79,8 +88,8 @@ fn verification_and_landing_have_separate_cohorts_and_costs_follow_the_work() {
     let waiting = q.builders.iter().find(|r| r.group.model == "unknown").unwrap();
     assert_eq!((waiting.counts.verified, waiting.counts.first_pass, waiting.counts.landed), (1, 0, 0));
     let review = q.spend.iter().find(|r| r.group.role == "review foreman").unwrap();
-    assert_eq!((review.spend.average_dollars, review.spend.cards, review.spend.unknown), (0.5, 1, true));
-    assert_eq!(q.spend.iter().find(|r| r.group.model == "codex builder").unwrap().spend.average_dollars, 2.0);
+    assert_eq!((review.spend.average_dollars, review.spend.cards, review.spend.unknown), (0.75, 1, true));
+    assert_eq!(q.spend.iter().find(|r| r.group.model == "codex builder").unwrap().spend.average_dollars, 4.0);
     assert_eq!((q.tools[0].counts.turns, q.tools[0].counts.percent), (1, Some(25.0)));
     assert_eq!(q.findings[0].counts.declined_percent, Some(100.0));
 }
