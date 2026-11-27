@@ -13,8 +13,7 @@ fn history(mode: &str, rows: &[(i64, &str, Value)]) -> History {
     }
 }
 
-#[test]
-fn verification_and_landing_have_separate_cohorts_and_costs_follow_the_work() {
+fn build_histories() -> Histories {
     let mut cards = Histories::new();
     let build =
         json!({"agent":"a/foreman","job":"build","cli":"codex","model":"builder","effort":"high","delta":2_000_000});
@@ -66,7 +65,12 @@ fn verification_and_landing_have_separate_cohorts_and_costs_follow_the_work() {
             ],
         ),
     );
-    let q = aggregate(9, &cards);
+    cards
+}
+
+#[test]
+fn verification_and_landing_have_separate_cohorts_and_costs_follow_the_work() {
+    let q = aggregate(9, &build_histories());
     let builder = q.builders.iter().find(|r| r.group.model == "codex builder").unwrap();
     assert_eq!(
         (builder.counts.verified, builder.counts.first_pass, builder.counts.landed, builder.counts.median_rounds),

@@ -57,8 +57,8 @@ impl Store {
         let mut stmt = self.conn.prepare(sql)?;
         let rows = stmt.query_map(params![since, until, project.as_str()], |r| {
             Ok(json!({
-                "cli":r.get::<_,String>(0)?, "tool":r.get::<_,String>(1)?, "failed":r.get::<_,u64>(2)?,
-                "turns":r.get::<_,u64>(3)?, "cards":r.get::<_,u64>(4)?
+                "cli":r.get::<_,String>(0)?, "tool":r.get::<_,String>(1)?, "failed":r.get::<_,i64>(2)?,
+                "turns":r.get::<_,i64>(3)?, "cards":r.get::<_,i64>(4)?
             }))
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
