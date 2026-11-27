@@ -278,6 +278,24 @@ pub fn type_name(ty: FieldType) -> &'static str {
     }
 }
 
+/// Formats the arguments shown beside a slash command in the native and web help lists.
+pub fn slash_fields(spec: &CommandSpec) -> String {
+    spec.fields
+        .iter()
+        .map(|f| {
+            let list = if f.ty == FieldType::StrList { "…" } else { "" };
+            if f.optional && f.ty == FieldType::Bool {
+                format!("[--{}]", f.name)
+            } else if f.optional {
+                format!("[--{} <{}{list}>]", f.name, f.name)
+            } else {
+                format!("<{}{list}>", f.name)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// A command's signature as `mork ctl` takes it: its name, its required fields in order, then
 /// its optional ones. Help, the API index and the reference all show this one line (fac-14).
 pub fn signature(spec: &CommandSpec) -> String {

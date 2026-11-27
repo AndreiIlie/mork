@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use mork_types::protocol::MAX_LINE;
 
+use super::composer::{self, Destination};
 use super::frames::{self, Message, MessageReader, ReadError};
 use crate::lock::Lock;
 
@@ -79,12 +80,11 @@ fn ws_to_sock(
     let close_code = loop {
         match frames_in.read(&mut reader) {
             Ok(Some(Message::Text(text))) => {
-                if unix
-                    .write_all(text.as_bytes())
-                    .and_then(|()| unix.write_all(b"\n"))
-                    .and_then(|()| unix.flush())
-                    .is_err()
-                {
+                let written = match composer::route(text) {
+                    Destination::Socket(line) => writeln!(unix, "{line}").and_then(|()| unix.flush()),
+                    Destination::Browser(answer) => write_open(writer, |w| frames::write_text(w, &answer)),
+                };
+                if written.is_err() {
                     break None;
                 }
             }

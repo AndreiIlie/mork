@@ -3,7 +3,7 @@
 
 use iced::widget::{Column, Row, column, row};
 use iced::{Element, Length};
-use mork_types::catalog::{CATALOG, FieldType};
+use mork_types::catalog::{self, CATALOG};
 use serde_json::Value;
 
 use crate::app::{App, Message, Overlay};
@@ -64,21 +64,7 @@ fn help<'a>() -> Element<'a, Message> {
     }
     col = col.push(txt("commands (1.13): the place and card are filled in from where they're typed", Tone::Dim));
     for c in CATALOG.iter().filter(|c| !c.faults_only) {
-        let fields: Vec<String> = c
-            .fields
-            .iter()
-            .map(|f| {
-                let list = if f.ty == FieldType::StrList { "…" } else { "" };
-                if f.optional && f.ty == FieldType::Bool {
-                    format!("[--{}]", f.name)
-                } else if f.optional {
-                    format!("[--{} <{}{list}>]", f.name, f.name)
-                } else {
-                    format!("<{}{list}>", f.name)
-                }
-            })
-            .collect();
-        col = col.push(pair(format!("/{}", c.name), fields.join(" "), Tone::Green));
+        col = col.push(pair(format!("/{}", c.name), catalog::slash_fields(c), Tone::Green));
     }
     col.into()
 }

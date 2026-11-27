@@ -18,6 +18,7 @@ pub mod door_config;
 pub mod door_plan;
 pub mod hash;
 pub mod ids;
+pub mod input;
 pub mod job;
 pub mod landing;
 pub mod lease;

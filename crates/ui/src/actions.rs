@@ -72,7 +72,7 @@ impl App {
         }
         let line = self.input.text();
         if line.trim_start().starts_with('/') {
-            self.note = Some("✗ send now sends a message, not a command: nothing sent".into());
+            self.note = Some(mork_types::input::SEND_NOW_COMMAND.into());
             return Vec::new();
         }
         if line.trim().is_empty() && self.draft_images().is_empty() {

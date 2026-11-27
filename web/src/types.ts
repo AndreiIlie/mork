@@ -504,6 +504,33 @@ export type CommandView = {
   cut?: boolean;
 };
 
+export type ComposerAction =
+  | { action: "help" } & {
+      commands: Array<[string, string]>;
+    }
+  | { action: "open" } & {
+      card: string;
+    }
+  | { action: "usage" };
+
+export type ComposerDraft = {
+  context: Context;
+  text: string;
+  images: Array<string>;
+  now: boolean;
+};
+
+export type ComposerRequest = {
+  id: number;
+  composer: ComposerDraft;
+};
+
+export type Context = {
+  place: string;
+  card: string | null;
+  to: string;
+};
+
 export type ContextView = {
   agent: AgentKey;
   used: number;
