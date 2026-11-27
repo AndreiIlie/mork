@@ -49,6 +49,16 @@ pub struct Limit {
 }
 
 impl Limit {
+    /// The reset in epoch milliseconds, whether the CLI reported seconds or milliseconds.
+    pub fn reset_ms(&self) -> Option<i64> {
+        self.resets_at.map(|r| if r < 100_000_000_000 { r.saturating_mul(1000) } else { r })
+    }
+
+    /// A reading expires at its reported reset.
+    pub fn expired(&self, now_ms: i64) -> bool {
+        self.reset_ms().is_some_and(|r| r <= now_ms)
+    }
+
     /// Its key in the state: one latest value per CLI, account, bucket and window.
     pub fn key(&self) -> String {
         match &self.account {

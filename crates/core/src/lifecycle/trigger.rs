@@ -105,15 +105,14 @@ fn quota(state: &State, account: Option<&str>, pass: &PassConfig, ctx: Ctx<'_>) 
 fn model_pool(seat: &Seat, limit: &Limit) -> bool {
     match seat.cli {
         Cli::Codex => limit.bucket == seat.model,
-        Cli::Claude => limit.window.strip_prefix("seven_day_").is_some_and(|model| seat.model.contains(model)),
+        Cli::Claude => short_name(&limit.window).strip_prefix("week ").is_some_and(|model| seat.model.contains(model)),
         Cli::Agy => false,
     }
 }
 
 fn allows(limit: Option<&Limit>, optional: bool, share: u32, now: i64) -> bool {
     let Some(l) = limit else { return optional };
-    let reset = l.resets_at.map(|r| if r < 100_000_000_000 { r.saturating_mul(1000) } else { r });
-    if reset.is_some_and(|r| r <= now) {
+    if l.expired(now) {
         return optional;
     }
     if l.reached {
@@ -122,5 +121,5 @@ fn allows(limit: Option<&Limit>, optional: bool, share: u32, now: i64) -> bool {
     if optional && l.percent.is_none() {
         return true;
     }
-    pace(l.percent, reset, length_ms(&l.window), l.seen_ms).is_some_and(|(_, end)| end <= u64::from(share))
+    pace(l.percent, l.reset_ms(), length_ms(&l.window), l.seen_ms).is_some_and(|(_, end)| end <= u64::from(share))
 }

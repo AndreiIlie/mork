@@ -125,7 +125,13 @@ pub(super) fn cloned(card: &mut Card, result: &Value) {
     card.description = description(run, card.started_ms, true);
 }
 
-pub(super) fn rearm(p: &mut Poster<'_>, card: &Card, run: &Run) {
+pub(super) fn dismissed(p: &mut Poster<'_>, card: &Card) {
+    if let Some(run) = card.lookback.as_ref().filter(|r| r.trigger != Trigger::Manual) {
+        rearm(p, card, run);
+    }
+}
+
+fn rearm(p: &mut Poster<'_>, card: &Card, run: &Run) {
     let mut counts = run.at_start.unwrap_or_else(|| counts(p.state, &card.project));
     counts.memory_edits += run.own_edits;
     p.other.push(Change::PutBaseline(Baseline { project: card.project.clone(), read: run.read, at_ms: p.now, counts }));
@@ -167,7 +173,7 @@ fn description(run: &Run, started_ms: i64, prepared: bool) -> String {
         }
     }
     let recipe = if run.read == Read::Dream {
-        "Load the `dream` skill to consolidate project memory.".to_owned()
+        "Load the `dream` skill to consolidate project memory. File no proposals.".to_owned()
     } else {
         format!(
             "Load the `looking-back` skill and follow its `{}` recipe. Leave grouped proposals and a short report.",

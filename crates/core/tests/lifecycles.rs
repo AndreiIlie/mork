@@ -103,6 +103,7 @@ fn a_local_card_lands_through_the_merge_queue() {
     s.built(LOCAL, "h1", "base1");
     verifying(&mut s, LOCAL);
     lands_locally(&mut s, LOCAL, &[]);
+    assert_eq!(s.state.landings.get("web"), Some(&1));
 }
 
 fn assert_pr_landing_status(s: &Sim, expected: &str) {

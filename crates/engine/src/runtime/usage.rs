@@ -41,8 +41,8 @@ fn readings<'a>(state: &'a State, now: i64, accounts: &Accounts) -> Vec<Reading<
                         .map_or_else(|| format!("claude {}", a.plan), str::to_owned)
                 },
             );
-            let reset_ms = l.resets_at.map(|r| if r < 100_000_000_000 { r.saturating_mul(1000) } else { r });
-            let stale = reset_ms.is_some_and(|r| r <= now);
+            let reset_ms = l.reset_ms();
+            let stale = l.expired(now);
             let signed_out = l.cli == Cli::Claude && l.account.as_ref().map(|a| &a.id) != active.map(|a| &a.id);
             let pace = (!stale)
                 .then(|| mork_core::agents::usage::pace(l.percent, reset_ms, length_ms(&l.window), l.seen_ms))

@@ -92,7 +92,7 @@ fn scheduled_positive_thresholds_and_manual_override() {
 }
 
 #[test]
-fn close_rearms_notes_without_moving_last_completion_or_pulse_range() {
+fn close_and_early_done_rearm_notes_without_moving_last_completion_or_pulse_range() {
     let mut s = Sim::new();
     set_pass(&mut s, PROJECT, Read::Pulse, json!({"mode":"scheduled","notes":1}));
     tick(&mut s);
@@ -112,13 +112,19 @@ fn close_rearms_notes_without_moving_last_completion_or_pulse_range() {
     let cursor = s.state.lookbacks[PROJECT][&Read::Pulse].clone();
     tick(&mut s);
     assert!(!running(&s));
+    for dismiss in
+        [json!({"close":{"card":"lookback-web-3","why":"cancel"}}), json!({"done":{"card":"lookback-web-4"}})]
+    {
+        note(&mut s, PROJECT, "lesson");
+        tick(&mut s);
+        s.operator(dismiss).unwrap();
+        tick(&mut s);
+        assert!(!running(&s));
+        assert_eq!(s.state.lookbacks[PROJECT][&Read::Pulse], cursor);
+    }
     note(&mut s, PROJECT, "lesson");
     tick(&mut s);
-    s.operator(json!({"close":{"card":"lookback-web-3","why":"cancel"}})).unwrap();
-    assert_eq!(s.state.lookbacks[PROJECT][&Read::Pulse], cursor);
-    note(&mut s, PROJECT, "lesson");
-    tick(&mut s);
-    assert_eq!(s.card("lookback-web-4").lookback.unwrap().from, cursor.commit);
+    assert_eq!(s.card("lookback-web-5").lookback.unwrap().from, cursor.commit);
 }
 
 #[test]
@@ -143,7 +149,6 @@ fn auto(s: &mut Sim, cli: Cli, model: &str) {
         .insert("foreman".into(), serde_json::from_value(json!({"report":{"cli":cli,"model":model}})).unwrap());
     set_pass(s, PROJECT, Read::Pulse, json!({"mode":"auto","notes":1}));
     tick(s);
-    note(s, PROJECT, "lesson");
 }
 
 fn limit(
@@ -173,6 +178,10 @@ fn limit(
 fn auto_checks_each_applicable_window_and_allows_codex_placeholder() {
     let mut s = Sim::new();
     auto(&mut s, Cli::Codex, "gpt-6");
+    limit(&mut s, Cli::Codex, "account", "week", Some(20), false, None);
+    tick(&mut s);
+    assert!(!running(&s), "idle capacity and quota alone started a pass");
+    note(&mut s, PROJECT, "lesson");
     for (week, short, reached, starts) in [
         (None, None, false, false),
         (Some(40), None, false, false),
@@ -199,7 +208,10 @@ fn quota_uses_the_signed_in_account_and_the_launching_models_pool() {
     {
         let mut s = Sim::new();
         auto(&mut s, cli, model);
+        note(&mut s, PROJECT, "lesson");
         limit(&mut s, cli, bad, "week", Some(5), false, (cli == Cli::Claude).then_some("old"));
+        tick(&mut s);
+        assert!(!running(&s), "another account or pool supplied headroom");
         limit(&mut s, cli, good, "week", Some(80), false, (cli == Cli::Claude).then_some("live"));
         tick(&mut s);
         assert!(!running(&s));
@@ -213,6 +225,7 @@ fn quota_uses_the_signed_in_account_and_the_launching_models_pool() {
 fn auto_waits_for_real_turns_and_their_owed_closing_turn_through_teardown() {
     let mut s = Sim::new();
     auto(&mut s, Cli::Codex, "gpt-6");
+    note(&mut s, PROJECT, "lesson");
     limit(&mut s, Cli::Codex, "account", "week", Some(10), false, None);
     s.through_brief("web-1", "web");
     let real = "web-1/foreman";

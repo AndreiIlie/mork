@@ -499,7 +499,7 @@ Days count from the last baseline.
 On first configuration, counts start at the first check and days start from the last completed read if there is one.
 Completion records the run's starting counts and the end time.
 Dream excludes its own edits from the next trigger.
-Closing an engine-started run resets the thresholds the same way and preserves the previous completed read's date and range.
+Ending an engine-started run early with `done` or `close` resets the thresholds the same way and preserves the previous completed read's date and range.
 
 Auto also requires idle capacity and quota headroom in the launching model's pool.
 The engine uses the signed-in Claude account or the agy model's group where applicable.

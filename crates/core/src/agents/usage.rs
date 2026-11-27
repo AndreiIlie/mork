@@ -85,10 +85,10 @@ fn tell_operator(p: &mut Poster<'_>, reached: &[&Limit]) {
     let windows: Vec<String> = reached
         .iter()
         .map(|l| {
-            let reset = l.resets_at.map_or_else(
+            let reset = l.reset_ms().map_or_else(
                 || "its reset unknown".to_owned(),
-                |s| {
-                    let (y, mo, day, h, mi, _) = crate::state::names::civil_from_ms(s.saturating_mul(1000));
+                |ms| {
+                    let (y, mo, day, h, mi, _) = crate::state::names::civil_from_ms(ms);
                     format!("resets {y:04}-{mo:02}-{day:02} {h:02}:{mi:02} UTC")
                 },
             );
@@ -110,7 +110,7 @@ pub(super) fn limit_reset(state: &State, a: &Agent, session: &SessionSeen, ctx: 
         let stored = || {
             let bucket = seat.as_ref().filter(|s| s.cli == Cli::Agy).map(|s| agy_bucket(&s.model))?;
             let reached = state.limits.values().filter(|l| l.cli == Cli::Agy && l.bucket == bucket && l.reached);
-            reached.filter_map(|l| l.resets_at).map(|s| s.saturating_mul(1000)).filter(|r| *r > ctx.now).max()
+            reached.filter_map(Limit::reset_ms).filter(|r| *r > ctx.now).max()
         };
         // A reset neither gave is unknown, never 0: look again in a minute.
         let reset = session.limit_reset.map(|s| s.saturating_mul(1000)).or_else(stored).unwrap_or(ctx.now + 60_000);
@@ -124,6 +124,6 @@ pub(super) fn limit_reset(state: &State, a: &Agent, session: &SessionSeen, ctx: 
     if reached.is_empty() {
         return None;
     }
-    let reset = reached.iter().filter_map(|l| l.resets_at).max().map(|s| s.saturating_mul(1000));
+    let reset = reached.iter().filter_map(|l| l.reset_ms()).max();
     Some(reset.unwrap_or(ctx.now + 60_000).max(ctx.now))
 }
