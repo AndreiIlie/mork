@@ -107,7 +107,12 @@ fn check_pass_pairs(text: &str, config: &Config) -> Result<(), ConfigError> {
     Ok(())
 }
 
-fn check_passes(text: &str, name: &str, project: &mork_types::config::ProjectConfig, has_pairs: bool) -> Result<(), ConfigError> {
+fn check_passes(
+    text: &str,
+    name: &str,
+    project: &mork_types::config::ProjectConfig,
+    has_pairs: bool,
+) -> Result<(), ConfigError> {
     use mork_types::lookback::{Read, Trigger};
     for (read, pass) in &project.passes {
         let thresholds = [pass.landings, pass.edits, pass.notes, pass.days];

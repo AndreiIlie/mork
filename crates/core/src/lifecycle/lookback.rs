@@ -57,16 +57,14 @@ pub(super) enum Start<'a> {
     Auto(&'a crate::agents::pools::Offer, &'a super::trigger::Score),
 }
 
-pub(super) fn begin(
-    p: &mut Poster<'_>,
-    project: &ProjectId,
-    read: Read,
-    start: Start<'_>,
-    ctx: Ctx<'_>,
-) -> CardId {
+pub(super) fn begin(p: &mut Poster<'_>, project: &ProjectId, read: Read, start: Start<'_>, ctx: Ctx<'_>) -> CardId {
     let state = p.state;
     let id = next_id(state, project.as_str());
-    let trigger = match start { Start::Manual => Trigger::Manual, Start::Scheduled(_) => Trigger::Scheduled, Start::Auto(..) => Trigger::Auto };
+    let trigger = match start {
+        Start::Manual => Trigger::Manual,
+        Start::Scheduled(_) => Trigger::Scheduled,
+        Start::Auto(..) => Trigger::Auto,
+    };
     let window = window(state, project, read, trigger, ctx.now);
     let title = format!("{} on {project}", read.spec().button);
     let mut c = Card::new(id.clone(), project.as_str(), &title, Mode::Report, 1, ctx.now);

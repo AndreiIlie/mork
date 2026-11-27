@@ -4,11 +4,12 @@
 mod common;
 
 use common::{Sim, reply};
+use mork_core::agents::pools::{Offer, ranked};
 use mork_core::agents::turns::due;
 use mork_core::decide::Event;
 use mork_core::lifecycle::lookback::live;
 use mork_types::card::Stage;
-use mork_types::config::Cli;
+use mork_types::config::{Cli, Effort, OPUS, SOL};
 use mork_types::lookback::{Cursor, PassConfig, Read, Trigger};
 use mork_types::state::{Owed, Retiring, Sender};
 use mork_types::usage::{Account, Limit};
@@ -143,12 +144,23 @@ fn days_use_existing_completed_cursor_on_first_tick() {
     assert!(running(&s));
 }
 
+fn picks(s: &mut Sim, entries: &[(Cli, &str, &[&str])]) {
+    let pass: Vec<_> = entries
+        .iter()
+        .map(|(cli, model, efforts)| json!({"cli":cli, "model":model,"label":model,"efforts":efforts}))
+        .collect();
+    s.config.picks = Some(serde_json::from_value(json!({"pass":pass})).unwrap());
+}
+
 fn auto(s: &mut Sim, cli: Cli, model: &str) {
-    s.config
-        .seats
-        .insert("foreman".into(), serde_json::from_value(json!({"report":{"cli":cli,"model":model}})).unwrap());
-    set_pass(s, PROJECT, Read::Pulse, json!({"mode":"auto","notes":1}));
+    picks(s, &[(cli, model, &["high"])]);
+    s.claude_account = Some("live");
+    set_pass(s, PROJECT, Read::Pulse, json!({"mode":"auto"}));
     tick(s);
+}
+
+fn land(s: &mut Sim, project: &str, count: u64) {
+    s.state.landings.insert(project.into(), count);
 }
 
 fn limit(
@@ -175,17 +187,25 @@ fn limit(
 }
 
 #[test]
-fn auto_checks_each_applicable_window_and_allows_codex_placeholder() {
+fn auto_checks_activity_the_bar_and_each_applicable_window() {
     let mut s = Sim::new();
-    auto(&mut s, Cli::Codex, "gpt-6");
+    auto(&mut s, Cli::Codex, SOL);
+    set_pass(&mut s, "ex", Read::Pulse, json!({"mode":"auto"}));
+    tick(&mut s);
+    s.now += 30 * DAY;
     limit(&mut s, Cli::Codex, "account", "week", Some(20), false, None);
     tick(&mut s);
-    assert!(!running(&s), "idle capacity and quota alone started a pass");
-    note(&mut s, PROJECT, "lesson");
+    assert!(!running(&s), "days alone started a pass");
+    land(&mut s, PROJECT, 1);
+    limit(&mut s, Cli::Codex, "account", "week", Some(49), false, None);
+    tick(&mut s);
+    assert!(!running(&s), "activity below the bar started a pass");
+    land(&mut s, PROJECT, 100);
+    land(&mut s, "ex", 80);
     for (week, short, reached, starts) in [
         (None, None, false, false),
-        (Some(40), None, false, false),
-        (Some(20), Some(40), false, false),
+        (Some(50), None, false, false),
+        (Some(20), Some(61), false, false),
         (Some(20), None, true, false),
         (Some(20), None, false, true),
     ] {
@@ -194,21 +214,32 @@ fn auto_checks_each_applicable_window_and_allows_codex_placeholder() {
         tick(&mut s);
         assert_eq!(running(&s), starts);
     }
-    set_pass(&mut s, "ex", Read::Pulse, json!({"mode":"auto","notes":1}));
-    tick(&mut s);
-    note(&mut s, "ex", "lesson");
+    let view = s.operator(json!({"projects":{}})).unwrap();
+    let project = view["projects"]["projects"].as_array().unwrap().iter().find(|p| p["name"] == PROJECT).unwrap();
+    let row = s.journal.iter().find(|(_, kind, _, _)| kind == "card.start").unwrap();
+    let data = &row.3;
+    assert_eq!(row.2.as_deref(), Some(CARD));
+    assert_eq!(data["score"]["landings"], project["passes"][0]["score"]["landings"]);
+    assert_eq!(data["bar"], project["passes"][0]["bar"]);
+    assert_eq!(data["bar"], 70);
+    assert_eq!(data["spare"], 30);
+    assert_eq!(data["pool"], "codex");
+    assert_eq!(data["model"], SOL);
+    assert_eq!(data["effort"], "high");
+    assert!(data["pair_score"].as_f64().unwrap() > 0.0);
+    cloned(&mut s, CARD);
+    s.turn_started(FOREMAN);
+    assert_eq!(s.state.agents[FOREMAN].choice.as_ref().unwrap().model, SOL);
     tick(&mut s);
     assert!(live(&s.state, &"ex".into()).is_none());
 }
 
 #[test]
 fn quota_uses_the_signed_in_account_and_the_launching_models_pool() {
-    for (cli, model, good, bad) in
-        [(Cli::Claude, "claude-sonnet", "account", "account"), (Cli::Agy, "claude-sonnet", "3p", "account")]
-    {
+    for (cli, good, bad) in [(Cli::Claude, "account", "account"), (Cli::Agy, "3p", "account")] {
         let mut s = Sim::new();
-        auto(&mut s, cli, model);
-        note(&mut s, PROJECT, "lesson");
+        auto(&mut s, cli, OPUS);
+        land(&mut s, PROJECT, 100);
         limit(&mut s, cli, bad, "week", Some(5), false, (cli == Cli::Claude).then_some("old"));
         tick(&mut s);
         assert!(!running(&s), "another account or pool supplied headroom");
@@ -221,11 +252,101 @@ fn quota_uses_the_signed_in_account_and_the_launching_models_pool() {
     }
 }
 
+fn offers(s: &Sim) -> Vec<Offer> {
+    ranked(
+        &s.state.limits,
+        s.now,
+        s.claude_account,
+        &s.config.seat("researcher").unwrap(),
+        &s.config.picks.as_ref().unwrap().pass,
+    )
+}
+
+#[test]
+fn untouched_stale_and_measured_zero_have_distinct_offers() {
+    let mut s = Sim::new();
+    auto(&mut s, Cli::Agy, OPUS);
+    assert!(!offers(&s)[0].open);
+    limit(&mut s, Cli::Agy, "3p", "week", Some(0), false, None);
+    s.state.limits.values_mut().next().unwrap().resets_at = None;
+    assert_eq!(offers(&s)[0].spare, 50);
+    s.now += 600_001;
+    assert!(!offers(&s)[0].open);
+    limit(&mut s, Cli::Agy, "3p", "week", Some(55), false, None);
+    let pair = &offers(&s)[0];
+    assert!(pair.open);
+    assert_eq!(pair.spare, 0);
+    picks(&mut s, &[(Cli::Claude, OPUS, &["high"])]);
+    limit(&mut s, Cli::Claude, "account", "week", Some(10), false, Some("live"));
+    s.now += 7 * DAY / 4;
+    assert_eq!(offers(&s)[0].spare, 60, "80% projected unused times 75% elapsed");
+    s.now += 7 * DAY / 4;
+    assert!(!offers(&s)[0].open);
+}
+
+#[test]
+fn pair_scores_follow_effort_cost_pool_spare_and_configured_order() {
+    let mut s = Sim::new();
+    s.claude_account = Some("live");
+    let efforts = &["low", "medium", "high", "xhigh", "max"];
+    for (cli, model, cutoffs) in [(Cli::Claude, OPUS, [10, 40, 70]), (Cli::Codex, SOL, [8, 38, 74])] {
+        picks(&mut s, &[(cli, model, efforts)]);
+        for (spare, effort) in
+            [(1, Effort::Low), (cutoffs[0], Effort::Medium), (cutoffs[1], Effort::High), (cutoffs[2], Effort::Xhigh)]
+        {
+            limit(&mut s, cli, "account", "week", Some(0), false, (cli == Cli::Claude).then_some("live"));
+            let row = s.state.limits.values_mut().find(|l| l.cli == cli).unwrap();
+            row.resets_at = Some(s.now + 7 * DAY * (100 - spare) / 100);
+            let pair = &offers(&s)[0];
+            assert_eq!((i64::from(pair.spare), pair.effort), (spare, effort));
+        }
+    }
+    picks(&mut s, &[(Cli::Codex, SOL, efforts), (Cli::Claude, OPUS, efforts)]);
+    for row in s.state.limits.values_mut() {
+        let spare = if row.cli == Cli::Claude { 51 } else { 10 };
+        row.resets_at = Some(s.now + 7 * DAY * (100 - spare) / 100);
+    }
+    assert_eq!(offers(&s)[0].pool, "claude live");
+    for row in s.state.limits.values_mut() {
+        row.percent = Some(95);
+    }
+    assert_eq!(offers(&s)[0].model, SOL);
+    assert_eq!(offers(&s)[0].effort, Effort::Low);
+}
+
+#[test]
+fn auto_researcher_uses_the_current_offer_outside_child_picks() {
+    let mut s = Sim::new();
+    auto(&mut s, Cli::Codex, SOL);
+    land(&mut s, PROJECT, 100);
+    limit(&mut s, Cli::Codex, "account", "week", Some(0), false, None);
+    tick(&mut s);
+    cloned(&mut s, CARD);
+    let (_, prompt) = s.turn_started_with_argv(FOREMAN, &["x"]);
+    assert!(prompt.contains("from picks.pass"));
+    picks(&mut s, &[(Cli::Agy, OPUS, &["medium"])]);
+    let spawn = json!({"spawn":{"card":CARD,"role":"researcher","task":"Read the code"}});
+    let sender = Sender::Agent(FOREMAN.into());
+    assert!(s.cmd(sender.clone(), spawn.clone()).unwrap_err().message.contains("no quota pool"));
+    limit(&mut s, Cli::Agy, "3p", "week", Some(60), false, None);
+    let mut named = spawn.clone();
+    named["spawn"]["model"] = json!(OPUS);
+    assert!(s.cmd(sender, named).unwrap_err().message.contains("engine chooses"));
+    let child = act(&mut s, spawn)["spawn"]["agent"].as_str().unwrap().to_owned();
+    assert!(child.ends_with("/researcher-1"));
+    s.turn_started(&child);
+    let chosen = s.state.agents[child.as_str()].choice.as_ref().unwrap();
+    assert_eq!(
+        (chosen.cli, chosen.model.as_str(), chosen.effort, chosen.by.as_str()),
+        (Cli::Agy, OPUS, Effort::Medium, "engine")
+    );
+}
+
 #[test]
 fn auto_waits_for_real_turns_and_their_owed_closing_turn_through_teardown() {
     let mut s = Sim::new();
-    auto(&mut s, Cli::Codex, "gpt-6");
-    note(&mut s, PROJECT, "lesson");
+    auto(&mut s, Cli::Codex, SOL);
+    land(&mut s, PROJECT, 100);
     limit(&mut s, Cli::Codex, "account", "week", Some(10), false, None);
     s.through_brief("web-1", "web");
     let real = "web-1/foreman";

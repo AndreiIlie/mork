@@ -102,6 +102,7 @@ One writer at a time in the clone, you included.
 The `delegating` skill says how to pick, task, reuse and steer them.
 
 The "Allowed models" section (sent when it changes) lists the models and efforts you may pick for the child roles your card can spawn, from the current configuration and subject to the child's wall.
+On an auto-started pass it tells you to omit the researcher's model, effort and CLI so the engine can choose from `picks.pass`.
 On a review card it names `picks.reviewer.inside` or `picks.reviewer.outside`, showing only that kind's permissions.
 
 ## Showing the work

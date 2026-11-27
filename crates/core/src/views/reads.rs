@@ -108,6 +108,7 @@ fn deliverables(run: Option<&Card>) -> Value {
 /// `projects`: each project's name, base, board prefix, where it lives, and its auto switch (fac-233).
 pub(super) fn projects(state: &State, ctx: Ctx<'_>) -> Decision {
     let config = ctx.config;
+    let bar = std::cell::OnceCell::new();
     let list: Vec<Value> = config
         .ordered_projects()
         .filter_map(|n| config.projects.get(n).map(|p| (n, p)))
@@ -121,6 +122,13 @@ pub(super) fn projects(state: &State, ctx: Ctx<'_>) -> Decision {
                 let config = p.passes.get(&read).cloned().unwrap_or_default();
                 let last = state.lookbacks.get(name).and_then(|rows| rows.get(&read));
                 let running = live.filter(|(_, active)| *active == read).map(|(id, _)| id);
+                if config.mode == mork_types::lookback::Trigger::Auto {
+                    use crate::lifecycle::trigger;
+                    let base = trigger::baseline(state, name, read, ctx.now);
+                    let bar = bar.get_or_init(|| trigger::starting_offer(state, ctx).map(|pair| 100 - pair.spare));
+                    return json!({"read": read, "mode": config.mode, "last": last, "running": running,
+                        "score": trigger::score(state, &base, ctx), "bar": bar});
+                }
                 json!({"read": read, "mode": config.mode, "landings": config.landings, "edits": config.edits,
                     "notes": config.notes, "days": config.days, "last": last, "running": running})
             });

@@ -188,10 +188,11 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
     let Sender::Agent(parent) = from else { return Decision::refused("a child needs a seat to report to") };
     agent.parent = Some(parent.clone());
     agent.topic = topic;
-    agent.choice = match spawn_choice(state, from, &agent, c, (model.as_deref(), effort.as_deref(), cli.as_deref()), ctx) {
-        Ok(choice) => choice,
-        Err(e) => return Decision::refused(e),
-    };
+    agent.choice =
+        match spawn_choice(state, from, &agent, c, (model.as_deref(), effort.as_deref(), cli.as_deref()), ctx) {
+            Ok(choice) => choice,
+            Err(e) => return Decision::refused(e),
+        };
     let mut p = Poster::for_ctx(state, ctx);
     p.put_agent(agent);
     task(&mut p, &who, from, task_text.trim());
@@ -201,13 +202,21 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
     d
 }
 
-fn spawn_choice(state: &State, from: &Sender, agent: &Agent, card: &Card,
-    (model, effort, cli): (Option<&str>, Option<&str>, Option<&str>), ctx: Ctx<'_>) -> Result<Option<Choice>, String> {
+fn spawn_choice(
+    state: &State,
+    from: &Sender,
+    agent: &Agent,
+    card: &Card,
+    (model, effort, cli): (Option<&str>, Option<&str>, Option<&str>),
+    ctx: Ctx<'_>,
+) -> Result<Option<Choice>, String> {
     let at = super::models::standing(state, agent);
     let selected = model.is_some() || effort.is_some() || cli.is_some();
     if agent.role == Role::Researcher && crate::lifecycle::lookback::automatic(card) {
         if selected {
-            return Err("the engine chooses this auto pass's researchers: drop `--model`, `--effort` and `--cli`".into());
+            return Err(
+                "the engine chooses this auto pass's researchers: drop `--model`, `--effort` and `--cli`".into()
+            );
         }
         return crate::lifecycle::trigger::best(state, "researcher", at, ctx)
             .map(|pair| Some(pair.choice(at.phase)))
@@ -223,7 +232,13 @@ fn spawn_choice(state: &State, from: &Sender, agent: &Agent, card: &Card,
         return Err("choose this child's model and effort: `spawn --model <model> --effort <effort>`".into());
     }
     let s = super::models::selection(ctx.config, agent, at, model, effort, cli, super::models::By::of(state, from))?;
-    Ok(Some(Choice { cli: s.model.cli, model: s.model.model, effort: s.effort, by: from.label(), phase: Some(at.phase) }))
+    Ok(Some(Choice {
+        cli: s.model.cli,
+        model: s.model.model,
+        effort: s.effort,
+        by: from.label(),
+        phase: Some(at.phase),
+    }))
 }
 
 pub(super) const EMPTY_REVIEW: &str = "your review-fail has empty findings. Put each blocking finding in `findings`, or repeat `review-fail` with empty `findings` to confirm the failure";

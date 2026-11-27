@@ -12,7 +12,7 @@ approval's `at_ms` ([lifecycle/brief.rs: `approve`, `offer`](../crates/core/src/
 
 ## Project passes
 
-A pass’s `card.start` row carries its trigger and, for an engine start, the threshold met.
+A pass’s `card.start` row carries its `trigger`. A scheduled start includes the `threshold` met. An auto start records the activity `score` parts and `total`, the `bar`, and the winning offer’s `pool`, `spare`, `cli`, `model`, `effort` and `pair_score`.
 A Dream foreman's `memory.write` and `memory.delete` rows carry the contents before and after the edit.
 Its `notes.deleted` row keeps the deleted lessons’ text keyed by note ID.
 

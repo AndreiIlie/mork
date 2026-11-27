@@ -24,12 +24,24 @@ pub struct Offer {
 
 impl Offer {
     pub(crate) fn choice(&self, phase: mork_types::config::SeatPhase) -> mork_types::state::Choice {
-        mork_types::state::Choice { cli: self.cli, model: self.model.clone(), effort: self.effort, by: "engine".into(), phase: Some(phase) }
+        mork_types::state::Choice {
+            cli: self.cli,
+            model: self.model.clone(),
+            effort: self.effort,
+            by: "engine".into(),
+            phase: Some(phase),
+        }
     }
 }
 
 /// Ranks the allowed pairs for this wall by score, keeping their input order on ties.
-pub fn ranked(limits: &BTreeMap<String, Limit>, now: i64, account: Option<&str>, seat: &Seat, allowed: &[PickModel]) -> Vec<Offer> {
+pub fn ranked(
+    limits: &BTreeMap<String, Limit>,
+    now: i64,
+    account: Option<&str>,
+    seat: &Seat,
+    allowed: &[PickModel],
+) -> Vec<Offer> {
     let mut offers = Vec::new();
     for entry in allowed {
         let cli = entry.cli;
@@ -51,8 +63,13 @@ pub fn ranked(limits: &BTreeMap<String, Limit>, now: i64, account: Option<&str>,
             }
             let share = f64::from(spare.unwrap_or_default());
             offers.push(Offer {
-                cli, model: entry.model.clone(), effort, pool: pool.clone(), open: spare.is_some(),
-                spare: spare.unwrap_or_default(), score: index * share / (share + dollars * bench::cost_scale(cli, &entry.model)),
+                cli,
+                model: entry.model.clone(),
+                effort,
+                pool: pool.clone(),
+                open: spare.is_some(),
+                spare: spare.unwrap_or_default(),
+                score: index * share / (share + dollars * bench::cost_scale(cli, &entry.model)),
             });
         }
     }
@@ -60,7 +77,13 @@ pub fn ranked(limits: &BTreeMap<String, Limit>, now: i64, account: Option<&str>,
     offers
 }
 
-fn headroom(limits: &BTreeMap<String, Limit>, entry: &PickModel, bucket: &str, account: Option<&str>, now: i64) -> Option<u32> {
+fn headroom(
+    limits: &BTreeMap<String, Limit>,
+    entry: &PickModel,
+    bucket: &str,
+    account: Option<&str>,
+    now: i64,
+) -> Option<u32> {
     let rows = limits.values().filter(|l| {
         l.cli == entry.cli && (l.cli != Cli::Claude || l.account.as_ref().map(|a| a.id.as_str()) == account)
     });
@@ -76,7 +99,7 @@ fn headroom(limits: &BTreeMap<String, Limit>, entry: &PickModel, bucket: &str, a
             Cli::Codex => row.bucket == entry.model,
             Cli::Agy => false,
         };
-        if !model_row && !(row.bucket == bucket && name == "5h") {
+        if !(model_row || row.bucket == bucket && name == "5h") {
             continue;
         }
         if row.reached || (name == "5h" && row.percent.is_some_and(|p| p > SHORT_CEILING)) {

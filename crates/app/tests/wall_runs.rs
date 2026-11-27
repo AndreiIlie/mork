@@ -23,7 +23,13 @@ fn request(config: &Config, project: &str, mode: Mode, role: Role, words: &[&str
     let from = Sender::Agent(agent.key.clone());
     state.agents.insert(agent.key.clone(), agent);
     let command: Vec<String> = words.iter().map(|w| (*w).into()).collect();
-    mork_core::queue::leases::lease(&state, &from, "walls", &command, Ctx { now: 1, config, faults: true, claude_account: None })
+    mork_core::queue::leases::lease(
+        &state,
+        &from,
+        "walls",
+        &command,
+        Ctx { now: 1, config, faults: true, claude_account: None },
+    )
 }
 
 #[test]

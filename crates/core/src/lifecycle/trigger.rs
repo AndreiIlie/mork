@@ -7,7 +7,10 @@ use mork_types::note::NoteWhat;
 use serde::Serialize;
 
 use super::lookback::{self, Start};
-use crate::agents::{pools::{self, Offer}, turns};
+use crate::agents::{
+    pools::{self, Offer},
+    turns,
+};
 use crate::decide::Ctx;
 use crate::post::Poster;
 use crate::state::{Change, State};
@@ -85,12 +88,22 @@ pub(crate) fn baseline(state: &State, project: &ProjectId, read: Read, now: i64)
         return b.clone();
     }
     let cursor = state.lookbacks.get(project).and_then(|reads| reads.get(&read));
-    Baseline { project: project.clone(), read, at_ms: cursor.map_or(now, |c| c.ended_ms), counts: lookback::counts(state, project) }
+    Baseline {
+        project: project.clone(),
+        read,
+        at_ms: cursor.map_or(now, |c| c.ended_ms),
+        counts: lookback::counts(state, project),
+    }
 }
 
 fn notes<'a>(state: &'a State, base: &'a Baseline, ctx: Ctx<'a>) -> impl Iterator<Item = ()> + 'a {
-    state.notes.range((std::ops::Bound::Excluded(base.counts.note), std::ops::Bound::Unbounded))
-        .filter(|(_, n)| matches!(n.what, NoteWhat::Lesson { .. }) && crate::memory::under(n, ctx.config.mork.project.as_ref()) == Some(&base.project))
+    state
+        .notes
+        .range((std::ops::Bound::Excluded(base.counts.note), std::ops::Bound::Unbounded))
+        .filter(|(_, n)| {
+            matches!(n.what, NoteWhat::Lesson { .. })
+                && crate::memory::under(n, ctx.config.mork.project.as_ref()) == Some(&base.project)
+        })
         .map(|_| ())
 }
 

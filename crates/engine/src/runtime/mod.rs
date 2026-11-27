@@ -278,8 +278,12 @@ impl Engine {
     }
 
     pub(super) fn decision_ctx(&self, now: i64) -> Ctx<'_> {
-        Ctx { now, config: &self.ctx.config, faults: self.faults(),
-            claude_account: self.views_cache.claude_accounts.live.as_ref().map(|a| a.id.as_str()) }
+        Ctx {
+            now,
+            config: &self.ctx.config,
+            faults: self.faults(),
+            claude_account: self.views_cache.claude_accounts.live.as_ref().map(|a| a.id.as_str()),
+        }
     }
 
     /// Decides and commits one event; carries out its intents after the commit.
