@@ -61,24 +61,25 @@ Mork is a 7-crate Rust workspace with a dependency graph and boundary rules enfo
 
 - **Linux** with user namespaces enabled, `bwrap` (Bubblewrap), and Landlock ABI 6+
 - **Git** for managing project repositories
-- One or more supported agent CLIs installed and signed in (`claude`, `codex`, etc.)
+- At least one of `claude`, `codex` or `agy` on your PATH
+- A checkout with a committed branch and a Git `user.name` and `user.email`
 
 ### Install a prebuilt release (x86_64 Linux)
 
 Each release includes the `mork` executable built on Ubuntu 24.04, the dashboard in `web/dist`, and a matching example config. Choose a version and check its release notes for supported upgrades and when to start fresh. [GitHub Releases](https://github.com/AndreiIlie/mork/releases)
 
 ```bash
-tag=v0.1.0  # Replace with the release tag you chose
+tag="RELEASE_TAG"  # Use a release that includes mork init
 bundle="mork-${tag}-linux-x86_64"
 curl -fLO "https://github.com/AndreiIlie/mork/releases/download/$tag/$bundle.tar.gz"
-mkdir -p ~/.local/opt ~/.config/mork
+mkdir -p ~/.local/opt
 tar -xzf "$bundle.tar.gz" -C ~/.local/opt
 cd ~/.local/opt/"$bundle"
-cp -n mork.example.toml ~/.config/mork/mork.toml
-realpath web/dist
+./mork init /path/to/repo
+./mork login codex  # Repeat for each CLI that init lists, using its name
 ```
 
-Edit `~/.config/mork/mork.toml`. Under `[mork]`, set `web_assets` to the absolute path printed by `realpath` and `web_port` to a free, fixed port (the example uses `41900`). Set your Git author and replace the example repository, board, and toolchain paths with your own.
+Init writes `~/.config/mork/mork.toml` and creates the project’s board under Mork’s data directory. It detects `cargo test` or an npm test script. For other projects, pass `--test 'your test command'`. A project whose tests need dependencies can set `install`; init sets it to `npm ci` for a root `package-lock.json`. See `mork.example.toml` for the configuration examples and `mork manual reference` for the keys.
 
 Run `./mork` in the extracted directory to start the engine and open the dashboard in your browser. On your first visit, run `./mork web` in a second terminal and open the printed link to connect. Use `./mork --no-browser` to start the engine alone.
 
@@ -94,13 +95,10 @@ cd mork
 # 2. Build the web UI
 cargo xtask web
 
-# 3. Copy and edit the example config
-mkdir -p ~/.config/mork
-cp mork.example.toml ~/.config/mork/mork.toml
-# Edit ~/.config/mork/mork.toml with your repo, board, and toolchain paths
-
-# 4. Build and run the engine
+# 3. Build the engine and register the checkout you want to work on
 cargo build --release -p mork-app
+./target/release/mork init /path/to/repo
+./target/release/mork login codex  # Use each CLI name printed by init
 ./target/release/mork
 ```
 

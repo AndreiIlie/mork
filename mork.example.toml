@@ -1,4 +1,4 @@
-# Copy to ~/.config/mork/mork.toml and adjust paths for your machine.
+# Run mork init /path/to/repo to generate a starting config for your machine.
 
 [mork]
 # Optional: set `project = "mork"` only if you are developing Mork itself
