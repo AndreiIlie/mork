@@ -1,6 +1,6 @@
 use super::{Event, Histories, History, group, percent};
 use mork_types::quality::{FindingRow, Precision, QualityGroup};
-use mork_types::review::{Raised, Review};
+use mork_types::review::{FindingState, Raised, Review};
 use std::collections::{BTreeMap, BTreeSet};
 
 struct Finding {
@@ -100,8 +100,9 @@ impl<'a> Origin<'a> {
         } else {
             for f in stored(snapshot, e) {
                 let mut row = self.finding(project, &f.by, false);
-                row.declined = f.declined;
-                row.fixed = f.resolved && !f.declined && !f.withdrawn && f.dropped.is_none();
+                let state = crate::views::findings::state_of(f);
+                row.declined = state == FindingState::Declined && !f.withdrawn;
+                row.fixed = state == FindingState::Resolved && !f.withdrawn;
                 findings.insert(u64::from(f.n), row);
             }
         }

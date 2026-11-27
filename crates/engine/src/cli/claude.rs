@@ -124,14 +124,17 @@ fn planner_call(st: &mut StreamState, b: &Value) {
     }
 }
 
+fn tool_failed(event: &Value, block: &Value) -> bool {
+    block["is_error"].as_bool() == Some(true)
+        || event.pointer("/tool_use_result/success").and_then(Value::as_bool) == Some(false)
+}
+
 // A tool's result ends its step (fac-206).
 fn results_of(st: &mut StreamState, ev: &Value) {
     let Some(blocks) = ev.pointer("/message/content").and_then(Value::as_array) else { return };
     for b in blocks.iter().filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_result")) {
         if let Some(id) = b.get("tool_use_id").and_then(Value::as_str) {
-            let failed = b["is_error"].as_bool() == Some(true)
-                || ev.pointer("/tool_use_result/success").and_then(Value::as_bool) == Some(false);
-            turn::ended(st, id, failed);
+            turn::ended(st, id, tool_failed(ev, b));
         }
     }
 }
@@ -141,8 +144,7 @@ fn planner_results(st: &mut StreamState, ev: &Value) {
     for b in blocks.iter().filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_result")) {
         let call = b.get("tool_use_id").and_then(Value::as_str).and_then(|id| st.planner_calls.get(id)).cloned();
         let Some((name, input)) = call else { continue };
-        let failed = ev.pointer("/tool_use_result/success").and_then(Value::as_bool) == Some(false);
-        if failed || b.get("is_error").and_then(Value::as_bool) == Some(true) {
+        if tool_failed(ev, b) {
             continue;
         }
         match name.as_str() {
