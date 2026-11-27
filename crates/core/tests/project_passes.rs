@@ -313,6 +313,10 @@ fn untouched_stale_and_measured_zero_have_distinct_offers() {
     assert_eq!(offers(&s)[0].spare, 60, "80% projected unused times 75% elapsed");
     s.now += 7 * DAY / 4;
     assert!(!offers(&s)[0].open);
+    limit(&mut s, Cli::Claude, "account", "week", Some(0), false, Some("live"));
+    assert!(offers(&s)[0].open);
+    s.now += 7 * DAY / 2 + 1;
+    assert!(!offers(&s)[0].open, "zero Claude usage from the previous week reopened the pool");
 }
 
 #[test]
