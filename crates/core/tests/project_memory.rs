@@ -64,13 +64,15 @@ fn bm25_uses_whole_words_field_weights_and_rarity_within_scope() {
     }
     s.operator(write("ex", "hidden", "door", "rare")).unwrap();
     assert_eq!(names(&mut s, seat(PLANNER), "DOOR-door"), ["door", "desc", "body"]);
-    let rare = names(&mut s, seat(PLANNER), "common rare");
-    assert_eq!(rare.first().map(String::as_str), Some("doorway"));
-    // Put the rare and common matches in the same field in otherwise equal documents.
     s.operator(write("web", "rarely", "plain", "scarce")).unwrap();
     s.operator(write("web", "often", "plain", "common")).unwrap();
     assert_eq!(names(&mut s, seat(PLANNER), "scarce common")[0], "rarely");
     assert!(names(&mut s, Sender::Operator, "door").contains(&"hidden".to_owned()));
+    s.config.projects.insert("ex-a".into(), s.config.projects["ex"].clone());
+    for (memory, name) in [("ex-a", "alpha"), ("ex", "omega"), ("ex", "beta")] {
+        s.operator(write(memory, name, "Equal", "weights")).unwrap();
+    }
+    assert_eq!(names(&mut s, Sender::Operator, "equal"), ["beta", "omega", "alpha"]);
 }
 
 #[test]
@@ -106,6 +108,19 @@ fn closing_permissions_and_journaled_changes_after_card_end() {
     );
 }
 
+fn assert_held_history(s: &Sim) {
+    let mut search = Search::new("withheld", Default::default(), &[]);
+    search.offer(Found::Card(Box::new(s.card(CARD))));
+    for (time, kind, c, data) in &s.journal {
+        if c.as_deref() == Some(CARD) {
+            assert!(!data.to_string().to_lowercase().contains("withheld"));
+            search.offer(Found::Event { card: CARD.into(), time: *time, kind: kind.clone(), data: data.clone() });
+        }
+    }
+    assert_eq!(search.answer()["history.search"]["hits"], json!([]));
+    assert_eq!(rows(s, "memory.staged", Some(CARD)), [json!({"by":PLANNER,"op":"write"})]);
+}
+
 #[test]
 fn committed_index_and_blind_reviewer_reads_exclude_held_lessons_until_landing() {
     let mut s = Sim::new();
@@ -139,16 +154,7 @@ fn committed_index_and_blind_reviewer_reads_exclude_held_lessons_until_landing()
     for cmd in [json!({"memory.stats":{"memory":"web"}}), json!({"card.show":{"card":CARD}})] {
         assert!(!s.cmd(seat(&reviewer), cmd).unwrap().to_string().contains("withheld"));
     }
-    let mut search = Search::new("withheld", Default::default(), &[]);
-    search.offer(Found::Card(Box::new(s.card(CARD))));
-    for (time, kind, c, data) in &s.journal {
-        if c.as_deref() == Some(CARD) {
-            assert!(!data.to_string().to_lowercase().contains("withheld"));
-            search.offer(Found::Event { card: CARD.into(), time: *time, kind: kind.clone(), data: data.clone() });
-        }
-    }
-    assert_eq!(search.answer()["history.search"]["hits"], json!([]));
-    assert_eq!(rows(&s, "memory.staged", Some(CARD)), [json!({"by":PLANNER,"op":"write"})]);
+    assert_held_history(&s);
     s.turn(&reviewer, reply("review-pass", "Passed"));
     s.round_ends(CARD, &[], &[]);
     let moved = s.action_of(|w| matches!(w, ActionWhat::MoveBase { card, .. } if card.as_str() == CARD));

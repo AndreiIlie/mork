@@ -77,8 +77,9 @@ pub(super) fn search(state: &State, from: &Sender, words: &str) -> Value {
     let average = docs.iter().map(|d| d.length).sum::<f64>() / n.max(1.0);
     let mut hits: Vec<_> =
         docs.iter().filter(|d| !d.frequencies.is_empty()).map(|d| (d.score(&idf, average), d.file)).collect();
-    // Stable sorting keeps memory/name order from the state map when scores tie.
-    hits.sort_by(|a, b| b.0.total_cmp(&a.0));
+    hits.sort_by(|(score_a, a), (score_b, b)| {
+        score_b.total_cmp(score_a).then_with(|| a.memory.cmp(&b.memory)).then_with(|| a.name.cmp(&b.name))
+    });
     let files: Vec<_> = hits
         .into_iter()
         .take(SEARCH_MAX)
