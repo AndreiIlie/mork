@@ -359,7 +359,6 @@ dependencies = [
  "mork-types",
  "percent-encoding",
  "png",
- "pulldown-cmark",
  "rusqlite",
  "serde",
  "serde_json",

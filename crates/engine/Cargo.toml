@@ -20,7 +20,6 @@ image.workspace = true
 rusqlite.workspace = true
 sha2.workspace = true
 ureq.workspace = true
-pulldown-cmark.workspace = true
 percent-encoding.workspace = true
 httparse.workspace = true
 shlex.workspace = true

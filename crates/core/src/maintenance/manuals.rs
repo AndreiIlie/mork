@@ -168,7 +168,7 @@ fn index() -> String {
         let _ = writeln!(out, "- `{line}`: {}", one_line(summary));
     }
     out.push_str("\nHelpers:\n");
-    for s in sections().filter(|s| s.name.starts_with("mork ")) {
+    for s in sections().filter(|s| s.name == "mork" || s.name.starts_with("mork ")) {
         let _ = writeln!(out, "- `{}`: {}", s.name, one_line(s.summary));
     }
     out
