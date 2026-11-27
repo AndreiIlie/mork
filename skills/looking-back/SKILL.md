@@ -14,7 +14,8 @@ Change no code and write no card.
 
 - Split merged changes into pieces of about three large changes or fifteen small ones.
   For a whole-code read, use module boundaries.
-  On an auto-started pass, omit model, effort and CLI at spawn. The engine chooses from `picks.pass` and refuses the spawn if no pool is open.
+  On an auto-started pass, omit model, effort and CLI at spawn.
+  The engine chooses from `picks.pass` and refuses the spawn if no pool is open.
   Give each researcher the fixed commit and the files, changes or cards it owns.
 - In each task say what counts as a find and what falls outside the read.
   Require the whole of every assigned file or hunk, including tests and deleted code, and a list of anything left unread.

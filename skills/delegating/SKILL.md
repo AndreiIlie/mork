@@ -16,7 +16,8 @@ Use the least work that answers the task.
   Task it with the pages to reproduce as they stand today, the mock's link, and "keep what the folder holds, fill what it lacks"; end `built` once its report says the baseline is done.
   A planner can spawn researchers at brief or during a specification dispute.
   The planner is no child: a foreman neither spawns nor picks it.
-  On an auto-started pass, omit model, effort and CLI for a researcher. The engine chooses from `picks.pass` at each spawn and refuses when no quota pool is open.
+  On an auto-started pass, omit model, effort and CLI for a researcher.
+  The engine chooses from `picks.pass` at each spawn and refuses when no quota pool is open.
   Every other researcher spawn requires both model and effort.
   A reviewer requires `--topic '<topic>'`, quoted, what it reviews in your own words, and a researcher takes none.
   A reviewer may omit model, effort and CLI together to use its configured inside or outside default, without allowlist permission.

@@ -12,7 +12,8 @@ Use writer and origin to trace the lesson, and reads and last read to prioritize
 Read each file with `mork ctl memory.read <project> <name>`.
 Reads by this run's seats leave usage tallies unchanged.
 
-On an auto-started pass, omit model, effort and CLI at spawn. The engine chooses from `picks.pass` and refuses the spawn if no pool is open.
+On an auto-started pass, omit model, effort and CLI at spawn.
+The engine chooses from `picks.pass` and refuses the spawn if no pool is open.
 Give researchers groups of about fifteen files to check against the fixed commit.
 Ask for a verdict of true, stale, contradicted or duplicate, with a file and line for each code claim.
 The foreman alone edits.

@@ -186,10 +186,29 @@ fn limit(
     s.state.limits.insert(l.key(), l);
 }
 
+fn check_start(s: &mut Sim) {
+    let view = s.operator(json!({"projects":{}})).unwrap();
+    let project = view["projects"]["projects"].as_array().unwrap().iter().find(|p| p["name"] == PROJECT).unwrap();
+    let row = s.journal.iter().find(|(_, kind, _, _)| kind == "card.start").unwrap();
+    let data = &row.3;
+    assert_eq!(row.2.as_deref(), Some(CARD));
+    assert_eq!(data["score"]["landings"], project["passes"][0]["score"]["landings"]);
+    assert_eq!(data["bar"], project["passes"][0]["bar"]);
+    assert_eq!(data["bar"], 70);
+    assert_eq!(data["spare"], 30);
+    assert_eq!(data["pool"], "codex");
+    assert_eq!(data["model"], SOL);
+    assert_eq!(data["effort"], "high");
+    assert!(data["pair_score"].as_f64().unwrap() > 0.0);
+}
+
 #[test]
 fn auto_checks_activity_the_bar_and_each_applicable_window() {
     let mut s = Sim::new();
     auto(&mut s, Cli::Codex, SOL);
+    s.config
+        .seats
+        .insert("foreman".into(), serde_json::from_value(json!({"report":{"cli":"claude","model":OPUS}})).unwrap());
     set_pass(&mut s, "ex", Read::Pulse, json!({"mode":"auto"}));
     tick(&mut s);
     s.now += 30 * DAY;
@@ -214,24 +233,36 @@ fn auto_checks_activity_the_bar_and_each_applicable_window() {
         tick(&mut s);
         assert_eq!(running(&s), starts);
     }
-    let view = s.operator(json!({"projects":{}})).unwrap();
-    let project = view["projects"]["projects"].as_array().unwrap().iter().find(|p| p["name"] == PROJECT).unwrap();
-    let row = s.journal.iter().find(|(_, kind, _, _)| kind == "card.start").unwrap();
-    let data = &row.3;
-    assert_eq!(row.2.as_deref(), Some(CARD));
-    assert_eq!(data["score"]["landings"], project["passes"][0]["score"]["landings"]);
-    assert_eq!(data["bar"], project["passes"][0]["bar"]);
-    assert_eq!(data["bar"], 70);
-    assert_eq!(data["spare"], 30);
-    assert_eq!(data["pool"], "codex");
-    assert_eq!(data["model"], SOL);
-    assert_eq!(data["effort"], "high");
-    assert!(data["pair_score"].as_f64().unwrap() > 0.0);
+    check_start(&mut s);
     cloned(&mut s, CARD);
     s.turn_started(FOREMAN);
-    assert_eq!(s.state.agents[FOREMAN].choice.as_ref().unwrap().model, SOL);
+    let chosen = s.state.agents[FOREMAN].choice.as_ref().unwrap();
+    assert_eq!((chosen.cli, chosen.model.as_str(), chosen.effort), (Cli::Codex, SOL, Effort::High));
     tick(&mut s);
     assert!(live(&s.state, &"ex".into()).is_none());
+}
+
+#[test]
+fn dream_beats_an_eligible_pulse_on_new_project_edits_and_lessons() {
+    let mut s = Sim::new();
+    auto(&mut s, Cli::Codex, SOL);
+    for read in [Read::DeepSweep, Read::Dream] {
+        set_pass(&mut s, PROJECT, read, json!({"mode":"auto"}));
+    }
+    tick(&mut s);
+    s.now += 14 * DAY;
+    land(&mut s, PROJECT, 1);
+    for n in 0..5 {
+        note(&mut s, PROJECT, "lesson");
+        s.operator(write(&format!("new-{n}"), PROJECT)).unwrap();
+    }
+    limit(&mut s, Cli::Codex, "account", "week", Some(0), false, None);
+    tick(&mut s);
+    assert_eq!(s.card(CARD).lookback.unwrap().read, Read::Dream);
+    let score = &s.journal.iter().find(|(_, k, _, _)| k == "card.start").unwrap().3["score"];
+    assert_eq!(score["notes"], 50.0);
+    assert_eq!(score["edits"], 20.0);
+    assert!(score["total"].as_f64().unwrap() >= 120.0);
 }
 
 #[test]

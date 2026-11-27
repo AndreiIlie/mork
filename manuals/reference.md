@@ -49,12 +49,14 @@ label = "Sol"
 efforts = ["high", "xhigh"]
 ```
 
-Scheduled passes require at least one positive threshold. Auto accepts only its mode and, for Dream, its budget.
+Scheduled passes require at least one positive threshold.
+Auto accepts only its mode and, for Dream, its budget.
 See `lookback` for how each threshold is counted.
 Dream's `budget` is the maximum number of project memory files to keep and defaults to 60.
 Auto requires at least one configured model and effort in the global `[[picks.pass]]` list.
 Each entry names a supported CLI and model together, with efforts that model accepts and that have benchmark values.
-The initial benchmark table covers Claude Fable 5.2, Opus 5.5, Sonnet 5.5, GPT-6.2 Astra and Sol, and Gemini 4 Neon. Opus can also run on agy at low, medium or high.
+The initial benchmark table covers Claude Fable 5.2, Opus 5.5, Sonnet 5.5, GPT-6.2 Astra and Sol, and Gemini 4 Neon.
+Opus can also run on agy at low, medium or high.
 A pass table containing the retired `spare` key fails to load.
 
 ### Project board and forge
@@ -475,7 +477,9 @@ Example: `mork ctl claude.account account-team`
 The configured projects, in the order their tables appear in `mork.toml`.
 
 Each entry in `projects.projects` has `name`, `base`, `prefix` (the board's card ID prefix), `local`, `forge` and `auto.on`.
-The `passes` rows give each read's mode, last completion and running card. Scheduled rows include thresholds. Auto rows give the live `score` parts and `total`, and the current `bar`, or `null` when quota prevents a start.
+The `passes` rows give each read's mode, last completion and running card.
+Scheduled rows include thresholds.
+Auto rows give the live `score` parts and `total`, and the current `bar`, or `null` when quota prevents a start.
 A local project has `local: true` and `forge: {"kind":"local"}`.
 A Bitbucket project has `local: false` and its `forge` holds `kind`, `workspace` and `slug`.
 A GitHub project also has `local: false` and exposes `kind`, `owner` and `repo`.
@@ -508,15 +512,25 @@ Dream excludes its own edits from the next trigger.
 Ending an engine-started run early with `done` or `close` resets the thresholds the same way and preserves the previous completed read's date and range.
 
 Auto scores each signal since the baseline as `100 * x / (x + half)` and adds the parts.
-Pulse uses halves of 20 landings and 7 days. Deep Sweep uses 200 landings and 30 days. Dream uses 20 memory edits, 5 lesson notes and 14 days.
-Pulse and Deep Sweep need a new landing. Dream needs a new edit or lesson.
+Pulse uses halves of 20 landings and 7 days.
+Deep Sweep uses 200 landings and 30 days.
+Dream uses 20 memory edits, 5 lesson notes and 14 days.
+Pulse and Deep Sweep need a new landing.
+Dream needs a new edit or lesson.
 
 For each allowed pair in `picks.pass`, the engine uses the quota pool available to its seat, including only the signed-in account on Claude.
-The weekly spare is the percent projected unused at reset from the reading, multiplied by the fraction of that window now elapsed. The smallest applicable weekly spare counts.
-A reached current window or a five-hour share above 60% closes the pair. A missing five-hour share permits a run unless the limit is reached.
-A required weekly reading must be usable and, on Codex and agy, at most ten minutes old. A fresh reading on those CLIs showing zero use with no future reset counts as 50 spare. An expired Claude week needs a new reading.
-The pair's score is `reasoning index * spare / (spare + scaled cost)`, using benchmark dollars per task scaled by 3.5 for Claude and agy third-party models, 13 for Codex and 2 for agy Gemini. Ties follow list order.
-The winning pair's spare must be positive to start a pass. The bar is 100 minus that spare. The pass furthest above its bar starts, with ties in project then pass order.
+The weekly spare is the percent projected unused at reset from the reading, multiplied by the fraction of that window now elapsed.
+The smallest applicable weekly spare counts.
+A reached current window or a five-hour share above 60% closes the pair.
+A missing five-hour share permits a run unless the limit is reached.
+A required weekly reading must be usable and, on Codex and agy, at most ten minutes old.
+A fresh reading on those CLIs showing zero use with no future reset counts as 50 spare.
+An expired Claude week needs a new reading.
+The pair's score is `reasoning index * spare / (spare + scaled cost)`, using benchmark dollars per task scaled by 3.5 for Claude and agy third-party models, 13 for Codex and 2 for agy Gemini.
+Ties follow list order.
+The winning pair's spare must be positive to start a pass.
+The bar is 100 minus that spare.
+The pass furthest above its bar starts, with ties in project then pass order.
 One auto pass can be live across all projects.
 While a real card has work running or owed, including a closing turn waiting for clone removal, auto starts no new turn.
 Running turns finish.
@@ -664,7 +678,10 @@ Example: `mork ctl dm ex-550 foreman`
 
 Spawns a researcher, reviewer or baseline seat for a card's foreman: a child, named, walled, in a DM of its own.
 
-Researchers require `model` and `effort` except on an auto-started pass. There, omit `model`, `effort` and `cli`. The engine chooses a pair from `picks.pass` at spawn and refuses the spawn if no quota pool is open. An open pool with measured zero spare can serve a researcher.
+Researchers require `model` and `effort` except on an auto-started pass.
+There, omit `model`, `effort` and `cli`.
+The engine chooses a pair from `picks.pass` at spawn and refuses the spawn if no quota pool is open.
+An open pool with measured zero spare can serve a researcher.
 A reviewer requires `topic`, what it reviews in the foreman's own words, quoted so a topic of several words passes whole (`--topic 'money, permissions or data integrity'`): the window's room list shows it beside the reviewer's name, and it is saved on the seat only, never on the card.
 A researcher that names one is refused.
 A reviewer may omit `model`, `effort` and `cli` together to launch on its configured inside or outside default, without allowlist permission.
