@@ -1,20 +1,4 @@
-use super::{Config, PickModel, ReviewKind, RoutingMode, SeatPhase, Standing};
-
-const REPORT: Standing = Standing { phase: SeatPhase::Report, review: None };
-const INSIDE: Standing = Standing { phase: SeatPhase::Work, review: Some(ReviewKind::Inside) };
-const OUTSIDE: Standing = Standing { phase: SeatPhase::Work, review: Some(ReviewKind::Outside) };
-
-pub const ROLES: &[(&str, Standing)] = &[
-    ("planner", Standing::WORK),
-    ("foreman", Standing::WORK),
-    ("foreman", REPORT),
-    ("review-foreman", INSIDE),
-    ("review-foreman", OUTSIDE),
-    ("researcher", Standing::WORK),
-    ("baseline", Standing::WORK),
-    ("reviewer", INSIDE),
-    ("reviewer", OUTSIDE),
-];
+use super::{Config, PickModel, ReviewKind, RoutingMode, SEAT_ROWS, SeatPhase, Standing};
 
 impl Config {
     pub fn routing_mode(&self, seat: &str, at: Standing) -> RoutingMode {
@@ -40,7 +24,7 @@ impl Config {
     }
 
     pub fn routing_enabled(&self) -> bool {
-        ROLES.iter().any(|&(name, at)| self.routing_mode(name, at) != RoutingMode::Fixed)
+        SEAT_ROWS.iter().any(|&(name, at)| self.routing_mode(name, at) != RoutingMode::Fixed)
             || self.projects.values().flat_map(|p| p.passes.values()).any(|p| p.mode == crate::lookback::Trigger::Auto)
     }
 }

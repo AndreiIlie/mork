@@ -324,14 +324,35 @@ impl Standing {
     /// At its work, outside a review.
     pub const WORK: Self = Self { phase: SeatPhase::Work, review: None };
 
+    pub const REPORT: Self = Self { phase: SeatPhase::Report, review: None };
+    pub const INSIDE: Self = Self { phase: SeatPhase::Work, review: Some(ReviewKind::Inside) };
+    pub const OUTSIDE: Self = Self { phase: SeatPhase::Work, review: Some(ReviewKind::Outside) };
+
     /// Every phase and review policy that may supply configured models.
-    pub const ALL: [Self; 4] = [
-        Self::WORK,
-        Self { phase: SeatPhase::Report, review: None },
-        Self { phase: SeatPhase::Work, review: Some(ReviewKind::Inside) },
-        Self { phase: SeatPhase::Work, review: Some(ReviewKind::Outside) },
-    ];
+    pub const ALL: [Self; 4] = [Self::WORK, Self::REPORT, Self::INSIDE, Self::OUTSIDE];
+
+    pub fn part(self) -> &'static str {
+        match (self.review, self.phase) {
+            (Some(ReviewKind::Inside), _) => "inside",
+            (Some(ReviewKind::Outside), _) => "outside",
+            (None, SeatPhase::Report) => "report",
+            (None, SeatPhase::Work) => "work",
+            (None, SeatPhase::Spec) => "spec",
+        }
+    }
 }
+
+pub const SEAT_ROWS: &[(&str, Standing)] = &[
+    ("planner", Standing::WORK),
+    ("foreman", Standing::WORK),
+    ("foreman", Standing::REPORT),
+    ("review-foreman", Standing::INSIDE),
+    ("review-foreman", Standing::OUTSIDE),
+    ("reviewer", Standing::INSIDE),
+    ("reviewer", Standing::OUTSIDE),
+    ("researcher", Standing::WORK),
+    ("baseline", Standing::WORK),
+];
 
 /// Whether a review seat's default at this standing moved from Claude to Codex (fac-558): outside reviews were
 /// already on Codex.

@@ -322,7 +322,7 @@ mod tests {
         assert!(parse(&common).is_err());
         assert!(parse(&format!("{common}{}", entry.replace("gpt-6.2-sol", "gpt-6.1-terra"))).is_err());
         let config = parse(&format!("{common}{entry}"))?;
-        assert_eq!(config.routing_mode("foreman", mork_types::config::Standing::ALL[1]), RoutingMode::Auto);
+        assert_eq!(config.routing_mode("foreman", mork_types::config::Standing::REPORT), RoutingMode::Auto);
         assert_eq!(config.routing_mode("foreman", mork_types::config::Standing::WORK), RoutingMode::Fixed);
         assert!(parse(&format!("{WAKE_PROJECT}\n[seats.echo]\nrouting='fixed'")).is_err());
         Ok(())

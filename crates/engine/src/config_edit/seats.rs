@@ -1,28 +1,7 @@
 use mork_types::config::view::{ConfigField, ConfigSection, ConfigValue, SeatDefault};
 use mork_types::config::{
-    Cli, Config, Effort, MODEL_CATALOG, OPERATOR_MODELS, PickModel, ReviewKind, Seat, SeatPhase, Standing, Wall, bench,
+    Cli, Config, Effort, MODEL_CATALOG, OPERATOR_MODELS, PickModel, SEAT_ROWS, Seat, Standing, Wall, bench,
 };
-
-pub(super) const ROWS: &[(&str, &str)] = &[
-    ("planner", "work"),
-    ("foreman", "work"),
-    ("foreman", "report"),
-    ("review-foreman", "inside"),
-    ("review-foreman", "outside"),
-    ("reviewer", "inside"),
-    ("reviewer", "outside"),
-    ("researcher", "work"),
-    ("baseline", "work"),
-];
-
-pub(super) fn standing(part: &str) -> Standing {
-    match part {
-        "report" => Standing { phase: SeatPhase::Report, review: None },
-        "inside" => Standing { review: Some(ReviewKind::Inside), ..Standing::WORK },
-        "outside" => Standing { review: Some(ReviewKind::Outside), ..Standing::WORK },
-        _ => Standing::WORK,
-    }
-}
 
 fn offers(group: &str, wall: Wall) -> Vec<PickModel> {
     let extra = if group == "seats" || group == "pass" { OPERATOR_MODELS } else { &[] };
@@ -50,8 +29,7 @@ fn selection(s: &Seat, configured: bool) -> ConfigValue {
     ConfigValue::Seat(SeatDefault { cli: s.cli, model: s.model.clone(), effort: s.effort, configured })
 }
 
-fn seat_field(c: &Config, fallback: &Config, name: &str, part: &str) -> Option<ConfigField> {
-    let at = standing(part);
+fn seat_field(c: &Config, fallback: &Config, name: &str, at: Standing) -> Option<ConfigField> {
     let current = c.seat_in(name, at)?;
     let configured = c.seats.get(name).is_some_and(|o| {
         o.cli.is_some()
@@ -69,7 +47,7 @@ fn seat_field(c: &Config, fallback: &Config, name: &str, part: &str) -> Option<C
         });
     }
     Some(ConfigField {
-        key: format!("{name}.{part}"),
+        key: format!("{name}.{}", at.part()),
         value: Some(selection(&current, configured)),
         default: Some(selection(&fallback.seat_in(name, at)?, false)),
         offers: choices,
@@ -87,7 +65,7 @@ pub(super) fn sections(c: &Config) -> [ConfigSection; 2] {
         o.inside = None;
         o.outside = None;
     }
-    let seats = ROWS.iter().filter_map(|(s, p)| seat_field(c, &fallback, s, p)).collect();
+    let seats = SEAT_ROWS.iter().filter_map(|&(name, at)| seat_field(c, &fallback, name, at)).collect();
     let picks = c.picks.clone().unwrap_or_default();
     let groups = [
         ("researcher", picks.researcher),

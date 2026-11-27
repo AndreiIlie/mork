@@ -1,7 +1,7 @@
 use std::cell::OnceCell;
 
 use mork_types::ProjectId;
-use mork_types::config::{SeatPhase, Standing};
+use mork_types::config::Standing;
 use mork_types::lookback::{Baseline, Counts, PassConfig, Read, Trigger};
 use mork_types::note::NoteWhat;
 use serde::Serialize;
@@ -41,9 +41,8 @@ pub(crate) fn offer(
 }
 
 pub(crate) fn starting_offer(state: &State, project: &ProjectId, ctx: Ctx<'_>) -> Option<Offer> {
-    let at = Standing { phase: SeatPhase::Report, review: None };
     let key = format!("{}/foreman", lookback::next_id(state, project.as_str()));
-    offer(state, project, &key, "foreman", at, ctx)
+    offer(state, project, &key, "foreman", Standing::REPORT, ctx)
 }
 
 pub(crate) fn bar(pair: &Offer) -> u32 {

@@ -76,11 +76,11 @@ fn picks_keep_their_label_and_validate_new_offers() {
 
 #[test]
 fn seat_reset_handles_common_and_work_overrides() {
-    use mork_types::config::{Cli, Effort};
+    use mork_types::config::{Cli, Effort, Standing};
     let text =
         format!("{BASE}[seats.foreman]\ncli='claude'\nmodel='claude-opus-5-5'\n[seats.planner.work]\neffort='low'\n");
     let mut cfg = config::parse(&text).unwrap();
-    let before = cfg.seat_in("foreman", seats::standing("report")).unwrap();
+    let before = cfg.seat_in("foreman", Standing::REPORT).unwrap();
     let mut text = text;
     for key in ["foreman.work", "planner.work"] {
         let view = read(&cfg, &Secrets::default(), false);
@@ -90,7 +90,7 @@ fn seat_reset_handles_common_and_work_overrides() {
     }
     assert_eq!(cfg.seat("foreman").unwrap().cli, Cli::Codex);
     assert_eq!(cfg.seat("planner").unwrap().effort, Effort::Xhigh);
-    assert_eq!(cfg.seat_in("foreman", seats::standing("report")).unwrap(), before);
+    assert_eq!(cfg.seat_in("foreman", Standing::REPORT).unwrap(), before);
 }
 
 #[test]

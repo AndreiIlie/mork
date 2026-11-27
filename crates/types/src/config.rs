@@ -13,8 +13,8 @@ pub use crate::job::SliceConfig;
 pub use crate::ports::Ports;
 pub use seats::{
     AGY_3P_BUCKET, AGY_PRICES, CLAUDE_BLOCKED, CODEX_PRICES, Cli, Effort, MODEL_CATALOG, ModelOverride,
-    OPERATOR_MODELS, OPUS, PickModel, Picks, ROSTER, ReviewKind, ReviewPicks, RoutingMode, SEAT_DEFAULTS, SOL, Seat,
-    SeatOverride, SeatPhase, Standing, Wall, agy_bucket, barred, cli_of_model, foreman_seat, moved_to_codex,
+    OPERATOR_MODELS, OPUS, PickModel, Picks, ROSTER, ReviewKind, ReviewPicks, RoutingMode, SEAT_DEFAULTS, SEAT_ROWS,
+    SOL, Seat, SeatOverride, SeatPhase, Standing, Wall, agy_bucket, barred, cli_of_model, foreman_seat, moved_to_codex,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

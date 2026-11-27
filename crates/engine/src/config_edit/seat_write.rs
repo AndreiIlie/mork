@@ -1,18 +1,20 @@
 use mork_types::config::view::SeatDefault;
-use mork_types::config::{Config, PickModel};
+use mork_types::config::{Config, PickModel, SEAT_ROWS, Standing};
 use toml_edit::Value;
 
 use super::document::{self, Result};
-use super::seats::standing;
+
+fn row(key: &str) -> Result<(&'static str, Standing)> {
+    let (name, part) = key.split_once('.').ok_or("Unknown seat standing.")?;
+    SEAT_ROWS
+        .iter()
+        .copied()
+        .find(|&(s, at)| s == name && at.part() == part)
+        .ok_or_else(|| "Unknown seat standing.".into())
+}
 
 fn sibling(name: &str, part: &str) -> Option<&'static str> {
-    match (name, part) {
-        ("foreman", "work") => Some("report"),
-        ("foreman", "report") => Some("work"),
-        ("reviewer" | "review-foreman", "inside") => Some("outside"),
-        ("reviewer" | "review-foreman", "outside") => Some("inside"),
-        _ => None,
-    }
+    SEAT_ROWS.iter().find(|&&(s, at)| s == name && at.part() != part).map(|(_, at)| at.part())
 }
 
 fn reset(s: &mut String, name: &str, part: &str) -> Result<()> {
@@ -51,7 +53,8 @@ pub(super) fn write(
     fallback: &SeatDefault,
     offers: &[PickModel],
 ) -> Result<()> {
-    let (name, part) = key.split_once('.').ok_or("Unknown seat standing.")?;
+    let (name, at) = row(key)?;
+    let part = at.part();
     let is_default = next.cli == fallback.cli && next.model == fallback.model && next.effort == fallback.effort;
     if !next.configured && !is_default {
         return Err("Use the seat’s default model and effort.".into());
@@ -67,20 +70,20 @@ pub(super) fn write(
         assign(s, name, part, "cli", next.cli.as_str())?;
         assign(s, name, part, "model", &next.model)?;
     }
-    if old.effort != next.effort || model_changed && !effective_effort(s, name, part, next)? {
+    if old.effort != next.effort || model_changed && !effective_effort(s, name, at, next)? {
         assign(s, name, part, "effort", next.effort.as_str())?;
     }
     Ok(())
 }
 
-fn effective_effort(text: &str, name: &str, part: &str, wanted: &SeatDefault) -> Result<bool> {
+fn effective_effort(text: &str, name: &str, at: Standing, wanted: &SeatDefault) -> Result<bool> {
     let config: Config = toml::from_str(text).map_err(|_| "Could not read the seat override.")?;
-    Ok(config.seat_in(name, standing(part)).is_some_and(|s| s.effort == wanted.effort))
+    Ok(config.seat_in(name, at).is_some_and(|s| s.effort == wanted.effort))
 }
 
 pub(super) fn verify(c: &Config, key: &str, wanted: &SeatDefault) -> Result<()> {
-    let (name, part) = key.split_once('.').ok_or("Unknown seat standing.")?;
-    let s = c.seat_in(name, standing(part)).ok_or("Missing seat.")?;
+    let (name, at) = row(key)?;
+    let s = c.seat_in(name, at).ok_or("Missing seat.")?;
     if (s.cli, &s.model, s.effort) != (wanted.cli, &wanted.model, wanted.effort) {
         return Err("The seat override does not produce the requested model and effort.".into());
     }

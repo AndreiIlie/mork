@@ -83,7 +83,7 @@ fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError>
 }
 
 fn check_router_pairs(text: &str, config: &Config) -> Result<(), ConfigError> {
-    use mork_types::config::{RoutingMode, Standing, routing::ROLES};
+    use mork_types::config::{RoutingMode, SEAT_ROWS, Standing};
     if let Some(echo) = config.seats.get("echo")
         && (echo.routing.is_some() || Standing::ALL.iter().any(|&at| echo.at(at).is_some_and(|s| s.routing.is_some())))
     {
@@ -92,7 +92,7 @@ fn check_router_pairs(text: &str, config: &Config) -> Result<(), ConfigError> {
             message: "echo has no routing role".into(),
         });
     }
-    for &(role, at) in ROLES {
+    for &(role, at) in SEAT_ROWS {
         if config.routing_mode(role, at) == RoutingMode::Fixed {
             continue;
         }

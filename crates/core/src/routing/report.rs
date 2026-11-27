@@ -1,4 +1,4 @@
-use mork_types::config::{Config, PickModel, RoutingMode, Standing, routing::ROLES};
+use mork_types::config::{Config, PickModel, RoutingMode, SEAT_ROWS, Standing};
 use mork_types::routing::{Arm, Metric, Statistics};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,7 +14,7 @@ use crate::agents::pools;
 pub fn answer(config: &Config, inputs: &Inputs<'_>, stats: &Statistics) -> Value {
     let mut roles = Vec::new();
     let mut pools = BTreeMap::new();
-    for &(name, at) in ROLES {
+    for &(name, at) in SEAT_ROWS {
         let (table, list) = config.router_list(name, at);
         let mode = config.routing_mode(name, at);
         roles.push(profile(config, inputs, stats, (name, at), (table, list, mode), &mut pools));
@@ -22,7 +22,7 @@ pub fn answer(config: &Config, inputs: &Inputs<'_>, stats: &Statistics) -> Value
     if let Some(picks) = &config.picks
         && !picks.pass.is_empty()
     {
-        for (name, at) in [("foreman", Standing::ALL[1]), ("researcher", Standing::WORK)] {
+        for (name, at) in [("foreman", Standing::REPORT), ("researcher", Standing::WORK)] {
             roles.push(profile(
                 config,
                 inputs,
@@ -88,7 +88,7 @@ fn profile(
         .filter(|a| mork_types::config::bench::benchmark(&a.model, a.effort).is_some())
         .map(|a| arm_report(&pop, &a))
         .collect();
-    json!({"role":role,"mode":mode,"list":table,"kind":at.review.map(|k|format!("{k:?}").to_lowercase()),"arms":estimates})
+    json!({"role":role,"mode":mode,"list":table,"kind":at.review.map(|_| at.part()),"arms":estimates})
 }
 
 fn arm_report(pop: &Population<'_>, a: &Arm) -> Value {
