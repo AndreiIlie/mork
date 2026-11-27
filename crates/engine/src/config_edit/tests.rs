@@ -35,6 +35,24 @@ fn adds_an_absent_setting_and_keeps_explicit_empty_ports() {
 }
 
 #[test]
+fn only_auto_clears_the_pass_thresholds_and_keeps_its_budget() {
+    use mork_types::lookback::Read;
+    let text = format!(
+        "{BASE}[projects.web.passes.dream]\nmode='scheduled'\nlandings=5\nedits=6\nnotes=7\ndays=8\nbudget=9\n\
+         [[picks.pass]]\ncli='codex'\nmodel='gpt-6.2-sol'\nlabel='Sol'\nefforts=['high']\n"
+    );
+    let cfg = config::parse(&text).unwrap();
+    let mode = |from: &str, to: &str| change("project", "passes.dream.mode", json!({"text":from}), json!({"text":to}));
+    let (text, cfg) = candidate(&text, &cfg, &mode("scheduled", "manual"), &Secrets::default()).unwrap();
+    let pass = &cfg.projects["web"].passes[&Read::Dream];
+    assert_eq!([pass.landings, pass.edits, pass.notes, pass.days], [Some(5), Some(6), Some(7), Some(8)]);
+    let (_, cfg) = candidate(&text, &cfg, &mode("manual", "auto"), &Secrets::default()).unwrap();
+    let pass = &cfg.projects["web"].passes[&Read::Dream];
+    assert_eq!([pass.landings, pass.edits, pass.notes, pass.days], [None; 4]);
+    assert_eq!(pass.budget, Some(9));
+}
+
+#[test]
 fn picks_keep_their_label_and_validate_new_offers() {
     let text = format!(
         "{BASE}[[picks.researcher]]\ncli='codex'\nmodel='gpt-6.2-sol'\nlabel='My Sol' # local alias\nefforts=['high']\n"

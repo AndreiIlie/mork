@@ -75,6 +75,9 @@ pub enum Trigger {
     Auto,
 }
 
+/// Number of memory files Dream keeps when the project omits its budget.
+pub const DEFAULT_DREAM_BUDGET: u64 = 60;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PassConfig {

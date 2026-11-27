@@ -77,8 +77,14 @@ impl Engine {
     ) -> Option<Result<Value, ErrorBody>> {
         let cmd = match Command::parse(&req.cmd, self.faults()) {
             Ok(c) => c,
-            Err(_) if req.cmd.get("config.change").is_some() => {
-                return Some(err(ErrorCode::Invalid, "Invalid config.change fields."));
+            Err(inv)
+                if sender == Some(Sender::Operator)
+                    && (req.cmd.get("config.change").is_some() || req.cmd.get("config").is_some()) =>
+            {
+                return Some(err(
+                    ErrorCode::Invalid,
+                    super::settings::invalid_config_command(&req.cmd, inv, &self.settings_secrets()),
+                ));
             }
             Err(inv) => return Some(err(ErrorCode::Invalid, inv.message)),
         };

@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use mork_types::Sha;
 use mork_types::card::Card;
-use mork_types::lookback::{INPUT_FILE, Read, Run};
+use mork_types::lookback::{DEFAULT_DREAM_BUDGET, INPUT_FILE, Read, Run};
 use serde_json::{Value, json};
 
 use super::Engine;
@@ -15,7 +15,7 @@ impl Engine {
         let mut inputs = json!({"read": run.read, "through": at, "started_ms": card.started_ms});
         if run.read == Read::Dream {
             let pass = self.ctx.config.projects.get(&card.project).and_then(|p| p.passes.get(&Read::Dream));
-            inputs["budget"] = json!(pass.and_then(|p| p.budget).unwrap_or(60));
+            inputs["budget"] = json!(pass.and_then(|p| p.budget).unwrap_or(DEFAULT_DREAM_BUDGET));
             inputs["last"] = json!(self.state.lookbacks.get(&card.project).and_then(|m| m.get(&Read::Dream)));
         } else {
             inputs["open_cards"] = json!(self.open_cards(card));

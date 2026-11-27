@@ -1,6 +1,6 @@
 use mork_types::config::view::{ConfigField, ConfigSection, ConfigValue, ConfigView};
 use mork_types::config::{self, ColleagueReview, Config, ProjectConfig, SliceConfig};
-use mork_types::lookback::{Read, Trigger};
+use mork_types::lookback::{DEFAULT_DREAM_BUDGET, Read, Trigger};
 
 use crate::secrets::Secrets;
 
@@ -90,7 +90,7 @@ fn project(name: &str, p: &ProjectConfig) -> ConfigSection {
             fields.push(text(&key(name), v.map(|n| n.to_string()).unwrap_or_default(), ""));
         }
         if read == Read::Dream {
-            fields.push(text(&key("budget"), pass.budget.unwrap_or(60), 60));
+            fields.push(text(&key("budget"), pass.budget.unwrap_or(DEFAULT_DREAM_BUDGET), DEFAULT_DREAM_BUDGET));
         }
     }
     fields.extend([entries("domains", &p.domains, &[]), ports("ports", &p.ports), ports("host_ports", &p.host_ports)]);

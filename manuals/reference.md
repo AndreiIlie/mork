@@ -437,7 +437,8 @@ Only the operator may run this command.
 Saves changed fields from one Settings section.
 Pass the `change` object with the section and project from `config`, and a `fields` object keyed by setting.
 Each field has the value read and the proposed value.
-When switching a pass to Auto, include the thresholds to clear with their read values.
+Switching a pass to Auto clears its thresholds.
+Manual keeps them.
 For example, to change the global test limit from three to four:
 
 ```sh

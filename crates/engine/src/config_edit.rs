@@ -16,6 +16,7 @@ use std::path::Path;
 use toml_edit::Value;
 
 pub(crate) const STALE: &str = "mork.toml changed on disk since Mork started. Reload Mork to edit it here.";
+const WITHHELD: &str = "Withheld: it holds a secret Mork knows. Edit it in mork.toml.";
 
 pub(crate) fn read(c: &Config, secrets: &Secrets, stale: bool) -> ConfigView {
     view::build(c, secrets, stale)
@@ -30,7 +31,7 @@ fn locate<'a>(v: &'a ConfigView, change: &ConfigChange) -> Result<&'a ConfigSect
 
 fn compared<'a>(section: &'a ConfigSection, key: &str, update: &FieldChange) -> Result<&'a ConfigField> {
     let field = section.fields.iter().find(|f| f.key == key).ok_or("Unknown setting.")?;
-    let current = field.value.as_ref().ok_or("Withheld: it holds a secret Mork knows. Edit it in mork.toml.")?;
+    let current = field.value.as_ref().ok_or(WITHHELD)?;
     if current != &update.read {
         let current = match current {
             ConfigValue::Text(s) => s.clone(),
@@ -105,10 +106,29 @@ fn apply(s: &mut String, section: &ConfigSection, field: &ConfigField, edit: &Fi
     }
 }
 
+fn clear_auto_thresholds(text: &mut String, section: &ConfigSection, change: &ConfigChange) -> Result<()> {
+    let Some(project) = &section.project else { return Ok(()) };
+    for read in mork_types::lookback::Read::ALL {
+        let name = read.spec().name;
+        let prefix = format!("passes.{name}");
+        let Some(mode) = change.fields.get(&format!("{prefix}.mode")) else { continue };
+        if mode.read == mode.value || !matches!(&mode.value, ConfigValue::Text(v) if v == "auto") {
+            continue;
+        }
+        for key in ["landings", "edits", "notes", "days"] {
+            let field = section.fields.iter().find(|f| f.key == format!("{prefix}.{key}"));
+            field.and_then(|f| f.value.as_ref()).ok_or(WITHHELD)?;
+            document::set(text, &["projects", project, "passes", name, key], None)?;
+        }
+    }
+    Ok(())
+}
+
 fn candidate(text: &str, cfg: &Config, change: &ConfigChange, secrets: &Secrets) -> Result<(String, Config)> {
     let view = read(cfg, secrets, false);
     let section = locate(&view, change)?;
     let mut text = text.to_owned();
+    clear_auto_thresholds(&mut text, section, change)?;
     for (key, edit) in &change.fields {
         let field = compared(section, key, edit)?;
         if edit.value != edit.read {
