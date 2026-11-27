@@ -38,6 +38,7 @@ Change no code and write no card.
   Page back from the oldest message's `seq` and use `history.journal` for older runs.
   The input file's `unplaced_landings` lists records whose landed commit is unknown.
   Report relevant gaps and use the available Git history to cover the code.
+- Read `tool_failures` for recurring tool failures across cards in the Pulse window.
 - Read each `ended_cards` entry, including review cards and earlier runs of reopened cards, using its card, room and journal for the listed run.
   Find causes of wasted turns that recur on at least two cards and asks already answered by the card or a manual.
 - Read the instruction files changed in the range, including AGENTS.md, manuals, roles, skills and docs.

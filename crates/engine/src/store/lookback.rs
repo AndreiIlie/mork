@@ -44,6 +44,26 @@ impl Store {
         Ok(landings)
     }
 
+    /// The most frequent tool failures affecting at least two cards in the project's Pulse window.
+    pub(crate) fn tool_failures(&self, project: &ProjectId, since: i64, until: i64) -> Result<Vec<Value>> {
+        let sql = "SELECT coalesce(json_extract(e.data,'$.cli'),'unknown') AS cli, tool.key,
+                     sum(tool.value) AS failures, count(*), count(DISTINCT e.card)
+                   FROM events e JOIN entities c ON c.kind='card' AND c.id=e.card,
+                     json_each(e.data,'$.tools.by') tool
+                   WHERE e.kind='cost' AND e.time>=?1 AND e.time<?2
+                     AND json_extract(c.data,'$.project')=?3 AND tool.value>0
+                   GROUP BY cli, tool.key HAVING count(DISTINCT e.card)>=2
+                   ORDER BY failures DESC, cli, tool.key LIMIT 10";
+        let mut stmt = self.conn.prepare(sql)?;
+        let rows = stmt.query_map(params![since, until, project.as_str()], |r| {
+            Ok(json!({
+                "cli":r.get::<_,String>(0)?, "tool":r.get::<_,String>(1)?, "failed":r.get::<_,u64>(2)?,
+                "turns":r.get::<_,u64>(3)?, "cards":r.get::<_,u64>(4)?
+            }))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// Terminal journal entries in the half-open window, with the run that ended even if it reopened.
     pub(crate) fn lookback_ends(&self, project: &ProjectId, since: i64, until: i64) -> Result<Vec<Value>> {
         // Older PR approvals could reopen a done review in merging without a card.start row.

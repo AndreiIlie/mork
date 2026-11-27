@@ -25,6 +25,8 @@ impl Engine {
             let ended = self.store.lookback_ends(&card.project, since, card.started_ms).map_err(|e| e.to_string())?;
             inputs["ended_since_ms"] = json!(since);
             inputs["ended_cards"] = json!(ended);
+            inputs["tool_failures"] =
+                json!(self.store.tool_failures(&card.project, since, card.started_ms).map_err(|e| e.to_string())?);
             self.merged_inputs(card, run, at, &mut inputs)?
         } else {
             None
