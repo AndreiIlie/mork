@@ -24,6 +24,12 @@ pub(crate) use notes::{origin, put, under};
 pub(crate) use search::index;
 pub(crate) use staged::commit;
 
+pub(crate) fn seat_card<'a>(state: &'a State, key: &mork_types::AgentKey) -> Option<&'a mork_types::card::Card> {
+    let agent = state.agents.get(key)?;
+    let id = crate::messages::places::card_of(state, &agent.place)?;
+    state.cards.get(&id)
+}
+
 pub(crate) fn lesson_note_help(mork: Option<&ProjectId>) -> String {
     match mork {
         Some(mork) => format!(

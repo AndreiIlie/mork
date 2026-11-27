@@ -269,9 +269,13 @@ Each new card session lists committed files by memory, name and description, fir
 
 - **Search before you start work:** `mork ctl memory.search <words>` lists the files of `general` and your card's project that match; read one with `mork ctl memory.read <memory> <name>`.
 - **During card work** file lessons as notes for the orchestrator to triage.
-- **During a closing turn** any card seat may create, rewrite or delete files in its project's memory with `memory.write` and `memory.delete`. Use notes for lessons intended for `general`.
-  Your card holds the edits until it lands, closes or finishes. A linked review holds them on the reviewed card. Closing edits after the holding card ends apply immediately.
-  A later committed edit to the same file takes precedence. The journal keeps the skipped edit and its reason.
+- **During a closing turn** any card seat may create, rewrite or delete files in its project's memory with `memory.write` and `memory.delete`.
+  Use notes for lessons intended for `general`.
+  Your card holds the edits until it lands, closes or finishes.
+  A linked review holds them on the reviewed card.
+  Closing edits after the holding card ends apply immediately.
+  A later committed edit to the same file takes precedence.
+  The journal keeps the skipped edit and its reason.
 - **When your session ends** (your card lands, is closed or done, your review card ends, your round releases you, your research ends), if it ran more than two turns, used a tool and its prompt cache is still warm, one closing turn of your own, at the session's own effort, invites project memory edits before asking for any feedback (a bug, an issue, a suggestion) you haven't filed: `feedback` about the project and, when `[mork] project` is configured, `mork_feedback` about Mork, which the engine files as notes; "nothing" is an answer to either.
   When `[mork] project` is unset, the closing turn asks `feedback` alone and refuses `mork_feedback`.
   A full card's planner is asked at its plan's approval while warm, and again at card end only if it ran a turn since and is still warm.

@@ -144,11 +144,7 @@ fn memory_buzz(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Opt
         Sender::Agent(key)
             if state.agents.get(key).is_some_and(|a| a.retiring.as_ref().is_some_and(|r| r.asked && !r.resumed)) =>
         {
-            let own = state
-                .agents
-                .get(key)
-                .and_then(|a| crate::memory::origin(state, a).1)
-                .and_then(|id| state.cards.get(&id));
+            let own = crate::memory::seat_card(state, key);
             if memory != GENERAL && own.is_some_and(|c| c.project.as_str() == memory) {
                 return None;
             }

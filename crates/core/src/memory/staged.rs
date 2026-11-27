@@ -60,17 +60,10 @@ pub(super) fn change(
     ctx: Ctx<'_>,
 ) -> Result<Decision, String> {
     super::lessons::known(memory, ctx)?;
-    let seat = match from {
-        Sender::Agent(key) => {
-            let card = state
-                .agents
-                .get(key)
-                .and_then(|a| super::origin(state, a).1)
-                .and_then(|id| state.cards.get(&id))
-                .ok_or("memory edits require a seat on a card")?;
-            Some((key, card))
-        }
-        _ => None,
+    let seat = if let Sender::Agent(key) = from {
+        Some((key, super::seat_card(state, key).ok_or("memory edits require a seat on a card")?))
+    } else {
+        None
     };
     let held = seat.and_then(|(key, card)| Some((key, &card.id, holding(state, card)?)));
     let pending = held.into_iter().flat_map(|(key, _, c)| c.staged_memory.iter().filter(move |s| &s.seat == key));

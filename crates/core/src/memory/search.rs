@@ -54,15 +54,8 @@ impl<'a, 'q> Document<'a, 'q> {
 }
 
 pub(super) fn search(state: &State, from: &Sender, words: &str) -> Value {
-    let project = match from {
-        Sender::Agent(key) => state
-            .agents
-            .get(key)
-            .and_then(|a| super::origin(state, a).1)
-            .and_then(|id| state.cards.get(&id))
-            .map(|c| c.project.as_str()),
-        _ => None,
-    };
+    let project =
+        if let Sender::Agent(key) = from { super::seat_card(state, key).map(|c| c.project.as_str()) } else { None };
     let words = words.to_lowercase();
     let query = tokens(&words).collect();
     let docs: Vec<_> = state

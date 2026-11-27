@@ -332,7 +332,8 @@ An indivisible row too large for a page is refused.
 This is a count-limited page, never an unbounded journal dump.
 
 Rows recorded without a card are included when they name the card's seats, places or exact stored job ids.
-Closing memory edits appear under the issuing seat's card as `memory.write`, `memory.delete` or `memory.skipped`. A `memory.staged` row carries only the seat and operation.
+Closing memory edits appear under the issuing seat's card as `memory.write`, `memory.delete` or `memory.skipped`.
+A `memory.staged` row carries only the seat and operation.
 These kinds locate the recorded facts; their data records changes, not a reconstructed snapshot:
 
 - `message` and `reply`: posted words, hands and accepted reply outcomes; `reply.refused`: a rejected reply's reason, without its rejected hand.
@@ -1614,8 +1615,11 @@ Example: `mork ctl memory.read mork wall-tests`
 
 ### memory.search
 
-Finds up to 20 committed files containing any whole query word. Words are lowercase runs of letters or digits, and repeated query words count once.
-BM25 ranks hits within the memories the sender can search. Name occurrences weigh 3, description occurrences 2 and body occurrences 1. Ties sort by memory, then file name.
+Finds up to 20 committed files containing any whole query word.
+Words are lowercase runs of letters or digits, and repeated query words count once.
+BM25 ranks hits within the memories the sender can search.
+Name occurrences weigh 3, description occurrences 2 and body occurrences 1.
+Ties sort by memory, then file name.
 
 A seat searches `general` and its card's project; an orchestrator or the operator every memory.
 No read is counted.
@@ -1634,22 +1638,33 @@ Rewrites of an existing name skip this check.
 
 A rewrite keeps its reads counted and its `origin`, the label of whoever created the file; its `writer` becomes the rewriter.
 Each applied write counts in the memory's `written`.
-Answers `{"memory.write": {"memory", "name", "rewrote", "staged"?}}`. A held write returns `staged: true`.
+Answers `{"memory.write": {"memory", "name", "rewrote", "staged"?}}`.
+A held write returns `staged: true`.
 
-The operator can edit any memory. An orchestrator can edit its project's memory. The configured Mork project's orchestrator can also edit `general`.
-Any card seat can edit its own project memory during its closing turn, until a new round supersedes that turn. During active work, file a lesson with `notes.add lesson`.
-While the card is live, it holds these edits. A linked review holds them on the reviewed card. After the holding card ends, closing edits apply immediately.
-A seat can rewrite or delete a file it just staged. Reads, rankings, counters and session indexes show only committed files.
-At card end the engine applies held edits in order. An intervening write or delete, including another card's commit, preserves the newer change and skips the conflicting held edit.
+The operator can edit any memory.
+An orchestrator can edit its project's memory.
+The configured Mork project's orchestrator can also edit `general`.
+Any card seat can edit its own project memory during its closing turn, until a new round supersedes that turn.
+During active work, file a lesson with `notes.add lesson`.
+While the card is live, it holds these edits.
+A linked review holds them on the reviewed card.
+After the holding card ends, closing edits apply immediately.
+A seat can rewrite or delete a file it just staged.
+Reads, rankings, counters and session indexes show only committed files.
+At card end the engine applies held edits in order.
+An intervening write or delete, including another card's commit, preserves the newer change and skips the conflicting held edit.
 The card journal records applied edits with their before and after contents and skipped edits with the proposed contents and reason.
-Undo a creation with `memory.delete`. Restore a rewrite or deletion with `memory.write` using the previous description and text. Use `--new` if a similar name prevents restoration.
+Undo a creation with `memory.delete`.
+Restore a rewrite or deletion with `memory.write` using the previous description and text.
+Use `--new` if a similar name prevents restoration.
 
 Example: `mork ctl memory.write mork wall-tests --description "Why wall tests skip inside a card's wall" --text "…"`
 
 ### memory.delete
 
 Deletes a memory file: one you found wrong, or no longer worth keeping.
-Answers `{"memory.delete": {"memory", "name", "staged"?}}`. A held deletion returns `staged: true`.
+Answers `{"memory.delete": {"memory", "name", "staged"?}}`.
+A held deletion returns `staged: true`.
 The permissions, staging, conflict and journal rules of `memory.write` also apply to deletions.
 
 Example: `mork ctl memory.delete mork wall-tests`

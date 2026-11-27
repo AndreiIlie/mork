@@ -99,24 +99,30 @@ fn checked(w: &Written<'_>) -> Result<(), String> {
 fn current_file<'a>(p: &'a Poster<'_>, memory: &str, name: &str) -> Option<&'a MemoryFile> {
     let key = key(memory, name);
     for change in p.other.iter().rev() {
-        match change {
-            Change::PutMemoryFile(f) if f.memory == memory && f.name == name => return Some(f),
-            Change::RemoveMemoryFile { key: k } if *k == key => return None,
-            _ => {}
+        if let Change::PutMemoryFile(f) = change
+            && f.memory == memory
+            && f.name == name
+        {
+            return Some(f);
+        }
+        if let Change::RemoveMemoryFile { key: k } = change
+            && *k == key
+        {
+            return None;
         }
     }
     p.state.memory_files.get(&key)
 }
 
 fn current_tally(p: &Poster<'_>, memory: &str) -> Tally {
-    p.other
-        .iter()
-        .rev()
-        .find_map(|change| match change {
-            Change::PutMemoryTally(t) if t.memory == memory => Some(t.clone()),
-            _ => None,
-        })
-        .unwrap_or_else(|| tally_of(p.state, memory))
+    for change in p.other.iter().rev() {
+        if let Change::PutMemoryTally(t) = change
+            && t.memory == memory
+        {
+            return t.clone();
+        }
+    }
+    tally_of(p.state, memory)
 }
 
 pub(super) fn apply(p: &mut Poster<'_>, memory: &str, edit: &Edit, by: &str, card: Option<&CardId>) -> bool {
