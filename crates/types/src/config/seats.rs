@@ -150,6 +150,9 @@ pub enum Effort {
 }
 
 impl Effort {
+    /// Efforts a foreman may choose for its child.
+    pub const PICKED: [Self; 2] = [Self::High, Self::Xhigh];
+
     /// Every supported level, lowest first.
     pub const ALL: [Self; 5] = [Self::Low, Self::Medium, Self::High, Self::Xhigh, Self::Max];
 

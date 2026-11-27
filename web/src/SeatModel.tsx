@@ -4,7 +4,7 @@ import { agentSeatName, modelTakesEffort } from "./format";
 import { RefusalLine } from "./offers";
 import type { AgentRow, ModelChoice } from "./types";
 
-const VENDOR: Record<string, string> = { claude: "Claude", codex: "Codex", agy: "agy" };
+export const VENDOR: Record<string, string> = { claude: "Claude", codex: "Codex", agy: "agy" };
 const SEGMENTS = "inline-flex flex-wrap divide-x divide-gray-400 border border-gray-400";
 const LEFT = "w-[64px] shrink-0 text-label-12 text-gray-700";
 
@@ -121,7 +121,7 @@ export function useSeatModel(seat: AgentRow | undefined, live: boolean) {
 
 export type SeatModelState = ReturnType<typeof useSeatModel>;
 
-function VendorRow({
+export function VendorRow({
   cli,
   choices,
   lit,
@@ -131,7 +131,7 @@ function VendorRow({
 }: {
   cli: string;
   choices: ModelChoice[];
-  lit: ModelChoice;
+  lit: Pick<ModelChoice, "cli" | "model"> | null;
   fresh: boolean;
   disabled: boolean;
   onPick: (c: ModelChoice) => void;
@@ -143,7 +143,7 @@ function VendorRow({
         {choices.map((c) => (
           <Segment
             key={`${c.cli}:${c.model}`}
-            on={c.cli === lit.cli && c.model === lit.model}
+            on={c.cli === lit?.cli && c.model === lit.model}
             label={c.label}
             disabled={disabled}
             onPick={() => onPick(c)}
@@ -153,6 +153,16 @@ function VendorRow({
       {fresh && <span className="text-label-12 text-gray-700">starts a fresh session</span>}
     </div>
   );
+}
+
+export function EffortRow<T extends string>({ efforts, selected, disabled = false, caption = true, onPick }: {
+  efforts: readonly T[]; selected: readonly string[]; disabled?: boolean; caption?: boolean; onPick: (e: T) => void;
+}) {
+  return <div className="flex flex-wrap items-center gap-3">
+    {caption && <span className={LEFT}>Effort</span>}
+    <div className={SEGMENTS}>{efforts.map(e => <Segment key={e} on={selected.includes(e)} label={e}
+      disabled={disabled} onPick={() => onPick(e)} />)}</div>
+  </div>;
 }
 
 /** Unfolded strip over the composer: segmented model rows per vendor, valid efforts, and next-turn summary. */
@@ -189,20 +199,8 @@ export function SeatModelPanel({ m }: { m: SeatModelState }) {
             onPick={m.pickModel}
           />
         ))}
-        <div className="flex flex-wrap items-center gap-3">
-          <span className={LEFT}>Effort</span>
-          <div className={SEGMENTS}>
-            {efforts.map((e) => (
-              <Segment
-                key={e}
-                on={draft === null && e === next.effort}
-                label={e}
-                disabled={disabled}
-                onPick={() => m.pickEffort(e)}
-              />
-            ))}
-          </div>
-        </div>
+        <EffortRow efforts={efforts} selected={draft === null ? [next.effort] : []}
+          disabled={disabled} onPick={m.pickEffort} />
       </div>
       <p className="mt-3 text-label-12 text-gray-900">{foot}</p>
       <RefusalLine refusal={m.refusal} className="mt-2" />

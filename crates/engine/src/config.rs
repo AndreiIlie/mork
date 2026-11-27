@@ -79,8 +79,13 @@ pub fn path() -> Option<PathBuf> {
 
 /// Reads and checks the config.
 pub fn read(path: &Path) -> Result<Config, ConfigError> {
+    read_text(path).map(|(_, config)| config)
+}
+
+pub(crate) fn read_text(path: &Path) -> Result<(String, Config), ConfigError> {
     let text = std::fs::read_to_string(path).map_err(|source| ConfigError::Read { path: path.to_owned(), source })?;
-    parse(&text).map_err(|e| ConfigError::In { path: path.to_owned(), error: Box::new(e) })
+    let cfg = parse(&text).map_err(|e| ConfigError::In { path: path.to_owned(), error: Box::new(e) })?;
+    Ok((text, cfg))
 }
 
 fn line_of(text: &str, offset: usize) -> usize {

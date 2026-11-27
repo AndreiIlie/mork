@@ -134,6 +134,17 @@ function AreaRows({ group, startable, start, live }: { group: BoardGroup; starta
   );
 }
 
+export function AutoDelegation({ project, auto, live, offers, compact }: {
+  project: string; auto: boolean | undefined; live: boolean; offers: ReturnType<typeof useHandOffers>; compact?: boolean;
+}) {
+  return <Segmented compact={compact} options={["Off", "On"] as const} value={auto ? "On" : "Off"}
+    disabled={() => !live || auto === undefined || !!offers.pending[project]}
+    onChange={v => {
+      const on = v === "On";
+      if (on !== auto) offers.press(project, { label: "Auto delegation", command: { auto: { project, off: !on } } });
+    }} />;
+}
+
 export function Project({ board, lookback, views, nowMs, live }: {
   board: BoardView;
   lookback: ProjectView | undefined;
@@ -142,7 +153,7 @@ export function Project({ board, lookback, views, nowMs, live }: {
   live: boolean;
 }) {
   const [creating, setCreating] = useState(false);
-  const { pending, refusals, press } = useHandOffers();
+  const autoOffers = useHandOffers();
   const [starting, setStarting] = useState<string | null>(null);
   const backlog = board.areas.reduce((n, g) => n + g.count, 0);
   const groups = [...board.areas, board.done].filter((g) => g.count > 0);
@@ -156,23 +167,14 @@ export function Project({ board, lookback, views, nowMs, live }: {
           <>
             <span className="flex items-center gap-2">
               <span className="text-label-12 text-gray-700">Auto delegation</span>
-              <Segmented
-                options={["Off", "On"] as const}
-                value={board.auto ? "On" : "Off"}
-                disabled={() => !live || !!pending[board.project]}
-                onChange={(v) => {
-                  const on = v === "On";
-                  if (on === board.auto) return;
-                  press(board.project, { label: "Auto delegation", command: { auto: { project: board.project, off: !on } } });
-                }}
-              />
+              <AutoDelegation project={board.project} auto={board.auto} live={live} offers={autoOffers} />
             </span>
             <Button tier="primary" size="md" disabled={!live} pressed={creating} onClick={() => setCreating((v) => !v)}>New card</Button>
           </>
         }
       />
       <PageScroll>
-        <RefusalLine refusal={refusals[board.project] ?? null} className="mb-2" />
+        <RefusalLine refusal={autoOffers.refusals[board.project] ?? null} className="mb-2" />
         {creating && <NewCard live={live} project={board.project} onDone={() => setCreating(false)} />}
         <MergeQueueSection queue={board.merge} nowMs={nowMs} />
         {lookback !== undefined && lookback.rows.length > 0 && <LookBack project={board.project} rows={lookback.rows} nowMs={nowMs} live={live} />}

@@ -221,6 +221,10 @@ export type Command =
       card?: string;
     } }
   | { usage: Record<string, never> }
+  | { config: Record<string, never> }
+  | { "config.change": {
+      change: ConfigChange;
+    } }
   | { quality: Record<string, never> }
   | { routing: Record<string, never> }
   | { "claude.account": {
@@ -532,6 +536,36 @@ export type ComposerRequest = {
   composer: ComposerDraft;
 };
 
+export type ConfigChange = {
+  section: string;
+  project: string | null;
+  fields: Record<string, FieldChange>;
+};
+
+export type ConfigField = {
+  key: string;
+  value: ConfigValue | null;
+  default: ConfigValue | null;
+  offers: Array<PickModel>;
+};
+
+export type ConfigSection = {
+  section: string;
+  project: string | null;
+  fields: Array<ConfigField>;
+};
+
+export type ConfigValue =
+  | { text: string }
+  | { entries: Array<string> }
+  | { seat: SeatDefault }
+  | { picks: Array<PickModel> };
+
+export type ConfigView = {
+  sections: Array<ConfigSection>;
+  stale: boolean;
+};
+
 export type Context = {
   place: string;
   card: string | null;
@@ -640,6 +674,11 @@ export type FailureRate = {
   calls: number;
   failed: number;
   percent: number | null;
+};
+
+export type FieldChange = {
+  read: ConfigValue;
+  value: ConfigValue;
 };
 
 export type FileRow = {
@@ -984,6 +1023,13 @@ export type Pick =
   | number
   | string;
 
+export type PickModel = {
+  cli: Cli;
+  model: string;
+  label: string;
+  efforts: Array<Effort>;
+};
+
 export type PinLine = {
   pin: string | null;
   master: Master;
@@ -1215,6 +1261,13 @@ export type SeatCost = {
   cost_cents: number;
   unknown: boolean;
   tokens: Tokens;
+};
+
+export type SeatDefault = {
+  cli: Cli;
+  model: string;
+  effort: Effort;
+  configured: boolean;
 };
 
 export type Setting = {

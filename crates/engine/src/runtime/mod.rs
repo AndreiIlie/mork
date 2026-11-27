@@ -35,6 +35,7 @@ mod review_threads;
 mod routing;
 mod say_images;
 mod search;
+mod settings;
 mod slots;
 mod startup;
 mod suite_logs;
@@ -185,6 +186,7 @@ impl Watched {
 
 pub struct Engine {
     routing: routing::Cache,
+    loaded_config: String,
     bound_web_port: Option<u16>,
     reserved_ports: std::collections::BTreeSet<u16>,
     pub opts: Options,

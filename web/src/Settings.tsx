@@ -1,4 +1,6 @@
-import { type ReactNode, useEffect } from "react";
+import { useEffect } from "react";
+import { Setting } from "./settings/Fields";
+import { ConfigTabs } from "./settings/ConfigTabs";
 import { ReloadChangelog } from "./ReloadChangelog";
 import { Usage } from "./Usage";
 import { Quality } from "./Quality";
@@ -11,20 +13,9 @@ import { List, Row } from "./ui/List";
 import { PageHeader, PageScroll } from "./ui/Page";
 import { Segmented } from "./ui/Segmented";
 
-const TABS = ["general", "usage", "quality", "updates"] as const;
-const TAB_LABEL: Record<SettingsTab, string> = { general: "General", usage: "Usage", quality: "Quality", updates: "Updates" };
+const TABS = ["general", "projects", "seats", "system", "usage", "quality", "updates"] as const;
+const TAB_LABEL: Record<SettingsTab, string> = { general: "General", projects: "Projects", seats: "Seats", system: "System", usage: "Usage", quality: "Quality", updates: "Updates" };
 const ALERT_WORDS = { granted: "Enabled", denied: "Blocked in this browser's site settings", unsupported: "Unavailable in this browser" } as const;
-
-function Setting({ title, words, children }: { title: string; words: string; children: ReactNode }) {
-  return (
-    <Row actions={children}>
-      <div className="min-w-0 flex-1">
-        <div className="text-label-14 text-gray-1000">{title}</div>
-        <div className="mt-0.5 text-label-12 text-gray-700">{words}</div>
-      </div>
-    </Row>
-  );
-}
 
 function General({ alerts, resourcesOn, setResourcesOn }: { alerts: AlertPermission; resourcesOn: boolean; setResourcesOn: (on: boolean) => void }) {
   const { permission, request } = alerts;
@@ -110,6 +101,7 @@ export function Settings({ tab, returnPath, screen, burn, burnError, build, main
       />
       <PageScroll key={tab}>
         {tab === "general" && <General alerts={alerts} resourcesOn={resourcesOn} setResourcesOn={setResourcesOn} />}
+        {(tab === "projects" || tab === "seats" || tab === "system") && <ConfigTabs tab={tab} screen={screen} live={live} />}
         {tab === "usage" && <Usage screen={screen} burnError={burnError} burn={burn} nowMs={nowMs} live={live} />}
         {tab === "quality" && <Quality live={live} />}
         {tab === "updates" && <Updates screen={screen} build={build} view={mainView} live={live} />}

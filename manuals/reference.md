@@ -443,6 +443,44 @@ Seven prior observations anchor each global estimate and each project or topic e
 It draws quality, adds the measured partner effect and subtracts the pool price times relative estimated cost.
 Auto passes use this router over `picks.pass`.
 
+### config
+
+Reads the settings the operator can edit in Projects, Seats and System.
+Project sections follow file order.
+Each field carries its current value, default and model choices where applicable.
+A withheld field has a null value.
+Mork withholds values containing known secrets and masks refusals.
+A Checks command containing a credential known only from that command is visible.
+The reply sets `stale` when the file differs from the configuration the engine loaded or last saved.
+Reload to edit it again.
+Only the operator may run this command.
+
+### config.change
+
+Saves changed fields from one Settings section.
+Pass the `change` object with the section and project from `config`, and a `fields` object keyed by setting.
+Each field has the value read and the proposed value.
+Switching a pass to Auto clears its thresholds.
+Manual keeps them.
+For example, to change the global test limit from three to four:
+
+```sh
+mork ctl config.change '{"section":"limits","project":null,"fields":{"max_test_runs":{"read":{"text":"3"},"value":{"text":"4"}}}}'
+```
+
+Only the operator may save.
+A conflict, a withheld field, a stale file or an invalid configuration refuses the whole change.
+After a conflict, read the current value before retrying.
+A save preserves the resolved file’s permissions.
+A setting restored to its default is removed when omission has that effect.
+Clearing global Ports writes an explicit empty list.
+Project passes, checks, slots, colleague review, wall reach, model choices and system limits apply on their next use.
+A head that passed checks keeps its pass.
+Existing walls keep their reach.
+Seat defaults apply at first launch or when a configured choice expires.
+Job resources apply at the next reload.
+Auto delegation uses the existing `auto` command.
+
 ### quality
 
 Reads the last 30 days of Quality figures, also shown in Settings under Quality.

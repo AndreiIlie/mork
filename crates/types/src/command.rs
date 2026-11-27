@@ -109,6 +109,10 @@ pub enum Command {
     },
     #[serde(rename = "usage")]
     Usage {},
+    #[serde(rename = "config")]
+    Config {},
+    #[serde(rename = "config.change")]
+    ConfigChange { change: crate::config::view::ConfigChange },
     #[serde(rename = "quality")]
     Quality {},
     #[serde(rename = "routing")]
