@@ -88,7 +88,8 @@ fn agy_opus_config_default_effort_and_child_pick_options_exclude_xhigh() {
 
     s.operator(json!({"say": {"place": CARD, "text": "Check."}})).unwrap();
     let plan = mork_core::agents::turns::plan(&s.state, &AgentKey::new(FOREMAN), s.ctx(), false).unwrap();
-    assert!(plan.prompt.contains("For a researcher: opus 5.5 (claude-opus-5-5, agy) at high."), "{}", plan.prompt);
+    let choices = plan.prompt.lines().find(|line| line.starts_with("For a researcher:"));
+    assert_eq!(choices, Some("For a researcher: opus 5.5 (claude-opus-5-5, agy) at high (fixed routing)."));
 
     let from = Sender::Agent(AgentKey::new(FOREMAN));
     let bad = s.cmd(

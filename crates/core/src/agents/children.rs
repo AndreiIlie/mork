@@ -160,8 +160,7 @@ pub(crate) fn task(p: &mut Poster<'_>, who: &Who, from: &Sender, text: &str) {
     p.wake(who, from);
 }
 
-/// Creates a child before posting its task; a reviewer may use its configured default, while explicit choices
-/// must keep the seat's wall and the sender's model and effort permissions.
+/// Creates a child before posting its task. Explicit selections must keep the seat's wall and the sender's permissions.
 pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Decision {
     let Command::Spawn { card, role, task: task_text, model, effort, cli, topic } = cmd else {
         return Decision::refused("not a spawn command");

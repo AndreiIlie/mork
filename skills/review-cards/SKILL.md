@@ -31,12 +31,13 @@ Nothing reviews a review card in turn.
      Examples include `crates/sys`, the wall, the door, authentication, permissions, billing, money and state migrations.
      Always run **Correctness** and **Design and simplicity**.
      Add **Money, permissions or data integrity** and **Performance** when each applies.
-     Run every applicable topic at `xhigh`.
+     In fixed and shadow modes, run every applicable topic at `xhigh`.
      If unavailable, use the highest effort available for that review kind and state the effort used in the verdict.
    - **Quick** applies to low-risk, behavior-preserving changes of 30 lines or fewer, such as a documentation typo or a local rename.
-     Run correctness alone at `high` when available, otherwise at the review kind's configured default.
+     Run correctness alone.
+     In fixed and shadow modes, use `high` when available, otherwise the review kind's configured default.
    - **Standard** covers every remaining change, including a one-line bug fix.
-     Use the review kind's configured default effort.
+     In fixed and shadow modes, use the review kind's configured default effort.
      On our changes and full colleague reviews run correctness, add design and simplicity above 30 lines, and add each applicable specialist.
      For the standard colleague review bar run correctness and add performance when it applies.
 

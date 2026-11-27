@@ -46,7 +46,7 @@ fn request(c: &Card, config: &Config) -> String {
         "{id} is a visual card: its mock is made in the spec conversation, before the plan's approve, on a baseline of \
          the pages it changes as they stand today. Build that baseline now: {wait}. Read the \
          card and the code and name those pages. Then spawn the card's baseline seat, `mork ctl spawn {id} baseline \
-         '<task>'`, on its configured default (name no model or effort), and task it to reproduce each page as it \
+         '<task>'`, without a model or effort so its routing mode applies, and task it to reproduce each page as it \
          stands today in the clone's `{FOLDER}/`, {}, as the `visual-mocks` skill's \"Visual mode\" says. \
          It keeps any mock already in the folder, an earlier run's restored one included, and fills only the surfaces \
          it lacks. Write nothing yourself: the baseline seat alone writes the folder. Once its report says the \

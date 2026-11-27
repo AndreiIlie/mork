@@ -1,4 +1,4 @@
-//! Ranking model and effort pairs against the quota windows used by their CLI.
+//! Quota headroom and benchmark inputs for the model and effort pairs a seat can run.
 
 use std::collections::BTreeMap;
 
