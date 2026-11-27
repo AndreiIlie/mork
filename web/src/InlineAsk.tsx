@@ -112,7 +112,7 @@ function ApproveBody({ words, brief, decisions }: { words: string; brief?: Brief
         </section>
       )}
       {code.length > 0 && (
-        <section>
+        <section data-unfold-row>
           <button
             type="button"
             aria-expanded={open}

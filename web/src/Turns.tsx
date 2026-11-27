@@ -14,7 +14,7 @@ function DetailRow({ d }: { d: Detail }) {
   const first = d.text.split("\n", 1)[0] ?? "";
   const kind = (d.sub ? "subagent's " : "") + d.kind;
   return (
-    <li className="py-0.5 pl-[52px]">
+    <li data-unfold-row className="py-0.5 pl-[52px]">
       <button
         type="button"
         aria-expanded={open}
@@ -39,7 +39,7 @@ function StepRow({ st, before, runs, nowMs }: { st: StepView; before: number; ru
   const [open, setOpen] = useState(false);
   const raw = st.command?.text ? st.command.text + (st.command.cut ? "…" : "") : undefined;
   return (
-    <li>
+    <li data-unfold-row>
       <button
         type="button"
         title={raw}
@@ -165,7 +165,7 @@ export function EndedTurnRow({ reviewForeman, turn, tzOffsetMin, nowMs }: { revi
   const [open, setOpen] = useState(false);
   const { end } = turnBounds(turn, nowMs);
   return (
-    <div className="py-2">
+    <div data-unfold-row className="py-2">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -193,7 +193,7 @@ export function ActivityTracker({ reviewForeman, turn, nowMs }: { reviewForeman?
   const thinking = thinkingMs(turn, nowMs);
   const status = thinking !== null ? `Thinking… ${took(thinking)}` : steps.length === 0 ? "working" : "";
   return (
-    <div className="py-1">
+    <div data-unfold-row className="py-1">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
