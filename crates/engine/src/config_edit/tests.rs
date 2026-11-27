@@ -109,7 +109,12 @@ fn file_changes_keep_links_permissions_and_refuse_stale_or_invalid_updates() {
         assert_eq!(fs::read_to_string(&file).unwrap(), BASE);
     }
     let good = change("limits", "max_test_runs", json!({"text":"3"}), json!({"text":"5"}));
+    let inherited = fs::File::open(&dir).unwrap();
+    let held = crate::init::lock(inherited.try_clone().unwrap()).unwrap();
+    assert_eq!(save(&path, BASE, &cfg, &good, &Secrets::default()).unwrap_err(), "another mork init is running");
+    drop(held);
     let (text, c) = save(&path, BASE, &cfg, &good, &Secrets::default()).unwrap();
+    drop(inherited);
     assert_eq!(c.mork.max_test_runs, 5);
     assert!(path.is_symlink());
     assert_eq!(fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o640);

@@ -161,22 +161,29 @@ fn directory(path: &Path) -> Result<File, String> {
     fs::create_dir_all(path).and_then(|()| File::open(path)).map_err(|e| at(path, e))
 }
 
-pub(crate) fn lock(file: &File) -> Result<(), String> {
-    if mork_sys::try_lock_exclusive(file).map_err(|e| e.to_string())? {
-        Ok(())
+pub(crate) struct DirectoryLock(File);
+
+impl Drop for DirectoryLock {
+    fn drop(&mut self) {
+        // A copy of the descriptor can outlive the edit and keep its flock after close.
+        let _ = self.0.unlock();
+    }
+}
+
+pub(crate) fn lock(file: File) -> Result<DirectoryLock, String> {
+    if mork_sys::try_lock_exclusive(&file).map_err(|e| e.to_string())? {
+        Ok(DirectoryLock(file))
     } else {
         Err("another mork init is running".into())
     }
 }
 
-fn locks(home: &Path, config: &Path) -> Result<(File, File), String> {
-    let home = directory(home)?;
-    lock(&home)?;
+fn locks(home: &Path, config: &Path) -> Result<(DirectoryLock, Option<DirectoryLock>), String> {
+    let home = lock(directory(home)?)?;
     let parent = directory(config.parent().ok_or("config path has no parent")?)?;
     let id = |f: &File| f.metadata().map(|m| (m.dev(), m.ino())).map_err(|e| e.to_string());
-    if id(&parent)? != id(&home)? {
-        lock(&parent)?;
-    }
+    let distinct = id(&parent)? != id(&home.0)?;
+    let parent = if distinct { Some(lock(parent)?) } else { None };
     Ok((home, parent))
 }
 

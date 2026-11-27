@@ -159,7 +159,7 @@ pub(crate) fn save(
     let real = path.canonicalize().map_err(|_| STALE)?;
     let folder = fs::File::open(real.parent().ok_or("Missing config directory.")?)
         .map_err(|_| "Cannot open the config directory.")?;
-    crate::init::lock(&folder)?;
+    let _lock = crate::init::lock(folder)?;
     let current = fs::read_to_string(&real).map_err(|_| STALE)?;
     if current != loaded {
         return Err(STALE.into());
