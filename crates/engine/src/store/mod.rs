@@ -437,7 +437,7 @@ mod tests {
         drop(store);
         let store = Store::open(&db, "test").unwrap();
         assert_eq!(store.version, schema::NEWEST);
-        let seq: u64 = store
+        let seq: i64 = store
             .conn
             .query_row("SELECT json_extract(data,'$.seq') FROM entities WHERE kind='ask' AND id='done'", [], |r| {
                 r.get(0)
