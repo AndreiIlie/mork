@@ -42,9 +42,16 @@ impl Population<'_> {
         };
         let bounded = |p: f64| if metric == Metric::Cost { p } else { p.clamp(CLAMP.0, CLAMP.1) };
         let data = arms.and_then(|group| group.get(a));
-        let global = shrink(bounded(prior), data.map(|l| l.global).unwrap_or_default());
+        let estimate = |prior, counts| {
+            let mut p = shrink(bounded(prior), counts);
+            if metric == Metric::Cost && population.sum <= 0.0 {
+                p.mean = cost;
+            }
+            p
+        };
+        let global = estimate(prior, data.map(|l| l.global).unwrap_or_default());
         let counts = data.and_then(|l| l.leaves.get(leaf?)).copied().unwrap_or_default();
-        let local = if leaf.is_some() { shrink(bounded(global.mean), counts) } else { global };
+        let local = if leaf.is_some() { estimate(global.mean, counts) } else { global };
         [global, local]
     }
 

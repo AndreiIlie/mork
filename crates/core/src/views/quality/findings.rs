@@ -49,6 +49,8 @@ fn stored<'a>(snapshot: Option<&'a Review>, event: &Event) -> impl Iterator<Item
 
 #[derive(Default)]
 struct Origin<'a> {
+    round: Option<u64>,
+    jobs: BTreeMap<&'a str, &'a Event>,
     topics: BTreeMap<&'a str, String>,
     costs: BTreeMap<&'a str, &'a Event>,
     reports: BTreeMap<&'a str, &'a Event>,
@@ -58,9 +60,16 @@ impl<'a> Origin<'a> {
     fn observe(&mut self, row: &'a Event) {
         let agent = row.text("agent").and_then(|s| s.rsplit('/').next()).unwrap_or("");
         match row.kind.as_str() {
-            "review.asked" => self.reports.clear(),
+            "review.asked" => {
+                self.round = row.round();
+                self.jobs.clear();
+                self.reports.clear();
+            }
             "cost" => {
                 self.costs.insert(agent, row);
+                if let Some(job) = row.text("job") {
+                    self.jobs.insert(job, row);
+                }
             }
             "child.spawned" => {
                 if let Some(t) = row.text("topic") {
@@ -68,7 +77,12 @@ impl<'a> Origin<'a> {
                 }
             }
             "reply" if row.text("outcome") == Some("review-fail") => {
-                if let Some(&cost) = self.costs.get(agent) {
+                let cost = if let Some(job) = row.text("job") {
+                    self.jobs.get(job).filter(|_| self.round.is_some() && row.data["round"].as_u64() == self.round)
+                } else {
+                    self.costs.get(agent)
+                };
+                if let Some(&cost) = cost {
                     self.reports.insert(agent, cost);
                 }
             }

@@ -33,11 +33,15 @@ pub fn answer(config: &Config, inputs: &Inputs<'_>, stats: &Statistics) -> Value
             ));
         }
     }
-    let synergy: Vec<_> = stats.partners.iter().map(|((role, model, partner), rate)| {
-        let population = Population { stats, role, mean_index: 1.0 };
-        let effect = population.synergy(model, Some(partner));
-        json!({"role":role, "model":model, "partner":partner, "weight":rate.weight, "synergy":effect})
-    }).collect();
+    let synergy: Vec<_> = stats
+        .partners
+        .iter()
+        .map(|((role, model, partner), rate)| {
+            let population = Population { stats, role, mean_index: 1.0 };
+            let effect = population.synergy(model, Some(partner));
+            json!({"role":role, "model":model, "partner":partner, "weight":rate.weight, "synergy":effect})
+        })
+        .collect();
     let picks: Vec<_> = stats.recent.iter().map(|(_, row)| row).collect();
     let shadow: BTreeMap<_, _> =
         stats.shadow.iter().map(|(role, [matched, total])| (role, json!({"matched":matched,"total":total}))).collect();
@@ -55,7 +59,12 @@ fn profile(
     let Some(seat) = config.seat_in(name, at) else { return Value::Null };
     let default;
     let list = if list.is_empty() {
-        default = PickModel { cli: seat.cli, model: seat.model.clone(), label: seat.label.clone(), efforts: vec![seat.effort] };
+        default = PickModel {
+            cli: seat.cli,
+            model: seat.model.clone(),
+            label: seat.label.clone(),
+            efforts: vec![seat.effort],
+        };
         std::slice::from_ref(&default)
     } else {
         list

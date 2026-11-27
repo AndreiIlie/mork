@@ -119,3 +119,80 @@ fn spawned_reviewer_verdict_identifies_its_round_job_and_router_choice() {
         ("router", Effort::High, Some(mork_types::config::SeatPhase::Work))
     );
 }
+
+#[test]
+fn price_exploration_and_partner_history_change_the_winning_model() {
+    use mork_core::routing::choose::{Inputs, Request};
+    use mork_types::config::{PickModel, SeatPhase};
+    use mork_types::routing::{Arm, Estimate, Levels, Metric, Statistics};
+    let mut sim = configured("foreman", "auto", true);
+    let limit = sim.state.limits.values_mut().next().unwrap();
+    limit.percent = Some(65);
+    limit.resets_at = Some((sim.now + 3 * 86_400_000) / 1000);
+    let seat = sim.config.seat("foreman").unwrap();
+    let expensive = "gpt-6.2-astra";
+    let candidates = [SOL, expensive].map(|model| PickModel {
+        cli: Cli::Codex,
+        model: model.into(),
+        label: model.into(),
+        efforts: vec![Effort::High],
+    });
+    let req = Request {
+        agent: "web-1/foreman",
+        role: "foreman.work",
+        run: 1,
+        phase: SeatPhase::Work,
+        leaf: Some("web"),
+        partner: None,
+    };
+    let choose = |stats: &Statistics, req: &Request<'_>| {
+        let inputs = Inputs { now: sim.now, limits: &sim.state.limits, account: None, stats: Some(stats) };
+        inputs.choose(req, &seat, &candidates, false)
+    };
+    let counts = |mean: f64| {
+        let e = Estimate { sum: mean * 100_000.0, weight: 100_000.0 };
+        Levels { global: e, leaves: std::collections::BTreeMap::from([("web".to_owned(), e)]) }
+    };
+    let arm = |model: &str| Arm { cli: Cli::Codex, model: model.into(), effort: Effort::High };
+    let mut stats = Statistics::default();
+    let quality = ("foreman.work".to_owned(), Metric::Quality);
+    stats.outcomes.entry(quality.clone()).or_default().insert(arm(expensive), counts(0.9));
+    assert!((1..100).any(|run| choose(&stats, &Request { run, ..req }).best().unwrap().offer.model == SOL));
+
+    for model in [SOL, expensive] {
+        stats.outcomes.entry(quality.clone()).or_default().insert(arm(model), counts(0.5));
+    }
+    let ordinary = choose(&stats, &req);
+    assert!(ordinary.candidates.iter().all(|c| c.offer.open && c.offer.spare == 0));
+    assert_eq!(ordinary.best().unwrap().offer.model, SOL);
+    stats
+        .partners
+        .insert(("foreman.work".into(), expensive.into(), OPUS.into()), Estimate { sum: 1000.0, weight: 1000.0 });
+    let paired = choose(&stats, &Request { partner: Some(OPUS), ..req });
+    assert_eq!(paired.best().unwrap().offer.model, expensive);
+}
+
+#[test]
+fn ordinary_researcher_can_delegate_selection_in_auto_mode() {
+    for mode in ["fixed", "shadow", "auto"] {
+        let mut sim = configured("researcher", mode, true);
+        sim.through_brief("web-1", "web");
+        let spawn = |sim: &mut Sim, options: Value| {
+            let mut cmd = json!({"spawn":{"card":"web-1","role":"researcher","task":"Trace the caller"}});
+            for (k, v) in options.as_object().unwrap() {
+                cmd["spawn"][k] = v.clone();
+            }
+            sim.cmd(mork_types::state::Sender::Agent("web-1/foreman".into()), cmd)
+        };
+        assert!(spawn(&mut sim, json!({"effort":"high"})).is_err());
+        let first = spawn(&mut sim, json!({}));
+        assert_eq!(first.is_ok(), mode == "auto");
+        if mode == "auto" {
+            assert_eq!(routes(&sim, "web-1/researcher-1")[0]["pick"]["model"], SOL);
+        }
+        let selected = spawn(&mut sim, json!({"model":SOL,"effort":"high"}));
+        assert!(selected.is_ok(), "{selected:?}");
+        let key = if mode == "auto" { "web-1/researcher-2" } else { "web-1/researcher-1" };
+        assert_eq!(routes(&sim, key).len(), usize::from(mode == "shadow"));
+    }
+}

@@ -229,7 +229,10 @@ fn spawn_choice(
         return Ok(Some(offer.pair.offer.choice(at.phase)));
     }
     if agent.role == Role::Baseline && selected {
-        return Err("a baseline seat runs on its configured default, `[seats.baseline]`: drop `--model`, `--effort` and `--cli`".into());
+        return Err(
+            "a baseline seat uses the routing mode in `[seats.baseline]`: drop `--model`, `--effort` and `--cli`"
+                .into(),
+        );
     }
     if !selected
         && (matches!(agent.role, Role::Reviewer | Role::Baseline)

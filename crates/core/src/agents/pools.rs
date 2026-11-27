@@ -57,11 +57,7 @@ pub fn offers(
         }
         let bucket = if cli == Cli::Agy { agy_bucket(&entry.model) } else { "account" };
         let pool = pool_name(cli, bucket);
-        let pool = if let Some(id) = account.filter(|_| cli == Cli::Claude) {
-            format!("{pool} {id}")
-        } else {
-            pool
-        };
+        let pool = if let Some(id) = account.filter(|_| cli == Cli::Claude) { format!("{pool} {id}") } else { pool };
         let spare = headroom(limits, entry, bucket, account, now);
         for &effort in &entry.efforts {
             let Some((index, _)) = bench::benchmark(&entry.model, effort) else { continue };

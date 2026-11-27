@@ -44,7 +44,7 @@ fn global_and_leaf_estimates_shrink_observations_and_stay_finite() {
     let zero = Levels { global: Estimate { sum: 0.0, weight: 2.0 }, leaves: Default::default() };
     stats.outcomes.entry(("researcher".into(), Metric::Cost)).or_default().insert(a.clone(), zero);
     let pop = Population { stats: &stats, role: "researcher", mean_index: 54.84 };
-    assert!(pop.levels(Metric::Cost, &a, None)[0].mean > 0.0);
+    assert_eq!(pop.levels(Metric::Cost, &a, Some("web"))[1].mean, 0.56);
 }
 
 fn history(mode: &str, rows: Vec<(i64, &str, Value)>) -> History {
@@ -141,8 +141,8 @@ fn catch_credits_the_bound_jobs_and_adjusts_for_topic_opportunity() {
             ));
         }
         rows.extend([
-            (15, "cost", cost("r/reviewer-1", "late", SOL, 100)),
-            (16, "reply", json!({"agent":"r/reviewer-1","job":"late","round":null,"outcome":"review-pass"})),
+            (15, "cost", cost("r/reviewer-0", "late", OPUS, 100)),
+            (16, "reply", json!({"agent":"r/reviewer-0","job":"late","round":null,"outcome":"review-fail"})),
             (
                 17,
                 "review.verdict",
