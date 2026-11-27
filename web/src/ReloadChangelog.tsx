@@ -96,7 +96,7 @@ export function ReloadChangelog({ build, view, live, tzOffsetMin }: ChangelogPro
         title="Reload changelog"
         aria-label={`Reload changelog for build ${build.slice(0, 8)}`}
         aria-expanded={open}
-        className="ml-auto flex h-7 cursor-pointer items-center gap-1 font-mono text-label-12 text-gray-900 hover:text-gray-1000"
+        className="ml-auto flex h-control cursor-pointer items-center gap-1 font-mono text-label-12 text-gray-900 hover:text-gray-1000"
       >
         {build.slice(0, 8)}
         <ChevronIcon open={open} />
@@ -114,7 +114,7 @@ export function ReloadChangelog({ build, view, live, tzOffsetMin }: ChangelogPro
             type="button"
             popoverTarget="reload-history"
             popoverTargetAction="hide"
-            className="cursor-pointer px-2 py-1 text-label-12 text-gray-900 hover:bg-gray-100 hover:text-gray-1000"
+            className="h-control cursor-pointer px-2 text-label-12 text-gray-900 hover:bg-gray-100 hover:text-gray-1000"
           >
             Close
           </button>

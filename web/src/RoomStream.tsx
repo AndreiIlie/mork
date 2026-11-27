@@ -372,7 +372,7 @@ export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, l
                 type="button"
                 disabled={!live || loading}
                 onClick={() => loadEarlier(scrollRef.current)}
-                className="cursor-pointer text-label-12 text-gray-900 hover:text-gray-1000 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-control cursor-pointer text-label-12 text-gray-900 hover:text-gray-1000 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? "Loading earlier messages…" : `${earlier} earlier ${plural(earlier, "message", "messages")}`}
               </button>

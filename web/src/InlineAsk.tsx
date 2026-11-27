@@ -57,7 +57,7 @@ export function InlineAsk({ hand, triage, live }: { hand: HandView; triage?: Tri
               type="button"
               disabled={!live || answering !== null || busy !== null}
               onClick={() => choose(o.n)}
-              className={`flex min-h-8 cursor-pointer items-baseline gap-3 border px-3 py-[5px] text-left text-label-14 text-gray-1000 transition-colors hover:border-gray-900 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`flex min-h-control cursor-pointer items-baseline gap-3 border px-3 py-[3px] text-left text-label-14 text-gray-1000 transition-colors hover:border-gray-900 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ${
                 o.n === pick ? "border-gray-700 bg-gray-200" : "border-gray-400 bg-background-100"
               }`}
             >

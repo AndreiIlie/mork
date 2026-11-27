@@ -273,7 +273,7 @@ function ProjectBacklog({
           <span className="flex items-center gap-2">
             <span className="text-label-12 text-gray-700">Auto delegation</span>
             <Segmented
-              height={26}
+              compact
               options={["Off", "On"] as const}
               value={board.auto ? "On" : "Off"}
               disabled={() => !live || !!pending[board.project]}

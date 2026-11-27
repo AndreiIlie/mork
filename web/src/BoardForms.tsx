@@ -88,7 +88,7 @@ function StartForm({ card, defaults, live, onDone }: { card: BoardRow; defaults:
     <div className="flex flex-wrap items-center gap-x-5 gap-y-3 bg-background-200 py-3 pl-[calc(var(--spacing-edge)+24px)] pr-edge">
       <span className="flex items-center gap-2">
         <span className={FIELD}>Mode</span>
-        <Segmented height={28}
+        <Segmented
           options={["Full", "Report"] as const}
           value={mode}
           onChange={setMode}
@@ -96,16 +96,16 @@ function StartForm({ card, defaults, live, onDone }: { card: BoardRow; defaults:
         />
       </span>
       <span className="flex items-center gap-2">
-        <Button tier="secondary" size="control" pressed={full && visual} disabled={!full || defaults.visual} onClick={() => setVisual((v) => !v)} title={full && defaults.visual ? "Its last run was visual: this one is too" : undefined}>
+        <Button tier="secondary" pressed={full && visual} disabled={!full || defaults.visual} onClick={() => setVisual((v) => !v)} title={full && defaults.visual ? "Its last run was visual: this one is too" : undefined}>
           Visual
         </Button>
-        <Button tier="secondary" size="control" pressed={full && noPlanner} disabled={!full} onClick={() => setNoPlanner((v) => !v)}>
+        <Button tier="secondary" pressed={full && noPlanner} disabled={!full} onClick={() => setNoPlanner((v) => !v)}>
           No planner
         </Button>
       </span>
       <span className="flex items-center gap-2">
         <span className={FIELD}>Delegation</span>
-        <Segmented height={28}
+        <Segmented
           options={LEVELS}
           value={LEVELS[level]}
           onChange={(name) => setLevel(LEVELS.indexOf(name))}
@@ -114,10 +114,10 @@ function StartForm({ card, defaults, live, onDone }: { card: BoardRow; defaults:
       </span>
       {inherited.length > 0 && <span className="text-label-12 text-gray-700">{inherited.join(" · ")}</span>}
       <span className="ml-auto flex items-center gap-2">
-        <Button size="control" tier="ghost" disabled={!!pending.start} onClick={onDone}>
+        <Button tier="ghost" disabled={!!pending.start} onClick={onDone}>
           Cancel
         </Button>
-        <Button size="control" tier="primary" disabled={!live || !!pending.start || modeOff(mode)} onClick={start}>
+        <Button tier="primary" disabled={!live || !!pending.start || modeOff(mode)} onClick={start}>
           {card.ran ? "Start again" : "Start"} {card.id}
         </Button>
       </span>
@@ -132,7 +132,7 @@ export function StartStrip({ card, view, live, onDone }: { card: BoardRow; view?
     return () => watchPlace(null);
   }, [card.id]);
   if (!view?.start) return <div className="flex items-center gap-3 bg-background-200 px-edge py-3 text-label-13">
-    <span>{view ? `${card.id} can't start now.` : "Loading…"}</span><Button tier="ghost" size="control" onClick={onDone}>Cancel</Button>
+    <span>{view ? `${card.id} can't start now.` : "Loading…"}</span><Button tier="ghost" onClick={onDone}>Cancel</Button>
   </div>;
   return <StartForm key={JSON.stringify(view.start)} card={card} defaults={view.start} live={live} onDone={onDone} />;
 }

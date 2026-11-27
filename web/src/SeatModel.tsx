@@ -25,7 +25,7 @@ function Segment({
       aria-pressed={on}
       disabled={disabled}
       onClick={onPick}
-      className={`h-8 cursor-pointer whitespace-nowrap px-3 text-label-13 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`h-[calc(var(--spacing-control)-2px)] cursor-pointer whitespace-nowrap px-3 text-label-13 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         on ? "bg-gray-100 text-gray-1000" : "text-gray-900 hover:text-gray-1000"
       }`}
     >

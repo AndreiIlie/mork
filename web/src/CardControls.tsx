@@ -60,7 +60,6 @@ export function CardControls({ card, status, live }: { card: CardHeader; status:
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <span className="text-label-12 text-gray-700">Delegation</span>
             <Segmented
-              height={28}
               options={LEVELS}
               value={currentLevel}
               disabled={(level) => disabled || !delegation || (level !== currentLevel && !levelCommand(level))}
@@ -69,10 +68,10 @@ export function CardControls({ card, status, live }: { card: CardHeader; status:
                 if (command) send("Delegation", command);
               }}
             />
-            <Button size="control" tier="secondary" disabled={disabled || !brief || !flipVisual} pressed={visual?.position === 1} onClick={() => send("Visual", flipVisual)}>Visual</Button>
+            <Button tier="secondary" disabled={disabled || !brief || !flipVisual} pressed={visual?.position === 1} onClick={() => send("Visual", flipVisual)}>Visual</Button>
             {preview?.on && <a href={preview.url} target="_blank" rel="noreferrer" className="font-mono text-label-12 text-gray-900 underline">{preview.url.replace(/^http:\/\//, "").replace(/\/$/, "")}</a>}
-            <Button size="control" tier="secondary" pressed={preview?.on === true} disabled={disabled || !preview?.enabled} onClick={() => send("Preview", { preview: { card: card.id, action: preview?.on ? "stop" : "start" } })}>Preview</Button>
-            <Button size="control" tier="secondary" pressed={card.paused} disabled={disabled || !pause} onClick={() => send(card.paused ? "Resume" : "Pause", pause)}>{card.paused ? "Resume" : "Pause"}</Button>
+            <Button tier="secondary" pressed={preview?.on === true} disabled={disabled || !preview?.enabled} onClick={() => send("Preview", { preview: { card: card.id, action: preview?.on ? "stop" : "start" } })}>Preview</Button>
+            <Button tier="secondary" pressed={card.paused} disabled={disabled || !pause} onClick={() => send(card.paused ? "Resume" : "Pause", pause)}>{card.paused ? "Resume" : "Pause"}</Button>
             <Menu items={[
               { label: "Back to brief…", disabled: !has("brief"), pick: () => open("brief") },
               { label: "Reopen mock", disabled: !has("mock"), pick: () => send("Reopen mock", { mock: { card: card.id } }) },

@@ -132,7 +132,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={notifications.request}
-          className="flex h-9 shrink-0 cursor-pointer items-center border-t border-gray-400 px-edge text-left text-label-12 text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-1000"
+          className="flex h-control shrink-0 cursor-pointer items-center border-t border-gray-400 px-edge text-left text-label-12 text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-1000"
         >
           Enable alerts
         </button>

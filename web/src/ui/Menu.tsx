@@ -35,10 +35,10 @@ export function Menu({ items }: { items: Item[] }) {
       const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1 : current + (e.key === "ArrowUp" ? -1 : 1);
       buttons[(next + buttons.length) % buttons.length]?.focus();
     }}>
-      <Button tier="secondary" size="control" square aria-label="More" aria-expanded={open} aria-haspopup="menu" pressed={open} onClick={() => setOpen(!open)}>⋯</Button>
+      <Button tier="secondary" square aria-label="More" aria-expanded={open} aria-haspopup="menu" pressed={open} onClick={() => setOpen(!open)}>⋯</Button>
       {open && <div role="menu" aria-label="More" className="absolute right-0 top-[32px] z-10 w-[180px] border border-gray-400 bg-background-100">
         {items.map((item) => <button key={item.label} type="button" role="menuitem" disabled={item.disabled} onClick={() => { close(); item.pick(); }}
-          className="flex h-8 w-full cursor-pointer items-center px-3 text-left text-label-13 text-gray-1000 hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-700 disabled:hover:bg-background-100">{item.label}</button>)}
+          className="flex h-control w-full cursor-pointer items-center px-3 text-left text-label-13 text-gray-1000 hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-700 disabled:hover:bg-background-100">{item.label}</button>)}
       </div>}
     </div>
   );
