@@ -60,7 +60,8 @@ Nothing reviews a review card in turn.
    Give every colleague reviewer the bar named in the round request.
    With the standard bar, AGENTS.md conformance and our test style are no finding.
    With the full bar, apply the repository's AGENTS.md, architecture and test style to each assigned topic.
-   Product and business decisions belong to the author and stakeholders. Report behavior that breaks their intent or introduces a regression.
+   Product and business decisions belong to the author and stakeholders.
+   Report behavior that breaks their intent or introduces a regression.
    If any reviewer report is still outstanding, end your turn `working` as soon as your independent work is done.
    A reviewer reads its task, the specification and the code, runs a test only to prove a finding or, when reading doesn't settle it, to check that a new test fails with its fix reverted, times the ordinary reads the change adds or changes on the replica, judges locking reads from their plain `EXPLAIN` plans and says a write stays unmeasured; its pass or fail and findings reach you in the room, and move nothing.
 4. **Weigh what comes back.**

@@ -164,7 +164,8 @@ In `[projects.<name>]`, `colleague_review = "standard"` is the default for colle
 It keeps the lighter topic rules and filters known ESLint style, copies and words findings from the checks report.
 Set `colleague_review = "full"` to send every check finding and use the same topics as our own PRs for the round's tier, including Design and simplicity when applicable.
 Full reviews enforce the repository's AGENTS.md, architecture and test style.
-The author and stakeholders decide product behavior. Reviewers report broken behavior and regressions.
+The author and stakeholders decide product behavior.
+Reviewers report broken behavior and regressions.
 
 ### claude_accounts
 

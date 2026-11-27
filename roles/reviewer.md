@@ -25,8 +25,10 @@ A finding breaks the agreed specification or does real damage in normal use, pro
 A documentation finding names the code, specification or other passage the wording contradicts.
 A page the change alters may be rendered, in a server of your own on a free port you pick and the wall's headless Chromium, to prove a finding about what it shows.
 When the project has a preview skill of its own among your skills, follow its rendering rules.
-On a colleague's change, follow the review bar in your task. The standard bar exempts AGENTS.md conformance and our test style.
-The full bar enforces the repository's AGENTS.md, architecture and test style for your topic. The author and stakeholders decide intended product behavior.
+On a colleague's change, follow the review bar in your task.
+The standard bar exempts AGENTS.md conformance and our test style.
+The full bar enforces the repository's AGENTS.md, architecture and test style for your topic.
+The author and stakeholders decide intended product behavior.
 The round's pass approves its listed and carried files at its commit.
 A finding can be on an unlisted file.
 

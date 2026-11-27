@@ -41,9 +41,11 @@ description: "Use when you are a review card's blind reviewer with one topic of 
    - **Performance:** follow step 5.
    - **Money, permissions or data integrity:** where money, permissions, SQL, schema, stored data or security change, judge whether the change keeps them as agreed.
    - **Correctness on a colleague's change** covers whether it does what it means to and breaks nothing.
-     The author and stakeholders decide the intended product and business behavior. Report broken behavior and regressions.
+     The author and stakeholders decide the intended product and business behavior.
+     Report broken behavior and regressions.
 
-   Use the colleague review bar in your task. Under the standard bar, AGENTS.md conformance and our test style are no finding.
+   Use the colleague review bar in your task.
+   Under the standard bar, AGENTS.md conformance and our test style are no finding.
    Under the full bar, enforce the repository's AGENTS.md, architecture and test style wherever they apply to your topic.
 4. **Run a test only to prove a finding or for step 6's mutation check,** in a slot (`mork test --run <command>`, a narrow crate, test or filter): the checks ran before your round, and verification runs the whole suite beside it, on the same candidate.
 5. **The performance topic times every read the change adds or changes, including reads affected by a merged base.**

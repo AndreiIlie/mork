@@ -91,16 +91,7 @@ pub(super) fn request(
     out.push_str(&new_plan(rc, n, ours.unwrap_or(subject)));
     out.push_str(&ruled(rc, &cloned.resolved));
     if super::gate::entry(rc) {
-        let bar = match ours {
-            Some(_) => ColleagueReview::Full,
-            None => ctx.config.projects.get(&rc.project).map(|p| p.colleague_review).unwrap_or_default(),
-        };
-        out.push_str(&checks(rc, bar));
-        let landing = merge_words(rc, forge, ctx);
-        match ours {
-            Some(ours) => out.push_str(&own_pr(rc, ours, forge, &landing)),
-            None => out.push_str(&colleague(rc, forge, &landing, bar)),
-        }
+        entry_instructions(&mut out, rc, ours, forge, ctx);
         out.push_str(&ours_notes(state, subject, ours, ctx));
         if let Some(r) = rc.review.as_deref() {
             out.push_str(&super::tickets::context(
@@ -247,6 +238,21 @@ fn merge_words(card: &Card, forge: &str, ctx: Ctx<'_>) -> String {
         format!("The operator's approval on {forge} merges the verified head.")
     } else {
         format!("The operator merges the PR manually on {forge}.")
+    }
+}
+
+fn entry_instructions(out: &mut String, rc: &Card, ours: Option<&Card>, forge: &str, ctx: Ctx<'_>) {
+    let landing = merge_words(rc, forge, ctx);
+    match ours {
+        Some(ours) => {
+            out.push_str(&checks(rc, ColleagueReview::Full));
+            out.push_str(&own_pr(rc, ours, forge, &landing));
+        }
+        None => {
+            let bar = ctx.config.projects.get(&rc.project).map(|p| p.colleague_review).unwrap_or_default();
+            out.push_str(&checks(rc, bar));
+            out.push_str(&colleague(rc, forge, &landing, bar));
+        }
     }
 }
 
