@@ -55,10 +55,8 @@ fn histories(conn: &Connection, since: i64) -> Result<BTreeMap<String, History>>
         CASE WHEN ?2 THEN json_extract(data,'$.review') END FROM entities WHERE kind='card' AND id=?1",
     )?;
     for (id, card) in &mut cards {
-        let legacy = card
-            .rows
-            .iter()
-            .any(|e| e.kind == "review.verdict" && e.time >= since && e.data.get("named").is_none());
+        let legacy =
+            card.rows.iter().any(|e| e.kind == "review.verdict" && e.time >= since && e.data.get("named").is_none());
         let mut result = meta.query(params![id, legacy])?;
         if let Some(row) = result.next()? {
             card.project = row.get(0)?;
