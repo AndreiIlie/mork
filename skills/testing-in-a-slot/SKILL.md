@@ -17,7 +17,8 @@ A researcher's or baseline seat's run takes a project slot and a machine test ru
 - **A JavaScript proof kept under `.git/`** runs with plain `node`, written with `node:test` or `assert`, never as a Jest test, which never looks inside `.git/`: `mork test --run node .git/mork/review-proofs/round-<n>/<proof>.js`, from the clone's root.
 - **The checks gate, before you hand on:** `mork test --checks`, the project's checks command on your clone as it stands, uncommitted changes and new files included, so you can run it before you commit.
   The engine also scans committed history for known secrets when it checks the submission.
-- **The project's linter:** use `mork test --checks` where checks are configured; Mork project's are rustfmt, the comment rules, clippy, the audits and `web/` (typecheck and build).
+- **The project's linter:** use `mork test --checks` where checks are configured.
+  For Mork, it checks that `web/src/types.ts` matches the Rust wire types and runs rustfmt, the comment rules, clippy, the audits and `web/` (typecheck and build).
   A bare linter command (`npx eslint`) may pick up a global one with no config, and there is no `--lint` form.
 - **Not the suite:** only verification runs a project's whole suite, in a clone of its own, once the card's gates pass, and the merge queue again when the base moved.
   Never run the suite's command through `--run` either.
