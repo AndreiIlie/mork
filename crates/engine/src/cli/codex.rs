@@ -96,12 +96,22 @@ pub(super) fn tool_item(st: &mut StreamState, it: &Value, completed: bool) {
         None => {
             // Commentary says what the seat is doing until the next step.
             st.doing = None;
-            turn::step(st, None, id, words, command);
+            let tool = it["tool"].as_str().or_else(|| it["type"].as_str()).unwrap_or("tool");
+            turn::step(st, None, id, tool, words, command);
         }
     }
     if completed {
-        turn::ended(st, id);
+        turn::ended(st, id, tool_failed(it));
     }
+}
+
+fn tool_failed(item: &Value) -> bool {
+    let exit = item.get("exit_code").or_else(|| item.get("exitCode")).and_then(Value::as_i64);
+    matches!(item["status"].as_str(), Some("failed" | "declined"))
+        || exit.is_some_and(|code| code != 0)
+        || !item["error"].is_null()
+        || item["success"].as_bool() == Some(false)
+        || item.pointer("/result/isError").and_then(Value::as_bool) == Some(true)
 }
 
 /// What the seat says it is doing, until its next step.

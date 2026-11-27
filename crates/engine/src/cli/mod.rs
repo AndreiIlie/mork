@@ -90,6 +90,8 @@ pub struct StreamState {
 /// One step, in words.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Step {
+    pub tool: String,
+    pub failed: bool,
     pub id: String,
     pub words: String,
     pub command: Option<mork_types::seen::CommandView>,
@@ -110,6 +112,19 @@ pub struct ContextReport {
 }
 
 impl StreamState {
+    /// Counts each invocation once even when the stream repeats its completion.
+    pub fn tool_counts(&self) -> mork_types::cost::ToolCounts {
+        let mut counts = mork_types::cost::ToolCounts::default();
+        for step in &self.steps {
+            counts.calls += 1;
+            if step.failed {
+                counts.failed += 1;
+                *counts.by.entry(step.tool.clone()).or_default() += 1;
+            }
+        }
+        counts
+    }
+
     /// A stream of a seat working in `folder` with HOME set to `home`.
     pub fn for_folder(folder: &str, home: &str) -> Self {
         Self { folder: folder.to_owned(), home: home.to_owned(), ..Self::default() }
@@ -146,5 +161,58 @@ pub fn window_of(st: &StreamState) -> Option<(String, u64)> {
     match model {
         Some(m) => st.windows.get(&m).map(|w| (m, *w)),
         None => st.windows.iter().next().map(|(m, w)| (m.clone(), *w)),
+    }
+}
+
+#[cfg(test)]
+mod tool_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn counts_outcomes_once_across_cli_streams() {
+        for (read, name, events) in [
+            (
+                claude::read_line as fn(&mut StreamState, &str),
+                "Bash",
+                vec![
+                    json!({"type":"assistant","message":{"content":[{"type":"tool_use","id":"a","name":"Bash"},{"type":"tool_use","id":"b","name":"Bash"}]}}),
+                    json!({"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"a","is_error":true},{"type":"tool_result","tool_use_id":"b"}]}}),
+                ],
+            ),
+            (
+                codex::read_line,
+                "command_execution",
+                vec![
+                    json!({"type":"item.completed","item":{"type":"command_execution","id":"a","exit_code":1}}),
+                    json!({"type":"item.completed","item":{"type":"command_execution","id":"b","exit_code":0}}),
+                ],
+            ),
+            (
+                appserver::read_line,
+                "example",
+                vec![
+                    json!({"method":"item/completed","params":{"item":{"type":"dynamicToolCall","tool":"example","id":"a","success":false}}}),
+                    json!({"method":"item/completed","params":{"item":{"type":"dynamicToolCall","tool":"example","id":"b","success":true}}}),
+                ],
+            ),
+            (
+                agy::read_line,
+                "read_file",
+                vec![
+                    json!({"event":"step_update","step_update":{"step_type":"tool","step_index":1,"tool_name":"read_file","state":"DONE","tool_info":{"error":"missing"}}}),
+                    json!({"event":"step_update","step_update":{"step_type":"tool","step_index":2,"tool_name":"read_file","state":"DONE"}}),
+                ],
+            ),
+        ] {
+            let mut stream = StreamState::default();
+            for event in events.iter().chain(&events) {
+                read(&mut stream, &event.to_string());
+            }
+            assert_eq!(
+                serde_json::to_value(stream.tool_counts()).unwrap(),
+                json!({"calls":2,"failed":1,"by":{name:1}})
+            );
+        }
     }
 }

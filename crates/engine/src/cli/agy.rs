@@ -231,10 +231,15 @@ fn step(st: &mut StreamState, u: &Value, conversation: String) {
             s.command = command;
         }
         Some(_) => {}
-        None => turn::step(st, None, &id, words, command),
+        None => turn::step(st, None, &id, tool, words, command),
     }
     if field("state") == Some("DONE") {
-        turn::ended(st, &id);
+        turn::ended(
+            st,
+            &id,
+            u.pointer("/tool_info/error")
+                .is_some_and(|e| !e.is_null() && e.as_str() != Some("") && e.as_bool() != Some(false)),
+        );
     }
 }
 

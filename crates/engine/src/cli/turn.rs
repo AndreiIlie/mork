@@ -29,17 +29,35 @@ pub fn detail(st: &mut StreamState, key: &str, thread: Option<&str>, kind: Detai
 }
 
 /// A step of `thread`, with what waited for it there, started when the line in hand was read.
-pub fn step(st: &mut StreamState, thread: Option<&str>, id: &str, words: String, command: Option<CommandView>) {
+pub fn step(
+    st: &mut StreamState,
+    thread: Option<&str>,
+    id: &str,
+    tool: &str,
+    words: String,
+    command: Option<CommandView>,
+) {
     let thread = thread.map(str::to_owned);
     let details = st.pending.remove(&thread).unwrap_or_default();
-    st.steps.push(Step { id: id.to_owned(), words, command, details, thread, start_ms: st.at, end_ms: None });
+    st.steps.push(Step {
+        tool: tool.to_owned(),
+        failed: false,
+        id: id.to_owned(),
+        words,
+        command,
+        details,
+        thread,
+        start_ms: st.at,
+        end_ms: None,
+    });
 }
 
 /// The step `id` ended when the line in hand was read; its first end holds.
-pub fn ended(st: &mut StreamState, id: &str) {
+pub fn ended(st: &mut StreamState, id: &str, failed: bool) {
     let at = st.at;
-    if let Some(s) = st.steps.iter_mut().find(|s| s.id == id && s.end_ms.is_none()) {
-        s.end_ms = at;
+    if let Some(s) = st.steps.iter_mut().find(|s| s.id == id) {
+        s.failed |= failed;
+        s.end_ms = s.end_ms.or(at);
     }
 }
 

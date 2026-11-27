@@ -1,6 +1,9 @@
 //! Engine-native failed-round findings triage (fac-680, fac-689, fac-694): holds a non-delegated
 //! card's failed round or a delegated review stalemate behind a triage ask, else sends findings directly.
 
+mod stalemate;
+use stalemate::stalemate_prev;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use mork_types::ask::{AskKind, Color};
@@ -105,26 +108,6 @@ pub(crate) fn release_on_delegate(p: &mut Poster<'_>, mut c: Card, ctx: Ctx<'_>)
     }
 }
 
-// Two consecutive completed rounds under the current plan stall when none of the prior round's
-// findings were resolved and every one repeats unresolved in the new round (fac-694).
-fn stalemate_prev(rc: &Card, pending: &PendingTriage) -> Option<(u32, usize)> {
-    let review = rc.review.as_deref()?;
-    let prev = review
-        .current()
-        .rev()
-        .find(|r| r.n < pending.round && matches!(r.verdict, Some(Verdict::Passed | Verdict::Failed)))?;
-    let prev_set: BTreeSet<u32> = prev.named.iter().copied().collect();
-    if prev.verdict != Some(Verdict::Failed) || prev_set.is_empty() {
-        return None;
-    }
-    let resolved = resolved_of(rc);
-    if prev_set.iter().any(|n| resolved.contains(n)) {
-        return None;
-    }
-    let curr_open: BTreeSet<u32> = pending.items.iter().map(|i| i.n).filter(|n| !resolved.contains(n)).collect();
-    (!curr_open.is_empty() && prev_set.is_subset(&curr_open)).then_some((prev.n, prev_set.len()))
-}
-
 fn stalemate_summary(prev: u32, repeated: usize, total: usize) -> String {
     let word = if repeated == 1 { "finding" } else { "findings" };
     if total > repeated {
@@ -134,9 +117,23 @@ fn stalemate_summary(prev: u32, repeated: usize, total: usize) -> String {
     }
 }
 
-fn open(p: &mut Poster<'_>, mut c: Card, rc: &Card, mut pending: PendingTriage, stalemate: Option<(u32, usize)>) {
+fn open(
+    p: &mut Poster<'_>,
+    mut c: Card,
+    rc: &Card,
+    mut pending: PendingTriage,
+    stalemate: Option<(u32, BTreeSet<u32>)>,
+) {
     let id = c.id.clone();
     asks::close(p, id.as_str(), &[AskKind::Triage]);
+    let stalemate = stalemate.map(|(prev, repeated)| {
+        p.journal(
+            "review.stalemate",
+            Some(id.as_str()),
+            json!({"review": rc.id, "round": pending.round, "findings": repeated}),
+        );
+        (prev, repeated.len())
+    });
     pending.stalemate = stalemate.is_some();
     let color = if pending.stalemate { Color::Red } else { Color::Yellow };
     let text = ask_text(&c, rc, &pending, stalemate);

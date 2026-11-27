@@ -35,6 +35,7 @@ pub struct SessionSeen {
     pub context: Option<u64>,
     /// The turn made a tool call (fac-176).
     pub tools: bool,
+    pub tool_counts: Option<mork_types::cost::ToolCounts>,
     /// The messages delivered into it that its model went on to read (fac-389), by seq.
     pub taken: Vec<u64>,
     /// Its model answered the turn's prompt (fac-620): what the prompt sent is in its session.

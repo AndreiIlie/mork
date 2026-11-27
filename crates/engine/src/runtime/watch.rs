@@ -255,7 +255,7 @@ impl Engine {
         }
         let (stream, session) = self.read_session(&job, &dir);
         // A stop or a failure carries no session: what the stream showed is kept first (1.4.8, fac-629).
-        if session.started || session.thread.is_some() || session.compacted {
+        if session.started || session.thread.is_some() || session.compacted || session.tool_counts.is_some() {
             self.apply(&Event::SessionSeen { id: id.clone(), session: session.clone() });
         }
         let exit_facts = exit.as_ref().map(|e| (e.stopped, e.error.clone()));
@@ -294,6 +294,7 @@ impl Engine {
             window: cli::window_of(&stream),
             context: stream.context.as_ref().map(|c| c.used),
             tools: !stream.steps.is_empty(),
+            tool_counts: self.live.get(&job.id).filter(|live| live.offset > 0).map(|_| stream.tool_counts()),
             taken: stream.taken.iter().filter_map(|u| cli::live::seq_of(job.id.as_str(), u)).collect(),
             answered: stream.answered,
             compacted: stream.compacted,

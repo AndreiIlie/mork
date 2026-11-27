@@ -129,7 +129,9 @@ fn results_of(st: &mut StreamState, ev: &Value) {
     let Some(blocks) = ev.pointer("/message/content").and_then(Value::as_array) else { return };
     for b in blocks.iter().filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_result")) {
         if let Some(id) = b.get("tool_use_id").and_then(Value::as_str) {
-            turn::ended(st, id);
+            let failed = b["is_error"].as_bool() == Some(true)
+                || ev.pointer("/tool_use_result/success").and_then(Value::as_bool) == Some(false);
+            turn::ended(st, id, failed);
         }
     }
 }
@@ -221,7 +223,7 @@ fn tool_step(st: &mut StreamState, thread: Option<&str>, b: &Value) {
     };
     let words = words.lines().next().unwrap_or("").trim().to_owned();
     let words = if thread.is_some() { format!("↳ {words}") } else { words };
-    turn::step(st, thread, id, words.chars().take(100).collect(), command);
+    turn::step(st, thread, id, name, words.chars().take(100).collect(), command);
 }
 
 // The words the operator approved for each tool (fac-206); a tool they don't name, or one missing what

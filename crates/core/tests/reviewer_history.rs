@@ -61,6 +61,7 @@ fn reviewer_can_supply_findings_or_confirm_an_empty_failure_before_reporting() {
         let foreman = format!("{rc}/foreman");
         let reviewer = format!("{rc}/reviewer-1");
         sim.turn_sending(&foreman, &[spawn_cmd(&rc, "tests", "Review tests")], reply("working", "Review"));
+        assert!(sim.journal.iter().any(|(_, k, _, d)| k == "child.spawned" && d["topic"] == "tests"));
         if findings.is_empty() {
             // Correcting a malformed reply cannot itself confirm a failure the reviewer has yet to report.
             sim.turn(&reviewer, Value::Null);
@@ -445,4 +446,21 @@ fn compacted_reviewer_correction_restores_the_subject_and_carried_decisions() {
     }
     assert!(!prefix.contains("discussion."));
     assert!(recorded.request_text().starts_with("Your reply was refused"));
+}
+
+#[test]
+fn turn_cost_keeps_measured_tool_counts_only() {
+    for measured in [true, false] {
+        let mut s = Sim::new();
+        s.through_brief("web-1", "web");
+        let id = s.turn_started("web-1/foreman");
+        let tools = json!({"calls":3,"failed":1,"by":{"Bash":1}});
+        let session = SessionSeen {
+            tool_counts: measured.then(|| serde_json::from_value(tools.clone()).unwrap()),
+            ..SessionSeen::default()
+        };
+        s.apply(Event::JobEnded { id, end: JobEnd::Cut { session } });
+        let cost = &s.journal.iter().rev().find(|(_, k, _, _)| k == "cost").unwrap().3;
+        assert_eq!(cost.get("tools"), measured.then_some(&tools));
+    }
 }

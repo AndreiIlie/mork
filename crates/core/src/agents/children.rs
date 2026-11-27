@@ -187,7 +187,7 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
     let (who, mut agent) = child(state, c, *role);
     let Sender::Agent(parent) = from else { return Decision::refused("a child needs a seat to report to") };
     agent.parent = Some(parent.clone());
-    agent.topic = topic;
+    agent.topic.clone_from(&topic);
     agent.choice =
         match spawn_choice(state, from, &agent, c, (model.as_deref(), effort.as_deref(), cli.as_deref()), ctx) {
             Ok(choice) => choice,
@@ -196,7 +196,11 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
     let mut p = Poster::for_ctx(state, ctx);
     p.put_agent(agent);
     task(&mut p, &who, from, task_text.trim());
-    p.journal("child.spawned", Some(id.as_str()), json!({"agent": who.key.as_str(), "role": role.as_str()}));
+    let mut event = json!({"agent": who.key.as_str(), "role": role.as_str()});
+    if let Some(topic) = topic {
+        event["topic"] = json!(topic);
+    }
+    p.journal("child.spawned", Some(id.as_str()), event);
     let mut d = Decision::ok(json!({"spawn": {"agent": who.key.as_str(), "place": who.place.as_str()}}));
     p.finish(&mut d);
     d

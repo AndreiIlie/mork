@@ -435,5 +435,9 @@ pub fn ready(p: &mut Poster<'_>, mut rc: Card, c: &Cloned, installed: bool, ctx:
         r.asked = Some(seq);
     }
     p.put_card(rc);
-    p.journal("review.asked", Some(id.as_str()), json!({"n": open.n, "commit": open.commit, "seq": seq}));
+    p.journal(
+        "review.asked",
+        Some(id.as_str()),
+        json!({"n": open.n, "commit": open.commit, "seq": seq, "submitted": open.submitted}),
+    );
 }

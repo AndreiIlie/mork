@@ -58,7 +58,22 @@ pub fn verdict(p: &mut Poster<'_>, mut rc: Card, r: &Reply, job: &Job, ctx: Ctx<
     rc.gates.review_asked = None;
     let id = rc.id.clone();
     p.put_card(rc.clone());
-    let data = json!({"n": open.n, "commit": open.commit, "passed": passed, "findings": findings.len()});
+    let kept: Vec<_> = rc
+        .review
+        .iter()
+        .flat_map(|r| {
+            let numbers = r
+                .rounds
+                .iter()
+                .find(|v| v.n == open.n)
+                .into_iter()
+                .flat_map(|v| &v.named)
+                .collect::<std::collections::BTreeSet<_>>();
+            r.raised.iter().filter(move |f| numbers.contains(&f.n))
+        })
+        .map(|f| json!({"n": f.n, "round": f.round, "by": f.by}))
+        .collect();
+    let data = json!({"named": kept, "n": open.n, "commit": open.commit, "passed": passed, "findings": findings.len()});
     p.journal("review.verdict", Some(id.as_str()), data);
     if passed {
         super::end::release(p, &id, ctx.config);

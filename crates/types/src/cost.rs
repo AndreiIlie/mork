@@ -2,6 +2,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{Cli, Effort};
 
+/// Tool invocations observed in a turn, with failed calls grouped by their stream tool name.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ToolCounts {
+    pub calls: u64,
+    pub failed: u64,
+    pub by: std::collections::BTreeMap<String, u64>,
+}
+
 /// Four disjoint token counts: input excludes cache reads and writes; output includes reasoning.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
