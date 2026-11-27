@@ -208,8 +208,6 @@ impl Cli {
 /// A seat, its defaults merged with the config's overrides.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Seat {
-    #[serde(default)]
-    pub routing: RoutingMode,
     pub name: String,
     pub cli: Cli,
     pub model: String,
@@ -423,7 +421,6 @@ impl Config {
             |m| catalog().find(|c| c.0 == cli && c.1 == m).map_or_else(|| m.clone(), |c| c.2.to_owned()),
         );
         Some(Seat {
-            routing: phase.and_then(|p| p.routing).or(o.routing).unwrap_or_default(),
             name: name.to_owned(),
             cli,
             model,

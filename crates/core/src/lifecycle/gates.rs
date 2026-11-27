@@ -201,9 +201,12 @@ fn taken(p: &mut Poster<'_>, mut card: Card, t: Taken, ctx: Ctx<'_>) {
         // The round under way reviews what it no longer lands (fac-95); any open triage is stale.
         crate::reviews::triage::withdraw(p, &mut card);
         crate::reviews::end::moved(p, &card, &t.head);
-        let built = card.gates.built_pending;
-        let clean = card.gates.clean;
-        card.gates = mork_types::card::Gates { built_pending: built, clean, ..Default::default() };
+        card.gates = mork_types::card::Gates {
+            built_pending: card.gates.built_pending,
+            submitting_model: card.gates.submitting_model,
+            clean: card.gates.clean,
+            ..Default::default()
+        };
     }
     // A new head at `ready` goes through the gates again: what waited on the old one goes.
     if moved && card.stage == Stage::Ready {

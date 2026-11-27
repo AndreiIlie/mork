@@ -40,14 +40,16 @@ fn choices(config: &Config, by: By) -> Vec<ModelChoice> {
 
 /// Where a seat stands for roster defaults, review classification and phase-bound picks.
 pub fn standing(state: &State, a: &Agent) -> Standing {
-    let Some(card) = places::card_of(state, &a.place).and_then(|c| state.cards.get(&c)) else {
-        return Standing::WORK;
-    };
+    let card = places::card_of(state, &a.place).and_then(|c| state.cards.get(&c));
+    card.map_or(Standing::WORK, |c| standing_on(state, c, a))
+}
+
+pub(crate) fn standing_on(state: &State, card: &Card, a: &Agent) -> Standing {
     let review = card.mode == Mode::Review && matches!(a.seat.as_str(), "review-foreman" | "reviewer");
     Standing { phase: phase_of(card, a), review: review.then(|| crate::reviews::gate::kind(state, card)) }
 }
 
-fn phase_of(card: &Card, a: &Agent) -> SeatPhase {
+pub(crate) fn phase_of(card: &Card, a: &Agent) -> SeatPhase {
     if a.seat.as_str() == "foreman" && card.mode == Mode::Report { SeatPhase::Report } else { SeatPhase::Work }
 }
 

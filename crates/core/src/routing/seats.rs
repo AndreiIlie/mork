@@ -1,10 +1,11 @@
 use mork_types::card::{Card, Mode};
 use mork_types::config::{RoutingMode, SeatPhase, Standing};
 use mork_types::reply::Role;
-use mork_types::state::{Agent, Choice};
+use mork_types::state::Agent;
 use serde_json::Value;
 
 use super::choose::{Inputs, Request};
+use crate::agents::models::{phase_of, standing_on};
 use crate::decide::{Ctx, Decision};
 use crate::state::{Change, State};
 
@@ -14,13 +15,6 @@ pub(crate) fn role(name: &str, phase: SeatPhase) -> &str {
         ("foreman", _) => "foreman.work",
         _ => name,
     }
-}
-
-fn standing(state: &State, card: &Card, a: &Agent) -> Standing {
-    let review = matches!(a.seat.as_str(), "review-foreman" | "reviewer") && card.mode == Mode::Review;
-    let phase =
-        if card.mode == Mode::Report && a.seat.as_str() == "foreman" { SeatPhase::Report } else { SeatPhase::Work };
-    Standing { phase, review: review.then(|| crate::reviews::gate::kind(state, card)) }
 }
 
 // A single decision may create the card and both seats. Its planner's effective choice must be visible to its foreman.
@@ -42,7 +36,7 @@ pub(crate) fn created(state: &State, d: &mut Decision, ctx: Ctx<'_>) {
         let Some((id, _)) = a.key.as_str().split_once('/') else { continue };
         let card = cards.get(&mork_types::CardId::new(id)).copied().or_else(|| state.cards.get(id));
         let Some(card) = card.filter(|c| c.stage.is_live()) else { continue };
-        let at = standing(state, card, a);
+        let at = standing_on(state, card, a);
         if (ctx.config.routing_mode(a.seat.as_str(), at) == RoutingMode::Fixed && a.role != Role::Planner)
             || crate::lifecycle::lookback::automatic(card)
         {
@@ -50,7 +44,7 @@ pub(crate) fn created(state: &State, d: &mut Decision, ctx: Ctx<'_>) {
         }
         let new_run = state.cards.get(id).is_none_or(|c| c.run != card.run);
         let new_seat = new_run || !state.agents.contains_key(&a.key);
-        let moved = state.cards.get(id).is_some_and(|old| standing(state, old, a).phase != at.phase);
+        let moved = state.cards.get(id).is_some_and(|old| phase_of(old, a) != at.phase);
         if new_seat || moved {
             updates.push((i, card, a.clone(), at));
         }
@@ -132,14 +126,10 @@ fn route(
         Request { agent: a.key.as_str(), run: card.run, phase: at.phase, role: role(name, at.phase), leaf, partner };
     let rec = Inputs::new(&state.limits, ctx).choose(&req, &seat, ctx.config.router_list(name, at).1, false);
     let row = rec.row(&req, mode);
-    if mode == RoutingMode::Auto {
-        let choice = rec.best().map(|c| c.offer.choice(at.phase)).unwrap_or_else(|| Choice {
-            cli: seat.cli,
-            model: seat.model,
-            effort: seat.effort,
-            by: "router".into(),
-            phase: Some(at.phase),
-        });
+    if mode == RoutingMode::Auto
+        && let Some(best) = rec.best()
+    {
+        let choice = best.offer.choice(at.phase);
         if a.session_started {
             a.pending = Some(choice);
         } else {

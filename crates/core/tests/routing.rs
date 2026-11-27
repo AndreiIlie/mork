@@ -70,6 +70,7 @@ fn start_routes_once_and_explicit_selections_win() {
                 assert_eq!(row["pick"]["model"], SOL);
             } else {
                 assert!(row["pick"].is_null());
+                assert!(agent.choice.is_none() && agent.pending.is_none());
             }
         }
         if mode == "auto" && open && !explicit {
@@ -83,7 +84,10 @@ fn start_routes_once_and_explicit_selections_win() {
 fn spawned_reviewer_verdict_identifies_its_round_job_and_router_choice() {
     let mut sim = configured("reviewer", "auto", true);
     sim.through_brief("web-1", "web");
-    sim.built("web-1", "h1", "base1");
+    let (id, _) = sim.turn_started_with_argv("web-1/foreman", &["codex", "-m", SOL, "--effort", "high"]);
+    let session = SessionSeen { started: true, ..Default::default() };
+    sim.apply(Event::JobEnded { id, end: JobEnd::Finished { reply: Ok(reply("built", "Built")), session } });
+    sim.take("web-1", "h1", "base1", &["src/a.rs"]);
     sim.checks("web-1", 0, &[]);
     sim.candidate("web-1");
     sim.round_asked("web-1");
@@ -96,6 +100,7 @@ fn spawned_reviewer_verdict_identifies_its_round_job_and_router_choice() {
         reply("working", "Review"),
     );
     let row = routes(&sim, &key)[0];
+    assert_eq!(row["partner"], SOL);
     assert_eq!(row["leaf"], "performance");
     assert_eq!(row["pick"]["effort"], "high");
     let (id, _) = sim.turn_started_with_argv(&key, &["codex", "-m", SOL, "--effort", "high"]);
