@@ -86,7 +86,7 @@ pub(super) fn begin(p: &mut Poster<'_>, project: &ProjectId, read: Read, start: 
             agent.seen_before = agent.seen;
             agent.choice = Some(pair.choice(mork_types::config::SeatPhase::Report));
             p.put_agent(agent);
-            data = json!({"run": 1, "mode": "report", "trigger": trigger, "score": score, "bar": 100 - pair.spare,
+            data = json!({"run": 1, "mode": "report", "trigger": trigger, "score": score, "bar": super::trigger::bar(pair),
                 "spare": pair.spare, "pool": pair.pool, "cli": pair.cli, "model": pair.model, "effort": pair.effort,
                 "pair_score": pair.score});
         }

@@ -26,6 +26,10 @@ pub(crate) fn starting_offer(state: &State, ctx: Ctx<'_>) -> Option<Offer> {
     best(state, "foreman", at, ctx).filter(|o| o.spare > 0)
 }
 
+pub(crate) fn bar(pair: &Offer) -> u32 {
+    100 - pair.spare
+}
+
 fn idle(p: &Poster<'_>) -> bool {
     !p.state.cards.values().any(|c| c.stage.is_live() && lookback::automatic(c))
         && !turns::real_running(p.state)
@@ -60,7 +64,7 @@ pub(crate) fn due(p: &mut Poster<'_>, ctx: Ctx<'_>) {
                 }
             } else if let Some(pair) = offer.get_or_init(|| idle(p).then(|| starting_offer(p.state, ctx)).flatten()) {
                 let score = score(p.state, &base, ctx);
-                let margin = score.total - f64::from(100 - pair.spare);
+                let margin = score.total - f64::from(bar(pair));
                 if score.active() && margin > 0.0 {
                     prefer(&mut candidate, Candidate { project, read, score, margin });
                 }

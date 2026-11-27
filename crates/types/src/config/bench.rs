@@ -1,7 +1,7 @@
 //! Cold-start estimates from the Artificial Analysis Intelligence Index v5, November 2026.
 
 use super::seats::{ASTRA, NEON, SONNET};
-use super::{Cli, Effort, OPUS, SOL, agy_bucket};
+use super::{Cli, Effort, OPUS, SOL};
 
 /// Reasoning index and USD per task at the given effort, shared across providers of the same model.
 pub fn benchmark(model: &str, effort: Effort) -> Option<(f64, f64)> {
@@ -18,10 +18,10 @@ pub fn benchmark(model: &str, effort: Effort) -> Option<(f64, f64)> {
 }
 
 /// Converts benchmark dollars to spare percentage points for the quota pool a model spends.
-pub fn cost_scale(cli: Cli, model: &str) -> f64 {
+pub fn cost_scale(cli: Cli, bucket: &str) -> f64 {
     match cli {
         Cli::Codex => 13.0,
-        Cli::Agy if agy_bucket(model) == "account" => 2.0,
+        Cli::Agy if bucket == "account" => 2.0,
         Cli::Claude | Cli::Agy => 3.5,
     }
 }

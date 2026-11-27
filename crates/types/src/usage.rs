@@ -31,6 +31,15 @@ pub struct Account {
     pub plan: String,
 }
 
+/// The label shared by quota readings and selections that use the same pool.
+pub fn pool_name(cli: crate::config::Cli, bucket: &str) -> String {
+    match (cli, bucket) {
+        (crate::config::Cli::Agy, "account") => "agy gemini".to_owned(),
+        (crate::config::Cli::Agy, b) => format!("agy {b}"),
+        (cli, _) => cli.as_str().to_owned(),
+    }
+}
+
 /// One usage-limit window of a CLI's account (1.4.8, Claude 10; Codex 7).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Limit {
@@ -69,11 +78,7 @@ impl Limit {
 
     /// The display name of this limit's pool: `agy gemini` or `agy 3p` for agy, else its CLI (fac-661).
     pub fn pool_name(&self) -> String {
-        match (self.cli, self.bucket.as_str()) {
-            (crate::config::Cli::Agy, "account") => "agy gemini".to_owned(),
-            (crate::config::Cli::Agy, b) => format!("agy {b}"),
-            (cli, _) => cli.as_str().to_owned(),
-        }
+        pool_name(self.cli, &self.bucket)
     }
 
     /// The same read, apart from when it was seen: a change worth a journal line (1.4.7.2).

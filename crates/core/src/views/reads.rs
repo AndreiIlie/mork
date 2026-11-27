@@ -125,7 +125,7 @@ pub(super) fn projects(state: &State, ctx: Ctx<'_>) -> Decision {
                 if config.mode == mork_types::lookback::Trigger::Auto {
                     use crate::lifecycle::trigger;
                     let base = trigger::baseline(state, name, read, ctx.now);
-                    let bar = bar.get_or_init(|| trigger::starting_offer(state, ctx).map(|pair| 100 - pair.spare));
+                    let bar = bar.get_or_init(|| trigger::starting_offer(state, ctx).as_ref().map(trigger::bar));
                     return json!({"read": read, "mode": config.mode, "last": last, "running": running,
                         "score": trigger::score(state, &base, ctx), "bar": bar});
                 }

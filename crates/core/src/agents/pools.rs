@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use mork_types::config::{Cli, Effort, PickModel, Seat, agy_bucket, bench};
-use mork_types::usage::{Limit, length_ms, short_name};
+use mork_types::usage::{Limit, length_ms, pool_name, short_name};
 
 use super::{models::walls_kept, usage::pace};
 
@@ -45,15 +45,16 @@ pub fn ranked(
     let mut offers = Vec::new();
     for entry in allowed {
         let cli = entry.cli;
-        if !walls_kept(seat, cli) || (cli == Cli::Claude && account.is_none()) {
+        if !walls_kept(seat, cli) {
             continue;
         }
         let bucket = if cli == Cli::Agy { agy_bucket(&entry.model) } else { "account" };
-        let pool = match cli {
-            Cli::Claude => format!("claude {}", account.unwrap_or_default()),
-            Cli::Codex => "codex".into(),
-            Cli::Agy if bucket == "account" => "agy gemini".into(),
-            Cli::Agy => format!("agy {bucket}"),
+        let pool = pool_name(cli, bucket);
+        let pool = if cli == Cli::Claude {
+            let Some(id) = account else { continue };
+            format!("{pool} {id}")
+        } else {
+            pool
         };
         let spare = headroom(limits, entry, bucket, account, now);
         for &effort in &entry.efforts {
@@ -69,7 +70,7 @@ pub fn ranked(
                 pool: pool.clone(),
                 open: spare.is_some(),
                 spare: spare.unwrap_or_default(),
-                score: index * share / (share + dollars * bench::cost_scale(cli, &entry.model)),
+                score: index * share / (share + dollars * bench::cost_scale(cli, bucket)),
             });
         }
     }
