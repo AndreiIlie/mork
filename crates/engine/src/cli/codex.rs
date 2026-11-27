@@ -65,7 +65,8 @@ fn item(st: &mut StreamState, ev: &Value) {
                 commentary(st, title.trim());
             }
         }
-        "command_execution" | "file_change" | "web_search" | "mcp_tool_call" | "collab_tool_call" => {
+        "command_execution" | "file_change" | "web_search" | "mcp_tool_call" | "collab_tool_call"
+        | "dynamic_tool_call" => {
             tool_item(st, it, completed);
         }
         _ => {}
@@ -89,6 +90,9 @@ pub(super) fn tool_item(st: &mut StreamState, it: &Value, completed: bool) {
     match st.steps.iter_mut().find(|s| s.id == id) {
         // Its completion may say what its start didn't, as a search's query.
         Some(s) if completed && (raw.is_some() || !is_command) => {
+            if let Some(tool) = it["tool"].as_str() {
+                s.tool = tool.into();
+            }
             s.words = words;
             s.command = command;
         }

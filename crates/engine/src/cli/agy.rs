@@ -226,20 +226,22 @@ fn step(st: &mut StreamState, u: &Value, conversation: String) {
     let words = words.chars().take(100).collect();
     match st.steps.iter_mut().find(|s| s.id == id) {
         // Its end may say what its start didn't, as its command or its file.
-        Some(s) if detailed => {
-            s.words = words;
-            s.command = command;
+        Some(s) => {
+            if tool != "tool" {
+                s.tool = tool.into();
+            }
+            if detailed {
+                s.words = words;
+                s.command = command;
+            }
         }
-        Some(_) => {}
         None => turn::step(st, None, &id, tool, words, command),
     }
-    if field("state") == Some("DONE") {
-        turn::ended(
-            st,
-            &id,
-            u.pointer("/tool_info/error")
-                .is_some_and(|e| !e.is_null() && e.as_str() != Some("") && e.as_bool() != Some(false)),
-        );
+    let failed = u
+        .pointer("/tool_info/error")
+        .is_some_and(|e| !e.is_null() && e.as_str() != Some("") && e.as_bool() != Some(false));
+    if state == Some("DONE") || failed {
+        turn::ended(st, &id, failed);
     }
 }
 
