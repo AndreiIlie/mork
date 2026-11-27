@@ -223,6 +223,15 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
     d
 }
 
+pub(super) const EMPTY_REVIEW: &str = "your review-fail has empty findings. Put each blocking finding in `findings`, or repeat `review-fail` with empty `findings` to confirm the failure";
+
+pub(super) fn needs_confirmation(a: &Agent, job: &Job, r: &Reply) -> bool {
+    a.role == Role::Reviewer
+        && r.outcome == Outcome::ReviewFail
+        && r.findings.is_empty()
+        && (job.corrects.is_none() || job.corrects != a.confirm_empty_review)
+}
+
 /// Reports a child's finished, blocked, asking or red reply to its parent's live turn or wakes it in the parent's
 /// room. Nothing submits the card, decides a review or asks the operator (fac-94, decision 1; fac-95; fac-99).
 pub fn replied(p: &mut Poster<'_>, card: &Card, who: &Who, r: &Reply, job: &Job) -> bool {

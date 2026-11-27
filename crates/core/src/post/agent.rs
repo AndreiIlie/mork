@@ -34,6 +34,7 @@ pub fn new_agent(who: &Who) -> Agent {
         fresh: None,
         parent: None,
         topic: None,
+        confirm_empty_review: None,
         choice: None,
         pending: None,
         retiring: None,

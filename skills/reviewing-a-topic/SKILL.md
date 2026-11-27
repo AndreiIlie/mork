@@ -120,4 +120,5 @@ JSON
    On reconsideration, limit `hand.message` to the disputed points, giving the evidence and your blocking judgment for each.
    Your revised verdict replaces your earlier verdict for this round, so list every finding you still consider blocking for your topic in `findings`, including undisputed ones.
    Return `review-fail` when any finding blocks, otherwise `review-pass` with empty `findings`.
+   If you return `review-fail` with empty `findings`, Mork prompts you once. Put any blocking findings from `hand.message` in `findings`, or repeat the empty `review-fail` to confirm it.
    The foreman weighs your verdict; you move nothing.

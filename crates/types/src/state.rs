@@ -259,6 +259,9 @@ pub struct Agent {
     /// What a reviewer reviews (fac-559), shown beside its name; none for other seats and reviewers saved before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub topic: Option<String>,
+    /// Only a correction of this turn can confirm its empty reviewer failure.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confirm_empty_review: Option<JobId>,
     /// Its session's own model and effort (fac-96), over its seat's: none, its seat's role defaults.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub choice: Option<Choice>,
