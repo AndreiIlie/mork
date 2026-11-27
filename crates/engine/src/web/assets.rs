@@ -42,14 +42,14 @@ pub fn content_type(path: &Path) -> &'static str {
 }
 
 /// Opens a regular static file beneath `root` without following symlinks, falling back to `index.html`
-/// for a path naming no existing file that is extensionless or a `/cards/<id>` page, dotted ids included.
+/// for a path naming no existing file that is extensionless or a card or project page, dotted names included.
 pub fn open_asset(root: &Path, url_path: &str) -> Option<(File, &'static str)> {
     let rel = safe_rel_path(url_path)?;
     if let Some(file) = open_regular(root, &rel) {
         return Some((file, content_type(&rel)));
     }
-    // A card id may carry a dot (`ex-583.1`), so every `/cards/<id>` is the app's route.
-    let route = rel.extension().is_none() || rel.parent() == Some(Path::new("cards"));
+    // Dots in a card id or project name are part of the route even when they look like file extensions.
+    let route = rel.extension().is_none() || matches!(rel.parent().and_then(Path::to_str), Some("cards" | "projects"));
     if rel != Path::new("index.html") && route {
         let index = Path::new("index.html");
         return open_regular(root, index).map(|file| (file, content_type(index)));
@@ -110,6 +110,8 @@ mod tests {
         assert_eq!(read_body("/cards/fac-671"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
         assert_eq!(read_body("/cards/ex-583.1"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
         assert_eq!(read_body("/cards/pr-example.com-123"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
+        assert_eq!(read_body("/projects/homefile.ro"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
+        assert_eq!(read_body("/projects/a/b.js"), None);
         assert_eq!(read_body("/cards/a/b.js"), None);
         assert_eq!(read_body("/assets/missing.js"), None);
         assert_eq!(read_body("/leak.txt"), None);
