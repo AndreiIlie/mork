@@ -13,6 +13,7 @@ export interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  onSendNow: () => void;
   placeholder: string;
   disabled?: boolean;
   sending?: boolean;
@@ -25,6 +26,7 @@ export function Composer({
   value,
   onChange,
   onSubmit,
+  onSendNow,
   placeholder,
   disabled = false,
   sending = false,
@@ -73,7 +75,9 @@ export function Composer({
       </label>
       <div className="flex items-center gap-2 px-gutter pb-3">
         {left}
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-2">
+          <Button tier="secondary" size="sm" disabled={locked || value.trim() === ""} onClick={onSendNow}
+            title="Send and interrupt the recipient’s running turn">Send now</Button>
           <Button tier="primary" size="sm" disabled={locked || value.trim() === ""} onClick={onSubmit}>
             {sending ? "Sending…" : "Send"}
           </Button>

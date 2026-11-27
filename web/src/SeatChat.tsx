@@ -44,13 +44,13 @@ function usePlaceComposer(place: string, live: boolean) {
     if (sendError !== null) setSendError(null);
   };
 
-  const submit = () => {
+  const submit = (delivery?: "now") => {
     const text = draft.trim();
     if (!live || sending || place === "" || text === "") return;
     const target = place;
     setSending(true);
     setSendError(null);
-    sendCommand({ say: { place: target, text } })
+    sendCommand({ say: { place: target, text, delivery } })
       .then(() => setDrafts((prev) => ({ ...prev, [target]: "" })))
       .catch((e: unknown) => setSendError(e instanceof Error ? e.message : String(e)))
       .finally(() => setSending(false));
@@ -118,7 +118,8 @@ export function SeatChat({
       <Composer
         value={draft}
         onChange={setDraft}
-        onSubmit={submit}
+        onSubmit={() => submit()}
+        onSendNow={() => submit("now")}
         placeholder={answering ? `Answer ${name}…` : `Message ${name}…`}
         disabled={!live || place === ""}
         sending={sending}
