@@ -42,7 +42,10 @@ pub fn options(user: &str, password: &str, at: &super::door_services::At<'_>) ->
     // Quoted, its quotes and backslashes escaped, as MySQL's option files read a value back.
     let q = |v: &str| format!("\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\""));
     let server = match at {
-        super::door_services::At::Socket(p) => format!("socket={}\nprotocol=SOCKET\n", q(&p.display().to_string())),
+        // The client sees a trusted Unix socket, but MySQL sees the SSH forward's TCP connection.
+        super::door_services::At::Socket(p) => {
+            format!("socket={}\nprotocol=SOCKET\nssl-mode=REQUIRED\n", q(&p.display().to_string()))
+        }
         super::door_services::At::Tcp(host, port) => format!("host={}\nport={port}\nprotocol=TCP\n", q(host)),
     };
     format!("[client]\nuser={}\npassword={}\n{server}", q(user), q(password))
@@ -236,4 +239,14 @@ pub fn kill_session(options: &Path, id: u64, env: &std::collections::BTreeMap<St
         Ok(c) => String::from_utf8_lossy(&c.stderr).contains("ERROR 1094"),
         Err(_) => false,
     }
+}
+
+#[test]
+fn tls_is_required_only_for_ssh_forwarded_sockets() {
+    use super::door_services::At;
+
+    let forwarded = options("reader", "", &At::Socket(Path::new("forward.sock")));
+    let direct = options("reader", "", &At::Tcp("127.0.0.1", 3306));
+    assert!(forwarded.lines().any(|line| line == "ssl-mode=REQUIRED"));
+    assert!(!direct.lines().any(|line| line.starts_with("ssl-mode=")));
 }
