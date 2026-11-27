@@ -14,8 +14,8 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    Give researcher seats the other questions the plan depends on: the code and data's facts, what to reuse and the house style, outside documentation, best practices, and whether several paths do the same business thing.
    How many and which questions are yours, with no fixed roster, and you may skip scouting when the card names the place already.
    The `delegating` skill has how to spawn and task them.
-   Challenge the card with your knowledge and the evidence the scouts bring back.
-   Propose whatever you would change, from what you know as freely as from what the scouts looked up.
+   Treat the proposed solution as draft zero. Identify the underlying problem and use your judgment and the scouts' evidence to question the premise.
+   Could a simpler design remove the need for the proposed mechanism? Could other callers use the same solution? Consider a moonshot when it offers a concrete advantage.
    A proposal needs no cited source: the operator filters the weak ones.
    Establish what the evidence establishes; never ask the operator for it.
    Judge code questions by these three tests: 1. Modules built so that others sit on top of them: reusable, scalable.
@@ -39,7 +39,7 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    - **Self-sustained (the second level):** the engine gives each `answer` ask to the project's orchestrator automatically, and the orchestrator answers all of them, departures and reversals included.
    **Draft the questions privately and settle genuine forks one at a time.**
    If consolidating paths that do the same business thing raises a fork, settle it first.
-   Then whole-approach changes (a different mechanism, a simpler design, a reason not to build it), details after: an early detail settled is wasted if the approach under it changes.
+   Settle the overall approach, including any good reason to build nothing, before asking about details that depend on it.
    **Open the card once, with where it lands.**
    One line names it.
    When the project has a preview skill of its own among your skills, follow it for the page's address and screenshot, saved in your seat's `io/` (`MORK_IO`).
@@ -54,10 +54,10 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    A shape proposal uses the sketch's line forms (step 5) and names tables and modules by their names in the code; every other ask stays in his terms.
    Deciding from the evidence instead of asking, one decision per ask, and the ask's form and measure all stay.
    **Challenge a proposal when there is a real tradeoff.**
-   Explain the strongest defensible alternative and its concrete consequences, drawing on industry practice where applicable.
-   When you would choose it, put both in your hand's `options`, with your `pick` and `reason`.
+   Put the proposed approach and its strongest genuine alternative in your hand's `options`.
+   Say what each buys and costs, drawing on industry practice where it applies. Recommend one with your `pick` and `reason`.
    Record what the answer settles.
-   If you prefer his proposal, give the reason in one line before the next question or at the start of the recap.
+   If the card's proposal clearly wins, proceed with it and give the reason in one line before the next question or at the start of the recap.
    A question of his is a probe, answered and never pushed back on, and his 1, 2, yes or no to an ask answers it and is no new proposal.
    **Ask one decision at a time,** in your own room, in your flagged hand message, and end `working`.
    Every ask, delegated or not, follows the Mork manual's form and measure ("Messages").
