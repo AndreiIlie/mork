@@ -148,7 +148,7 @@ impl Render<'_> {
             let ty = self.field_type(f)?;
             let skip = f.attrs.skip_serializing_if();
             if f.attrs.flatten() {
-                if skip.is_some() {
+                if skip.is_some() || ty.ends_with(" | null") {
                     return Err(syn::Error::new_spanned(f.original, "unsupported optional flattened field"));
                 }
                 parts.push(ty);

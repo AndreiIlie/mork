@@ -18,43 +18,53 @@ pub(super) struct Source {
 
 impl Source {
     pub fn read(root: &Path) -> Result<Self, String> {
-        let folder = root.join("crates/types/src");
         let mut source = Self::default();
-        for file in crate::walk::rust_files(&folder) {
-            let relative = crate::walk::rel(&folder, &file.with_extension(""));
-            let module = match relative.trim_end_matches("/mod") {
-                "lib" => "crate".to_owned(),
-                path => format!("crate::{}", path.replace('/', "::")),
-            };
-            let path = crate::walk::rel(root, &file);
-            let text = fs::read_to_string(&file).map_err(|e| format!("{path}: {e}"))?;
-            let parsed = syn::parse_file(&text).map_err(|e| format!("{path}:{}: {e}", e.span().start().line))?;
-            source.module(&path, &module, parsed.items);
-        }
+        let dir = Path::new("crates/types/src");
+        source.read_file(root, &dir.join("lib.rs"), dir, "crate")?;
         Ok(source)
     }
 
-    fn module(&mut self, file: &str, module: &str, items: Vec<Item>) {
+    fn read_file(&mut self, root: &Path, file: &Path, dir: &Path, module: &str) -> Result<(), String> {
+        let path = file.display();
+        let text = fs::read_to_string(root.join(file)).map_err(|e| format!("{path}: {e}"))?;
+        let parsed = syn::parse_file(&text).map_err(|e| format!("{path}:{}: {e}", e.span().start().line))?;
+        self.module(root, file, dir, module, parsed.items)
+    }
+
+    fn module(&mut self, root: &Path, file: &Path, dir: &Path, module: &str, items: Vec<Item>) -> Result<(), String> {
         self.imports.insert(module.to_owned(), crate::rust::aliases_of(items.iter()));
         for item in items {
             let input: DeriveInput = match item {
                 Item::Struct(s) => s.into(),
                 Item::Enum(e) => e.into(),
                 Item::Mod(m) => {
-                    if !crate::rust::is_test(&m.attrs)
-                        && let Some((_, items)) = m.content
-                    {
-                        self.module(file, &format!("{module}::{}", m.ident), items);
-                    }
+                    self.child(root, file, dir, module, m)?;
                     continue;
                 }
                 _ => continue,
             };
             self.definitions.insert(
                 format!("{module}::{}", input.ident),
-                Definition { file: file.to_owned(), module: module.to_owned(), input },
+                Definition { file: file.display().to_string(), module: module.to_owned(), input },
             );
         }
+        Ok(())
+    }
+
+    fn child(&mut self, root: &Path, file: &Path, dir: &Path, module: &str, m: syn::ItemMod) -> Result<(), String> {
+        // References into an unmapped module fail at the wire field that needs it.
+        if m.attrs.iter().any(|a| ["path", "cfg", "cfg_attr"].iter().any(|k| a.path().is_ident(k))) {
+            return Ok(());
+        }
+        let name = format!("{module}::{}", m.ident);
+        let child = dir.join(m.ident.to_string());
+        if let Some((_, items)) = m.content {
+            return self.module(root, file, &child, &name, items);
+        }
+        let sibling = child.with_extension("rs");
+        let nested = child.join("mod.rs");
+        let path = if root.join(&sibling).is_file() { sibling } else { nested };
+        self.read_file(root, &path, &child, &name)
     }
 
     // Imported names can pass through several re-exports, including the crate root's ID types.
