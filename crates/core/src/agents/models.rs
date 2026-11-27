@@ -402,7 +402,7 @@ fn model_of(
 }
 
 fn retired(want: &str) -> String {
-    format!("`{want}` is the operator's own pick alone: Fable and Astra take no spawn, start or other pick")
+    format!("only the operator's own pick can explicitly select `{want}`")
 }
 
 // Why a model named, by id or its label's first word, isn't offered: a wall bars it, or it is the operator's alone (fac-615).
@@ -447,7 +447,7 @@ pub fn selection(
     }
     if by != By::Operator && !Effort::OFFERED.contains(&effort) {
         let e = effort.as_str();
-        return Err(format!("`{e}` is the operator's own pick alone: name an effort, {OFFERED_EFFORTS}"));
+        return Err(format!("only the operator's own pick can explicitly select `{e}`. Choose {OFFERED_EFFORTS}"));
     }
     if !allowed(config, a, at, m.cli, &m.model, effort, by) {
         let efforts = permissions(config, a, at)

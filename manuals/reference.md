@@ -726,7 +726,8 @@ label = "Sol"
 efforts = ["high", "xhigh"]
 ```
 
-An entry naming Fable or Astra permits nothing, nor does a `max` effort in one: those are offered to the operator's own picks alone, and refused at spawn, start and every other pick.
+Researcher and reviewer pick lists grant a foreman no permission to select Fable, Astra or `max`.
+For auto pass foremen and researchers, the engine can select Fable, Astra and supported `max` efforts explicitly listed in `[[picks.pass]]`.
 
 Each additional model has its own entry.
 A plain `[[picks.reviewer]]` is rejected as a config error naming its line, with no compatibility reading.
@@ -973,7 +974,9 @@ Picks an agent's model and effort for its next turn.
 The operator's own pick, in his window or with his own `mork ctl pick`, offers every configured seat, phase and allowlist model, including both reviewer lists, the roster's and catalog's models including Sonnet 5.5, Opus 5.5, GPT-6.2 Sol, Gemini 4 Neon (`gemini-4-neon`) and Opus 5.5 on agy (`claude-opus-5-5`, label `opus 5.5`), plus Luna (`gpt-6-luna`, label `luna`), Fable 5.2 (`claude-fable-5-2`, label `fable 5.2`) and Astra (`gpt-6.2-astra`, label `astra`).
 Its efforts are `low`, `medium`, `high`, `xhigh` and `max`.
 Gemini 4 Neon offers `low`, `medium`, `high` and `xhigh`; Opus 5.5 on agy offers `low`, `medium` and `high`.
-Fable, Astra and `max` are offered to the operator's own pick alone, and refused at every other pick and at every spawn and start, the operator's own start included.
+Only the operator's own `pick` command or window picker can explicitly select Fable, Astra or `max`.
+The `spawn` and `start` commands refuse these explicit selections for every sender.
+An auto pass can launch its foreman and researchers on these choices through `[[picks.pass]]`.
 A permitted `mork.toml` row or launched session naming one still runs, and a configured Fable or Astra row shows its label.
 His choices are unrestricted by the foreman allowlists.
 The wall constraint applies to every sender, the operator included: an unwalled Claude seat offers Claude models only, because its deny list exists only in Claude Code.

@@ -125,8 +125,8 @@ impl Effort {
     /// Every supported level, lowest first.
     pub const ALL: [Self; 5] = [Self::Low, Self::Medium, Self::High, Self::Xhigh, Self::Max];
 
-    /// The levels any chooser but the operator's own pick may choose (fac-558, fac-615): a configured or launched `max`
-    /// still runs.
+    /// The levels available for explicit selections outside the operator's own pick.
+    /// Configured seats and auto pass pairs may use a supported `max` effort.
     pub const OFFERED: [Self; 4] = [Self::Low, Self::Medium, Self::High, Self::Xhigh];
 
     /// A level by its word.
@@ -246,8 +246,8 @@ pub fn agy_bucket(model: &str) -> &'static str {
     if model.starts_with("gemini-") { "account" } else { AGY_3P_BUCKET }
 }
 
-/// Whether a model is one only the operator's own pick may newly choose (fac-558, fac-615): a configured row or a launched
-/// session naming Fable or Astra still runs.
+/// Whether only the operator's own pick may explicitly select this model.
+/// Configured seats, auto pass pairs and launched sessions can use Fable or Astra.
 pub fn barred(model: &str) -> bool {
     let m = model.to_ascii_lowercase();
     m.contains("fable") || m.contains("astra")
