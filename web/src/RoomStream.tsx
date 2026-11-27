@@ -149,7 +149,7 @@ function FoldedRow({
     </>
   );
   return (
-    <div className="py-2">
+    <div data-unfold-row className="py-2">
       <div className="flex items-center gap-3">
         {expandable ? (
           <button

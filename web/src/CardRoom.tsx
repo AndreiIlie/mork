@@ -191,7 +191,7 @@ export function CardRoom({
           <p className="mt-2 text-copy-14 text-gray-900">This card has no room in Mork.</p>
           <div className="mt-6">
             <Button tier="secondary" onClick={() => navigate("/")}>
-              Back to Board
+              Back to Mork Console
             </Button>
           </div>
         </div>

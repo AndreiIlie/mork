@@ -9,18 +9,14 @@ import { Segmented } from "./ui/Segmented";
 const INPUT = "w-full border border-gray-400 bg-background-100 px-3 text-label-13 text-gray-1000 placeholder:text-gray-700";
 const FIELD = "text-label-12 text-gray-700";
 
-export function NewCard({ projects, project, live, onDone }: { projects: string[]; project: string; live: boolean; onDone: () => void }) {
+export function NewCard({ project, live, onDone }: { project: string; live: boolean; onDone: () => void }) {
   const { press, pending, refusals } = useHandOffers();
-  const [where, setWhere] = useState(project);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   return (
     <section className="mb-gutter border border-gray-400">
       <div className="flex items-center gap-3 border-b border-gray-400 px-edge py-3">
         <h2 className="text-heading-14 text-gray-1000">New card</h2>
-        <span className="ml-auto">
-          <Segmented options={projects} value={where} onChange={setWhere} />
-        </span>
       </div>
       <div className="flex flex-col gap-3 px-edge py-4">
         <label className="flex flex-col gap-1.5">
@@ -37,13 +33,13 @@ export function NewCard({ projects, project, live, onDone }: { projects: string[
           />
         </label>
         <div className="flex items-center gap-2">
-          <Button tier="primary" disabled={!live || !projects.includes(where) || !title.trim() || !!pending.create} onClick={() => press("create", { label: "Create", command: { "card.create": { project: where, title, description } } }, onDone)}>
-            Create in {where}
+          <Button tier="primary" disabled={!live || !title.trim() || !!pending.create} onClick={() => press("create", { label: "Create", command: { "card.create": { project, title, description } } }, onDone)}>
+            Create in {project}
           </Button>
           <Button tier="ghost" disabled={!!pending.create} onClick={onDone}>
             Cancel
           </Button>
-          <span className="ml-auto text-label-12 text-gray-700">The card lands in {where}&apos;s backlog, not started.</span>
+          <span className="ml-auto text-label-12 text-gray-700">The card lands in {project}&apos;s backlog, not started.</span>
         </div>
         <RefusalLine refusal={refusals.create ?? null} className="" />
       </div>

@@ -9,7 +9,7 @@ import { SectionHead } from "./ui/Section";
 
 const ID = "min-w-[76px] max-w-[220px] shrink-0 truncate font-mono text-label-13 font-medium text-gray-1000";
 
-/** The Board's attention list: the open hands waiting on the operator, in the engine's order, with their offers. */
+/** The Console's attention list: the open hands waiting on the operator, in the engine's order, with their offers. */
 export function RaisedHands({ hands, nowMs, live }: { hands: HandView[]; nowMs: number; live: boolean }) {
   const { pending, refusals, press } = useHandOffers();
   const expiring = hands.filter((h) => coldMinutes(h.cold_at_ms, nowMs) !== null).length;

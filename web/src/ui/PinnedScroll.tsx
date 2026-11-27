@@ -1,4 +1,4 @@
-import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from "react";
+import { type MouseEvent, type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDownIcon } from "../icons";
 import { Button } from "./Button";
 
@@ -6,6 +6,20 @@ const BOTTOM_SLACK_PX = 24;
 
 function atBottom(el: HTMLElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_SLACK_PX;
+}
+
+function revealRow(box: HTMLElement, row: Element, jumpButton: HTMLElement) {
+  const pane = box.getBoundingClientRect();
+  const bounds = row.getBoundingClientRect();
+  const button = jumpButton.getBoundingClientRect();
+  let shift = Math.max(0, bounds.bottom - pane.bottom);
+  const untilPinned = box.scrollHeight - box.clientHeight - box.scrollTop - BOTTOM_SLACK_PX;
+  const overlapsButton = bounds.left < button.right && bounds.right > button.left
+    && bounds.top - shift < button.bottom && bounds.bottom - shift > button.top;
+  // Moving into the pinned range hides the button, which can take less scrolling than clearing it.
+  if (shift < untilPinned && overlapsButton) shift = Math.min(bounds.bottom - button.top, Math.ceil(untilPinned));
+  // A row taller than the available space should start at its heading.
+  box.scrollTop += Math.min(shift, bounds.top - pane.top);
 }
 
 export interface PinnedScrollProps {
@@ -21,6 +35,7 @@ export function PinnedScroll({ children, scrollRef, keepRef }: PinnedScrollProps
   const ownRef = useRef<HTMLDivElement | null>(null);
   const boxRef = scrollRef ?? ownRef;
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const jumpButtonRef = useRef<HTMLSpanElement | null>(null);
   const pinnedRef = useRef(true);
   const lastTopRef = useRef(0);
   const clickedRef = useRef(false);
@@ -40,7 +55,7 @@ export function PinnedScroll({ children, scrollRef, keepRef }: PinnedScrollProps
       if (box.clientHeight === 0) return;
       const keep = clickedRef.current || keepRef?.current === true;
       if (keepRef !== undefined) keepRef.current = false;
-      // The reader's own unfold or a restored place stays put, and an unpinned pane pins again once at its bottom.
+      // A click or history restoration chose the reader's position before this resize.
       if (keep || !pinnedRef.current) setPinned(atBottom(box));
       else box.scrollTop = box.scrollHeight;
       lastTopRef.current = box.scrollTop;
@@ -61,9 +76,19 @@ export function PinnedScroll({ children, scrollRef, keepRef }: PinnedScrollProps
   };
 
   // Held for two frames so the observer, which runs after the next frame's layout, sees the click.
-  const onClickCapture = () => {
+  const onClickCapture = (event: MouseEvent<HTMLDivElement>) => {
+    const box = event.currentTarget;
+    const toggle = event.target instanceof Element ? event.target.closest('button[aria-expanded="false"]') : null;
     clickedRef.current = true;
-    requestAnimationFrame(() => requestAnimationFrame(() => (clickedRef.current = false)));
+    requestAnimationFrame(() => {
+      const row = toggle?.closest("[data-unfold-row]");
+      if (row && box.contains(row) && toggle?.getAttribute("aria-expanded") === "true" && jumpButtonRef.current) {
+        revealRow(box, row, jumpButtonRef.current);
+        lastTopRef.current = box.scrollTop;
+        setPinned(atBottom(box));
+      }
+      requestAnimationFrame(() => (clickedRef.current = false));
+    });
   };
 
   const toBottom = () => {
@@ -79,15 +104,13 @@ export function PinnedScroll({ children, scrollRef, keepRef }: PinnedScrollProps
       <div ref={boxRef} onScroll={onScroll} onClickCapture={onClickCapture} className="min-h-0 flex-1 overflow-y-auto">
         <div ref={contentRef}>{children}</div>
       </div>
-      {away && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
-          <span className="pointer-events-auto">
-            <Button tier="secondary" size="sm" square aria-label="Scroll to bottom" title="Scroll to bottom" onClick={toBottom}>
-              <ArrowDownIcon />
-            </Button>
-          </span>
-        </div>
-      )}
+      <div className={`pointer-events-none absolute inset-x-0 bottom-3 flex justify-center ${away ? "" : "invisible"}`}>
+        <span ref={jumpButtonRef} className="pointer-events-auto flex">
+          <Button tier="secondary" size="sm" square aria-label="Scroll to bottom" title="Scroll to bottom" onClick={toBottom}>
+            <ArrowDownIcon />
+          </Button>
+        </span>
+      </div>
     </div>
   );
 }

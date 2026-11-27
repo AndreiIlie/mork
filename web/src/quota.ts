@@ -30,7 +30,7 @@ export function elapsedPercent(w: Share, nowMs: number): number | null {
   return left > 0 && left < length ? ((length - left) / length) * 100 : null;
 }
 
-/** Shared pace, tone, tick, and reset reading for a quota window, used by Sidebar and Usage. */
+/** Shared pace, tone, tick, and reset reading for a quota window. */
 export function quotaReading(w: Share, nowMs: number, signedOut = w.signed_out === true): QuotaReading {
   const stale = w.stale || (w.reset_ms != null && w.reset_ms <= nowMs);
   const reached = w.reached && !stale;
@@ -46,7 +46,7 @@ export function quotaReading(w: Share, nowMs: number, signedOut = w.signed_out =
   return { stale, reached, percent, ends, hot, words, barPercent, tone, tick, resetLeft };
 }
 
-const WINDOW_WORDS: Record<string, string> = { "5h": "5h", week: "wk" };
+const WINDOW_WORDS: Record<string, string> = { "5h": "5h", week: "wk", fable: "fable" };
 
 function poolLabel(cli: string): string {
   const words = cli.split(" ");
@@ -54,14 +54,23 @@ function poolLabel(cli: string): string {
   return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
 }
 
-// The hottest window: an over-pace one first, then the highest percent used.
-export function hottest(shares: Share[], nowMs: number): { label: string; words: string; hot: boolean } | null {
-  const rows = shares
+function runsOutIn(w: Share, ends: number | null, nowMs: number): number | null {
+  const length = WINDOW_MS[w.window];
+  if (ends === null || ends <= 100 || length === undefined || w.reset_ms == null) return null;
+  return w.reset_ms - length * (1 - 100 / ends) - nowMs;
+}
+
+/** Ranks up to three current windows by confirmed exhaustion, forecast exhaustion time, then projected usage. */
+export function closestQuotas(shares: Share[], nowMs: number) {
+  return shares
     .filter((w) => w.signed_out !== true && WINDOW_WORDS[w.window] !== undefined)
     .map((w) => ({ w, q: quotaReading(w, nowMs, false) }))
-    .filter(({ q }) => q.words !== "?");
-  if (rows.length === 0) return null;
-  rows.sort((a, b) => Number(b.q.hot) - Number(a.q.hot) || (b.q.barPercent) - (a.q.barPercent));
-  const { w, q } = rows[0];
-  return { label: `${poolLabel(w.cli)} ${WINDOW_WORDS[w.window]}`, words: q.words, hot: q.hot };
+    .filter(({ q }) => !q.stale && q.words !== "?")
+    .map((row) => ({ ...row, out: runsOutIn(row.w, row.q.ends, nowMs) }))
+    .sort((a, b) =>
+      Number(b.q.reached) - Number(a.q.reached) ||
+      (a.out ?? Infinity) - (b.out ?? Infinity) ||
+      (b.q.ends ?? b.q.barPercent) - (a.q.ends ?? a.q.barPercent))
+    .slice(0, 3)
+    .map(({ w, q }) => ({ label: `${poolLabel(w.cli)} ${WINDOW_WORDS[w.window]}`, reading: q }));
 }

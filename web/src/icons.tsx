@@ -26,36 +26,12 @@ export function HandIcon({ className = "" }: { className?: string }) {
   );
 }
 
-export function BoardIcon({ className = "" }: { className?: string }) {
+export function SettingsIcon() {
   return (
-    <svg
-      viewBox="0 0 20 20"
-      className={`h-4 w-4 shrink-0 ${className}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <rect x="2.75" y="3.25" width="5.5" height="13.5" />
-      <rect x="11.75" y="3.25" width="5.5" height="8.5" />
-    </svg>
-  );
-}
-
-export function GitMergeIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className={`h-3.5 w-3.5 shrink-0 ${className}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <circle cx="4.5" cy="3.5" r="1.75" />
-      <circle cx="4.5" cy="12.5" r="1.75" />
-      <circle cx="11.5" cy="6.5" r="1.75" />
-      <path d="M4.5 5.25v5.5M4.5 5.25c0 2.5 2 3.5 5.25 1.75" strokeLinecap="round" />
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <path d="M2 4.5h6M12 4.5h2M2 11.5h2M8 11.5h6" strokeLinecap="square" />
+      <rect x="8.75" y="2.75" width="3.5" height="3.5" />
+      <rect x="4.75" y="9.75" width="3.5" height="3.5" />
     </svg>
   );
 }

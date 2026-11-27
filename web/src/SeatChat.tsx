@@ -3,7 +3,7 @@ import { RoomStream, type ChatAsks } from "./RoomStream";
 import { SeatModelPanel, useSeatModel } from "./SeatModel";
 import { CommandHelp } from "./CommandHelp";
 import { usePlaceComposer } from "./chatDraft";
-import { cardPath, navigate } from "./route";
+import { cardPath, navigate, SETTINGS_PATH } from "./route";
 import { coldMinutes } from "./format";
 import { ContextRing } from "./ContextRing";
 import { Cold } from "./icons";
@@ -71,7 +71,7 @@ export function SeatChat({
     if (action.action === "help") setHelp({ place, commands: action.commands });
     else {
       setHelp(null);
-      navigate(action.action === "usage" ? "/usage" : cardPath(action.card));
+      navigate(action.action === "usage" ? SETTINGS_PATH.usage : cardPath(action.card));
     }
   };
   const { draft, setText, remove, paste, submit } = usePlaceComposer(place, view, live, show);

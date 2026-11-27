@@ -143,7 +143,7 @@ export function TriagePanel({
     <div>
       <ul className="divide-y divide-gray-400">
         {triage.findings.map((f) => (
-          <li key={f.n} className="py-2 pl-4 pr-2">
+          <li key={f.n} data-unfold-row className="py-2 pl-4 pr-2">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <button
                 type="button"

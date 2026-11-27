@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useHandOffers, RefusalLine } from "./offers";
+import { projectPath } from "./route";
 import type { CardHeader, Color, Command } from "./types";
 import { Button } from "./ui/Button";
 import { Dot } from "./ui/Dot";
@@ -48,9 +49,9 @@ export function CardControls({ card, status, live }: { card: CardHeader; status:
     <>
       <header className="shrink-0 border-b border-gray-400 px-gutter py-4">
         <div className="flex min-h-7 flex-wrap items-center gap-2 text-label-13 text-gray-900">
-          <TextLink to="/">Board</TextLink>
+          <TextLink to="/">Mork</TextLink>
           <span>/</span>
-          <span>{card.about.project}</span>
+          <TextLink to={projectPath(card.about.project)}>{card.about.project}</TextLink>
           <span>/</span>
           <span className="font-mono text-gray-1000">{card.id}</span>
           <span className="ml-3 flex items-center gap-2 font-mono text-label-12 text-gray-1000">

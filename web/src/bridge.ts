@@ -261,7 +261,7 @@ export function requestCommand(command: unknown): Promise<unknown> {
   return liveDial.send({ cmd: command });
 }
 
-export async function submitComposer(composer: ComposerDraft): Promise<ComposerAction | undefined> {
+export async function submitComposer(composer: ComposerDraft): Promise<{ action?: ComposerAction; answer: unknown }> {
   if (liveDial === null) throw new Error("not connected");
   const answer = await liveDial.send({ composer }) as { composer?: ComposerAction } & Partial<HistoryAnswer>;
   const page = answer?.history;
@@ -273,7 +273,7 @@ export async function submitComposer(composer: ComposerDraft): Promise<ComposerA
       return { views: { ...state.views, [page.place]: merged } };
     });
   }
-  return answer?.composer;
+  return { action: answer?.composer, answer };
 }
 
 // A size-limited view can omit its entire tail. Read the newest page when it supplies no cursor.

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { readHistory, watchMain } from "./bridge";
 import { clockTime } from "./format";
-import { ChevronIcon } from "./icons";
+import { List } from "./ui/List";
+import { SectionHead } from "./ui/Section";
 import { useRetainedStream } from "./streamHistory";
 import type { MessageView, PlaceView } from "./types";
 
@@ -40,7 +41,7 @@ function History({ view, live, tzOffsetMin }: HistoryProps) {
       }).catch((e: unknown) => {
         if (active) setError(e instanceof Error ? e.message : String(e));
       });
-    }, { root: target.parentElement });
+    });
     observer.observe(target);
     return () => {
       active = false;
@@ -49,14 +50,14 @@ function History({ view, live, tzOffsetMin }: HistoryProps) {
   }, [error, firstSeq, hasEarlier, live, prepend]);
 
   return (
-    <div className="max-h-[min(28rem,65vh)] overflow-y-auto">
+    <>
       <ol className="divide-y divide-gray-400">
         {entries.map((m) => (
-          <li key={m.seq} className="px-edge py-3">
-            <time dateTime={new Date(m.time_ms).toISOString()} className="mb-1 block font-mono text-label-12 tabular-nums text-gray-700">
+          <li key={m.seq} className="flex items-center gap-3 px-edge py-3">
+            <time dateTime={new Date(m.time_ms).toISOString()} className="w-[112px] shrink-0 font-mono text-label-12 tabular-nums text-gray-700">
               {DATE.format(m.time_ms + tzOffsetMin * 60_000)}, {clockTime(m.time_ms, tzOffsetMin)}
             </time>
-            <div className="whitespace-pre-wrap wrap-anywhere text-copy-14">{m.text}{m.cut && "…"}</div>
+            <div className="min-w-0 flex-1 whitespace-pre-wrap wrap-anywhere text-copy-14">{m.text}{m.cut && "…"}</div>
           </li>
         ))}
       </ol>
@@ -69,60 +70,24 @@ function History({ view, live, tzOffsetMin }: HistoryProps) {
         </div>
       )}
       {error !== null && <p role="alert" className="px-edge py-2 text-copy-13 text-red-900">{error}</p>}
-    </div>
+    </>
   );
 }
 
-interface ChangelogProps {
-  build: string;
-  view: PlaceView | undefined;
-  live: boolean;
-  tzOffsetMin: number;
-}
-
-export function ReloadChangelog({ build, view, live, tzOffsetMin }: ChangelogProps) {
-  const [open, setOpen] = useState(false);
+export function ReloadChangelog({ view, live, tzOffsetMin }: Omit<HistoryProps, "view"> & { view?: PlaceView }) {
   useEffect(() => {
-    if (!open) return;
     watchMain(true);
     return () => watchMain(false);
-  }, [open]);
+  }, []);
 
   return (
-    <>
-      <button
-        type="button"
-        popoverTarget="reload-history"
-        title="Reload changelog"
-        aria-label={`Reload changelog for build ${build.slice(0, 8)}`}
-        aria-expanded={open}
-        className="ml-auto flex h-control cursor-pointer items-center gap-1 font-mono text-label-12 text-gray-900 hover:text-gray-1000"
-      >
-        {build.slice(0, 8)}
-        <ChevronIcon open={open} />
-      </button>
-      <section
-        id="reload-history"
-        popover="auto"
-        aria-labelledby="history-title"
-        onToggle={(e) => setOpen(e.currentTarget.matches(":popover-open"))}
-        className="fixed inset-auto top-12 left-edge m-0 w-[min(520px,calc(100vw-32px))] border border-gray-400 bg-background-100 text-gray-1000"
-      >
-        <div className="flex items-center justify-between border-b border-gray-400 px-edge py-2">
-          <h2 id="history-title" className="text-heading-14">Reload changelog</h2>
-          <button
-            type="button"
-            popoverTarget="reload-history"
-            popoverTargetAction="hide"
-            className="h-control cursor-pointer px-2 text-label-12 text-gray-900 hover:bg-gray-100 hover:text-gray-1000"
-          >
-            Close
-          </button>
-        </div>
-        {open && (view ? <History view={view} live={live} tzOffsetMin={tzOffsetMin} /> : (
+    <section className="mt-gutter">
+      <SectionHead title="Reload changelog" />
+      <List>
+        {view ? <History view={view} live={live} tzOffsetMin={tzOffsetMin} /> : (
           <p role="status" className="px-edge py-3 text-label-13 text-gray-700">{live ? "Loading updates…" : "Waiting for connection…"}</p>
-        ))}
-      </section>
-    </>
+        )}
+      </List>
+    </section>
   );
 }
