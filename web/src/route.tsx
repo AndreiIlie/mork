@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from "react";
 
-export type SettingsTab = "general" | "usage" | "updates";
+export type SettingsTab = "general" | "usage" | "quality" | "updates";
 export type Route =
   | { page: "console" }
   | { page: "project"; project: string }
@@ -11,6 +11,7 @@ export function parseRoute(pathname: string, search = ""): Route {
   const path = pathname.replace(/\/$/, "");
   if (path === "/usage" || path === SETTINGS_PATH.usage) return { page: "settings", tab: "usage" };
   if (path === SETTINGS_PATH.general) return { page: "settings", tab: "general" };
+  if (path === SETTINGS_PATH.quality) return { page: "settings", tab: "quality" };
   if (path === SETTINGS_PATH.updates) return { page: "settings", tab: "updates" };
   const match = /^\/(cards|projects)\/([^/]+)\/?$/.exec(pathname);
   if (!match) return { page: "console" };
@@ -32,6 +33,7 @@ export function projectPath(project: string): string {
 export const SETTINGS_PATH: Record<SettingsTab, string> = {
   general: "/settings",
   usage: "/settings/usage",
+  quality: "/settings/quality",
   updates: "/settings/updates",
 };
 

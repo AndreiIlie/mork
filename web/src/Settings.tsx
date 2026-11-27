@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect } from "react";
 import { ReloadChangelog } from "./ReloadChangelog";
 import { Usage } from "./Usage";
+import { Quality } from "./Quality";
 import type { AlertPermission } from "./alerts";
 import { RefusalLine, useHandOffers } from "./offers";
 import { SETTINGS_PATH, type SettingsTab, navigate } from "./route";
@@ -10,8 +11,8 @@ import { List, Row } from "./ui/List";
 import { PageHeader, PageScroll } from "./ui/Page";
 import { Segmented } from "./ui/Segmented";
 
-const TABS = ["general", "usage", "updates"] as const;
-const TAB_LABEL: Record<SettingsTab, string> = { general: "General", usage: "Usage", updates: "Updates" };
+const TABS = ["general", "usage", "quality", "updates"] as const;
+const TAB_LABEL: Record<SettingsTab, string> = { general: "General", usage: "Usage", quality: "Quality", updates: "Updates" };
 const ALERT_WORDS = { granted: "Enabled", denied: "Blocked in this browser's site settings", unsupported: "Unavailable in this browser" } as const;
 
 function Setting({ title, words, children }: { title: string; words: string; children: ReactNode }) {
@@ -110,6 +111,7 @@ export function Settings({ tab, returnPath, screen, burn, burnError, build, main
       <PageScroll key={tab}>
         {tab === "general" && <General alerts={alerts} resourcesOn={resourcesOn} setResourcesOn={setResourcesOn} />}
         {tab === "usage" && <Usage screen={screen} burnError={burnError} burn={burn} nowMs={nowMs} live={live} />}
+        {tab === "quality" && <Quality live={live} />}
         {tab === "updates" && <Updates screen={screen} build={build} view={mainView} live={live} />}
       </PageScroll>
     </main>
