@@ -161,7 +161,7 @@ fn directory(path: &Path) -> Result<File, String> {
     fs::create_dir_all(path).and_then(|()| File::open(path)).map_err(|e| at(path, e))
 }
 
-fn lock(file: &File) -> Result<(), String> {
+pub(crate) fn lock(file: &File) -> Result<(), String> {
     if mork_sys::try_lock_exclusive(file).map_err(|e| e.to_string())? {
         Ok(())
     } else {

@@ -23,6 +23,9 @@ pub fn buzzed(from: &Sender, cmd: &Command, e: ErrorBody) -> crate::decide::Deci
 
 /// Whether a command is buzzed, and why; run on every command before its handler.
 pub fn buzz(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Option<ErrorBody> {
+    if matches!(cmd, Command::Config {} | Command::ConfigChange { .. }) && *from != Sender::Operator {
+        return Some(ErrorBody::new(ErrorCode::Buzz, "Settings commands are the operator’s alone."));
+    }
     if let Some(e) = door_buzz(state, from, cmd) {
         return Some(e);
     }

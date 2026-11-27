@@ -9,12 +9,14 @@ use render::Render;
 use source::Source;
 
 const OUTPUT: &str = "web/src/types.ts";
-const ROOTS: [&str; 7] = [
+const ROOTS: [&str; 9] = [
     "crate::protocol::Request",
     "crate::protocol::Frame",
     "crate::chat::HistoryAnswer",
     "crate::usage::UsageAnswer",
     "crate::quality::QualityAnswer",
+    "crate::config::view::ConfigView",
+    "crate::config::view::ConfigChange",
     "crate::protocol::ComposerRequest",
     "crate::protocol::ComposerAction",
 ];

@@ -12,6 +12,7 @@ pub mod clipboard;
 pub mod clock;
 pub mod config;
 mod config_checks;
+mod config_edit;
 pub mod doctor;
 pub mod door;
 mod encoding;

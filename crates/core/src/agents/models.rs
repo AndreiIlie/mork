@@ -162,10 +162,8 @@ fn offers(config: &Config, a: &Agent, at: Standing, by: By) -> Vec<ModelChoice> 
 
 // A chooser held to its picks chooses high or xhigh alone, whatever they list (fac-558); the operator's own pick takes every
 // effort, max included (fac-615), and defaults and launched sessions run as configured.
-const PICKED_EFFORTS: [Effort; 2] = [Effort::High, Effort::Xhigh];
-
 fn efforts_of(a: &Agent, by: By) -> &'static [Effort] {
-    let others = if restricted(a, by) { &PICKED_EFFORTS[..] } else { &Effort::OFFERED };
+    let others = if restricted(a, by) { &Effort::PICKED[..] } else { &Effort::OFFERED };
     if by == By::Operator { &Effort::ALL } else { others }
 }
 

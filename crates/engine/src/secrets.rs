@@ -182,6 +182,10 @@ impl Secrets {
         t
     }
 
+    pub(crate) fn contains_value(&self, value: &Value) -> bool {
+        self.mask_value(value) != *value
+    }
+
     /// A JSON value with every string and key masked as written, before an encoding escapes a
     /// secret's quotes or backslashes past `mask`; a number that is a secret, masked as a string.
     pub fn mask_value(&self, v: &Value) -> Value {

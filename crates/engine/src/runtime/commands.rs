@@ -77,6 +77,9 @@ impl Engine {
     ) -> Option<Result<Value, ErrorBody>> {
         let cmd = match Command::parse(&req.cmd, self.faults()) {
             Ok(c) => c,
+            Err(_) if req.cmd.get("config.change").is_some() => {
+                return Some(err(ErrorCode::Invalid, "Invalid config.change fields."));
+            }
             Err(inv) => return Some(err(ErrorCode::Invalid, inv.message)),
         };
         let from = match sent_as(req.sent_as.as_deref(), sender, &self.ctx.config) {
@@ -97,29 +100,45 @@ impl Engine {
             return Some(Err(e));
         }
         let reload = matches!(cmd, Command::Reload { .. });
-        if matches!(self.phase, Phase::Reloading { .. }) && cmd.acts_outward() && !reload {
+        if matches!(self.phase, Phase::Reloading { .. })
+            && (cmd.acts_outward() || matches!(cmd, Command::Config {}))
+            && !reload
+        {
             return Some(err(ErrorCode::Reloading, "a reload is under way"));
         }
+        self.dispatch(conn, req.id, cmd, from, job)
+    }
+
+    fn dispatch(
+        &mut self,
+        conn: &Arc<Conn>,
+        id: u64,
+        cmd: Command,
+        from: Sender,
+        job: Option<JobId>,
+    ) -> Option<Result<Value, ErrorBody>> {
         Some(match cmd {
             Command::Watch { places, tail, full } => {
-                return self.watch(conn, req.id, places, tail, full.unwrap_or(false));
+                return self.watch(conn, id, places, tail, full.unwrap_or(false));
             }
             Command::Hook {} => match &from {
-                Sender::Orchestrator(project) => return self.hook(conn, req.id, &project.clone()),
+                Sender::Orchestrator(project) => return self.hook(conn, id, &project.clone()),
                 _ => err(ErrorCode::Refused, "`hook` is a project's orchestrator's"),
             },
             Command::Wakes {} => match &from {
-                Sender::Orchestrator(project) => return self.wait_wakes(conn, req.id, project),
+                Sender::Orchestrator(project) => return self.wait_wakes(conn, id, project),
                 _ => err(ErrorCode::Refused, "`wakes` is a project's orchestrator's"),
             },
             Command::History { place, before, count, turns } => Ok(self.history(&place, before, count, turns)),
-            Command::HistorySearch { words } => return self.history_search(conn, req.id, &from, words),
-            cmd @ Command::HistoryJournal { .. } => return self.history_journal(conn, req.id, &from, cmd),
+            Command::HistorySearch { words } => return self.history_search(conn, id, &from, words),
+            cmd @ Command::HistoryJournal { .. } => return self.history_journal(conn, id, &from, cmd),
             Command::Status { jobs, all, card } => Ok(self.status(jobs, all, card.as_deref(), conn.origin)),
-            Command::Quality {} => return self.quality(conn, req.id),
+            Command::Config {} => self.config_answer(),
+            Command::ConfigChange { change } => self.config_change(&change),
+            Command::Quality {} => return self.quality(conn, id),
             Command::Usage {} => Ok(self.usage()),
             Command::ClaudeAccount { name } => self.claude_account(&name),
-            Command::DebugSleep { ms } => return self.debug_sleep(conn, req.id, ms),
+            Command::DebugSleep { ms } => return self.debug_sleep(conn, id, ms),
             Command::Build { commit } => self.start_build(&commit, None),
             Command::Pin { commit } => self.pin_cmd(&commit, &from),
             Command::Reload { target } => self.reload_cmd(target.as_deref(), &from),
@@ -127,10 +146,10 @@ impl Engine {
                 self.board_request(cmd, from)
             }
             cmd @ (Command::TestLease { .. } | Command::TestResume { .. } | Command::TestDone { .. }) => {
-                return self.slot_request(conn, req.id, cmd, from);
+                return self.slot_request(conn, id, cmd, from);
             }
             Command::Door { target, op, params } => {
-                return self.door_request(conn, req.id, super::door::Asked { target, op, params, from, job });
+                return self.door_request(conn, id, super::door::Asked { target, op, params, from, job });
             }
             Command::DoorHelp { target } => self.door_help(target.as_deref()),
             Command::Preview { card, action } => self.preview_cmd(card, action, false, from),

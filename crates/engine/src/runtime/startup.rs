@@ -211,7 +211,7 @@ type Opened = (Engine, Receiver<Input>, Option<builds::ReloadNote>, Option<Strin
 
 // Split from `start` only to keep each within the 60-line limit (fac-145).
 fn open(opts: Options, t: &mut Timer, lock_file: File, sock_fds: Option<(RawFd, RawFd)>) -> Result<Opened, String> {
-    let mut config = config::read(&opts.config_path)?;
+    let (loaded_config, mut config) = config::read_text(&opts.config_path)?;
     t.step("config");
     make_dirs(&opts.home)?;
     git_identity(&opts.home, &config)?;
@@ -241,6 +241,7 @@ fn open(opts: Options, t: &mut Timer, lock_file: File, sock_fds: Option<(RawFd, 
     let (ctx, fallback) = context(&opts, config, choosing, skills);
     let wakes = super::wakes::Wakes::open(&opts.home);
     let engine = Engine {
+        loaded_config,
         reserved_ports,
         bound_web_port,
         opts,

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod bench;
 mod seats;
+pub mod view;
 
 pub use crate::job::SliceConfig;
 pub use crate::ports::Ports;
@@ -59,9 +60,9 @@ pub struct MorkConfig {
     pub project: Option<crate::ProjectId>,
     #[serde(default = "d_true")]
     pub notifications: bool,
-    #[serde(default = "d_max_test_runs")]
+    #[serde(default = "default_max_test_runs")]
     pub max_test_runs: u64,
-    #[serde(default = "d_ports")]
+    #[serde(default = "default_ports")]
     pub ports: Vec<u16>,
     #[serde(default)]
     pub domains: Vec<String>,
@@ -89,7 +90,7 @@ pub struct MorkConfig {
     /// Shared auto-compaction context cap in tokens for Claude and agy seats (fac-681); 0 disables the cap.
     #[serde(default = "d_context_cap")]
     pub context_cap: u64,
-    #[serde(default = "d_fresh_context_percent")]
+    #[serde(default = "default_fresh_context_percent")]
     pub fresh_context_percent: u8,
     /// Extra skills folder merged with the built-in skills at start (fac-721).
     #[serde(default)]
@@ -405,7 +406,7 @@ pub struct ProjectConfig {
     pub host_ports: Vec<Ports>,
     #[serde(default)]
     pub toolchains: Vec<Toolchain>,
-    #[serde(default = "d_slots")]
+    #[serde(default = "default_slots")]
     pub slots: u64,
     /// A folder of datasets, bound read-only at `/data` in its cards' walls when it exists (fac-173).
     pub data: Option<String>,
@@ -435,10 +436,10 @@ pub const PROJECT_REQUIRED: &[&str] = &["repo", "board", "test"];
 fn d_true() -> bool {
     true
 }
-fn d_max_test_runs() -> u64 {
+pub fn default_max_test_runs() -> u64 {
     3
 }
-fn d_ports() -> Vec<u16> {
+pub fn default_ports() -> Vec<u16> {
     vec![443, 80, 53]
 }
 fn d_port_range() -> String {
@@ -470,10 +471,10 @@ fn d_merged() -> String {
 fn d_base() -> String {
     "master".into()
 }
-fn d_slots() -> u64 {
+pub fn default_slots() -> u64 {
     2
 }
-fn d_fresh_context_percent() -> u8 {
+pub fn default_fresh_context_percent() -> u8 {
     70
 }
 
