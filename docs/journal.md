@@ -10,6 +10,12 @@ The job's `settled_ms` written by the decision uses it too
 ([agents/ends.rs: `settle`](../crates/core/src/agents/ends.rs)), as does a new
 approval's `at_ms` ([lifecycle/brief.rs: `approve`, `offer`](../crates/core/src/lifecycle/brief.rs)).
 
+## Project passes
+
+A pass’s `card.start` row carries its trigger and, for an engine start, the threshold met.
+A Dream foreman's `memory.write` and `memory.delete` rows carry the contents before and after the edit.
+Its `notes.deleted` row keeps the deleted lessons’ text keyed by note ID.
+
 ## Rows and order
 
 The journal is the `events` table. Its `seq` records insertion order; read it in

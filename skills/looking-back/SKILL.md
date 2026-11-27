@@ -74,4 +74,5 @@ Do not file smell or feedback notes during a look-back.
 Give a short report listing the proposal titles and any gaps, or say that the read found nothing.
 Mention weaker finds beyond the seven in one line of the report.
 End with `report-ready`.
-The operator's `done` then records the run.
+A scheduled or auto run ends at `report-ready`.
+The operator's `done` records a manually started run.

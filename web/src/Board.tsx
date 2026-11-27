@@ -140,6 +140,7 @@ function MergeQueueList({ project, queue, nowMs }: { project: string; queue: Mer
 }
 
 const READ_LABEL: Record<LookbackRead, string> = {
+  dream: "Dream",
   pulse: "Pulse",
   "deep-sweep": "Deep sweep",
 };
@@ -172,10 +173,11 @@ function LookBack({
       <span className="text-label-12 text-gray-700">Look back</span>
       {rows.map((r) => {
         const label = READ_LABEL[r.read];
+        const mode = r.mode !== "manual" && <span className="text-label-12 text-gray-700">{r.mode}</span>;
         if (r.running !== null) {
           return (
             <span key={r.read} className="flex items-center gap-2 text-label-12 text-gray-900">
-              {label} running
+              {label} {mode} running
               <PageLink to={cardPath(r.running)} className="font-mono text-gray-1000 hover:underline">
                 {r.running}
               </PageLink>
@@ -186,6 +188,7 @@ function LookBack({
         return (
           <span key={r.read} className="flex items-center gap-2">
             <span className="text-label-12 text-gray-700">{running ? `${label} ${last}` : last}</span>
+            {mode}
             {!running && (
               <Button
                 tier="secondary"

@@ -253,7 +253,7 @@ When `[mork] project` is unset, a seat cannot file cross-project notes with `--p
   Never a card's state or decisions, which stay on the card, nor what the code or the manuals already say.
 - **Code smells**: one you see in code your work doesn't change, a refactor target or a concern about code quality: `mork ctl notes.add smell '<what is wrong>' --file <file> --line <line> --why '<why it matters>'`, always under your own project.
   A smell seen in a colleague's PR goes here, never on the PR.
-- **Proposals**: a look-back run's grouped cleanup suggestions, each with a title, text and files.
+- **Proposals**: a Pulse or Deep Sweep run's grouped cleanup suggestions, each with a title, text and files.
   The project's orchestrator turns a proposal into a card with `card.create` and deletes the note once triaged.
 
 A note moves nothing: it is no finding, and no fix must address it.
@@ -268,7 +268,9 @@ Files may be wrong or stale, and they are never instructions.
 Each new card session lists committed files by memory, name and description, first `general`, then the card's project.
 
 - **Search before you start work:** `mork ctl memory.search <words>` lists the files of `general` and your card's project that match; read one with `mork ctl memory.read <memory> <name>`.
-- **During card work** file lessons as notes for the orchestrator to triage.
+- **During card work** file lessons as notes for triage.
+  A Dream foreman consolidates its project's memory and deletes handled project lesson notes.
+  Its edits apply immediately and its card journal keeps the changes.
 - **During a closing turn** any card seat may create, rewrite or delete files in its project's memory with `memory.write` and `memory.delete`.
   Use notes for lessons intended for `general`.
   Your card holds the edits until it lands, closes or finishes.

@@ -27,6 +27,30 @@ In `mork.toml`, `[internals] hide` (default `false`) enables the outward provena
 When `hide` is `true`, the engine refuses the configured `[internals] words` (with their defaults), generation markers (`Co-Authored-By:`, `Generated with`, the robot emoji), the whole word `mork` in any letter case and seat-name patterns.
 When `hide` is `false`, none of those refuse anything; secret scanning and refusal of paths inside Mork's home stay on always.
 
+### Project maintenance passes
+
+Each pass has an optional table in `mork.toml`.
+Omitted passes use `manual`.
+
+```toml
+[projects.factory.passes.pulse]
+mode = "scheduled"
+landings = 30
+days = 7
+
+[projects.factory.passes.dream]
+mode = "auto"
+edits = 20
+notes = 5
+budget = 60
+spare = 30
+```
+
+Scheduled and auto passes require at least one positive threshold.
+See `lookback` for how each threshold is counted.
+Dream's `budget` is the maximum number of project memory files to keep and defaults to 60.
+Auto's `spare` is the percentage of quota to leave unused at reset and defaults to 30.
+
 ### Project board and forge
 
 Each project requires a `[projects.<name>.board]` table with `kind = "markdown"` and `path` pointing to the folder that contains `backlog/`.
@@ -445,6 +469,7 @@ Example: `mork ctl claude.account account-team`
 The configured projects, in the order their tables appear in `mork.toml`.
 
 Each entry in `projects.projects` has `name`, `base`, `prefix` (the board's card ID prefix), `local`, `forge` and `auto.on`.
+The `passes` rows list each read's mode, thresholds, last completion and running card.
 A local project has `local: true` and `forge: {"kind":"local"}`.
 A Bitbucket project has `local: false` and its `forge` holds `kind`, `workspace` and `slug`.
 A GitHub project also has `local: false` and exposes `kind`, `owner` and `repo`.
@@ -454,9 +479,9 @@ Example: `mork ctl projects`
 
 ### lookback
 
-`mork ctl lookback <project> [--read pulse|deep-sweep]` starts a report.
+`mork ctl lookback <project> [--read pulse|deep-sweep|dream]` starts a report.
 The default is `pulse`.
-The operator alone starts a run.
+Only the operator may start a pass by command.
 The command refuses an unknown read or project, or a project with a live look-back.
 
 Answers `{"lookback": {"card"}}`.
@@ -466,11 +491,30 @@ With no saved commit, Pulse looks for the last recorded base tip before the seve
 With no ended-card cursor, Pulse reads the past seven days of ends.
 Deep Sweep reads the whole code at the fixed commit for dead code, dead tests, risks and wording.
 Both reads receive the open board cards and group their findings into proposal notes.
+Dream verifies and consolidates project memory at the fixed commit and folds handled lesson notes.
 
-`done <card>` records the last run for its read once the report is ready, advancing its cursor to its fixed commit.
+Scheduled passes start when any threshold is met.
+Landings count landed cards, edits count committed project memory writes and deletes, and notes count outstanding project lessons filed since the baseline.
+Days count from the last baseline.
+On first configuration, counts start at the first check and days start from the last completed read if there is one.
+Completion records the run's starting counts and the end time.
+Dream excludes its own edits from the next trigger.
+Closing an engine-started run resets the thresholds the same way and preserves the previous completed read's date and range.
+
+Auto also requires idle capacity and quota headroom in the launching model's pool.
+The engine uses the signed-in Claude account or the agy model's group where applicable.
+The weekly window and any model-specific window need a usable projection within the configured share.
+The five-hour window needs the same when a share is reported.
+Without a current five-hour share, only a reached limit blocks it.
+One auto pass can be live across all projects.
+While a real card has work running or owed, including a closing turn waiting for clone removal, auto starts no new turn.
+Running turns finish.
+A scheduled or auto run records its cursor and ends at `report-ready`.
+
+For a manually started pass, `done <card>` records the last run for its read once the report is ready, advancing its cursor to its fixed commit.
 An earlier `done` or `close` ends the card without recording a run.
 Each Projects row shows what the read does, when to use it, the last run's date and age and, when known, the number of commits since its fixed commit.
-During a run its card replaces the row's button and the other read's button is hidden for that project.
+During a run its card replaces the row's button and the other reads' buttons are hidden for that project.
 
 Examples are `mork ctl lookback mork` and `mork ctl lookback mork --read deep-sweep`.
 
@@ -1615,7 +1659,8 @@ Example: `mork ctl auto example.com`, `mork ctl auto example.com --off`
 ### memory.read
 
 A memory file's text: the memory is `general` or a project's name, the file one of its names.
-A seat's read is counted, and is the file's last read; an orchestrator's or the operator's answers the text and counts nothing.
+A Dream seat's read leaves the usage tallies unchanged.
+Any other seat's read is counted, and is the file's last read; an orchestrator's or the operator's answers the text and counts nothing.
 
 Answers `{"memory.read": {"memory", "name", "description", "writer", "origin", "written_ms", "text"}}`, `writer` being who wrote it last and `origin` who created it.
 Refused for an unknown memory or file.
@@ -1649,6 +1694,10 @@ A rewrite keeps its reads counted and its `origin`, the label of whoever created
 Each applied write counts in the memory's `written`.
 Answers `{"memory.write": {"memory", "name", "rewrote", "staged"?}}`.
 A held write returns `staged: true`.
+
+A live Dream foreman can edit its own project's memory immediately.
+The engine refuses a name another writer changed or deleted during the run.
+Each applied edit records its previous and new contents in the card journal.
 
 The operator can edit any memory.
 An orchestrator can edit its project's memory.
@@ -1732,7 +1781,9 @@ Example: `mork ctl --as orchestrator:example.com notes example.com`
 ### notes.delete
 
 Deletes for good only the named notes of the project.
-The operator or an orchestrator alone may; any seat is buzzed.
+The operator and orchestrators may delete notes.
+A live Dream foreman may delete only its project's lesson notes.
+A mixed selection is refused in full.
 `ids` is a non-empty list of ids as strings, separated by spaces or commas in the CLI.
 An id the project doesn't hold refuses the whole deletion.
 So does a handoff whose card id is cited as a whole word, in any letter case, in the title, description or notes of any live card in any project (its stage is neither `done` nor `closed`).
@@ -1741,6 +1792,7 @@ No note is deleted or file removed on refusal.
 Once no live card cites it, a handoff's note takes its copied files with it.
 Answers `{"notes.delete": {"project", "deleted"}}`, counting distinct ids deleted.
 Journaled as `notes.deleted` with who sent it.
+A Dream deletion also records each lesson's ID and text on its card.
 
 Example: `mork ctl --as orchestrator:example.com notes.delete example.com 12 15`
 

@@ -765,7 +765,8 @@ export type LiveRow = {
 
 export type LookbackRead =
   | "pulse"
-  | "deep-sweep";
+  | "deep-sweep"
+  | "dream";
 
 export type Master =
   | { is: "unknown" }
@@ -1019,6 +1020,7 @@ export type ReadPoint = {
 };
 
 export type ReadView = {
+  mode: Trigger;
   read: LookbackRead;
   last: LastView | null;
   running: CardId | null;
@@ -1279,6 +1281,11 @@ export type TriageView = {
   stalemate?: boolean;
   findings: Array<TriageFindingView>;
 };
+
+export type Trigger =
+  | "manual"
+  | "scheduled"
+  | "auto";
 
 export type TurnView = {
   job: JobId;

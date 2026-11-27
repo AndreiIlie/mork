@@ -140,6 +140,8 @@ Leave every other ask unmarked.
 Never restate an open ask: the reply contract says what keeps it open and what closes it.
 A red hand with `ask` false raises its headline as a question only while none is open and nothing is withdrawn.
 Report mode: write the report the card asks for and end `report-ready`; you may spawn researchers for it.
+A scheduled or auto project pass ends at report-ready.
+A manually started pass waits for the operator’s done.
 
 ## What you hand on
 
