@@ -377,6 +377,12 @@ mod tests {
     }
 
     #[test]
+    fn spawn_help_shows_the_two_task_forms_on_its_first_line() {
+        let help = mork_core::maintenance::manuals::command_help("spawn").unwrap();
+        assert!(help.lines().next().unwrap().contains("(<task: a string> | --task-file <path, or - for stdin>)"));
+    }
+
+    #[test]
     fn search_signature_match_uses_summary_and_all_words_are_required() {
         let help = search_text(&["--help"]);
         assert_eq!(search_text(&["merge", "--help", "--json"]), help);
