@@ -53,15 +53,17 @@ mod tests {
         let token = "synthetic-\"token";
         secrets.add("test", token);
         let refusal = |read| {
-            let cmd = json!({"config.change":{"change":{"section":"limits", "fields":{
-                "max_test_runs":{"read":read, "value":{"text":"4"}}
+            let cmd = json!({"config.change":{"change":{"section":"reach", "fields":{
+                "domains":{"read":read, "value":{"entries":[]}}
             }}}});
             let invalid = mork_types::Command::parse(&cmd, false).unwrap_err();
             invalid_config_command(&cmd, invalid, &secrets)
         };
-        assert!(refusal(json!({"text":3})).contains("expected a string"));
-        let masked = refusal(json!({token:"3"}));
-        assert!(masked.contains("‹secret›"));
-        assert!(!masked.contains("synthetic"));
+        assert!(refusal(json!({"entries":[3]})).contains("expected a string"));
+        for read in [json!({token:[]}), json!({"entries":token})] {
+            let masked = refusal(read);
+            assert!(masked.contains("‹secret›"));
+            assert!(!masked.contains("synthetic"));
+        }
     }
 }
