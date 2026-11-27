@@ -21,6 +21,7 @@ fn build_histories() -> Histories {
     closing["job"] = json!("close");
     let tool = json!({"agent":"r/foreman","cli":"claude","model":"review","effort":"high","delta":500_000,"unknown":true,
         "tools":{"calls":4,"failed":1,"by":{"Bash":1}}});
+    let review_closing = json!({"agent":"r/foreman","cli":"claude","model":"review","effort":"high","delta":250_000});
     cards.insert(
         "a".into(),
         history(
@@ -50,11 +51,7 @@ fn build_histories() -> Histories {
                 (9, "cost", tool),
                 (10, "review.verdict", json!({"n":1,"passed":false,"named":[{"n":1,"round":1,"by":"foreman"}]})),
                 (11, "review.resolved", json!({"n":1,"declined":true})),
-                (
-                    19,
-                    "cost",
-                    json!({"agent":"r/foreman","cli":"claude","model":"review","effort":"high","delta":250_000}),
-                ),
+                (19, "cost", review_closing),
             ],
         ),
     );
