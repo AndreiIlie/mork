@@ -1,7 +1,7 @@
 //! Input helpers for the native editor and its command buttons.
 
 use mork_types::Command;
-pub use mork_types::input::{Context, Parsed, draft, names_a_place, parse, shown_nowhere};
+pub use mork_types::input::{Context, Parsed, draft, names_a_place, open_refusal, parse, shown_nowhere, submission};
 
 /// An input holding a draft, its cursor at the end.
 pub(crate) fn draft_content(text: &str) -> iced::widget::text_editor::Content {

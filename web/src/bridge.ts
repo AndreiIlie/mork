@@ -1,3 +1,4 @@
+import { prependHistory } from "./streamHistory";
 import type { ComposerAction, ComposerDraft, ComposerRequest, ErrorBody, Frame, HistoryAnswer, HistoryPage, PlaceView, Request, Screen } from "./types";
 
 /** Where the link to the engine stands: `reconnecting` keeps the last screen it had. */
@@ -268,9 +269,7 @@ export async function submitComposer(composer: ComposerDraft): Promise<ComposerA
     activeUpdate?.((state) => {
       const view = state.views[page.place];
       if (!view || page.earlier + page.messages.length !== view.earlier) return {};
-      const jobs = new Set(view.turns?.map(turn => turn.turn.job));
-      const turns = [...(page.turns ?? []).filter(turn => !jobs.has(turn.turn.job)), ...(view.turns ?? [])];
-      const merged = { ...view, turns, earlier: page.earlier, messages: [...page.messages, ...view.messages] };
+      const merged = { ...view, ...prependHistory(view, page) };
       return { views: { ...state.views, [page.place]: merged } };
     });
   }

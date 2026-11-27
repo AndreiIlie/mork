@@ -1,8 +1,6 @@
 // Local composer actions answer on the WebSocket without reaching the operator socket.
 
-use mork_types::Command;
 use mork_types::catalog::{CATALOG, slash_fields};
-use mork_types::command::Delivery;
 use mork_types::input::{self, Parsed};
 use mork_types::protocol::{ComposerAction, ComposerRequest, ErrorBody, ErrorCode, MAX_LINE};
 use serde_json::json;
@@ -19,31 +17,22 @@ pub(super) fn route(text: String) -> Destination {
     let refuse = |code, message: String| {
         Destination::Browser(json!({"id": id, "err": ErrorBody::new(code, message)}).to_string())
     };
-    if draft.now && draft.text.trim_start().starts_with('/') {
-        return refuse(ErrorCode::Invalid, input::SEND_NOW_COMMAND.into());
-    }
-    let action = match input::draft(&draft.text, &draft.images, &draft.context) {
-        Parsed::Send(mut cmd) => {
-            if draft.now
-                && let Command::Say { delivery, .. } = &mut cmd
-            {
-                *delivery = Some(Delivery::Now);
-            }
+    let parsed = input::submission(&draft.text, &draft.images, &draft.context, draft.now)
+        .unwrap_or_else(|note| Parsed::Note(note.into()));
+    let action = match parsed {
+        Parsed::Send(cmd) => {
             let line = json!({"id": id, "cmd": cmd}).to_string();
             if line.len() > MAX_LINE {
                 return refuse(ErrorCode::TooLarge, "the line is over 1 MiB".into());
             }
             return Destination::Socket(line);
         }
-        Parsed::Open(card) if input::shown_nowhere(&card) => {
-            return refuse(
-                ErrorCode::Invalid,
-                format!(
-                    "✗ {card} is the foreman's and planner's exchange, which the window shows nowhere: `mork ctl history {card}` reads it"
-                ),
-            );
+        Parsed::Open(card) => {
+            if let Some(note) = input::open_refusal(&card) {
+                return refuse(ErrorCode::Invalid, note);
+            }
+            ComposerAction::Open { card }
         }
-        Parsed::Open(card) => ComposerAction::Open { card },
         Parsed::Help => ComposerAction::Help { commands: help() },
         Parsed::Usage(_) => ComposerAction::Usage,
         Parsed::Note(message) => return refuse(ErrorCode::Invalid, message),
@@ -122,6 +111,7 @@ mod tests {
         for (text, now) in [
             ("/demo", true),
             ("/open", false),
+            ("/open ex-1/challenge", false),
             ("/say 'hi", false),
             ("@ ", false),
             ("@foreman", false),

@@ -7,12 +7,12 @@ interface RetainedStream {
   turns: ChatTurn[];
 }
 
-function prependHistory(prev: RetainedStream, page: HistoryPage): RetainedStream {
+export function prependHistory(prev: Pick<PlaceView, "messages" | "turns" | "earlier">, page: HistoryPage): RetainedStream {
   const bySeq = new Map(prev.messages.map((m) => [m.seq, m]));
   for (const m of page.messages) {
     if (!bySeq.has(m.seq)) bySeq.set(m.seq, m);
   }
-  const byJob = new Map(prev.turns.map((t) => [t.turn.job, t]));
+  const byJob = new Map(prev.turns?.map((t) => [t.turn.job, t]));
   for (const t of page.turns ?? []) {
     if (!byJob.has(t.turn.job)) byJob.set(t.turn.job, t);
   }

@@ -5,9 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Command;
 use crate::catalog::{self, CommandSpec};
-
-/// Send now preserves a slash draft so the operator can still execute it with Send.
-pub const SEND_NOW_COMMAND: &str = "✗ send now sends a message, not a command: nothing sent";
+use crate::command::Delivery;
 
 /// Where the line is typed: the place, its card, who plain text goes to (empty: whoever the
 /// engine gives the place's unaddressed words to).
@@ -59,6 +57,18 @@ pub fn draft(line: &str, images: &[String], ctx: &Context) -> Parsed {
         return parse(line, ctx);
     }
     say(trimmed, images, ctx)
+}
+
+/// Applies the requested delivery to a draft. A command submitted with Send now stays in the editor.
+pub fn submission(line: &str, images: &[String], ctx: &Context, now: bool) -> Result<Parsed, &'static str> {
+    if now && line.trim_start().starts_with('/') {
+        return Err("✗ send now sends a message, not a command: nothing sent");
+    }
+    let mut parsed = draft(line, images, ctx);
+    if now && let Parsed::Send(Command::Say { delivery, .. }) = &mut parsed {
+        *delivery = Some(Delivery::Now);
+    }
+    Ok(parsed)
 }
 
 // The engine says whether a leading `@name` reaches anyone (3.4.5).
@@ -212,6 +222,13 @@ fn split(args: &[String]) -> (Vec<(String, String)>, Vec<String>) {
 /// (fac-633), `history` and `watch` read it.
 pub fn shown_nowhere(place: &str) -> bool {
     place.split_once('/').is_some_and(|(card, rest)| rest == "challenge" && card != "main" && names_a_place(card))
+}
+
+/// Gives the operator the history command for a place that cannot be opened in either window.
+pub fn open_refusal(place: &str) -> Option<String> {
+    shown_nowhere(place).then(|| format!(
+        "✗ {place} is the foreman's and planner's exchange, which the window shows nowhere: `mork ctl history {place}` reads it"
+    ))
 }
 
 /// Whether a word names a place: `main`, a card's id (`ex-550`, `ex-12.1`, `pr-ex-12`), or a DM
