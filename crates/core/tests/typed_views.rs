@@ -343,3 +343,17 @@ fn a_delivered_message_stays_unread_until_the_recipient_acknowledges_it() {
     s.apply(Event::JobEnded { id: job, end: JobEnd::Finished { reply: Ok(reply("working", "Read")), session } });
     assert_eq!(pending(&s, seq), None);
 }
+
+#[test]
+fn an_image_only_say_exposes_pasted_images_in_the_stream_and_history() {
+    let mut s = start_no_planner();
+    let images = ["/home/operator/pasted/abcd.png", "/home/operator/other.png"];
+    s.operator(json!({"say": {"place": CARD, "text": "", "images": images}})).expect("image-only say");
+    let current = mork_core::views::conversation::messages(&s.state, CARD, None);
+    let history = mork_core::views::conversation::history(&s.state, CARD, u64::MAX, 20);
+    for messages in [&current.messages, &history.messages] {
+        let row = messages.iter().find(|m| !m.images.is_empty()).expect("operator image message");
+        assert_eq!(row.images[0].url.as_deref(), Some("/images/pasted/abcd.png"));
+        assert_eq!(row.images[1].url, None);
+    }
+}

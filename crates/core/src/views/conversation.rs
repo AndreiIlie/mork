@@ -121,13 +121,15 @@ pub(super) fn message(m: &Message) -> MessageView {
     }
 }
 
-// A job's published copy, `…/jobs/<job>/published/<file>`, is served at `/images/<job>/<file>` (fac-696); a pasted
-// image has no URL.
+// Bridge URLs name files relative to the two image stores. Other operator-supplied paths stay local.
 fn image(path: &str) -> ImageView {
     let parts: Vec<&str> = path.rsplit('/').take(4).collect();
     let url = match parts.as_slice() {
         [file, "published", job, "jobs"] if !file.is_empty() && !job.is_empty() => {
             Some(format!("/images/{}/{}", encoded(job), encoded(file)))
+        }
+        [file, "pasted", ..] if !file.is_empty() && *file != "." && *file != ".." => {
+            Some(format!("/images/pasted/{}", encoded(file)))
         }
         _ => None,
     };

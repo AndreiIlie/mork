@@ -85,8 +85,7 @@ pub struct MessageView {
     pub choice: Option<u32>,
 }
 
-/// An image a message carries (fac-696): its path outside any wall, and where the web bridge serves it, for a job's
-/// published copy.
+/// A message image's path outside the wall and its bridge URL when published or pasted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImageView {
     pub path: String,

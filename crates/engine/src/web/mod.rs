@@ -38,14 +38,12 @@ pub fn start(home: &Home, port: u16, assets: Option<PathBuf>) -> Option<SocketAd
     };
     crate::runtime::upkeep::log(home, &format!("web bridge listening on http://{addr}"));
     let assets = Arc::new(assets);
-    let sock = Arc::new(home.mork_sock());
-    let jobs = Arc::new(home.jobs());
+    let home = home.clone();
     std::thread::spawn(move || {
         for stream in listener.incoming() {
             let Ok(stream) = stream else { continue };
-            let (secret, assets, sock, jobs) =
-                (Arc::clone(&secret), Arc::clone(&assets), Arc::clone(&sock), Arc::clone(&jobs));
-            std::thread::spawn(move || handle(stream, &secret, (assets.as_deref(), &jobs), &sock));
+            let (secret, assets, home) = (Arc::clone(&secret), Arc::clone(&assets), home.clone());
+            std::thread::spawn(move || handle(stream, &secret, assets.as_deref(), &home));
         }
     });
     Some(addr)
@@ -60,6 +58,7 @@ fn report_error(home: &Home, msg: &str) {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Route {
     Ws(http::WsCheck),
+    Upload,
     Image { head_only: bool },
     Static { head_only: bool },
     Status(u16, &'static str),
@@ -75,6 +74,7 @@ pub fn route(head: &http::Head, secret: &str) -> Route {
         return match head.method.as_str() {
             _ if !http::bearer_matches(head, secret) => Route::Status(401, "Unauthorized"),
             _ if !http::origin_allowed(head.header("origin")) => Route::Status(403, "Forbidden"),
+            "POST" if head.path == images::PASTE => Route::Upload,
             "GET" => Route::Image { head_only: false },
             "HEAD" => Route::Image { head_only: true },
             _ => Route::Status(405, "Method Not Allowed"),
@@ -87,7 +87,7 @@ pub fn route(head: &http::Head, secret: &str) -> Route {
     }
 }
 
-fn handle(mut stream: TcpStream, secret: &str, (assets, jobs): (Option<&Path>, &Path), sock: &Path) {
+fn handle(mut stream: TcpStream, secret: &str, assets: Option<&Path>, home: &Home) {
     let Ok(Some((head, leftover))) = http::read_head(&mut stream) else { return };
     match route(&head, secret) {
         Route::Ws(http::WsCheck::Status(code, reason)) | Route::Status(code, reason) => {
@@ -96,10 +96,13 @@ fn handle(mut stream: TcpStream, secret: &str, (assets, jobs): (Option<&Path>, &
         Route::Ws(http::WsCheck::Ok { ws_key }) => {
             let accept = frames::accept_key(&ws_key);
             if http::write_101(&mut stream, &accept).is_ok() {
-                relay::serve(stream, leftover, sock.to_path_buf());
+                relay::serve(stream, leftover, home.mork_sock());
             }
         }
-        Route::Image { head_only } => match images::open_image(jobs, &head.path) {
+        Route::Upload => {
+            let _ = images::upload(&mut stream, &head, leftover, home);
+        }
+        Route::Image { head_only } => match images::open_image(home, &head.path) {
             Some((file, content_type)) => {
                 let _ = http::write_file(&mut stream, content_type, file, head_only);
             }
@@ -144,6 +147,17 @@ mod tests {
         assert_eq!(route(&in_url, KEY), Route::Status(401, "Unauthorized"));
         let keyed = head(&format!("GET /images/j/1-a.png HTTP/1.1\r\nAuthorization: Bearer {KEY}\r\n\r\n"));
         assert_eq!(route(&keyed, KEY), Route::Image { head_only: false });
+    }
+
+    #[test]
+    fn paste_upload_checks_key_origin_and_method() {
+        let post = |headers: &str| head(&format!("POST /images/pasted HTTP/1.1\r\n{headers}\r\n"));
+        let auth = format!("Authorization: Bearer {KEY}\r\n");
+        assert_eq!(route(&post(""), KEY), Route::Status(401, "Unauthorized"));
+        assert_eq!(route(&post(&format!("{auth}Origin: null\r\n")), KEY), Route::Status(403, "Forbidden"));
+        assert_eq!(route(&post(&auth), KEY), Route::Upload);
+        let other = head(&format!("POST /images/j/file HTTP/1.1\r\n{auth}\r\n"));
+        assert_eq!(route(&other, KEY), Route::Status(405, "Method Not Allowed"));
     }
 
     #[test]

@@ -1,7 +1,9 @@
 //! The desktop's clipboard (fac-31): its image, read over X11 (on GNOME through XWayland, which
 //! shares the Wayland clipboard; iced reads only text), and saved as a PNG under the home.
 
-use std::path::PathBuf;
+use std::fs::File;
+use std::os::fd::AsRawFd;
+use std::path::{Path, PathBuf};
 
 use crate::paths::Home;
 
@@ -23,11 +25,16 @@ pub fn save(home: &Home, width: usize, height: usize, rgba: &[u8]) -> Result<Pat
     let png = encode(width, height, rgba).map_err(|e| format!("the pasted image can't be saved: {e}"))?;
     let dir = home.pasted();
     let hash = crate::files::sha256_hex(&png);
-    let path = dir.join(format!("{}.png", &hash[..16]));
+    let name = format!("{}.png", &hash[..16]);
     std::fs::create_dir_all(&dir)
-        .and_then(|()| crate::files::write_whole(&path, &png))
+        .and_then(|()| mork_sys::open_dir_beneath(&File::open(home.root())?, Path::new("pasted")))
+        .and_then(|folder| {
+            // Pin the paste folder across the temporary write and rename, including concurrent pastes.
+            let pinned = PathBuf::from(format!("/proc/self/fd/{}", folder.as_raw_fd()));
+            crate::files::write_whole(&pinned.join(&name), &png)
+        })
         .map_err(|e| format!("the pasted image can't be saved in {}: {e}", dir.display()))?;
-    Ok(path)
+    Ok(dir.join(name))
 }
 
 fn encode(width: usize, height: usize, rgba: &[u8]) -> Result<Vec<u8>, String> {

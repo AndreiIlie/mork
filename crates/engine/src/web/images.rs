@@ -1,26 +1,41 @@
-//! A message's published image over the bridge (fac-696): `/images/<job>/<file>` reads `<job>/published/<file>`
-//! beneath the jobs folder alone, a regular PNG or JPEG by its bytes, and nothing else.
+//! The keyed bridge serves published and pasted images. Uploads share the native clipboard’s PNG store.
 
 use std::fs::File;
+use std::io::{self, Cursor, Read, Write};
+use std::net::TcpStream;
 use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 
+use image::{ImageDecoder, ImageFormat, ImageReader};
 use percent_encoding::percent_decode_str;
+
+use super::http;
+use crate::paths::Home;
+
+pub(super) const PASTE: &str = "/images/pasted";
+const MAX_BYTES: u64 = 64 << 20;
+type Status = (u16, &'static str);
+
+fn plain(raw: &str) -> Option<String> {
+    let s = percent_decode_str(raw).decode_utf8().ok()?;
+    let bad = s.is_empty() || s == "." || s == ".." || s.contains(['/', '\\', '\0']);
+    (!bad).then(|| s.into_owned())
+}
 
 /// What the route's path names beneath the jobs folder: one plain job and one plain file, each decoded once.
 pub fn image_rel(url_path: &str) -> Option<PathBuf> {
     let (job, file) = url_path.strip_prefix("/images/")?.split_once('/')?;
-    let plain = |raw: &str| {
-        let s = percent_decode_str(raw).decode_utf8().ok()?;
-        let bad = s.is_empty() || s == "." || s == ".." || s.contains(['/', '\\', '\0']);
-        (!bad).then(|| s.into_owned())
-    };
     Some(PathBuf::from(plain(job)?).join("published").join(plain(file)?))
 }
 
-/// Opens the image the path names, following no link, in `jobs`' own path too, and never leaving it, with its type.
-pub fn open_image(jobs: &Path, url_path: &str) -> Option<(File, &'static str)> {
-    let file = mork_sys::open_beneath_no_symlinks(jobs, &image_rel(url_path)?).ok()?;
+/// Opens only a regular image beneath the matching store, without following links inside the store.
+pub fn open_image(home: &Home, url_path: &str) -> Option<(File, &'static str)> {
+    let file = if let Some(raw) = url_path.strip_prefix("/images/pasted/") {
+        let root = File::open(home.root()).ok()?;
+        mork_sys::open_file_beneath(&root, &Path::new("pasted").join(plain(raw)?)).ok()?
+    } else {
+        mork_sys::open_beneath_no_symlinks(&home.jobs(), &image_rel(url_path)?).ok()?
+    };
     if !file.metadata().ok()?.is_file() {
         return None;
     }
@@ -35,9 +50,107 @@ pub fn open_image(jobs: &Path, url_path: &str) -> Option<(File, &'static str)> {
     }
 }
 
+pub(super) fn upload(stream: &mut TcpStream, head: &http::Head, leftover: Vec<u8>, home: &Home) -> io::Result<()> {
+    let result = body_length(head).and_then(|length| {
+        let mut bytes = leftover;
+        if bytes.len() as u64 > length {
+            return Err((400, "Invalid image length"));
+        }
+        let remaining = length - bytes.len() as u64;
+        (&mut *stream).take(remaining).read_to_end(&mut bytes).map_err(|_| (400, "Incomplete image upload"))?;
+        if bytes.len() as u64 != length {
+            return Err((400, "Incomplete image upload"));
+        }
+        store(home, &bytes)
+    });
+    match result {
+        Ok(path) => {
+            let body = path.to_str().ok_or_else(|| io::Error::other("paste path is not UTF-8"))?;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )?;
+            stream.flush()
+        }
+        Err((code, why)) => http::write_status(stream, code, why),
+    }
+}
+
+fn body_length(head: &http::Head) -> Result<u64, Status> {
+    let mut lengths = head.headers.iter().filter(|(name, _)| name.eq_ignore_ascii_case("content-length"));
+    let (_, value) = lengths.next().ok_or((411, "Length Required"))?;
+    if lengths.next().is_some()
+        || head.header("transfer-encoding").is_some()
+        || !value.bytes().all(|b| b.is_ascii_digit())
+    {
+        return Err((400, "Invalid image length"));
+    }
+    let length = value.parse::<u64>().map_err(|_| (400, "Invalid image length"))?;
+    if length > MAX_BYTES { Err((413, "Image too large")) } else { Ok(length) }
+}
+
+fn store(home: &Home, bytes: &[u8]) -> Result<PathBuf, Status> {
+    let kind = match image::guess_format(bytes) {
+        Ok(kind @ (ImageFormat::Png | ImageFormat::Jpeg)) => kind,
+        _ => return Err((415, "Expected a PNG or JPEG image")),
+    };
+    let mut reader = ImageReader::with_format(Cursor::new(bytes), kind);
+    let mut limits = image::Limits::default();
+    limits.max_alloc = Some(MAX_BYTES);
+    reader.limits(limits);
+    let mut decoder = reader.into_decoder().map_err(|_| (422, "Invalid image"))?;
+    let (width, height) = decoder.dimensions();
+    if decoder.total_bytes() > MAX_BYTES || u64::from(width) * u64::from(height) > MAX_BYTES / 4 {
+        return Err((413, "Image too large"));
+    }
+    let orientation = decoder.orientation().map_err(|_| (422, "Invalid image"))?;
+    let mut image = image::DynamicImage::from_decoder(decoder).map_err(|_| (422, "Invalid image"))?;
+    image.apply_orientation(orientation);
+    let rgba = image.into_rgba8();
+    crate::clipboard::save(home, rgba.width() as usize, rgba.height() as usize, &rgba)
+        .map_err(|_| (500, "Could not save pasted image"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn upload_length_is_unambiguous_and_bounded() {
+        let length = |headers: &str| {
+            let raw = format!("POST /images/pasted HTTP/1.1\r\n{headers}\r\n");
+            body_length(&http::parse_head(raw.as_bytes()).unwrap())
+        };
+        assert_eq!(length("Content-Length: 123\r\n"), Ok(123));
+        for bad in [
+            "",
+            "Content-Length: 67108865\r\n",
+            "Content-Length: 5\r\nContent-Length: 6\r\n",
+            "Content-Length: 5\r\nTransfer-Encoding: chunked\r\n",
+        ] {
+            assert!(length(bad).is_err());
+        }
+    }
+
+    #[test]
+    fn upload_and_native_paste_share_a_confined_png_store() {
+        let home = Home::new(std::env::temp_dir().join(crate::random::uuid()));
+        let native = crate::clipboard::save(&home, 1, 1, &[0, 25, 0, 255]).unwrap();
+        let bytes = std::fs::read(&native).unwrap();
+        assert_eq!(store(&home, &bytes), Ok(native.clone()));
+        assert!(store(&home, &bytes[..15]).is_err());
+        assert!(store(&home, b"plain text").is_err());
+        let name = native.file_name().unwrap().to_str().unwrap();
+        let (mut opened, kind) = open_image(&home, &format!("/images/pasted/{name}")).unwrap();
+        let mut served = Vec::new();
+        opened.read_to_end(&mut served).unwrap();
+        assert_eq!((kind, served), ("image/png", bytes));
+        std::os::unix::fs::symlink(&native, home.pasted().join("linked.png")).unwrap();
+        assert!(open_image(&home, "/images/pasted/linked.png").is_none());
+        assert!(open_image(&home, "/images/pasted/sub%2Ffile.png").is_none());
+        std::fs::remove_dir_all(home.root()).unwrap();
+    }
 
     #[test]
     fn the_route_names_one_plain_job_and_file_beneath_published() {
