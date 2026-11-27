@@ -8,6 +8,7 @@ import type { ChatTurn, HandView, ImageView, MessageView, PlaceView, ReplyHand, 
 import { useRetainedStream } from "./streamHistory";
 import { Button } from "./ui/Button";
 import { Dot } from "./ui/Dot";
+import { ImageThumbnail } from "./ui/ImagePreview";
 import { PinnedScroll } from "./ui/PinnedScroll";
 
 type StreamEntry = { kind: "message"; m: MessageView; run?: MessageView[] } | { kind: "turn"; t: ChatTurn };
@@ -66,10 +67,11 @@ function firstLine(text: string): string {
   return text.split("\n", 1)[0]?.trim() ?? "";
 }
 
-// A published image loads with the bridge's key; a click opens it full size. One the bridge doesn't serve shows its name.
+// Only keyed bridge reads can supply the preview. Unavailable files keep their filename in the conversation.
 function Thumbnail({ image }: { image: ImageView }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
+    setSrc(null);
     if (image.url === undefined) return undefined;
     let made: string | null = null;
     let gone = false;
@@ -81,7 +83,7 @@ function Thumbnail({ image }: { image: ImageView }) {
           setSrc(u);
         }
       })
-      .catch(() => setSrc(null));
+      .catch(() => { if (!gone) setSrc(null); });
     return () => {
       gone = true;
       if (made !== null) URL.revokeObjectURL(made);
@@ -89,11 +91,7 @@ function Thumbnail({ image }: { image: ImageView }) {
   }, [image.url]);
   const name = image.path.split("/").pop() ?? image.path;
   if (src === null) return <span className="text-label-12 text-gray-700">{name}</span>;
-  return (
-    <a href={src} target="_blank" rel="noreferrer" title={name}>
-      <img src={src} alt={name} className="h-24 w-auto max-w-full border border-gray-400" />
-    </a>
-  );
+  return <ImageThumbnail url={src} name={name} />;
 }
 
 function MessageExtras({ m }: { m: MessageView }) {

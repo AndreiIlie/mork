@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ImageThumbnail } from "./ImagePreview";
 import { Button } from "./Button";
 
 function fitHeight(el: HTMLTextAreaElement) {
@@ -21,7 +22,7 @@ function DraftThumbnail({ file }: { file: File }) {
     setUrl(local);
     return () => URL.revokeObjectURL(local);
   }, [file]);
-  return url && <img src={url} alt={file.name} className="block h-16 w-auto max-w-full border border-gray-400 object-contain" />;
+  return url ? <ImageThumbnail url={url} name={file.name || "Pasted image"} draft /> : null;
 }
 
 export interface ComposerProps {
