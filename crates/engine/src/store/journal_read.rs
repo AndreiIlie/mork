@@ -49,8 +49,9 @@ fn card_jobs(conn: &Connection, card: &str) -> Result<BTreeSet<String>> {
 }
 
 impl Reader<'_> {
-    fn belongs(&self, card: Option<&str>, data: &Value) -> bool {
-        card == Some(self.read.card.as_str()) || card.is_none() && journal::cardless(&self.read.card, &self.jobs, data)
+    fn belongs(&self, card: Option<&str>, kind: &str, data: &Value) -> bool {
+        card == Some(self.read.card.as_str())
+            || card.is_none() && journal::cardless(&self.read.card, &self.jobs, kind, data)
     }
 
     fn at(&self, time: i64) -> Result<i64> {
@@ -59,11 +60,12 @@ impl Reader<'_> {
         let mut stmt = self.conn.prepare(sql)?;
         let mut rows = stmt.query(params![self.read.card, time])?;
         while let Some(r) = rows.next()? {
-            if !self.read.includes(&r.get::<_, String>(2)?) {
+            let kind = r.get::<_, String>(2)?;
+            if !self.read.includes(&kind) {
                 continue;
             }
             let data: Value = serde_json::from_str(&r.get::<_, String>(3)?)?;
-            if self.belongs(r.get::<_, Option<String>>(1)?.as_deref(), &data) {
+            if self.belongs(r.get::<_, Option<String>>(1)?.as_deref(), &kind, &data) {
                 return Ok(r.get(0)?);
             }
         }
@@ -84,7 +86,7 @@ impl Reader<'_> {
                 continue;
             }
             let data: Value = serde_json::from_str(&r.get::<_, String>(4)?)?;
-            if !self.belongs(r.get::<_, Option<String>>(2)?.as_deref(), &data) || !page.wants(side) {
+            if !self.belongs(r.get::<_, Option<String>>(2)?.as_deref(), &kind, &data) || !page.wants(side) {
                 continue;
             }
             let message = self.message(&kind, &data)?;

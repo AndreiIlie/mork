@@ -240,6 +240,7 @@ Without `tail`, a view carries the place's whole conversation, within its line; 
 By default a view is the conversation alone: `{"place", "revision", "messages", "earlier", "pinned"}`, with no header, agents, offers, plan, notes, sessions, outputs, `turns` or `lists`.
 With `--full` (JSON: `"full": true`) it is the whole view, described below, which can be large.
 The command line prints every line as it comes, reconnects when Mork restarts, and runs until stopped: each word is one place.
+The web Card Room and Mork Console direct a typed `/watch` to `mork ctl watch` in a terminal so board and chat updates stay live.
 Changes nothing.
 
 With `--full`, each agent row of a card's room and DMs carries its `turn`: read for the views alone and kept in memory, never in the state, so no gate, job or turn waits on them.
@@ -373,6 +374,7 @@ An indivisible row too large for a page is refused.
 This is a count-limited page, never an unbounded journal dump.
 
 Rows recorded without a card are included when they name the card's seats, places or exact stored job ids.
+A `limits` row belongs to the card that owns the job named in `data.read.job`.
 Closing memory edits appear under the issuing seat's card as `memory.write`, `memory.delete` or `memory.skipped`.
 A `memory.staged` row carries only the seat and operation.
 These kinds locate the recorded facts; their data records changes, not a reconstructed snapshot:

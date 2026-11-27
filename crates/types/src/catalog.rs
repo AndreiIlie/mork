@@ -303,7 +303,9 @@ pub fn signature(spec: &CommandSpec) -> String {
     let mut line = format!("mork ctl {}", spec.name);
     for f in spec.fields {
         let t = type_name(f.ty);
-        line.push_str(&if f.optional && f.ty == FieldType::Bool {
+        line.push_str(&if spec.name == "spawn" && f.name == "task" {
+            format!(" (<task: {t}> | --task-file <path, or - for stdin>)")
+        } else if f.optional && f.ty == FieldType::Bool {
             format!(" [--{}]", f.name)
         } else if f.optional {
             format!(" [--{} <{t}>]", f.name)
