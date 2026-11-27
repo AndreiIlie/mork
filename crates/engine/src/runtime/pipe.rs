@@ -108,8 +108,7 @@ impl Engine {
         }
         if self.pipe.last_tick.is_none_or(|t| clock::elapsed(t) > Duration::from_secs(1)) {
             self.pipe.last_tick = Some(clock::instant());
-            let claude_account = self.views_cache.claude_accounts.live.as_ref().map(|a| a.id.clone());
-            self.apply(&Event::Tick { claude_account });
+            self.apply(&Event::Tick);
         }
         self.poll();
         self.slots_tick();

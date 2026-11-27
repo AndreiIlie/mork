@@ -26,7 +26,7 @@ fn set_pass(s: &mut Sim, project: &str, read: Read, config: Value) {
 }
 
 fn tick(s: &mut Sim) {
-    s.apply(Event::Tick { claude_account: Some("live".into()) });
+    s.apply(Event::Tick);
 }
 
 fn running(s: &Sim) -> bool {

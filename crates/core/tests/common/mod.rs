@@ -65,6 +65,7 @@ pub struct Sim {
     pub state: mork_core::state::State,
     pub config: Config,
     pub now: i64,
+    pub claude_account: Option<&'static str>,
     /// Intents not yet carried out.
     pub intents: Vec<Intent>,
     /// Journal rows emitted by `decide`, in order, for timeline-backed view tests.
@@ -80,6 +81,7 @@ impl Sim {
             state: mork_core::state::State::default(),
             config: config(),
             now: 1_792_000_000_000,
+            claude_account: None,
             intents: Vec::new(),
             journal: Vec::new(),
             tip: "base1",
@@ -88,7 +90,7 @@ impl Sim {
     }
 
     pub fn ctx(&self) -> Ctx<'_> {
-        Ctx { now: self.now, config: &self.config, faults: false }
+        Ctx { now: self.now, config: &self.config, faults: false, claude_account: self.claude_account }
     }
 
     /// Decides one event and commits its changes, a second later than the last.

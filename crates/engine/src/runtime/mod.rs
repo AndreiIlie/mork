@@ -277,6 +277,11 @@ impl Engine {
         faults::TEST_SETTINGS
     }
 
+    pub(super) fn decision_ctx(&self, now: i64) -> Ctx<'_> {
+        Ctx { now, config: &self.ctx.config, faults: self.faults(),
+            claude_account: self.views_cache.claude_accounts.live.as_ref().map(|a| a.id.as_str()) }
+    }
+
     /// Decides and commits one event; carries out its intents after the commit.
     pub fn apply(&mut self, event: &Event) -> Decision {
         self.load_wanted(event);
@@ -287,7 +292,7 @@ impl Engine {
 
     /// Decides one event on the state as it stands, committing nothing.
     pub(super) fn decide(&self, event: &Event, now: i64) -> Decision {
-        let ctx = Ctx { now, config: &self.ctx.config, faults: self.faults() };
+        let ctx = self.decision_ctx(now);
         mork_core::decide::decide(&self.state, event, ctx)
     }
 

@@ -335,7 +335,7 @@ fn send_event(conn: &Conn, watched: &super::Watched, place: &str, event: WatchEv
 
 impl Engine {
     pub(super) fn ctx_now(&self) -> mork_core::decide::Ctx<'_> {
-        mork_core::decide::Ctx { now: crate::clock::now_ms(), config: &self.ctx.config, faults: self.faults() }
+        self.decision_ctx(crate::clock::now_ms())
     }
 
     // Conversation watches omit full place state so a message-only client stays within the line budget.

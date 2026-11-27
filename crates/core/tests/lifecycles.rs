@@ -400,7 +400,7 @@ fn lookback_fetches_a_bitbucket_project_with_a_cursor_while_idle() {
     }
     s.settle_actions();
     s.now += 5 * 60 * 1000;
-    s.apply(Event::Tick { claude_account: None });
+    s.apply(Event::Tick);
     let projects: Vec<_> = s
         .pending()
         .into_iter()

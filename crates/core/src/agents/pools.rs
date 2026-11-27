@@ -22,6 +22,12 @@ pub struct Offer {
     pub pool: String,
 }
 
+impl Offer {
+    pub(crate) fn choice(&self, phase: mork_types::config::SeatPhase) -> mork_types::state::Choice {
+        mork_types::state::Choice { cli: self.cli, model: self.model.clone(), effort: self.effort, by: "engine".into(), phase: Some(phase) }
+    }
+}
+
 /// Ranks the allowed pairs for this wall by score, keeping their input order on ties.
 pub fn ranked(limits: &BTreeMap<String, Limit>, now: i64, account: Option<&str>, seat: &Seat, allowed: &[PickModel]) -> Vec<Offer> {
     let mut offers = Vec::new();

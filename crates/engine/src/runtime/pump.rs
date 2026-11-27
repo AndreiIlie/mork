@@ -119,7 +119,7 @@ impl Engine {
                 self.apply(&Event::TurnUnmade { agent: key, reason: format!("no closing folder: {e}") });
                 continue;
             }
-            let ctx = mork_core::decide::Ctx { now: clock::now_ms(), config: &self.ctx.config, faults: self.faults() };
+            let ctx = self.ctx_now();
             let codex_exec = seat.is_ok_and(|s| s.cli == Cli::Codex && mode == WallMode::None);
             let Some(plan) = turns::plan(&self.state, &key, ctx, codex_exec) else { continue };
             let (job, session) = match self.turn_job(&plan) {

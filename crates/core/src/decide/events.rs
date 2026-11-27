@@ -39,14 +39,14 @@ pub(super) fn started(state: &State, ctx: Ctx<'_>) -> Decision {
     d
 }
 
-pub(super) fn tick(state: &State, claude_account: Option<&str>, ctx: Ctx<'_>) -> Decision {
+pub(super) fn tick(state: &State, ctx: Ctx<'_>) -> Decision {
     let mut p = Poster::for_ctx(state, ctx);
     crate::queue::holds::advance(&mut p, ctx);
     retry_fetches(&mut p, ctx);
     crate::queue::leases::expire(&mut p, ctx);
     crate::agents::closing::expire(&mut p, ctx);
     crate::agents::stalled::wake(&mut p);
-    crate::lifecycle::trigger::due(&mut p, claude_account, ctx);
+    crate::lifecycle::trigger::due(&mut p, ctx);
     timed_fetches(&mut p, ctx);
     let mut d = Decision::default();
     p.finish(&mut d);

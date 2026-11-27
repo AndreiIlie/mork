@@ -41,22 +41,28 @@ pub(super) fn start(state: &State, project: &ProjectId, read: Option<&str>, ctx:
         return Decision::refused(format!("{id} is still running"));
     }
     let mut p = Poster::for_ctx(state, ctx);
-    let id = begin(&mut p, project, read, Trigger::Manual, None, ctx);
+    let id = begin(&mut p, project, read, Start::Manual, ctx);
     let mut d = Decision::ok(json!({"lookback": {"card": id}}));
     p.finish(&mut d);
     d
+}
+
+pub(super) enum Start<'a> {
+    Manual,
+    Scheduled(&'a str),
+    Auto(&'a crate::agents::pools::Offer, &'a super::trigger::Score),
 }
 
 pub(super) fn begin(
     p: &mut Poster<'_>,
     project: &ProjectId,
     read: Read,
-    trigger: Trigger,
-    threshold: Option<&str>,
+    start: Start<'_>,
     ctx: Ctx<'_>,
 ) -> CardId {
     let state = p.state;
     let id = next_id(state, project.as_str());
+    let trigger = match start { Start::Manual => Trigger::Manual, Start::Scheduled(_) => Trigger::Scheduled, Start::Auto(..) => Trigger::Auto };
     let window = window(state, project, read, trigger, ctx.now);
     let title = format!("{} on {project}", read.spec().button);
     let mut c = Card::new(id.clone(), project.as_str(), &title, Mode::Report, 1, ctx.now);
@@ -68,8 +74,20 @@ pub(super) fn begin(
     p.put_card(c);
     p.touch_place(id.as_str());
     let mut data = json!({"run": 1, "mode": "report", "trigger": trigger});
-    if let Some(met) = threshold {
-        data["threshold"] = json!(met);
+    match start {
+        Start::Manual => {}
+        Start::Scheduled(met) => data["threshold"] = json!(met),
+        Start::Auto(pair, score) => {
+            let who = crate::messages::requests::agent_of(&id, mork_types::reply::Role::Foreman);
+            let mut agent = crate::post::new_agent(&who);
+            agent.seen = p.next_seq;
+            agent.seen_before = agent.seen;
+            agent.choice = Some(pair.choice(mork_types::config::SeatPhase::Report));
+            p.put_agent(agent);
+            data = json!({"run": 1, "mode": "report", "trigger": trigger, "score": score, "bar": 100 - pair.spare,
+                "spare": pair.spare, "pool": pair.pool, "cli": pair.cli, "model": pair.model, "effort": pair.effort,
+                "pair_score": pair.score});
+        }
     }
     p.journal("card.start", Some(id.as_str()), data);
     p.fetch(project.as_str());
