@@ -167,7 +167,7 @@ fn list(state: &State, project: &ProjectId, ctx: Ctx<'_>) -> Decision {
     Decision::ok(json!({"notes": {"project": project, "notes": notes}}))
 }
 
-/// Main's Notes tab: configured projects in file order, then removed projects by name; notes newest first.
+/// Groups notes by configured project in file order, then removed project by name, newest note first.
 pub fn view(state: &State, config: &Config) -> Vec<ProjectNotes> {
     let mut projects: BTreeMap<ProjectId, Vec<Note>> = BTreeMap::new();
     for n in state.notes.values().rev() {

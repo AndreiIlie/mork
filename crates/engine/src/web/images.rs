@@ -1,4 +1,4 @@
-//! The keyed bridge serves published and pasted images. Uploads share the native clipboard’s PNG store.
+//! The keyed bridge serves published and pasted images.
 
 use std::fs::File;
 use std::io::{self, Cursor, Read, Write};
@@ -134,19 +134,19 @@ mod tests {
     }
 
     #[test]
-    fn upload_and_native_paste_share_a_confined_png_store() {
+    fn uploads_use_the_confined_png_store() {
         let home = Home::new(std::env::temp_dir().join(crate::random::uuid()));
-        let native = crate::clipboard::save(&home, 1, 1, &[0, 25, 0, 255]).unwrap();
-        let bytes = std::fs::read(&native).unwrap();
-        assert_eq!(store(&home, &bytes), Ok(native.clone()));
+        let saved = crate::clipboard::save(&home, 1, 1, &[0, 25, 0, 255]).unwrap();
+        let bytes = std::fs::read(&saved).unwrap();
+        assert_eq!(store(&home, &bytes), Ok(saved.clone()));
         assert!(store(&home, &bytes[..15]).is_err());
         assert!(store(&home, b"plain text").is_err());
-        let name = native.file_name().unwrap().to_str().unwrap();
+        let name = saved.file_name().unwrap().to_str().unwrap();
         let (mut opened, kind) = open_image(&home, &format!("/images/pasted/{name}")).unwrap();
         let mut served = Vec::new();
         opened.read_to_end(&mut served).unwrap();
         assert_eq!((kind, served), ("image/png", bytes));
-        std::os::unix::fs::symlink(&native, home.pasted().join("linked.png")).unwrap();
+        std::os::unix::fs::symlink(&saved, home.pasted().join("linked.png")).unwrap();
         assert!(open_image(&home, "/images/pasted/linked.png").is_none());
         assert!(open_image(&home, "/images/pasted/sub%2Ffile.png").is_none());
         std::fs::remove_dir_all(home.root()).unwrap();

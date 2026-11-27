@@ -4,7 +4,6 @@ mod cli;
 mod ctl;
 mod launcher;
 mod local;
-mod window;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

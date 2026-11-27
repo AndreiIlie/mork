@@ -1,5 +1,5 @@
 // fac-278, fac-654: a published image, a reply's or a say's, is a job's copy of a file beneath its seat's `io/`; links,
-// others' files, `..`, non-regular files and `published/` are refused. A clicked one is staged from beneath its folder.
+// others' files, `..`, non-regular files and `published/` are refused.
 #![cfg(feature = "faults")]
 // why: test code: a failed unwrap is the test failing, which 1.12.4 leaves to tests.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -215,53 +215,4 @@ fn given_the_copy(turns: &[mork_types::state::Job], copy: &str) {
     for rel in retry.io_copies.keys() {
         assert_eq!(read(&seat.join(rel)), "ORIG", "{rel}: the retry was given the copy, not what its first try left");
     }
-}
-
-#[test]
-fn fac278_a_clicked_image_is_staged_from_beneath_its_folder_only() {
-    let t = mork_fakes::TestHome::new();
-    let home = mork_engine::paths::Home::new(t.mork_home());
-    let pasted = mork_engine::clipboard::save(&home, 1, 1, &[0, 0, 0, 255]).unwrap();
-    let png = std::fs::read(&pasted).unwrap();
-    let (job, seat, outside) = (home.jobs().join("20200101-j"), home.seat_io("20200101-s"), t.root.join("outside"));
-    for d in [job.join("io/folder.png"), job.join("published"), job.join("other"), seat.clone(), outside.clone()] {
-        std::fs::create_dir_all(d).unwrap();
-    }
-    for f in [job.join("published/1-shot"), job.join("io/pic.png"), job.join("other/x.png"), outside.join("x.png")] {
-        std::fs::write(f, &png).unwrap();
-    }
-    std::fs::write(seat.join("seat.png"), &png).unwrap();
-    std::os::unix::fs::symlink(outside.join("x.png"), seat.join("link.png")).unwrap();
-    std::fs::write(job.join("io/text.png"), "SHOT").unwrap();
-    std::os::unix::fs::symlink(outside.join("x.png"), job.join("io/link.png")).unwrap();
-    std::os::unix::fs::symlink(&outside, job.join("io/dir")).unwrap();
-    assert!(std::process::Command::new("mkfifo").arg(job.join("io/fifo.png")).status().unwrap().success());
-    let (viewer, at) = (t.root.join("viewer"), |rel: &str| job.join(rel).display().to_string());
-    let stage = |path: &str| mork_engine::jobs::outputs::staged_image(&home, path, &viewer);
-    let in_seat = |rel: &str| seat.join(rel).display().to_string();
-    let good =
-        [(at("published/1-shot"), "1-shot.png"), (at("io/pic.png"), "pic.png"), (in_seat("seat.png"), "seat.png")];
-    for (path, name) in good {
-        let copy = stage(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
-        assert_eq!((copy.file_name().unwrap().to_str().unwrap(), std::fs::read(&copy).unwrap()), (name, png.clone()));
-    }
-    stage(&pasted.display().to_string()).unwrap();
-    let escapes = [
-        (at("io/link.png"), "Too many levels of symbolic links"),
-        (at("io/dir/x.png"), "Too many levels of symbolic links"),
-        (at("io/folder.png"), "not a regular file"),
-        (at("io/fifo.png"), "not a regular file"),
-        (at("io/text.png"), "not a PNG or JPEG image"),
-        (at("other/x.png"), "not in a job's io/ nor its published copies"),
-        (at("io/../other/x.png"), "not a path inside its folder"),
-        (in_seat("link.png"), "Too many levels of symbolic links"),
-        (in_seat("../20200101-o/x.png"), "not a path inside its folder"),
-        (outside.join("x.png").display().to_string(), "not a seat's, a job's or a pasted file"),
-    ];
-    for (path, why) in escapes {
-        let e = stage(&path).map(|p| p.display().to_string()).expect_err(&path);
-        assert!(e.to_string().contains(why), "{path}: {e}, not {why}");
-    }
-    let staged = std::fs::read_dir(&viewer).unwrap().count();
-    assert_eq!(staged, 4, "only the four images were staged, each in a folder of its own");
 }

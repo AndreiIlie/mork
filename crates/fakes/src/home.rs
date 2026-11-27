@@ -25,7 +25,6 @@ pub const FAKE_LINKS: &[(&str, &str)] = &[
     ("cargo", "fake-cargo"),
     ("notify-send", "fake-notify-send"),
     ("fake-checks", "fake-checks"),
-    ("fake-editor", "fake-editor"),
     ("ssh", "fake-ssh"),
     ("mysql", "fake-mysql"),
     ("mongoexport", "fake-mongoexport"),

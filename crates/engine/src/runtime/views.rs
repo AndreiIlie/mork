@@ -27,8 +27,7 @@ const TEXT_MAX: usize = 64 * 1024;
 // What a view's agents' turns may take of its line, all together, and each text or thinking.
 const TURNS_BUDGET: usize = 192 * 1024;
 const DETAIL_MAX: usize = 8 * 1024;
-/// What `watch` names to get the screen rather than a place (5).
-pub const SCREEN: &str = "screen";
+const SCREEN: &str = "screen";
 
 fn cut_to(text: &str, max: usize) -> (String, bool) {
     if text.len() <= max {
@@ -287,7 +286,7 @@ fn shorten(b: &mut BoardView, r: Rows) {
 fn bounded_screen(mut s: Screen) -> Screen {
     for h in &mut s.hands {
         h.headline = cut_to(&h.headline, WORDS_MAX).0;
-        // Large triage asks list every finding for the native window; keep them whole until LINE_BUDGET trims (fac-680).
+        // Large triage asks list every finding in the watch view; keep them whole until LINE_BUDGET trims (fac-680).
         if h.kind != mork_types::ask::AskKind::Triage {
             h.words = cut_to(&h.words, WORDS_MAX).0;
         }

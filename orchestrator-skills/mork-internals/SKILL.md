@@ -21,7 +21,7 @@ It holds `state.db` (read it, never write it), `jobs/`, `clones/<card>/`, `mirro
   Never print `web.key` or the keyed URL `mork web` prints.
 - **`targets.toml`**, in Mork's home, holds the door's targets: never read or print a credential's value.
 - **Claude accounts:** the active login is `logins/claude/.credentials.json` with `login-home/.claude.json`; saved accounts are `login-home/.claude/accounts/<name>.credentials.json` and `<name>.claude.json`, each named in `[claude_accounts]`.
-  Switching accounts is the operator's call (`claude.account <name>`, or a pool's header in the window's Usage section): never switch, nor offer to.
+  Switching accounts is the operator's call (`claude.account <name>`, or Switch in Account Quotas under Settings, Usage): never switch, nor offer to.
   Ask him to sign in again only when a login hits its hard expiry.
   A new sign-in or renewal runs in a temporary folder (`HOME=<folder> claude auth login`).
   Copy `<folder>/.claude/.credentials.json` to the saved account's `<name>.credentials.json` with mode 600.

@@ -33,7 +33,7 @@ pub struct Config {
     /// Saved Claude accounts: `<name> = "<pool header>"` (fac-721).
     #[serde(default)]
     pub claude_accounts: BTreeMap<String, String>,
-    /// Window-owned SSH web forwards, keyed by name (fac-721).
+    /// Configured SSH web forwards, keyed by name (fac-721).
     #[serde(default)]
     pub tunnels: BTreeMap<String, TunnelConfig>,
     /// The projects in the file's order, for every project list; empty, their names' order.
@@ -57,10 +57,6 @@ pub struct Toolchain {
 pub struct MorkConfig {
     #[serde(default)]
     pub project: Option<crate::ProjectId>,
-    #[serde(default = "d_editor")]
-    pub editor: String,
-    #[serde(default = "d_true")]
-    pub animations: bool,
     #[serde(default = "d_true")]
     pub notifications: bool,
     #[serde(default = "d_max_test_runs")]
@@ -319,7 +315,7 @@ pub struct Checks {
     pub folder: String,
 }
 
-/// `[tunnels.<name>]`: a window-owned SSH web forward (fac-721).
+/// `[tunnels.<name>]`: an SSH web forward (fac-721).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TunnelConfig {
@@ -436,9 +432,6 @@ pub const REQUIRED: &[(&str, &[&str])] = &[("mork", &[]), ("git", &["author"])];
 /// A project's required keys.
 pub const PROJECT_REQUIRED: &[&str] = &["repo", "board", "test"];
 
-fn d_editor() -> String {
-    "code -g {file}:{line}".into()
-}
 fn d_true() -> bool {
     true
 }

@@ -56,7 +56,7 @@ pub fn build(root: &Path, select: &[&str], extra: &[&str], args: &[&str]) -> Res
 }
 
 /// The test binaries cargo's JSON `messages` report, each to run with `args`, the largest first:
-/// the binaries that link the app and the window hold the slow tests, so none of them starts last.
+/// the binaries that link the app hold the slow tests, so none of them starts last.
 pub fn binaries(messages: &str, meta: &Value, args: &[&str]) -> Result<Vec<Binary>, String> {
     let messages: Vec<Value> = messages.lines().filter_map(|l| serde_json::from_str(l).ok()).collect();
     let mut out = Vec::new();

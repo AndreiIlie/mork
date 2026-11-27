@@ -1,21 +1,6 @@
-//! The desktop's clipboard (fac-31): its image, read over X11 (on GNOME through XWayland, which
-//! shares the Wayland clipboard; iced reads only text), and saved as a PNG under the home.
-
 use std::path::PathBuf;
 
 use crate::paths::Home;
-
-/// The clipboard's image, saved by `save`: its path, none when the clipboard holds no image, or
-/// why it couldn't be read or saved. The read waits up to seconds for the clipboard's owner.
-pub fn image(home: &Home) -> Result<Option<PathBuf>, String> {
-    let mut clipboard = arboard::Clipboard::new().map_err(|e| format!("the clipboard can't be read: {e}"))?;
-    let data = match clipboard.get_image() {
-        Ok(d) => d,
-        Err(arboard::Error::ContentNotAvailable) => return Ok(None),
-        Err(e) => return Err(format!("the clipboard's image can't be read: {e}")),
-    };
-    save(home, data.width, data.height, &data.bytes).map(Some)
-}
 
 /// An image's RGBA pixels written as a PNG under `Home::pasted`, named by its content, so the
 /// same image pasted again is the same file: its path.

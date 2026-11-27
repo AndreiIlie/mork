@@ -224,7 +224,7 @@ pub fn shown_nowhere(place: &str) -> bool {
     place.split_once('/').is_some_and(|(card, rest)| rest == "challenge" && card != "main" && names_a_place(card))
 }
 
-/// Gives the operator the history command for a place that cannot be opened in either window.
+/// Gives the operator the history command for a place that cannot be opened in the dashboard.
 pub fn open_refusal(place: &str) -> Option<String> {
     shown_nowhere(place).then(|| format!(
         "✗ {place} is the foreman's and planner's exchange, which the window shows nowhere: `mork ctl history {place}` reads it"

@@ -13,7 +13,7 @@ import { PinnedScroll } from "./ui/PinnedScroll";
 
 type StreamEntry = { kind: "message"; m: MessageView; run?: MessageView[] } | { kind: "turn"; t: ChatTurn };
 
-// Matches crates/ui/src/activity.rs `entries`: ended turns before the first message with a greater seq, rest at the end.
+// Place ended turns before the first message with a greater seq, rest at the end.
 function interleaveEntries(messages: MessageView[], turns: ChatTurn[]): StreamEntry[] {
   const ended = turns.filter((t) => !t.running && t.step_count > 0).sort((a, b) => a.after_seq - b.after_seq);
   const out: StreamEntry[] = [];

@@ -7,7 +7,6 @@ pub mod caps;
 pub mod comments;
 pub mod graph;
 pub mod hygiene;
-pub mod palette;
 pub mod rust;
 pub mod sentences;
 pub mod source;
@@ -33,7 +32,6 @@ pub const CRATES: &[(&str, &str)] = &[
     ("types", "mork-types"),
     ("core", "mork-core"),
     ("engine", "mork-engine"),
-    ("ui", "mork-ui"),
     ("sys", "mork-sys"),
     ("app", "mork-app"),
     ("fakes", "mork-fakes"),

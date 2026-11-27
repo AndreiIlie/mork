@@ -77,7 +77,7 @@ fn with_home(sub: Option<&str>, args: &[String], rest: &[String]) -> i32 {
         Err(c) => return c,
     };
     match sub {
-        None | Some("--no-window") => app(&home, args, None),
+        None | Some("--no-browser") => app(&home, args, None),
         Some("--reloaded") => match rest.first() {
             Some(id) => app(&home, args, Some(id.clone())),
             None => usage("mork --reloaded <id>"),
@@ -137,25 +137,29 @@ fn app(home: &Home, args: &[String], reloaded: Option<String>) -> i32 {
         return code;
     }
     let Some(config_path) = config::path() else { return usage("mork: no config path: set MORK_CONFIG or HOME") };
-    let no_window = args.iter().skip(1).any(|a| a == "--no-window");
-    let mode_args = if no_window { vec!["--no-window".to_owned()] } else { Vec::new() };
+    let open_web = args.len() == 1;
     let opts = Options {
         home: home.clone(),
-        config_path: config_path.clone(),
+        config_path,
         bin: bin(),
         commit: commit(),
         dirty: dirty(),
         began,
         reloaded,
-        mode_args,
+        open_web,
     };
-    if no_window {
-        return runtime::run(opts, None);
+    match runtime::run(opts) {
+        Ok(code) => code,
+        Err(runtime::StartError::AlreadyRunning(why)) if open_web => match ctl::open_dashboard(home) {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("mork: {why}. Couldn't open the dashboard: {e}");
+                1
+            }
+        },
+        Err(runtime::StartError::AlreadyRunning(why) | runtime::StartError::Failed(why)) => {
+            eprintln!("mork: {why}");
+            1
+        }
     }
-    // The engine says what is wrong with a bad config.
-    let settings = config::read(&config_path)
-        .map_or(mork_ui::app::Settings { editor: String::new(), animations: true, tunnels: Default::default() }, |c| {
-            mork_ui::app::Settings { editor: c.mork.editor, animations: c.mork.animations, tunnels: c.tunnels }
-        });
-    crate::window::run(home, settings, move |tx| runtime::run(opts, Some(tx)))
 }

@@ -66,7 +66,7 @@ pub enum NewNote {
     Proposal,
 }
 
-/// A project's notes as main's Notes tab shows them, newest first.
+/// A project's notes, newest first.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectNotes {
     pub project: crate::ProjectId,

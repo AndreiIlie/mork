@@ -177,31 +177,11 @@ impl Drain {
     }
 }
 
-/// The config's editor on a finding (5.7.5): started and left to run, its end reaped on a
-/// thread of its own. It is the operator's program, outside any wall.
-pub fn editor(home_root: &Path, argv: &[String]) -> io::Result<()> {
-    let (program, args) = argv.split_first().ok_or_else(|| io::Error::other("no editor command"))?;
-    proclog::record(home_root, "editor", argv, "", false);
-    let mut child = Command::new(program).args(args).stdin(Stdio::null()).spawn()?;
-    std::thread::spawn(move || child.wait());
-    Ok(())
-}
-
-/// The system's viewer on a file a turn produced (fac-105): `xdg-open`, started and left to run
-/// as the editor is, outside any wall, on its private copy (`outputs::stage`).
-pub fn viewer(home_root: &Path, path: &Path) -> io::Result<()> {
-    let argv = ["xdg-open".to_owned(), path.display().to_string()];
-    proclog::record(home_root, "viewer", &argv, "", false);
-    let mut child = Command::new(&argv[0]).arg(path).stdin(Stdio::null()).spawn()?;
-    std::thread::spawn(move || child.wait());
-    Ok(())
-}
-
-/// The system's browser on a web page: `xdg-open`, started and left to run as the viewer is.
-pub fn browser(home_root: &Path, url: &str) -> io::Result<()> {
-    let argv = ["xdg-open".to_owned(), url.to_owned()];
+/// Opens the keyless dashboard address in the system browser.
+pub fn browser(home_root: &Path, address: &str) -> io::Result<()> {
+    let argv = ["xdg-open".to_owned(), address.to_owned()];
     proclog::record(home_root, "browser", &argv, "", false);
-    let mut child = Command::new(&argv[0]).arg(url).stdin(Stdio::null()).spawn()?;
+    let mut child = Command::new(&argv[0]).arg(&argv[1]).stdin(Stdio::null()).spawn()?;
     std::thread::spawn(move || child.wait());
     Ok(())
 }

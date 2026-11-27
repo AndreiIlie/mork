@@ -257,7 +257,8 @@ When `[mork] project` is unset, a seat cannot file cross-project notes with `--p
   The project's orchestrator turns a proposal into a card with `card.create` and deletes the note once triaged.
 
 A note moves nothing: it is no finding, and no fix must address it.
-The operator reads every project's in main's Notes tab; the project's orchestrator reads them (`notes <project>`), triages them, lessons into memory or a skill and feedback into cards, and deletes those triaged (`notes.delete`).
+The operator and the project's orchestrator can read its notes with `notes <project>`.
+The orchestrator triages them, lessons into memory or a skill and feedback into cards, and deletes those triaged (`notes.delete`).
 
 ## Memory
 
@@ -324,7 +325,6 @@ The `messages` skill shows good asks and two bad examples, including one with th
 **An ask to the operator about something on a screen** carries a screenshot of that thing in the hand's `images` where the seat can render it.
 For a web page, use the wall's headless Chromium, as the `visual-mocks` skill says.
 When a project has a preview skill of its own among your skills, follow its rendering rules.
-For an ask to the operator about Mork's native window, use the words shown on screen.
 
 A child's flagged message or red hand reaches its parent as a request in its parent's room, in the parent's running turn or by waking it.
 The planner and foreman may raise asks to the operator within their roles, each in its own room.
