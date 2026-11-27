@@ -1,7 +1,6 @@
 //! What the window does with a key, a line, a press or a click (section 5): the handlers
 //! behind `App::update`.
 
-use mork_types::command::Delivery;
 use mork_types::config::Effort;
 use mork_types::orchestrator::ReviewSection;
 use mork_types::reply::Role;
@@ -71,10 +70,6 @@ impl App {
             return Vec::new();
         }
         let line = self.input.text();
-        if line.trim_start().starts_with('/') {
-            self.note = Some("✗ send now sends a message, not a command: nothing sent".into());
-            return Vec::new();
-        }
         if line.trim().is_empty() && self.draft_images().is_empty() {
             return Vec::new();
         }
@@ -85,10 +80,10 @@ impl App {
     /// leave the draft only with the `say` that carries them.
     pub(crate) fn submit(&mut self, line: &str, now: bool) -> Vec<Effect> {
         let images = self.draft_images().to_vec();
-        let mut parsed = input::draft(line, &images, &self.context());
-        if now && let Parsed::Send(Command::Say { delivery, .. }) = &mut parsed {
-            *delivery = Some(Delivery::Now);
-        }
+        let parsed = match input::submission(line, &images, &self.context(), now) {
+            Ok(parsed) => parsed,
+            Err(note) => return self.act_on(Parsed::Note(note.into())),
+        };
         if matches!(&parsed, Parsed::Send(Command::Say { images: Some(carried), .. }) if *carried == images) {
             self.session.draft_images.remove(&self.session.place);
         }
@@ -186,10 +181,8 @@ impl App {
 
     /// Opens a place: its draft and its scroll come back, its view is watched (5.6.3, 5.1.5).
     pub(crate) fn open(&mut self, place: String) -> Vec<Effect> {
-        if input::shown_nowhere(&place) {
-            self.note = Some(format!(
-                "✗ {place} is the foreman's and planner's exchange, which the window shows nowhere: `mork ctl history {place}` reads it"
-            ));
+        if let Some(note) = input::open_refusal(&place) {
+            self.note = Some(note);
             return Vec::new();
         }
         self.overlay = None;

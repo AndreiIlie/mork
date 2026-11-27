@@ -1,6 +1,7 @@
 //! Local HTTP and WebSocket bridge (fac-671): serves static UI assets and relays `/ws` to `mork.sock`.
 
 pub mod assets;
+mod composer;
 pub mod frames;
 pub mod http;
 pub mod images;

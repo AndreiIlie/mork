@@ -1,4 +1,5 @@
-import type { ErrorBody, Frame, HistoryAnswer, HistoryPage, PlaceView, Request, Screen } from "./types";
+import { prependHistory } from "./streamHistory";
+import type { ComposerAction, ComposerDraft, ComposerRequest, ErrorBody, Frame, HistoryAnswer, HistoryPage, PlaceView, Request, Screen } from "./types";
 
 /** Where the link to the engine stands: `reconnecting` keeps the last screen it had. */
 export type Link = "connecting" | "live" | "reconnecting" | "disconnected";
@@ -165,7 +166,7 @@ class Dial {
       const build = frame.hello.build;
       // A dial that failed before its hello left `disconnected`; this one is through.
       this.update((s) => ({ build, link: s.screen === null ? "connecting" : "reconnecting" }));
-      this.write(PROBE_ID, { status: {} });
+      this.write({ id: PROBE_ID, cmd: { status: {} } });
     } else if ("event" in frame) {
       const event = frame.event;
       if (typeof event !== "object" || event === null) return;
@@ -186,14 +187,19 @@ class Dial {
   }
 
   rewatch(): void {
-    this.write(WATCH_ID, watchCommand());
+    this.write({ id: WATCH_ID, cmd: watchCommand() });
   }
 
-  send(command: unknown): Promise<unknown> {
+  send(body: Omit<Request, "id"> | Omit<ComposerRequest, "id">): Promise<unknown> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      if (!this.write(id, command)) this.settle(id, { message: "not connected" }, undefined);
+      try {
+        if (!this.write({ id, ...body })) throw new Error("not connected");
+      } catch (error) {
+        this.pending.delete(id);
+        reject(error);
+      }
     });
   }
 
@@ -226,7 +232,7 @@ class Dial {
     this.update({ recovering: err.message });
     this.probeTimer = window.setTimeout(() => {
       this.probeTimer = null;
-      this.write(PROBE_ID, { status: {} });
+      this.write({ id: PROBE_ID, cmd: { status: {} } });
     }, PROBE_MS);
   }
 
@@ -238,9 +244,13 @@ class Dial {
     else p.reject(new Error(err.message));
   }
 
-  private write(id: number, cmd: unknown): boolean {
+  private write(request: Request | ComposerRequest): boolean {
     if (this.ws.readyState !== WebSocket.OPEN) return false;
-    this.ws.send(JSON.stringify({ id, cmd } satisfies Request));
+    const line = JSON.stringify(request);
+    if ("composer" in request && new TextEncoder().encode(line).length > (1 << 20)) {
+      throw new Error("the line is over 1 MiB");
+    }
+    this.ws.send(line);
     return true;
   }
 }
@@ -248,7 +258,22 @@ class Dial {
 /** Sends one command as the operator and resolves with its `ok` body; rejects with the engine's words on refusal or a drop. */
 export function requestCommand(command: unknown): Promise<unknown> {
   if (liveDial === null) return Promise.reject(new Error("not connected"));
-  return liveDial.send(command);
+  return liveDial.send({ cmd: command });
+}
+
+export async function submitComposer(composer: ComposerDraft): Promise<ComposerAction | undefined> {
+  if (liveDial === null) throw new Error("not connected");
+  const answer = await liveDial.send({ composer }) as { composer?: ComposerAction } & Partial<HistoryAnswer>;
+  const page = answer?.history;
+  if (page && page.messages.length) {
+    activeUpdate?.((state) => {
+      const view = state.views[page.place];
+      if (!view || page.earlier + page.messages.length !== view.earlier) return {};
+      const merged = { ...view, ...prependHistory(view, page) };
+      return { views: { ...state.views, [page.place]: merged } };
+    });
+  }
+  return answer?.composer;
 }
 
 // A size-limited view can omit its entire tail. Read the newest page when it supplies no cursor.

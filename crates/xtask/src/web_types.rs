@@ -9,8 +9,14 @@ use render::Render;
 use source::Source;
 
 const OUTPUT: &str = "web/src/types.ts";
-const ROOTS: [&str; 4] =
-    ["crate::protocol::Request", "crate::protocol::Frame", "crate::chat::HistoryAnswer", "crate::usage::UsageAnswer"];
+const ROOTS: [&str; 6] = [
+    "crate::protocol::Request",
+    "crate::protocol::Frame",
+    "crate::chat::HistoryAnswer",
+    "crate::usage::UsageAnswer",
+    "crate::protocol::ComposerRequest",
+    "crate::protocol::ComposerAction",
+];
 const COMMAND: &str = "cargo xtask web-types";
 
 fn generate(root: &Path) -> Result<String, String> {

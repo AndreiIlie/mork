@@ -70,6 +70,31 @@ pub struct Request {
     pub sent_as: Option<String>,
 }
 
+/// A web composer submission keeps the original words until Rust resolves its command and fields.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ComposerRequest {
+    pub id: u64,
+    pub composer: ComposerDraft,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ComposerDraft {
+    pub context: crate::input::Context,
+    pub text: String,
+    pub images: Vec<String>,
+    pub now: bool,
+}
+
+/// Local actions returned by the bridge. Engine commands keep their usual answer.
+#[derive(Debug, Serialize)]
+#[serde(tag = "action", rename_all = "lowercase")]
+pub enum ComposerAction {
+    Help { commands: Vec<(String, String)> },
+    Open { card: String },
+    Usage,
+}
+
 /// An incoming web socket line, distinguished by its existing outer keys.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
