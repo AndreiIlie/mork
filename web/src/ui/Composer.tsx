@@ -102,8 +102,9 @@ export function Composer({
           disabled={locked}
           onChange={(e) => onChange(e.target.value)}
           onPaste={(event) => {
+            if (locked || event.clipboardData.getData("text/plain") !== "") return;
             const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
-            if (locked || !images.length) return;
+            if (!images.length) return;
             event.preventDefault();
             onPasteImages(images);
           }}
