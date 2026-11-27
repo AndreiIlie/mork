@@ -61,22 +61,23 @@ fn settle_fetch(sim: &mut Sim, project: &str, branch: &str, head: &Sha, base: &s
     }
 }
 
-fn pass_train_checks(sim: &mut Sim, card: &str, commit: &Sha, tree: &str) {
+fn train_checks(sim: &mut Sim, card: &str, commit: &Sha, tree: &str, findings: &[Value]) {
     let check = sim.open_jobs(|p| matches!(p, Purpose::TrainRun { card: c, checks: true, .. } if c.as_str() == card))
         [0]
     .clone();
     let at = Checkout { head: Some(commit.clone()), tree: Some(tree.into()), tracked_clean: true, clean: true };
+    let status = i32::from(!findings.is_empty());
     let run = FinalRun {
         head: commit.clone(),
         before: at.clone(),
         after: at,
         checks: Some(CheckRun {
             head: commit.clone(),
-            exit: Some(0),
-            report: Some(json!({"status": 0, "findings": [], "base": sha("base1"), "head": commit})),
+            exit: Some(status),
+            report: Some(json!({"status": status, "findings": findings, "base": sha("base1"), "head": commit})),
             folder_commit: "c1".into(),
             folder_dirty: false,
-            located: Vec::new(),
+            located: findings.iter().map(|f| Ok(f["file"].as_str().unwrap().to_owned())).collect(),
             folder_moved: false,
         }),
         ran: true,
@@ -101,7 +102,7 @@ fn drive_entry_to_round(sim: &mut Sim, rc: &str, commit: &Sha, files: &[&str]) {
         review_changes: Some(contents(commit.as_str(), files)),
     };
     sim.end_job(&id, serde_json::to_value(made).unwrap());
-    pass_train_checks(sim, rc, commit, &tree);
+    train_checks(sim, rc, commit, &tree, &[]);
     let clone = sim.open_jobs(|p| matches!(p, Purpose::Clone { card, .. } if card.as_str() == rc))[0].clone();
     sim.end_job(&clone, json!({"at": commit}));
 }
@@ -209,7 +210,7 @@ fn setup_linked_round_two(sim: &mut Sim, card: &str, c2: &Sha) -> (String, JobId
         review_changes: None,
     };
     sim.end_job(&cand_id, serde_json::to_value(made).unwrap());
-    pass_train_checks(sim, card, c2, &tree);
+    train_checks(sim, card, c2, &tree, &[]);
     sim.round_asked(card);
     sim.turn_sending(
         &format!("{rc}/foreman"),
@@ -359,4 +360,61 @@ fn a_secret_stops_a_pr_entry_before_its_round() {
     assert_eq!(card.failed_job.as_ref(), Some(&purpose));
     assert!(card.review.as_ref().unwrap().rounds.is_empty());
     assert!(sim.open_jobs(|p| matches!(p, Purpose::TrainRun { checks: false, .. })).is_empty());
+}
+
+fn check_colleague_rounds(full_project: &str) {
+    let mut sim = Sim::new();
+    let head = sha("feature");
+    let summaries = ["@stylistic/semi: missing semicolon", "jscpd/copied-block: clone", "new words finding in title"];
+    let findings: Vec<_> = summaries
+        .iter()
+        .copied()
+        .chain(["no-undef: unknown variable"])
+        .map(|summary| json!({"tool": "lint", "file": "src/a.js", "line": 1, "summary": summary}))
+        .collect();
+    let mut config = json!(sim.config);
+    config["projects"][full_project]["colleague_review"] = json!("full");
+    sim.config = serde_json::from_value(config).unwrap();
+    sim.apply(Event::OpenPrsRead { project: "ex".into(), prs: vec![open_pr(7, &head)] });
+    sim.operator(json!({"review.branch": {"project": "web", "branch": "feature"}})).unwrap();
+
+    for (project, card, branch) in [("ex", "pr-ex-7", "feat-7"), ("web", "branch-web-feature", "feature")] {
+        settle_fetch(&mut sim, project, branch, &head, "base1");
+        sim.candidate(card);
+        train_checks(&mut sim, card, &head, &format!("tree-{head}"), &findings);
+        sim.answer_job(
+            "review clone",
+            |p| matches!(p, Purpose::Clone { card: c, .. } if c.as_str() == card),
+            json!({"at": head}),
+        );
+        let request = sim.engine_to(card, "foreman").into_iter().find(|m| m.headline == "Review round 1").unwrap().text;
+        assert!(request.contains("no-undef: unknown variable"));
+        for summary in summaries {
+            assert_eq!(request.contains(summary), project == full_project, "{card}: {summary}");
+        }
+        if project == full_project {
+            assert!(request.contains("The checks found 4:"));
+            assert!(request.contains("Use our own PR topics for the tier, including Design and simplicity"));
+            assert!(request.contains("Enforce the repository's AGENTS.md, architecture and test style"));
+            assert!(request.contains("Product and business decisions belong to the author and stakeholders"));
+        } else {
+            for label in ["ESLint style", "copies", "words"] {
+                assert!(request.contains(&format!("Dropped {label} findings: 1.")));
+            }
+            assert!(request.contains("count what remains only where it proves a finding"));
+            assert!(
+                request.contains("Conformance to the repository's AGENTS.md or to our own test style is no finding")
+            );
+        }
+    }
+}
+
+#[test]
+fn full_colleague_pr_and_default_colleague_branch_receive_their_projects_review_bars() {
+    check_colleague_rounds("ex");
+}
+
+#[test]
+fn full_colleague_branch_and_default_colleague_pr_receive_their_projects_review_bars() {
+    check_colleague_rounds("web");
 }

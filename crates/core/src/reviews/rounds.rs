@@ -473,8 +473,12 @@ fn colleague(card: &Card, forge: &str, landing: &str, bar: ColleagueReview) -> S
         ),
     };
     let rules = match bar {
-        ColleagueReview::Standard => "Standard colleague review. On correctness, judge whether the change does what it means to and breaks nothing. Conformance to the repository's AGENTS.md or to our own test style is no finding.",
-        ColleagueReview::Full => "Full colleague review. Use our own PR topics for the tier, including Design and simplicity when applicable. Enforce the repository's AGENTS.md, architecture and test style. Product and business decisions belong to the author and stakeholders. Report broken behavior and regressions.",
+        ColleagueReview::Standard => {
+            "Standard colleague review. On correctness, judge whether the change does what it means to and breaks nothing. Conformance to the repository's AGENTS.md or to our own test style is no finding."
+        }
+        ColleagueReview::Full => {
+            "Full colleague review. Use our own PR topics for the tier, including Design and simplicity when applicable. Enforce the repository's AGENTS.md, architecture and test style. Product and business decisions belong to the author and stakeholders. Report broken behavior and regressions."
+        }
     };
     format!(
         "\n\n{what}\n\n{REVIEW_TIER} {rules} Give each reviewer the colleague review bar with its task.\n\nGive each topic to a blind reviewer of its own, `mork ctl spawn {} reviewer '<task>' --topic '<topic>'` on its configured default, adding `--model <model> --effort <effort>` only to choose another from its pick list, the topic in your own words (the room list shows it beside the reviewer), its task naming that topic first. A reviewer's first pass reads the whole change against its destination. End `review-pass`, or `review-fail` with the proven findings.{}",
