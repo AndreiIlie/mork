@@ -179,6 +179,9 @@ fn picks(state: &State, a: &Agent, config: &Config, s: &mut Sections<'_>, out: &
 }
 
 fn choices(state: &State, card: &Card, config: &Config, role: Role) -> String {
+    if role == Role::Researcher && crate::lifecycle::lookback::automatic(card) {
+        return "For a researcher: spawn with the task alone. The engine chooses the model and effort from picks.pass at each spawn.".into();
+    }
     let (_, child) = super::children::child(state, card, role);
     format!("For a {}: {}.", role.as_str(), super::models::pick_options(state, config, &child))
 }

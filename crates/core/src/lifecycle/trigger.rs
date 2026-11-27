@@ -24,7 +24,7 @@ pub(crate) fn starting_offer(state: &State, ctx: Ctx<'_>) -> Option<Offer> {
 }
 
 fn idle(p: &Poster<'_>) -> bool {
-    !p.state.cards.values().any(|c| c.stage.is_live() && c.lookback.as_ref().is_some_and(|r| r.trigger == Trigger::Auto))
+    !p.state.cards.values().any(|c| c.stage.is_live() && lookback::automatic(c))
         && !turns::real_running(p.state)
         && !p.all_agents().any(|a| turns::real_owed(p.state, a))
 }

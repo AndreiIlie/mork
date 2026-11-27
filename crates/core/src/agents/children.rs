@@ -184,36 +184,14 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
         (_, Some(_)) => return Decision::refused("only a reviewer has a topic: drop `--topic`"),
         (_, None) => {}
     }
-    let selected = model.is_some() || effort.is_some() || cli.is_some();
-    if *role == Role::Baseline && selected {
-        return Decision::refused(
-            "a baseline seat runs on its configured default, `[seats.baseline]`: drop `--model`, `--effort` and `--cli`",
-        );
-    }
-    if *role != Role::Baseline && (*role != Role::Reviewer || selected) && (model.is_none() || effort.is_none()) {
-        return Decision::refused("choose this child's model and effort: `spawn --model <model> --effort <effort>`");
-    }
     let (who, mut agent) = child(state, c, *role);
     let Sender::Agent(parent) = from else { return Decision::refused("a child needs a seat to report to") };
     agent.parent = Some(parent.clone());
     agent.topic = topic;
-    if selected {
-        let at = super::models::standing(state, &agent);
-        let s = match super::models::selection(
-            ctx.config,
-            &agent,
-            at,
-            model.as_deref(),
-            effort.as_deref(),
-            cli.as_deref(),
-            super::models::By::of(state, from),
-        ) {
-            Ok(s) => s,
-            Err(e) => return Decision::refused(e),
-        };
-        let (cli, model, effort, by) = (s.model.cli, s.model.model, s.effort, parent.to_string());
-        agent.choice = Some(Choice { cli, model, effort, by, phase: Some(at.phase) });
-    }
+    agent.choice = match spawn_choice(state, from, &agent, c, (model.as_deref(), effort.as_deref(), cli.as_deref()), ctx) {
+        Ok(choice) => choice,
+        Err(e) => return Decision::refused(e),
+    };
     let mut p = Poster::for_ctx(state, ctx);
     p.put_agent(agent);
     task(&mut p, &who, from, task_text.trim());
@@ -221,6 +199,31 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
     let mut d = Decision::ok(json!({"spawn": {"agent": who.key.as_str(), "place": who.place.as_str()}}));
     p.finish(&mut d);
     d
+}
+
+fn spawn_choice(state: &State, from: &Sender, agent: &Agent, card: &Card,
+    (model, effort, cli): (Option<&str>, Option<&str>, Option<&str>), ctx: Ctx<'_>) -> Result<Option<Choice>, String> {
+    let at = super::models::standing(state, agent);
+    let selected = model.is_some() || effort.is_some() || cli.is_some();
+    if agent.role == Role::Researcher && crate::lifecycle::lookback::automatic(card) {
+        if selected {
+            return Err("the engine chooses this auto pass's researchers: drop `--model`, `--effort` and `--cli`".into());
+        }
+        return crate::lifecycle::trigger::best(state, "researcher", at, ctx)
+            .map(|pair| Some(pair.choice(at.phase)))
+            .ok_or_else(|| "no quota pool is open for a researcher now".into());
+    }
+    if agent.role == Role::Baseline && selected {
+        return Err("a baseline seat runs on its configured default, `[seats.baseline]`: drop `--model`, `--effort` and `--cli`".into());
+    }
+    if !selected && matches!(agent.role, Role::Reviewer | Role::Baseline) {
+        return Ok(None);
+    }
+    if model.is_none() || effort.is_none() {
+        return Err("choose this child's model and effort: `spawn --model <model> --effort <effort>`".into());
+    }
+    let s = super::models::selection(ctx.config, agent, at, model, effort, cli, super::models::By::of(state, from))?;
+    Ok(Some(Choice { cli: s.model.cli, model: s.model.model, effort: s.effort, by: from.label(), phase: Some(at.phase) }))
 }
 
 pub(super) const EMPTY_REVIEW: &str = "your review-fail has empty findings. Put each blocking finding in `findings`, or repeat `review-fail` with empty `findings` to confirm the failure";

@@ -11,6 +11,10 @@ use crate::state::{Change, State};
 
 const WEEK_MS: i64 = 7 * 86_400_000;
 
+pub(crate) fn automatic(card: &Card) -> bool {
+    card.lookback.as_ref().is_some_and(|r| r.trigger == Trigger::Auto)
+}
+
 /// A project's next look-back card, numbered from 1 over its cards loaded or not: each has a room of its own.
 pub fn next_id(state: &State, project: &str) -> CardId {
     let prefix = format!("lookback-{project}-");
