@@ -92,10 +92,12 @@ export function SeatChat({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-3 border-b border-gray-400 px-gutter py-3">
         {seat !== undefined && <SeatDot light={seat.light} />}
-        <h2 className="font-mono text-label-14 font-medium text-gray-1000">{name}</h2>
+        <h2 className={`min-w-0 text-label-14 font-medium text-gray-1000 ${seat?.topic ? "[overflow-wrap:anywhere]" : "font-mono"}`}>
+          {seat?.topic || name}
+        </h2>
         {room !== "" && <span className="text-label-12 text-gray-900">{room}</span>}
         {seat !== undefined && (
-          <span className="ml-auto flex items-center gap-3 font-mono text-label-12 tabular-nums text-gray-900">
+          <span className="ml-auto flex shrink-0 items-center gap-3 font-mono text-label-12 tabular-nums text-gray-900">
             <ContextRing context={seat.context} />
             {cache.cold !== null ? (
               <Cold minutes={cache.cold} />

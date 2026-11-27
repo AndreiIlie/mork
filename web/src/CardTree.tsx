@@ -152,14 +152,20 @@ export function CardTree({ nodes, card, seats, review, steps, status, selected, 
                     depth === 1 ? "pl-[44px]" : depth === 2 ? "pl-[64px]" : "pl-[84px]"
                   } ${seatOn ? "bg-gray-200" : "hover:bg-gray-100"}`}
                 >
-                  <SeatDot light={row.light} />
-                  <span className={`shrink-0 font-mono ${seatOn || lit ? "font-medium text-gray-1000" : "text-gray-900"}`}>{name}</span>
-                  {count && round && <FindingCount count={count} verdict={round.verdict} />}
-                  {mark !== undefined && (
-                    <span aria-label="Raised Hand" className={mark}>
-                      <HandIcon className="h-3 w-3" />
+                  <span className="flex min-w-0 max-w-full items-center gap-2">
+                    <SeatDot light={row.light} />
+                    <span className="min-w-0 [overflow-wrap:anywhere]">
+                      <span className={`${row.topic ? "font-sans" : "font-mono"} ${seatOn || lit ? "font-medium text-gray-1000" : "text-gray-900"}`}>
+                        {row.topic || name}
+                      </span>
+                      {count && round && <>{" "}<FindingCount count={count} verdict={round.verdict} /></>}
                     </span>
-                  )}
+                    {mark !== undefined && (
+                      <span aria-label="Raised Hand" className={mark}>
+                        <HandIcon className="h-3 w-3" />
+                      </span>
+                    )}
+                  </span>
                   <span className="ml-auto flex min-w-0 max-w-full items-center gap-2 text-right text-gray-700">
                     <span className="min-w-0 [overflow-wrap:anywhere]">
                       {row.label}{row.effort && ` · ${row.effort}`}
