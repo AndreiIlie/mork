@@ -277,8 +277,9 @@ pub struct LiveMarks {
 /// One place, as the window shows it (5.7, 5.8.2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlaceView {
+    /// Unread message sequences and whether each can interrupt its recipient, including messages outside the tail.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub receipts: Vec<crate::chat::SeatReceipt>,
+    pub unread: Vec<(u64, bool)>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub decisions: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

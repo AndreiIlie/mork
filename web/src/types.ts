@@ -787,7 +787,6 @@ export type MergeQueue = {
 };
 
 export type MessageView = {
-  recipient?: AgentKey;
   pending?: boolean;
   seq: number;
   time_ms: number;
@@ -960,7 +959,7 @@ export type PlaceKind =
   | { is: "other" };
 
 export type PlaceView = {
-  receipts?: Array<SeatReceipt>;
+  unread?: Array<[number, boolean]>;
   decisions?: Array<string>;
   start?: StartDefaults;
   place: PlaceId;
@@ -1122,13 +1121,6 @@ export type SeatCost = {
   cost_cents: number;
   unknown: boolean;
   tokens: Tokens;
-};
-
-export type SeatReceipt = {
-  recipient: AgentKey;
-  seen: number;
-  taken: Array<number>;
-  interruptible: boolean;
 };
 
 export type Setting = {

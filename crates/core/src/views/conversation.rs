@@ -72,10 +72,7 @@ fn shown(
     seats: &[Recipient],
 ) -> MessageView {
     let mut v = MessageView { open_ask: open.get(&m.seq).copied().cloned(), ..message(m) };
-    if let Some(target) = receipts::addressed(seats, m) {
-        v.recipient = Some(target.agent.key.clone());
-        v.pending = target.receipt.pending(m.seq);
-    }
+    v.pending = receipts::pending(seats, m);
     if let (Sender::Agent(k), Author::Agent { label, .. }) = (&m.from, &mut v.from)
         && Some(k) == review_foreman
     {
@@ -106,7 +103,6 @@ pub(super) fn message(m: &Message) -> MessageView {
         }
     };
     MessageView {
-        recipient: None,
         pending: None,
         seq: m.seq,
         time_ms: m.time,

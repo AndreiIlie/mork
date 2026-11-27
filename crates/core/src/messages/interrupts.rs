@@ -14,16 +14,13 @@ pub(super) fn posted(state: &State, place: &str, seq: u64, ctx: Ctx<'_>) -> Deci
     let Some(target) = receipts::posted(state, place, seq) else {
         return Decision::refused("the message has no recipient seat here");
     };
-    match target.receipt.pending(seq) {
+    match target.pending(seq) {
         None => return Decision::refused("the recipient has already read this message"),
         Some(false) => return Decision::refused("the recipient has no running turn to interrupt"),
         Some(true) => {}
     }
     let mut p = Poster::for_ctx(state, ctx);
-    let Some(job) = receipts::current_job(state, target.agent) else {
-        return Decision::refused("the recipient has no running turn to interrupt");
-    };
-    interrupt(&mut p, job);
+    cut(&mut p, &target.agent.key);
     let mut d = Decision::ok(json!({"message.send-now": {"seq": seq, "to": target.agent.key}}));
     p.finish(&mut d);
     d
@@ -41,15 +38,11 @@ pub(super) fn cut(p: &mut Poster<'_>, key: &AgentKey) {
     let Some(job) = p.state.jobs.values().find(|j| &j.owner == key && j.purpose.is_none() && running(j)) else {
         return;
     };
-    interrupt(p, job);
-}
-
-fn interrupt(p: &mut Poster<'_>, job: &Job) {
     let mut j = job.clone();
     j.stop_requested = true;
     j.interrupted = true;
     p.intent(Intent::StopJob { id: j.id.clone() });
-    p.journal("interrupt", None, json!({"agent": j.owner.as_str(), "job": j.id.as_str()}));
+    p.journal("interrupt", None, json!({"agent": key.as_str(), "job": j.id.as_str()}));
     p.other.push(Change::PutJob(Box::new(j)));
 }
 

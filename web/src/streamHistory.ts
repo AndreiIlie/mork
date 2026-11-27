@@ -59,11 +59,10 @@ export function useRetainedStream(view: PlaceView) {
   const messages = useMemo(() => {
     const tail = view.messages[0]?.seq ?? Infinity;
     if (stream.messages.length === 0 || stream.messages[0].seq >= tail) return stream.messages;
-    const receipts = new Map(view.receipts?.map(r => [r.recipient, { ...r, taken: new Set(r.taken) }]));
+    const unread = new Map(view.unread);
     return stream.messages.map(m => {
-      if (m.seq >= tail || m.recipient === undefined) return m;
-      const r = receipts.get(m.recipient);
-      const pending = r && m.seq >= r.seen && !r.taken.has(m.seq) ? r.interruptible : undefined;
+      if (m.seq >= tail) return m;
+      const pending = unread.get(m.seq);
       return pending === m.pending ? m : { ...m, pending };
     });
   }, [stream.messages, view]);

@@ -293,7 +293,10 @@ fn post_for_foreman(s: &mut Sim, text: &str) -> u64 {
 #[allow(clippy::expect_used)]
 fn pending(s: &Sim, seq: u64) -> Option<bool> {
     let page = mork_core::views::conversation::history(&s.state, CARD, u64::MAX, 100);
-    page.messages.iter().find(|m| m.seq == seq).expect("posted message").pending
+    let pending = page.messages.iter().find(|m| m.seq == seq).expect("posted message").pending;
+    let retained = room(s, CARD).unread.into_iter().find(|(n, _)| *n == seq);
+    assert_eq!(retained.map(|(_, interruptible)| interruptible), pending, "a row outside the live tail");
+    pending
 }
 
 #[test]

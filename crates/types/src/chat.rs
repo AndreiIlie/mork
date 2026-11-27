@@ -57,8 +57,6 @@ pub fn took(ms: i64) -> String {
 /// One message, as the conversation draws it (5.7.5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MessageView {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub recipient: Option<AgentKey>,
     /// Present while unread. True when the recipient can be interrupted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending: Option<bool>,
@@ -85,22 +83,6 @@ pub struct MessageView {
     /// The option of a seat's ask this answer chose, by its number from 1 (fac-696).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub choice: Option<u32>,
-}
-
-/// The recipient’s current news cursor and live receipts, also applying to messages paged into an open chat.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SeatReceipt {
-    pub recipient: AgentKey,
-    pub seen: u64,
-    pub taken: Vec<u64>,
-    pub interruptible: bool,
-}
-
-impl SeatReceipt {
-    /// Whether an unread message can interrupt its recipient. None once read.
-    pub fn pending(&self, seq: u64) -> Option<bool> {
-        (seq >= self.seen && self.taken.binary_search(&seq).is_err()).then_some(self.interruptible)
-    }
 }
 
 /// An image a message carries (fac-696): its path outside any wall, and where the web bridge serves it, for a job's

@@ -43,7 +43,10 @@ pub fn place(state: &State, place: &str, tail: Option<u64>, outside: &Outside, c
     let seats = crate::messages::receipts::recipients(state, place);
     let (messages, earlier, pinned) = conversation(state, place, tail, &seats);
     PlaceView {
-        receipts: seats.into_iter().map(|s| s.receipt).collect(),
+        unread: state
+            .messages_in(place)
+            .filter_map(|m| crate::messages::receipts::pending(&seats, m).map(|interruptible| (m.seq, interruptible)))
+            .collect(),
         place: PlaceId::new(place),
         revision: state.revision,
         card: card.map(|c| header(state, c, outside, ctx)),

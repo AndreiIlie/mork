@@ -1,14 +1,15 @@
 //! Read receipts belong to the addressed seat, including when two seats share a challenge place.
 
 use mork_types::JobId;
-use mork_types::chat::SeatReceipt;
 use mork_types::state::{Agent, AgentStatus, Job, Message, MessageKind, Sender};
 
 use crate::state::State;
 
 pub(crate) struct Recipient<'a> {
     pub agent: &'a Agent,
-    pub receipt: SeatReceipt,
+    seen: u64,
+    taken: Vec<u64>,
+    interruptible: bool,
     short: &'a str,
 }
 
@@ -41,23 +42,27 @@ pub(crate) fn recipients<'a>(state: &'a State, place: &str) -> Vec<Recipient<'a>
             taken.retain(|seq| *seq >= agent.seen);
             taken.sort_unstable();
             taken.dedup();
-            let receipt = SeatReceipt {
-                recipient: agent.key.clone(),
+            Some(Recipient {
+                agent,
+                short,
                 seen: agent.seen.max(first),
                 taken,
                 interruptible: !agent.paused && agent.retiring.is_none() && job.is_some_and(|j| !j.stop_requested),
-            };
-            Some(Recipient { agent, receipt, short })
+            })
         })
         .collect()
 }
 
-pub(super) fn current_job<'a>(state: &'a State, a: &Agent) -> Option<&'a Job> {
+fn current_job<'a>(state: &'a State, a: &Agent) -> Option<&'a Job> {
     let AgentStatus::Working { job } = &a.status else { return None };
     state.jobs.get(job).filter(|j| j.owner == a.key && j.purpose.is_none() && j.settled.is_none())
 }
 
 impl Recipient<'_> {
+    pub(crate) fn pending(&self, seq: u64) -> Option<bool> {
+        (seq >= self.seen && self.taken.binary_search(&seq).is_err()).then_some(self.interruptible)
+    }
+
     fn addressed(&self, m: &Message) -> bool {
         let Some(to) = m.to.as_deref() else { return false };
         let key = &self.agent.key;
@@ -72,8 +77,8 @@ fn unique<T>(mut matches: impl Iterator<Item = T>) -> Option<T> {
     matches.next().is_none().then_some(seat)
 }
 
-pub(crate) fn addressed<'a, 's>(seats: &'a [Recipient<'s>], m: &Message) -> Option<&'a Recipient<'s>> {
-    unique(seats.iter().filter(|s| s.addressed(m)))
+pub(crate) fn pending(seats: &[Recipient], m: &Message) -> Option<bool> {
+    unique(seats.iter().filter(|s| s.addressed(m)))?.pending(m.seq)
 }
 
 pub(crate) fn posted<'a>(state: &'a State, place: &str, seq: u64) -> Option<Recipient<'a>> {
