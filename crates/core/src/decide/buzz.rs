@@ -80,7 +80,7 @@ pub fn buzz(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Option
 fn other_buzz(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Option<ErrorBody> {
     orchestrator_buzz(from, cmd)
         .or_else(|| triage_buzz(from, cmd))
-        .or_else(|| memory_buzz(from, cmd, ctx))
+        .or_else(|| memory_buzz(state, from, cmd, ctx))
         .or_else(|| claude_account_buzz(from, cmd))
         .or_else(|| alarm_buzz(state, from, cmd))
         .or_else(|| spawn_buzz(state, from, cmd))
@@ -133,8 +133,7 @@ fn triage_buzz(from: &Sender, cmd: &Command) -> Option<ErrorBody> {
     ))
 }
 
-// A memory's writes are the operator's and its owner's: a project's orchestrator, and `general` Mork's (fac-592).
-fn memory_buzz(from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Option<ErrorBody> {
+fn memory_buzz(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Option<ErrorBody> {
     let (Command::MemoryWrite { memory, .. } | Command::MemoryDelete { memory, .. }) = cmd else { return None };
     let owned = |p: &mork_types::ProjectId| {
         if memory == GENERAL { ctx.config.mork.project.as_ref() == Some(p) } else { p.as_str() == memory }
@@ -142,8 +141,20 @@ fn memory_buzz(from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Option<ErrorBody> 
     let words = match from {
         Sender::Operator => return None,
         Sender::Orchestrator(p) if owned(p) => return None,
+        Sender::Agent(key)
+            if state.agents.get(key).is_some_and(|a| a.retiring.as_ref().is_some_and(|r| r.asked && !r.resumed)) =>
+        {
+            let own = crate::memory::seat_card(state, key);
+            if memory != GENERAL && own.is_some_and(|c| c.project.as_str() == memory) {
+                return None;
+            }
+            format!(
+                "On your closing turn you may edit only your card's project memory. {}",
+                crate::memory::lesson_note_help(ctx.config.mork.project.as_ref())
+            )
+        }
         Sender::Agent(_) => format!(
-            "Writing or deleting memory is the operator's, or its orchestrator's. {}",
+            "Writing or deleting your project's memory requires your closing turn. {}",
             crate::memory::lesson_note_help(ctx.config.mork.project.as_ref())
         ),
         Sender::Engine | Sender::Orchestrator(_) | Sender::Pa if ctx.config.mork.project.is_some() => format!(

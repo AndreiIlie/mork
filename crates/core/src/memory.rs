@@ -6,6 +6,7 @@ mod lessons;
 mod notes;
 mod search;
 mod similar;
+mod staged;
 
 use mork_types::state::Sender;
 use mork_types::{Command, ProjectId};
@@ -21,6 +22,13 @@ pub use lessons::view;
 pub use notes::view as notes_view;
 pub(crate) use notes::{origin, put, under};
 pub(crate) use search::index;
+pub(crate) use staged::commit;
+
+pub(crate) fn seat_card<'a>(state: &'a State, key: &mork_types::AgentKey) -> Option<&'a mork_types::card::Card> {
+    let agent = state.agents.get(key)?;
+    let id = crate::messages::places::card_of(state, &agent.place)?;
+    state.cards.get(&id)
+}
 
 pub(crate) fn lesson_note_help(mork: Option<&ProjectId>) -> String {
     match mork {
@@ -43,7 +51,7 @@ pub fn command(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Dec
     } else if let Command::MemoryWrite { memory, name, description, text, new } = cmd {
         lessons::write(state, from, Written { memory, name, description, text, new: new.unwrap_or(false) }, ctx)
     } else if let Command::MemoryDelete { memory, name } = cmd {
-        found(state, memory, name, ctx).map(|f| lessons::delete(state, f))
+        staged::change(state, from, memory, mork_types::memory::Edit { name: name.clone(), after: None }, false, ctx)
     } else if let Command::MemoryStats { memory } = cmd {
         memory
             .as_deref()

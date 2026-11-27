@@ -59,6 +59,7 @@ pub(super) fn running(p: &Poster<'_>, key: &AgentKey) -> bool {
 
 /// Every seat of a card ends with it: `remove`, they go; else they stay, as a landed card's do.
 pub fn card_ended(p: &mut Poster<'_>, id: &CardId, remove: bool, config: &Config) {
+    crate::memory::commit(p, id);
     for k in seats_of(p, id) {
         retire(p, &k, remove, config);
     }

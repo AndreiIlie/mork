@@ -7,6 +7,29 @@ use serde::{Deserialize, Serialize};
 pub const GENERAL: &str = "general";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Content {
+    pub description: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Edit {
+    pub name: String,
+    /// Absence means deletion.
+    pub after: Option<Content>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Staged {
+    pub edit: Edit,
+    pub seat: crate::AgentKey,
+    /// The seat's own card can differ from the card holding the edit.
+    pub card: crate::CardId,
+    pub at_ms: i64,
+    pub conflicted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MemoryFile {
     /// `general`, or a project's name.
     pub memory: String,

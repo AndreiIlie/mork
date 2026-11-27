@@ -2,20 +2,18 @@
 
 use std::collections::BTreeSet;
 
-use mork_types::memory::MemoryFile;
-
 pub(super) fn close_file<'a>(
-    files: impl Iterator<Item = &'a MemoryFile>,
+    mut files: impl Iterator<Item = (&'a str, &'a str)>,
     name: &str,
     description: &str,
-) -> Option<&'a MemoryFile> {
+) -> Option<&'a str> {
     let new = words(name, description);
-    files.into_iter().find(|f| {
-        let old = words(&f.name, &f.description);
+    files.find_map(|(name, description)| {
+        let old = words(name, description);
         let overlap = new.intersection(&old).count();
         // Three shared words and a third of the smaller set catch renamed lessons while
         // tolerating incidental vocabulary (fac-201).
-        overlap >= 3 && overlap * 3 >= new.len().min(old.len())
+        (overlap >= 3 && overlap * 3 >= new.len().min(old.len())).then_some(name)
     })
 }
 

@@ -1,4 +1,4 @@
-//! `history.search` (fac-371): cards' posted messages and records matched as `memory.search` matches,
+//! `history.search` (fac-371): cards' posted messages and records matched by substring,
 //! each hit marked only as the records mark it: a decision standing or withdrawn, a delegated answer.
 
 use std::collections::BTreeMap;
