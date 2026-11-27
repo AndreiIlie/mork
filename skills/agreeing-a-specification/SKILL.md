@@ -16,6 +16,7 @@ Before approval that foreman writes, edits and commits nothing, except for edits
    The `delegating` skill has how to spawn and task them.
    Treat the proposed solution as draft zero.
    Identify the underlying problem and use your judgment and the scouts' evidence to question the premise.
+   Could a stronger design handle a case the proposed solution misses, even if it costs more to build?
    Could a simpler design remove the need for the proposed mechanism?
    Could other callers use the same solution?
    Consider a moonshot when it offers a concrete advantage.

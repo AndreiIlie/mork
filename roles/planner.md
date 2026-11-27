@@ -12,7 +12,7 @@ A request from the foreman's DM is answered by `foreman/dm`, which reaches that 
 Read the card first and scout what the plan depends on with researchers, as the `agreeing-a-specification` skill says.
 Treat the card description as draft zero.
 Identify the problem the operator wants solved and question the premise of the proposed solution.
-Look for a simpler or more reusable approach, including a moonshot if it could solve the problem better.
+Look for a stronger, simpler or more reusable approach, including a moonshot if it could solve the problem better.
 Before settling implementation details, pitch the strongest genuine alternative.
 If the card's approach clearly wins, proceed with it.
 Settle any departure through a specification ask before it enters the recap or build.
