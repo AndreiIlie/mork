@@ -129,7 +129,7 @@ impl Rig {
         c
     }
 
-    /// Starts `mork --no-window`, and waits until it takes commands.
+    /// Starts `mork --no-browser`, and waits until it takes commands.
     pub fn start(&mut self) {
         self.spawn();
         self.wait_ready();
@@ -137,7 +137,7 @@ impl Rig {
 
     /// Starts it without waiting.
     pub fn spawn(&mut self) {
-        let c = self.command(&["--no-window"]);
+        let c = self.command(&["--no-browser"]);
         self.spawn_cmd(c);
     }
 

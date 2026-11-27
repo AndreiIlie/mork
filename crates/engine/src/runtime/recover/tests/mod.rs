@@ -90,7 +90,7 @@ impl Fixture {
             dirty: false,
             began: clock::instant(),
             reloaded: None,
-            mode_args: vec![],
+            open_web: false,
         };
         let config = crate::config::parse("[mork]\n[git]\nauthor = 'Test <test@example.invalid>'").unwrap();
         let ctx = Context::new(self.home.clone(), config, opts.bin.clone(), Default::default());
@@ -100,6 +100,7 @@ impl Fixture {
         // Recovery needs the store and job files. The app's listeners and event loop never start.
         Engine {
             reserved_ports: Default::default(),
+            bound_web_port: None,
             opts,
             ctx,
             store,

@@ -100,13 +100,13 @@ impl Scratch {
         &self.config
     }
 
-    /// Starts Mork (`--no-window`) and waits for it to be ready.
+    /// Starts Mork (`--no-browser`) and waits for it to be ready.
     pub fn start(&mut self) -> Result<(), String> {
         let env = vec![
             ("MORK_HOME".to_owned(), self.home.root().display().to_string()),
             ("MORK_CONFIG".to_owned(), self.config.display().to_string()),
         ];
-        let argv = vec![self.bin.display().to_string(), "--no-window".into()];
+        let argv = vec![self.bin.display().to_string(), "--no-browser".into()];
         let log = self.root.join("mork.log");
         self.app = Some(launch::child(self.home.root(), &argv, &env, &log).map_err(|e| e.to_string())?);
         let start = mork_engine::clock::instant();

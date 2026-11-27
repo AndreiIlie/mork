@@ -29,8 +29,11 @@ struct Link {
 }
 
 fn connect(home: &Home) -> Result<Link, String> {
-    let path = socket(home);
-    let stream = UnixStream::connect(&path).map_err(|_| format!("no Mork running on {}", home.root().display()))?;
+    connect_at(home, &socket(home))
+}
+
+fn connect_at(home: &Home, path: &std::path::Path) -> Result<Link, String> {
+    let stream = UnixStream::connect(path).map_err(|_| format!("no Mork running on {}", home.root().display()))?;
     let mut reader = BufReader::new(stream.try_clone().map_err(|e| e.to_string())?);
     let mut line = String::new();
     reader.read_line(&mut line).map_err(|e| e.to_string())?;
@@ -316,11 +319,30 @@ fn print_wakes(ok: &Value) -> i32 {
 /// One command to a running mork, as the other subcommands send it: `Ok(None)` when no
 /// mork runs; `Err` with the refusal's words.
 pub fn request(home: &Home, cmd: &Value) -> Result<Option<Value>, String> {
-    let Ok(mut link) = connect(home) else { return Ok(None) };
+    let Ok(link) = connect(home) else { return Ok(None) };
+    request_link(link, cmd).map(Some)
+}
+
+pub(super) fn open_dashboard(home: &Home) -> Result<(), String> {
+    let link = connect_at(home, &home.mork_sock())?;
+    let answer = request_link(link, &json!({"status": {}}))?;
+    let web = &answer["status"]["web"];
+    if let Some(why) = web["unavailable"].as_str() {
+        return Err(why.to_owned());
+    }
+    let port = web["port"]
+        .as_u64()
+        .and_then(|n| u16::try_from(n).ok())
+        .filter(|&p| p != 0)
+        .ok_or_else(|| "the running engine did not report a web port".to_owned())?;
+    launch::browser(home.root(), port).map_err(|e| e.to_string())
+}
+
+fn request_link(mut link: Link, cmd: &Value) -> Result<Value, String> {
     let line = json!({"id": 1, "cmd": cmd}).to_string();
     let v = exchange(&mut link, &line).ok_or_else(|| NO_ANSWER.to_owned())?;
     match v.get("ok") {
-        Some(ok) => Ok(Some(ok.clone())),
+        Some(ok) => Ok(ok.clone()),
         None => Err(v["err"]["message"].as_str().unwrap_or("refused").to_owned()),
     }
 }

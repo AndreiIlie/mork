@@ -11,7 +11,7 @@ use std::time::Instant;
 use mork_core::decide::Event;
 use mork_core::state::State;
 
-use super::{Engine, Input, Options, Phase, upkeep};
+use super::{Engine, Input, Options, Phase, StartError, upkeep};
 use crate::jobs::context::Context;
 use crate::paths::Home;
 use crate::sockets::{self, Origin, Shared};
@@ -32,7 +32,8 @@ pub struct Kept {
 /// The environment variable that hands the kept descriptors to the target of a reload.
 pub const INHERIT: &str = "MORK_INHERIT";
 
-fn lock(home: &Home) -> Result<File, String> {
+fn lock(home: &Home) -> Result<File, StartError> {
+    std::fs::create_dir_all(home.root()).map_err(|e| format!("{}: {e}", home.root().display()))?;
     let mut f = OpenOptions::new()
         .read(true)
         .write(true)
@@ -43,7 +44,11 @@ fn lock(home: &Home) -> Result<File, String> {
     if !mork_sys::try_lock_exclusive(&f).map_err(|e| e.to_string())? {
         let mut pid = String::new();
         let _ = f.read_to_string(&mut pid);
-        return Err(format!("Mork already runs on {} (pid {})", home.root().display(), pid.trim()));
+        return Err(StartError::AlreadyRunning(format!(
+            "Mork already runs on {} (pid {})",
+            home.root().display(),
+            pid.trim()
+        )));
     }
     f.set_len(0).map_err(|e| e.to_string())?;
     let _ = write!(f, "{}", std::process::id());
@@ -205,15 +210,11 @@ impl Timer {
 type Opened = (Engine, Receiver<Input>, Option<builds::ReloadNote>, Option<String>);
 
 // Split from `start` only to keep each within the 60-line limit (fac-145).
-fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
+fn open(opts: Options, t: &mut Timer, lock_file: File, sock_fds: Option<(RawFd, RawFd)>) -> Result<Opened, String> {
     let mut config = config::read(&opts.config_path)?;
     t.step("config");
     make_dirs(&opts.home)?;
     git_identity(&opts.home, &config)?;
-    let (lock_file, sock_fds) = match inherited(&opts) {
-        Some((l, f, a)) => (l, Some((f, a))),
-        None => (lock(&opts.home)?, None),
-    };
     mork_sys::install_term_flag().map_err(|e| e.to_string())?;
     let shared = Shared::new(opts.commit.clone(), opts.dirty, opts.home.root().display().to_string());
     let (tx, rx) = channel();
@@ -241,6 +242,7 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
     let wakes = super::wakes::Wakes::open(&opts.home);
     let engine = Engine {
         reserved_ports,
+        bound_web_port,
         opts,
         ctx,
         store,
@@ -269,9 +271,13 @@ fn open(opts: Options, t: &mut Timer) -> Result<Opened, String> {
 }
 
 /// Starts the engine from its configured home and the running build's resources.
-pub fn start(opts: Options) -> Result<(Engine, Receiver<Input>), String> {
+pub fn start(opts: Options) -> Result<(Engine, Receiver<Input>), StartError> {
+    let (lock_file, sock_fds) = match inherited(&opts) {
+        Some((l, f, a)) => (l, Some((f, a))),
+        None => (lock(&opts.home)?, None),
+    };
     let mut t = Timer::new(&opts);
-    let (mut engine, rx, reload_note, fallback) = open(opts, &mut t)?;
+    let (mut engine, rx, reload_note, fallback) = open(opts, &mut t, lock_file, sock_fds)?;
     engine.views_cache.claude_accounts = crate::claude_accounts::Accounts::read(
         &engine.opts.home.login_home(),
         engine.ctx.config.claude_accounts.clone(),

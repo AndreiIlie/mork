@@ -1,5 +1,5 @@
 //! The engine's life: start up (2.7), take commands, launch and watch jobs, keep up, and
-//! shut down cleanly. It runs on threads of its own; the window never waits on it (1.1.3).
+//! shut down cleanly.
 
 mod act_board;
 mod act_forge;
@@ -86,9 +86,8 @@ pub struct Options {
     pub began: Instant,
     /// Started by a reload: its id (`--reloaded <id>`).
     pub reloaded: Option<String>,
-    /// How the app runs (`--no-window`, or nothing for the window): a reload's target runs
-    /// the same way.
-    pub mode_args: Vec<String>,
+    /// Only an interactive start opens the dashboard.
+    pub open_web: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -186,6 +185,7 @@ impl Watched {
 }
 
 pub struct Engine {
+    bound_web_port: Option<u16>,
     reserved_ports: std::collections::BTreeSet<u16>,
     pub opts: Options,
     pub ctx: Context,
@@ -254,25 +254,52 @@ pub enum Input {
     DoorKilled(Box<door::Killed>),
 }
 
-/// Runs the engine until a clean shutdown; returns the exit code.
-pub fn run(opts: Options, tunnels: Option<Sender<crate::jobs::web_tunnels::Configured>>) -> i32 {
-    match startup::start(opts) {
-        Ok((mut engine, rx)) => {
-            if let Some(tx) = tunnels {
-                let _ = tx.send(engine.ctx.config.tunnels.clone());
-            }
-            let code = engine.serve(&rx);
-            engine.shutdown();
-            code
-        }
-        Err(e) => {
-            eprintln!("mork: {e}");
-            1
-        }
+#[derive(Debug)]
+pub enum StartError {
+    AlreadyRunning(String),
+    Failed(String),
+}
+
+impl From<String> for StartError {
+    fn from(reason: String) -> Self {
+        Self::Failed(reason)
     }
 }
 
+/// Runs the engine until shutdown, returning a distinct error when the home is in use.
+pub fn run(opts: Options) -> Result<i32, StartError> {
+    let (mut engine, rx) = startup::start(opts)?;
+    if engine.opts.open_web && !mork_sys::term_requested() {
+        engine.open_dashboard();
+    }
+    let code = engine.serve(&rx);
+    engine.shutdown();
+    Ok(code)
+}
+
 impl Engine {
+    fn dashboard_port(&self) -> Result<u16, &'static str> {
+        self.ctx.config.mork.web_port.ok_or("[mork] web_port is unset")?;
+        let port = self.bound_web_port.ok_or("the web bridge failed to start")?;
+        crate::web::dashboard(self.ctx.config.mork.web_assets.as_deref())?;
+        Ok(port)
+    }
+
+    fn open_dashboard(&self) {
+        // A configured bridge already reported the specific startup error on stderr.
+        if self.ctx.config.mork.web_port.is_some() && self.bound_web_port.is_none() {
+            return;
+        }
+        match self.dashboard_port() {
+            Ok(port) => {
+                if let Err(e) = crate::jobs::launch::browser(self.opts.home.root(), port) {
+                    eprintln!("mork: couldn't open the dashboard: {e}");
+                }
+            }
+            Err(why) => eprintln!("mork: couldn't open the dashboard: {why}"),
+        }
+    }
+
     pub fn faults(&self) -> bool {
         faults::TEST_SETTINGS
     }

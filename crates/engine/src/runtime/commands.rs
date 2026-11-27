@@ -115,7 +115,7 @@ impl Engine {
             Command::History { place, before, count, turns } => Ok(self.history(&place, before, count, turns)),
             Command::HistorySearch { words } => return self.history_search(conn, req.id, &from, words),
             cmd @ Command::HistoryJournal { .. } => return self.history_journal(conn, req.id, &from, cmd),
-            Command::Status { jobs, all, card } => Ok(self.status(jobs, all, card.as_deref())),
+            Command::Status { jobs, all, card } => Ok(self.status(jobs, all, card.as_deref(), conn.origin)),
             Command::Usage {} => Ok(self.usage()),
             Command::ClaudeAccount { name } => self.claude_account(&name),
             Command::DebugSleep { ms } => return self.debug_sleep(conn, req.id, ms),
@@ -240,9 +240,21 @@ impl Engine {
         None
     }
 
-    fn status(&self, jobs: Option<bool>, all: Option<bool>, card: Option<&str>) -> Value {
+    fn status(
+        &self,
+        jobs: Option<bool>,
+        all: Option<bool>,
+        card: Option<&str>,
+        origin: crate::sockets::Origin,
+    ) -> Value {
         let lines = mork_core::views::status::status_lines(&self.state);
         let mut status = json!({"lines": lines, "revision": self.state.revision});
+        if origin == crate::sockets::Origin::Operator {
+            status["web"] = match self.dashboard_port() {
+                Ok(port) => json!({"port": port}),
+                Err(why) => json!({"unavailable": why}),
+            };
+        }
         if jobs.unwrap_or(false) {
             status["jobs"] = json!(self.status_jobs(all.unwrap_or(false), card));
         }

@@ -27,7 +27,6 @@ impl Engine {
             self.reload_failed(&format!("pin.next couldn't be written: {e}"));
             return;
         }
-        // `ui-session.json` is the window's, kept current as it changes: left as it is (M4.7).
         self.end_limits_read();
         self.hooks_settle();
         self.previews_end();
@@ -44,8 +43,7 @@ impl Engine {
             }
         }
         let inherit = fds.iter().map(i32::to_string).collect::<Vec<_>>().join(",");
-        let mut args = vec!["--reloaded".to_owned(), id];
-        args.extend(self.opts.mode_args.clone());
+        let args = ["--reloaded".to_owned(), id];
         let err = launch::exec(&builds::binary(&self.opts.home, &target), &args, &[(INHERIT.to_owned(), inherit)]);
         // The exec failed: the kept descriptors close on the next exec again (M1.3).
         for fd in fds {

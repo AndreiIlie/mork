@@ -55,6 +55,12 @@ fn report_error(home: &Home, msg: &str) {
     crate::runtime::upkeep::log(home, msg);
 }
 
+pub(crate) fn dashboard(assets: Option<&str>) -> Result<(), &'static str> {
+    let root = assets.ok_or("[mork] web_assets is unset")?;
+    assets::open_asset(Path::new(root), "/").ok_or("web_assets has no readable dashboard index.html")?;
+    Ok(())
+}
+
 /// Pure dispatch decision for one parsed HTTP request head.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Route {
