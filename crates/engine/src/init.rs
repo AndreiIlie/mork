@@ -217,20 +217,31 @@ impl Registration {
             return Err("pass --prefix with one or more ASCII letters".into());
         }
         let board = home.boards().join(&name).join("backlog");
-        text::destinations_outside(&root, &[&config, &home.tools().join("bin"), &board])?;
-        for entry in ["tasks", "completed", "archive/tasks", "config.yml"] {
-            text::destinations_outside(&root, &[&board.join(entry)])?;
+        for destination in [
+            config.clone(),
+            home.tools().join("bin"),
+            board.join("tasks"),
+            board.join("completed"),
+            board.join("archive/tasks"),
+            board.join("config.yml"),
+        ] {
+            text::destinations_outside(&root, &[&destination, &resolved(&destination)?])?;
         }
         let cargo = root.join("Cargo.toml").is_file();
         let package_path = root.join("package.json");
-        let package = optional(fs::read_to_string(&package_path), &package_path)?;
+        let has_package = package_path.is_file();
+        let package = if !cargo && opts.test.is_none() && has_package {
+            Some(fs::read_to_string(&package_path).map_err(|e| at(&package_path, e))?)
+        } else {
+            None
+        };
         let test = text::test_command(opts.test, cargo, package.as_deref())?.to_owned();
         let install = root.join("package-lock.json").is_file().then_some("npm ci");
         let mut domains = Vec::new();
         if cargo {
             domains.extend(["index.crates.io", "static.crates.io"]);
         }
-        if package.is_some() {
+        if has_package {
             domains.push("registry.npmjs.org");
         }
         Ok(Self { home, config, root, name, base, test, domains, install })

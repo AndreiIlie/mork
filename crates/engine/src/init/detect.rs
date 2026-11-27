@@ -23,6 +23,7 @@ fn ephemeral(path: &Path) -> bool {
 }
 
 fn executable(dir: &Path, name: &str) -> Option<(PathBuf, PathBuf)> {
+    let dir = if dir.as_os_str().is_empty() { Path::new(".") } else { dir };
     let place = dir.canonicalize().ok()?.join(name);
     let metadata = fs::metadata(&place).ok()?;
     if !metadata.is_file() || metadata.permissions().mode() & 0o111 == 0 || ephemeral(&place) {
@@ -45,7 +46,7 @@ fn npm_package(target: &Path) -> Option<&Path> {
 impl Tools {
     fn add(&mut self, name: &str, place: &Path, target: &Path, home: &Path) {
         let package = npm_package(target);
-        let mount = package.unwrap_or(place);
+        let mount = package.unwrap_or_else(|| if place.starts_with(home) { place } else { target });
         if mount.starts_with(home) {
             self.mounts.insert(mount.to_owned());
         }

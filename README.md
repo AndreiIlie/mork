@@ -79,7 +79,7 @@ cd ~/.local/opt/"$bundle"
 ./mork login codex  # Repeat for each CLI that init lists, using its name
 ```
 
-Init writes `~/.config/mork/mork.toml` and creates the project’s board under Mork’s data directory. It detects `cargo test` or an npm test script. For other projects, pass `--test 'your test command'`. A project whose tests need dependencies can set `install`; init sets it to `npm ci` for a root `package-lock.json`. See `mork.example.toml` for the configuration examples and `mork manual reference` for the keys.
+Init writes `~/.config/mork/mork.toml` and creates the project’s board under Mork’s data directory. It detects `cargo test` or an npm test script. For other projects, pass `--test 'your test command'`. For tests that need dependencies, set `install`. Init sets it to `npm ci` for a root `package-lock.json`. See `mork.example.toml` for the configuration examples and `mork manual reference` for the keys.
 
 Run `./mork` in the extracted directory to start the engine and open the dashboard in your browser. On your first visit, run `./mork web` in a second terminal and open the printed link to connect. Use `./mork --no-browser` to start the engine alone.
 

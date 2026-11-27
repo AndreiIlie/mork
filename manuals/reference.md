@@ -1868,21 +1868,51 @@ Example: `mork ctl orchestrator.review notes example.com`
 
 ### mork init
 
-`mork init [<repo>] [--name <project>] [--prefix <letters>] [--test <command>]` registers a local Git checkout. Run it outside a Mork job, with a repository path or from any directory in the checkout. It runs without prompts or a running engine. An already registered checkout prints its project name and exits successfully.
+`mork init [<repo>] [--name <project>] [--prefix <letters>] [--test <command>]` registers a local Git checkout.
+Run it outside a Mork job, with a repository path or from any directory in the checkout.
+It runs without prompts or a running engine.
+An already registered checkout prints its project name and exits successfully.
 
-Init takes the checked-out branch as the base. The branch needs a commit. The project name defaults to the checkout directory’s name and accepts ASCII letters, digits, dots, underscores and dashes, excluding `.` and `..`. The board prefix defaults to the first three ASCII letters in the name, lowercased. Use `--name` or `--prefix` to choose an unused value.
+Init takes the checked-out branch as the base.
+The branch needs a commit.
+The project name defaults to the checkout directory’s name and accepts ASCII letters, digits, dots, underscores and dashes, excluding `.` and `..`.
+The board prefix defaults to the first three ASCII letters in the name, lowercased.
+Use `--name` or `--prefix` to choose an unused value.
 
-The project uses the local forge. Init chooses `cargo test` for a root `Cargo.toml`, then `npm test` for a root `package.json` with a test script. Give `--test 'your test command'` to override detection. If neither yields a test command, init exits before writing. A root `package-lock.json` adds `install = "npm ci"`. A Cargo manifest adds `index.crates.io` and `static.crates.io` to the project’s domains, and a package manifest adds `registry.npmjs.org`.
+The project uses the local forge.
+Init chooses `cargo test` for a root `Cargo.toml`, then `npm test` for a root `package.json` with a test script.
+Give `--test 'your test command'` to override detection.
+If neither yields a test command, init exits before writing.
+A root `package-lock.json` adds `install = "npm ci"`.
+A Cargo manifest adds `index.crates.io` and `static.crates.io` to the project’s domains, and a package manifest adds `registry.npmjs.org`.
 
-On first setup, init creates `~/.config/mork/mork.toml` (or `MORK_CONFIG`) with the checkout’s Git `user.name` and `user.email` as the author. It needs both and at least one of `claude`, `codex` and `agy` on PATH. It keeps the seat defaults when Claude and Codex are both installed. Otherwise all seats use the first installed CLI in that order. Each detected CLI adds its model and login domains.
+On first setup, init creates `~/.config/mork/mork.toml` (or `MORK_CONFIG`) with the checkout’s Git `user.name` and `user.email` as the author.
+It needs both and at least one of `claude`, `codex` and `agy` on PATH.
+It keeps the seat defaults when Claude and Codex are both installed.
+Otherwise all seats use the first installed CLI in that order.
+Each detected CLI adds its model and login domains.
 
-Init detects Node, npm, npx, Cargo and the Rust proxies beside Cargo. For tools in the operator’s home, it lists the program file or its individual npm package directory in `toolchains`. For executables outside the standard system bin directories, it adds links under `<Mork home>/tools/bin` to the wall’s PATH. It sets `RUSTUP_HOME` when found and exposes the installed `toolchains`, `update-hashes` and `settings.toml` entries when inside the operator’s home. Cargo and npm get their shared download caches. The initial dashboard uses port 41900 and `web/dist` from the release bundle or source build when available.
+Init detects Node, npm, npx, Cargo and the Rust proxies beside Cargo.
+For tools in the operator’s home, it lists the program file or its individual npm package directory in `toolchains`.
+For executables outside the standard system bin directories, it adds links under `<Mork home>/tools/bin` to the wall’s PATH.
+It sets `RUSTUP_HOME` when found and exposes the installed `toolchains`, `update-hashes` and `settings.toml` entries when inside the operator’s home.
+Cargo and npm get their shared download caches.
+The initial dashboard uses port 41900 and `web/dist` from the release bundle or source build when available.
 
-The markdown board lives at `<Mork home>/boards/<project>/backlog/`. Init creates `tasks/`, `completed/`, `archive/tasks/` and `config.yml` with the statuses Backlog, In Progress and Done. It keeps a pre-existing board config and uses its prefix, which must contain only ASCII letters and agree with any explicit prefix. Agent clones and write destinations inside the registered checkout are refused.
+The markdown board lives at `<Mork home>/boards/<project>/backlog/`.
+Init creates `tasks/`, `completed/`, `archive/tasks/` and `config.yml` with the statuses Backlog, In Progress and Done.
+It keeps a pre-existing board config and uses its prefix, which must contain only ASCII letters and agree with any explicit prefix.
+Agent clones and write destinations inside the registered checkout are refused.
 
-For an existing config, init adds only the project table at the end. It locks the Mork home and config directories, checks the resulting TOML and replaces the resolved config file atomically, preserving existing text, symlinks and permission bits. A concurrent init holding either lock causes a refusal. Restart a running Mork to load the added project.
+For an existing config, init adds only the project table at the end.
+It locks the Mork home and config directories, checks the resulting TOML and replaces the resolved config file atomically, preserving existing text, symlinks and permission bits.
+A concurrent init holding either lock causes a refusal.
+Restart a running Mork to load the added project.
 
-Init prints the config, project and board details and, on first setup, the detected tools and sign-in commands. Run `mork login <cli>` for each listed CLI, then `mork`. Invalid arguments exit with code 2. A refused registration prints its reason and exits with code 1.
+Init prints the config, project and board details and, on first setup, the detected tools and sign-in commands.
+Run `mork login <cli>` for each listed CLI, then `mork`.
+Invalid arguments exit with code 2.
+A refused registration prints its reason and exits with code 1.
 
 ### mork login
 
