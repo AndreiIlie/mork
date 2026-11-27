@@ -81,8 +81,30 @@ fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError>
     Ok(())
 }
 
+fn check_passes(text: &str, name: &str, project: &mork_types::config::ProjectConfig) -> Result<(), ConfigError> {
+    use mork_types::lookback::{Read, Trigger};
+    for (read, pass) in &project.passes {
+        let thresholds = [pass.landings, pass.edits, pass.notes, pass.days];
+        let problem = if thresholds.contains(&Some(0)) {
+            "thresholds must be positive"
+        } else if pass.mode != Trigger::Manual && thresholds.iter().all(Option::is_none) {
+            "scheduled and auto require a threshold"
+        } else if *read != Read::Dream && pass.budget.is_some() {
+            "only dream takes a budget"
+        } else if pass.spare.is_some_and(|n| n > 100) {
+            "spare must be a percentage from 0 to 100"
+        } else {
+            continue;
+        };
+        let table = format!("projects.{name}.passes.{}", read.spec().name);
+        return Err(ConfigError::Value { line: table_line(text, &table), message: format!("{table}: {problem}") });
+    }
+    Ok(())
+}
+
 fn check_projects(text: &str, config: &mut Config) -> Result<(), ConfigError> {
     for (name, p) in &mut config.projects {
+        check_passes(text, name.as_str(), p)?;
         let approval = p.forge.merges_on_approval();
         if let mork_types::config::ForgeConfig::Github { token, approver, .. } = &mut p.forge {
             let table = format!("projects.{name}.forge");

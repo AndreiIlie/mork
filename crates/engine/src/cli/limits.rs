@@ -11,7 +11,7 @@ pub struct Window {
     /// The account's own (`account`), or a model's or a limit's own.
     pub bucket: String,
     /// `5h`, `week`, `<n>m`, or Claude's own names (`five_hour`, `seven_day`, …), kept as
-    /// reported; [`short_name`] is how they show.
+    /// reported; [`mork_types::usage::short_name`] is how they show.
     pub window: String,
     pub percent: Option<u32>,
     pub resets_at: Option<i64>,
@@ -32,28 +32,6 @@ pub fn claude_account(config: &Value) -> Option<mork_types::usage::Account> {
         _ => return None,
     };
     Some(mork_types::usage::Account { id: format!("{org}/{id}"), plan: plan.into() })
-}
-
-/// A window's display name: the 5h, week and Fable pools, or the vendor's other window name.
-pub fn short_name(window: &str) -> String {
-    match window {
-        "five_hour" => "5h".into(),
-        "seven_day" => "week".into(),
-        "seven_day_overage_included" => "fable".into(),
-        w => w.strip_prefix("seven_day_").map_or_else(|| w.to_owned(), |m| format!("week {m}")),
-    }
-}
-
-/// A window's length, from its name, when it says one (5.10.3, M4.23).
-pub fn length_ms(window: &str) -> Option<i64> {
-    let short = short_name(window);
-    let n = |t: &str| t.parse::<i64>().ok();
-    match short.as_str() {
-        w if w == "week" || w == "fable" || w.starts_with("week ") => Some(7 * 86_400_000),
-        w if w.ends_with('h') => n(&w[..w.len() - 1]).map(|h| h * 3_600_000),
-        w if w.ends_with('m') => n(&w[..w.len() - 1]).map(|m| m * 60_000),
-        _ => None,
-    }
 }
 
 fn percent(fraction: Option<&Value>) -> Option<u32> {

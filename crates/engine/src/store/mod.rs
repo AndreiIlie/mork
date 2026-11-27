@@ -314,10 +314,7 @@ fn load_entity(s: &mut State, kind: &str, data: &str) -> Result<()> {
             let a: mork_types::orchestrator::Auto = serde_json::from_str(data)?;
             s.autos.insert(a.project.clone(), a);
         }
-        "lookback" => {
-            let c: mork_types::lookback::Cursor = serde_json::from_str(data)?;
-            s.lookbacks.entry(c.project.clone()).or_default().insert(c.read, c);
-        }
+        "lookback" | "pass-baseline" | "landings" => lookback::load(s, kind, data)?,
         "forge-token" => {
             let (project, why) = serde_json::from_str(data)?;
             s.world.token_refused.insert(project, why);
@@ -380,10 +377,7 @@ fn write_change(tx: &rusqlite::Transaction<'_>, c: &Change) -> Result<()> {
             put_entity(tx, "pass", &id, &serde_json::to_string(p)?)?;
         }
         Change::PutAuto(a) => put_entity(tx, "auto", a.project.as_str(), &serde_json::to_string(a)?)?,
-        Change::PutLookback(c) => {
-            let id = format!("{}/{}", c.project, c.read.spec().name);
-            put_entity(tx, "lookback", &id, &serde_json::to_string(c)?)?;
-        }
+        Change::PutLookback(_) | Change::PutLandings { .. } | Change::PutBaseline(_) => lookback::write(tx, c)?,
         Change::PutOwedWork(w) => put_entity(tx, "owed-work", &w.key(), &serde_json::to_string(w)?)?,
         Change::RemoveOwedWork { key } => {
             tx.execute("DELETE FROM entities WHERE kind = 'owed-work' AND id = ?1", params![key])?;
@@ -424,6 +418,29 @@ mod tests {
         let db = dir.join("state.db");
         let store = Store::open(&db, "test").unwrap();
         assert_eq!(store.version, schema::NEWEST);
+        let id = "lookback-web-1";
+        let mut old = serde_json::to_value(mork_types::card::Card::new(
+            id.into(),
+            "web",
+            "Pulse",
+            mork_types::card::Mode::Report,
+            1,
+            10,
+        ))
+        .unwrap();
+        old["lookback"] =
+            serde_json::json!({"read":"pulse","from":null,"since_ms":0,"ended_since_ms":0,"through":null});
+        let cursor = serde_json::json!({"project":"web","read":"pulse","commit":null,"started_ms":0,"ended_ms":5});
+        store.conn.execute("INSERT INTO entities VALUES('card', ?1, ?2)", [id, &old.to_string()]).unwrap();
+        store.conn.execute("INSERT INTO entities VALUES('lookback','web/pulse',?1)", [cursor.to_string()]).unwrap();
+        store.conn.pragma_update(None, "user_version", 57).unwrap();
+        drop(store);
+        let store = Store::open(&db, "test").unwrap();
+        let state = store.load().unwrap();
+        let run = state.cards[id].lookback.as_ref().unwrap();
+        assert_eq!(run.trigger, mork_types::lookback::Trigger::Manual);
+        assert_eq!(run.at_start, None);
+        assert_eq!(state.lookbacks["web"][&run.read].ended_ms, 5);
         // A version 56 ask already points at its message. Replaying the old migration would replace that link.
         use mork_types::ask::{Ask, AskKind, Color};
         let mut ask = Ask::new("done".into(), "web-1", Some("web-1".into()), AskKind::Done, Color::Yellow, "Done?");

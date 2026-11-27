@@ -63,7 +63,11 @@ pub(super) fn read(state: &State, from: &Sender, f: &MemoryFile, now: i64) -> De
         "memory": f.memory, "name": f.name, "description": f.description,
         "writer": f.writer, "origin": f.origin, "written_ms": f.written_ms, "text": f.text,
     }}));
-    if matches!(from, Sender::Agent(_)) {
+    if let Sender::Agent(key) = from
+        && !super::seat_card(state, key)
+            .and_then(|c| c.lookback.as_ref())
+            .is_some_and(|r| r.read == mork_types::lookback::Read::Dream)
+    {
         let mut next = f.clone();
         next.reads += 1;
         next.last_read_ms = Some(now);
@@ -154,8 +158,26 @@ pub(super) fn apply(p: &mut Poster<'_>, memory: &str, edit: &Edit, by: &str, car
     p.other.push(change);
     p.other.push(Change::PutMemoryTally(tally));
     p.journal(kind, card.map(CardId::as_str), data);
+    dream_edit(p, memory, &edit.name, by);
     super::staged::mark(p, memory, &edit.name);
     true
+}
+
+fn dream_edit(p: &mut Poster<'_>, memory: &str, name: &str, by: &str) {
+    let Some(mut card) = p.card_where(|c| {
+        c.project.as_str() == memory
+            && c.stage.is_live()
+            && c.lookback.as_ref().is_some_and(|r| r.read == mork_types::lookback::Read::Dream)
+    }) else {
+        return;
+    };
+    let Some(run) = card.lookback.as_mut() else { return };
+    if by == format!("{}/foreman", card.id) {
+        run.own_edits += 1;
+    } else {
+        run.changed.insert(name.to_owned());
+    }
+    p.put_card(card);
 }
 
 // `memory.stats`: each memory's counts and files, or `only`'s.

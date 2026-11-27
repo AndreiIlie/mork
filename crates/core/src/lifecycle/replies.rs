@@ -177,6 +177,11 @@ pub fn outcome(p: &mut Poster<'_>, who: &Who, r: &Reply, job: &Job, ctx: Ctx<'_>
             }
         }
         (Role::Foreman, Outcome::ReportReady) if card.stage == Stage::Report => {
+            if card.lookback.as_ref().is_some_and(|r| r.trigger != mork_types::lookback::Trigger::Manual) {
+                super::lookback::completed(p, &card);
+                super::stops::ended(p, card, ctx);
+                return;
+            }
             let mut raise = Raise::new(
                 card.id.as_str(),
                 AskKind::Done,

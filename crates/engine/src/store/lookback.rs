@@ -1,11 +1,12 @@
 use mork_core::maintenance::changelog;
+use mork_core::state::{Change, State};
 use mork_types::ProjectId;
 use mork_types::action::Action;
 use rusqlite::params;
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use super::{Result, Store};
+use super::{Result, Store, put_entity};
 
 /// A landing's known bounds and the submitted head that identifies its card's work.
 #[derive(Serialize)]
@@ -80,4 +81,40 @@ impl Store {
         }
         Ok(ends)
     }
+}
+
+pub(super) fn load(s: &mut State, kind: &str, data: &str) -> Result<()> {
+    match kind {
+        "pass-baseline" => {
+            s.apply(&Change::PutBaseline(serde_json::from_str(data)?));
+        }
+        "landings" => {
+            let (project, n) = serde_json::from_str(data)?;
+            s.landings.insert(project, n);
+        }
+        "lookback" => {
+            let c: mork_types::lookback::Cursor = serde_json::from_str(data)?;
+            s.lookbacks.entry(c.project.clone()).or_default().insert(c.read, c);
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+pub(super) fn write(tx: &rusqlite::Transaction<'_>, c: &Change) -> Result<()> {
+    match c {
+        Change::PutLandings { project, count: n } => {
+            put_entity(tx, "landings", project, &serde_json::to_string(&(project, n))?)?
+        }
+        Change::PutBaseline(b) => {
+            let id = format!("{}/{}", b.project, b.read.spec().name);
+            put_entity(tx, "pass-baseline", &id, &serde_json::to_string(b)?)?;
+        }
+        Change::PutLookback(c) => {
+            let id = format!("{}/{}", c.project, c.read.spec().name);
+            put_entity(tx, "lookback", &id, &serde_json::to_string(c)?)?;
+        }
+        _ => {}
+    }
+    Ok(())
 }

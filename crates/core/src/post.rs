@@ -157,8 +157,12 @@ impl<'a> Poster<'a> {
 
     /// The agents, as this decision has them, that `f` accepts; any it removed gone.
     pub fn agents_where(&self, f: impl Fn(&Agent) -> bool) -> Vec<Agent> {
+        self.all_agents().filter(|a| f(a)).cloned().collect()
+    }
+
+    pub(crate) fn all_agents(&self) -> impl Iterator<Item = &Agent> {
         let kept = self.state.agents.iter().filter(|(k, _)| !self.agents.contains_key(*k)).map(|(_, a)| a);
-        self.agents.values().chain(kept).filter(|a| !self.removed.contains(&a.key) && f(a)).cloned().collect()
+        self.agents.values().chain(kept).filter(|a| !self.removed.contains(&a.key))
     }
 
     /// Makes sure a place exists.

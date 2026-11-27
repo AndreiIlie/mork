@@ -4,7 +4,8 @@ use mork_types::usage::{Limit, LimitView};
 use mork_types::view::Share;
 
 use crate::claude_accounts::Accounts;
-use crate::cli::limits::{ACCOUNT, length_ms, short_name};
+use crate::cli::limits::ACCOUNT;
+use mork_types::usage::{length_ms, short_name};
 
 struct Reading<'a> {
     limit: &'a Limit,

@@ -65,7 +65,11 @@ pub(super) fn change(
     } else {
         None
     };
-    let held = seat.and_then(|(key, card)| Some((key, &card.id, holding(state, card)?)));
+    let dream = super::dream_foreman(state, from);
+    if dream.and_then(|c| c.lookback.as_ref()).is_some_and(|r| r.changed.contains(&edit.name)) {
+        return Err(format!("memory file `{}` changed during this dream run", edit.name));
+    }
+    let held = seat.filter(|_| dream.is_none()).and_then(|(key, card)| Some((key, &card.id, holding(state, card)?)));
     let pending = held.into_iter().flat_map(|(key, _, c)| c.staged_memory.iter().filter(move |s| &s.seat == key));
     let exists = validate(memory, &edit, new, descriptions(state, memory, pending))?;
     let kind = if edit.after.is_some() { "memory.write" } else { "memory.delete" };

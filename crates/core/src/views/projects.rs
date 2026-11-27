@@ -25,7 +25,8 @@ pub(super) fn projects(state: &State, outside: &Outside, ctx: Ctx<'_>) -> Vec<Pr
                         last_view(c.ended_ms, outside.tz_offset_min, commits)
                     });
                     let running = live.filter(|(_, active)| *active == read).map(|(id, _)| id.clone());
-                    ReadView { read, last, running }
+                    let mode = ctx.config.projects[project].passes.get(&read).map(|p| p.mode).unwrap_or_default();
+                    ReadView { read, last, running, mode }
                 })
                 .collect();
             ProjectView { project: project.clone(), rows }

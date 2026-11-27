@@ -13,6 +13,7 @@ pub const INPUT_FILE: &str = ".git/mork/lookback.json";
 pub enum Read {
     Pulse,
     DeepSweep,
+    Dream,
 }
 
 /// The words shared by the command, card and Projects tab.
@@ -24,7 +25,7 @@ pub struct ReadSpec {
 
 impl Read {
     /// The order of reads in the Projects tab.
-    pub const ALL: [Self; 2] = [Self::Pulse, Self::DeepSweep];
+    pub const ALL: [Self; 3] = [Self::Pulse, Self::DeepSweep, Self::Dream];
 
     /// Finds a read by its command name.
     pub fn named(name: &str) -> Option<Self> {
@@ -44,6 +45,11 @@ impl Read {
                 "Look back: deep sweep",
                 "Reads the whole code for dead code, dead tests, risks and wording. Run it monthly.",
             ),
+            Self::Dream => (
+                "dream",
+                "Look back: dream",
+                "Consolidates project memory against the current code and folds lesson notes.",
+            ),
         };
         ReadSpec { name, button, detail }
     }
@@ -60,6 +66,42 @@ pub struct Cursor {
     pub read: Read,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Trigger {
+    #[default]
+    Manual,
+    Scheduled,
+    Auto,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PassConfig {
+    pub mode: Trigger,
+    pub landings: Option<u64>,
+    pub edits: Option<u64>,
+    pub notes: Option<u64>,
+    pub days: Option<u64>,
+    pub spare: Option<u32>,
+    pub budget: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Counts {
+    pub landings: u64,
+    pub memory_edits: u64,
+    pub note: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Baseline {
+    pub project: ProjectId,
+    pub read: Read,
+    pub at_ms: i64,
+    pub counts: Counts,
+}
+
 /// A report's fixed read window; `through` is filled when its clone's commit is selected.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Run {
@@ -68,6 +110,14 @@ pub struct Run {
     pub since_ms: Option<i64>,
     pub ended_since_ms: Option<i64>,
     pub through: Option<Sha>,
+    #[serde(default)]
+    pub trigger: Trigger,
+    #[serde(default)]
+    pub at_start: Option<Counts>,
+    #[serde(default)]
+    pub own_edits: u64,
+    #[serde(default)]
+    pub changed: std::collections::BTreeSet<String>,
 }
 
 /// One configured project's look-back in main, whether or not it has run before.
@@ -80,6 +130,7 @@ pub struct ProjectView {
 /// A row's last completion and, for the active read, its live card.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReadView {
+    pub mode: Trigger,
     pub read: Read,
     pub last: Option<LastView>,
     pub running: Option<CardId>,

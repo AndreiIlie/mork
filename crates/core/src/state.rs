@@ -46,6 +46,8 @@ pub struct State {
     pub orchestrator_next: u64,
     /// Each project's auto switch, by project, on or off (fac-233).
     pub autos: BTreeMap<mork_types::ProjectId, mork_types::orchestrator::Auto>,
+    pub landings: BTreeMap<mork_types::ProjectId, u64>,
+    pub baselines: BTreeMap<(mork_types::ProjectId, mork_types::lookback::Read), mork_types::lookback::Baseline>,
     pub lookbacks: BTreeMap<mork_types::ProjectId, BTreeMap<mork_types::lookback::Read, mork_types::lookback::Cursor>>,
     /// The memories' files, by [`mork_types::memory::MemoryFile::key`] (fac-159).
     pub memory_files: BTreeMap<String, mork_types::memory::MemoryFile>,
@@ -107,6 +109,11 @@ pub enum Change {
     AddOrchestratorEvent(mork_types::orchestrator::OrchestratorEvent),
     /// A project's auto switch (fac-233).
     PutAuto(mork_types::orchestrator::Auto),
+    PutBaseline(mork_types::lookback::Baseline),
+    PutLandings {
+        project: mork_types::ProjectId,
+        count: u64,
+    },
     PutLookback(mork_types::lookback::Cursor),
     PutMemoryFile(Box<mork_types::memory::MemoryFile>),
     RemoveMemoryFile {
@@ -195,6 +202,8 @@ impl State {
             | Change::RemoveOwedWork { .. }
             | Change::AddOrchestratorEvent(_)
             | Change::PutAuto(_)
+            | Change::PutBaseline(_)
+            | Change::PutLandings { .. }
             | Change::PutLookback(_) => self.apply_more(c),
             Change::PutMemoryFile(_) | Change::RemoveMemoryFile { .. } | Change::PutMemoryTally(_) => {
                 self.apply_memory(c);
@@ -220,6 +229,10 @@ impl State {
             self.notes.remove(id);
         } else if let Change::PutAuto(a) = c {
             self.autos.insert(a.project.clone(), a.clone());
+        } else if let Change::PutBaseline(b) = c {
+            self.baselines.insert((b.project.clone(), b.read), b.clone());
+        } else if let Change::PutLandings { project, count: n } = c {
+            self.landings.insert(project.clone(), *n);
         } else if let Change::PutLookback(c) = c {
             self.lookbacks.entry(c.project.clone()).or_default().insert(c.read, c.clone());
         }

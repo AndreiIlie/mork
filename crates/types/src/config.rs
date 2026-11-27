@@ -367,6 +367,8 @@ impl TicketsConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
+    #[serde(default)]
+    pub passes: BTreeMap<crate::lookback::Read, crate::lookback::PassConfig>,
     pub repo: String,
     pub git_author: Option<String>,
     #[serde(default = "d_base")]

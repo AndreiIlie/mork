@@ -13,7 +13,13 @@ use crate::git::{self, mirror};
 impl Engine {
     pub(super) fn write_lookback(&self, card: &Card, run: &Run, at: &str, dir: &Path) -> Result<Option<Sha>, String> {
         let mut inputs = json!({"read": run.read, "through": at, "started_ms": card.started_ms});
-        inputs["open_cards"] = json!(self.open_cards(card));
+        if run.read == Read::Dream {
+            let pass = self.ctx.config.projects.get(&card.project).and_then(|p| p.passes.get(&Read::Dream));
+            inputs["budget"] = json!(pass.and_then(|p| p.budget).unwrap_or(60));
+            inputs["last"] = json!(self.state.lookbacks.get(&card.project).and_then(|m| m.get(&Read::Dream)));
+        } else {
+            inputs["open_cards"] = json!(self.open_cards(card));
+        }
         let from = if run.read == Read::Pulse {
             let since = run.ended_since_ms.ok_or("pulse has no starting time for ended cards")?;
             let ended = self.store.lookback_ends(&card.project, since, card.started_ms).map_err(|e| e.to_string())?;

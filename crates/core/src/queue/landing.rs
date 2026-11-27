@@ -299,6 +299,8 @@ pub fn landed_at(
     if let Some(after) = after {
         row["after"] = json!(after);
     }
+    let count = p.state.landings.get(&project).copied().unwrap_or_default() + 1;
+    p.other.push(crate::state::Change::PutLandings { project: project.clone(), count });
     p.journal("card.landed", Some(id.as_str()), row);
     crate::reviews::end::end(p, &c, ctx);
     super::joins::early(p, &c, tip.clone().or(c.head.clone()), ctx);

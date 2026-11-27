@@ -2,6 +2,28 @@
 
 use serde::{Deserialize, Serialize};
 
+/// A window's display name: the 5h, week and Fable pools, or the vendor's other window name.
+pub fn short_name(window: &str) -> String {
+    match window {
+        "five_hour" => "5h".into(),
+        "seven_day" => "week".into(),
+        "seven_day_overage_included" => "fable".into(),
+        w => w.strip_prefix("seven_day_").map_or_else(|| w.to_owned(), |m| format!("week {m}")),
+    }
+}
+
+/// A window's length, from its name, when it says one (5.10.3, M4.23).
+pub fn length_ms(window: &str) -> Option<i64> {
+    let short = short_name(window);
+    let n = |t: &str| t.parse::<i64>().ok();
+    match short.as_str() {
+        w if w == "week" || w == "fable" || w.starts_with("week ") => Some(7 * 86_400_000),
+        w if w.ends_with('h') => n(&w[..w.len() - 1]).map(|h| h * 3_600_000),
+        w if w.ends_with('m') => n(&w[..w.len() - 1]).map(|m| m * 60_000),
+        _ => None,
+    }
+}
+
 /// The Claude account and organization whose plan owns a reading.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Account {

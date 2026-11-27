@@ -50,14 +50,14 @@ fn brief_stall_check_waits_for_foreman_reply_in_challenge_place() {
     assert!(s.owed(&foreman));
 
     // Before foreman starts its turn, Tick must not nudge planner.
-    s.apply(Event::Tick);
+    s.apply(Event::Tick { claude_account: None });
     assert_eq!(stalled_nudges(&s, &spec, "planner"), 0, "planner must not be nudged while foreman owes a reply");
     assert!(s.card(CARD).stalled.is_none());
 
     // Once foreman replies in the challenge place and planner later stalls with nothing owed, planner is nudged.
     s.turn(&foreman, reply_with("working", "Answered", "planner", "response", "Looks good."));
     s.turn(&planner, reply("working", "Still thinking"));
-    s.apply(Event::Tick);
+    s.apply(Event::Tick { claude_account: None });
     assert_eq!(stalled_nudges(&s, &spec, "planner"), 1, "planner should be nudged once its request was answered");
     assert!(s.card(CARD).stalled.is_some());
 }
@@ -74,7 +74,7 @@ fn brief_stall_check_nudges_foreman_if_it_drops_challenge_request() {
     // Foreman runs and ends `working` without replying to planner.
     s.turn(&foreman, reply("working", "Read it"));
 
-    s.apply(Event::Tick);
+    s.apply(Event::Tick { claude_account: None });
     assert_eq!(stalled_nudges(&s, &spec, "planner"), 0, "planner must not be nudged when foreman owes the reply");
     assert_eq!(stalled_nudges(&s, CARD, "foreman"), 1, "foreman should be nudged for its unanswered request");
 }
@@ -107,7 +107,7 @@ fn build_stall_check_ignores_brief_objection_and_tracks_build_request() {
     for id in s.open_jobs(|p| matches!(p, Purpose::Bundle { card: c, .. } if c.as_str() == CARD)) {
         s.end_job(&id, clean.clone());
     }
-    s.apply(Event::Tick);
+    s.apply(Event::Tick { claude_account: None });
     assert_eq!(stalled_nudges(&s, CARD, "foreman"), 1, "brief request must not suppress build stall check");
     assert_eq!(stalled_nudges(&s, &spec, "planner"), 0, "brief request must not nudge planner at build");
 
@@ -117,10 +117,10 @@ fn build_stall_check_ignores_brief_objection_and_tracks_build_request() {
     for id in s.open_jobs(|p| matches!(p, Purpose::Bundle { card: c, .. } if c.as_str() == CARD)) {
         s.end_job(&id, clean.clone());
     }
-    s.apply(Event::Tick);
+    s.apply(Event::Tick { claude_account: None });
     assert!(s.card(CARD).stalled.is_none(), "moving to planner should clear the prior stall");
     s.turn(&planner, reply("working", "Read it without answering"));
-    s.apply(Event::Tick);
+    s.apply(Event::Tick { claude_account: None });
     assert_eq!(stalled_nudges(&s, CARD, "foreman"), 1, "foreman must not be nudged while planner owes a reply");
     assert_eq!(stalled_nudges(&s, &spec, "planner"), 1, "planner should be nudged for its unanswered build request");
 }

@@ -55,6 +55,7 @@ pub(super) fn cut_noted(prompt: &str) -> String {
 /// The agents owed a turn that may launch now: owed, unpaused, past any reset, no job unsettled, of a
 /// live card (fac-146) whose turns the merge queue doesn't hold (fac-10), past its other turn holds.
 pub fn due(state: &State, config: &Config, now: i64) -> Vec<AgentKey> {
+    let busy = std::cell::OnceCell::new();
     state
         .agents
         .values()
@@ -69,8 +70,29 @@ pub fn due(state: &State, config: &Config, now: i64) -> Vec<AgentKey> {
         .filter(|a| a.retiring.is_some() || !crate::lifecycle::mock::holds(state, a))
         // A visual card's mock folder has one writer: the baseline seat first, then the planner (fac-636).
         .filter(|a| !crate::lifecycle::baseline::waits(state, a))
+        .filter(|a| {
+            let auto = crate::memory::seat_card(state, &a.key)
+                .and_then(|c| c.lookback.as_ref())
+                .is_some_and(|run| run.trigger == mork_types::lookback::Trigger::Auto);
+            !auto || !*busy.get_or_init(|| real_running(state) || state.agents.values().any(|a| real_owed(state, a)))
+        })
         .map(|a| a.key.clone())
         .collect()
+}
+
+pub(crate) fn real_running(state: &State) -> bool {
+    state
+        .jobs
+        .values()
+        .filter(|j| j.purpose.is_none() && j.settled.is_none())
+        .filter_map(|j| j.owner.as_str().split_once('/'))
+        .any(|(card, _)| state.cards.get(card).is_some_and(|c| c.lookback.is_none()))
+}
+
+pub(crate) fn real_owed(state: &State, a: &Agent) -> bool {
+    a.owed.is_some()
+        && crate::memory::seat_card(state, &a.key).is_some_and(|c| c.lookback.is_none())
+        && (super::closing::ending_turn(a) || (!a.paused && super::closing::may_run(state, a)))
 }
 
 /// Whether the seat itself is ready to launch an owed turn.

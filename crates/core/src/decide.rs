@@ -161,7 +161,9 @@ pub enum Event {
         commit: String,
     },
     /// Time passed: leases to free, queues to start, fetches and polls due.
-    Tick,
+    Tick {
+        claude_account: Option<String>,
+    },
     /// A test-slot client's connection ended (4.9.3).
     LeaseClosed {
         lease: mork_types::LeaseId,
@@ -335,7 +337,7 @@ fn route(state: &State, event: &Event, ctx: Ctx<'_>) -> Decision {
             changes: vec![Change::SetChecksFolder { project: project.clone(), commit: commit.clone() }],
             ..Decision::default()
         },
-        Event::Tick => events::tick(state, ctx),
+        Event::Tick { claude_account } => events::tick(state, claude_account.as_deref(), ctx),
         Event::LeaseClosed { lease } => crate::queue::leases::closed(state, lease, ctx),
         Event::Started => events::started(state, ctx),
     }

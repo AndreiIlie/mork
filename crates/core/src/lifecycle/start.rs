@@ -57,6 +57,7 @@ pub(super) fn port(p: &Poster<'_>, ctx: Ctx<'_>) -> Option<u16> {
     let live = p.state.cards.values().filter(|c| c.stage.is_live());
     let mut used: std::collections::BTreeSet<_> =
         live.flat_map(|c| [c.port, c.mock.and_then(|m| m.port)]).flatten().collect();
+    used.extend(p.all_new_cards().iter().filter_map(|c| c.port));
     used.extend(ctx.config.mork.web_port);
     used.extend(ctx.config.tunnels.values().map(|t| t.port));
     (from..=to).find(|n| !used.contains(n))

@@ -187,10 +187,20 @@ fn delete(state: &State, from: &Sender, project: &ProjectId, ids: &[String], ctx
     }
     let mork = ctx.config.mork.project.as_ref();
     let mut selected = BTreeSet::new();
+    let dream = super::dream_foreman(state, from);
+    let mut lessons = BTreeMap::new();
     for id in ids {
         let id = id.parse::<u64>().map_err(|_| format!("`{id}` isn't a note id"))?;
-        if !state.notes.get(&id).is_some_and(|n| under(n, mork) == Some(project)) {
-            return Err(format!("project `{project}` has no note {id}"));
+        let note = state
+            .notes
+            .get(&id)
+            .filter(|n| under(n, mork) == Some(project))
+            .ok_or_else(|| format!("project `{project}` has no note {id}"))?;
+        if dream.is_some() {
+            let NoteWhat::Lesson { text } = &note.what else {
+                return Err(format!("note {id} is not a lesson"));
+            };
+            lessons.insert(id, text);
         }
         selected.insert(id);
     }
@@ -204,7 +214,11 @@ fn delete(state: &State, from: &Sender, project: &ProjectId, ids: &[String], ctx
         }
     }
     let mut d = Decision::ok(json!({"notes.delete": {"project": project, "deleted": selected.len()}}));
-    d.journal("notes.deleted", None, json!({"project": project, "ids": selected, "by": from.label()}));
+    let mut data = json!({"project": project, "ids": selected, "by": from.label()});
+    if dream.is_some() {
+        data["lessons"] = json!(lessons);
+    }
+    d.journal("notes.deleted", dream.map(|c| c.id.as_str()), data);
     for id in &selected {
         // A handoff's note goes with its files: nothing else lists them.
         if let Some(Note { card: Some(card), project: kept, what: NoteWhat::Handoff { run, .. }, .. }) =

@@ -237,6 +237,9 @@ pub(super) fn close(state: &State, id: &str, why: &str, ctx: Ctx<'_>) -> Decisio
     let cid = c.id.clone();
     stop_in(&mut p, c.clone(), ctx);
     let mut c = p.card(&cid).unwrap_or(c);
+    if let Some(run) = c.lookback.as_ref().filter(|r| r.trigger != mork_types::lookback::Trigger::Manual) {
+        super::lookback::rearm(&mut p, &c, run);
+    }
     c.stage = Stage::Closed;
     c.closed = Some(why.to_owned());
     c.released = !c.carries.is_empty() && super::carried::closed_on_board(p.state, &cid);
@@ -299,7 +302,9 @@ pub(super) fn done(state: &State, from: &Sender, id: &str, ctx: Ctx<'_>) -> Deci
         let what = crate::board::writes::change(state, &c.project, &bc.file, edit, Some(c.id.clone()), p.now);
         p.act(what);
     }
-    super::lookback::completed(&mut p, &c);
+    if p.all_asks().any(|a| a.open && a.kind == mork_types::ask::AskKind::Done && a.card.as_ref() == Some(&c.id)) {
+        super::lookback::completed(&mut p, &c);
+    }
     ended(&mut p, c, ctx);
     let mut d = Decision::ok(json!({"done": {"card": id}}));
     p.finish(&mut d);

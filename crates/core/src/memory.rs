@@ -30,6 +30,16 @@ pub(crate) fn seat_card<'a>(state: &'a State, key: &mork_types::AgentKey) -> Opt
     state.cards.get(&id)
 }
 
+pub(crate) fn dream_foreman<'a>(state: &'a State, from: &Sender) -> Option<&'a mork_types::card::Card> {
+    let Sender::Agent(key) = from else { return None };
+    let agent = state.agents.get(key)?;
+    let card = state.cards.get(agent.place.as_str())?;
+    (agent.role == mork_types::reply::Role::Foreman
+        && card.stage == mork_types::card::Stage::Report
+        && card.lookback.as_ref().is_some_and(|r| r.read == mork_types::lookback::Read::Dream))
+    .then_some(card)
+}
+
 pub(crate) fn lesson_note_help(mork: Option<&ProjectId>) -> String {
     match mork {
         Some(mork) => format!(

@@ -79,7 +79,7 @@ pub fn buzz(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Option
 
 fn other_buzz(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Option<ErrorBody> {
     orchestrator_buzz(from, cmd)
-        .or_else(|| triage_buzz(from, cmd))
+        .or_else(|| triage_buzz(state, from, cmd))
         .or_else(|| memory_buzz(state, from, cmd, ctx))
         .or_else(|| claude_account_buzz(from, cmd))
         .or_else(|| alarm_buzz(state, from, cmd))
@@ -121,14 +121,18 @@ fn orchestrator_buzz(from: &Sender, cmd: &Command) -> Option<ErrorBody> {
     Some(ErrorBody::new(ErrorCode::Buzz, words))
 }
 
-// Deleting triaged notes is the operator's, or an orchestrator's (fac-189, fac-193, fac-287).
-fn triage_buzz(from: &Sender, cmd: &Command) -> Option<ErrorBody> {
-    if !matches!(cmd, Command::NotesDelete { .. }) || *from == Sender::Operator || from.is_orchestrator() {
+// A Dream seat's project is checked here and each note's kind before the deletion.
+fn triage_buzz(state: &State, from: &Sender, cmd: &Command) -> Option<ErrorBody> {
+    let Command::NotesDelete { project, .. } = cmd else { return None };
+    if *from == Sender::Operator
+        || from.is_orchestrator()
+        || crate::memory::dream_foreman(state, from).is_some_and(|c| c.project == *project)
+    {
         return None;
     }
     Some(ErrorBody::new(
         ErrorCode::Buzz,
-        "Deleting notes is the operator's, or an orchestrator's: they triage them, and a deletion is for good."
+        "Only the operator, an orchestrator or a Dream foreman folding its project's lessons may delete notes."
             .to_owned(),
     ))
 }
@@ -141,6 +145,12 @@ fn memory_buzz(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Opt
     let words = match from {
         Sender::Operator => return None,
         Sender::Orchestrator(p) if owned(p) => return None,
+        Sender::Agent(_)
+            if memory != GENERAL
+                && crate::memory::dream_foreman(state, from).is_some_and(|c| c.project.as_str() == memory) =>
+        {
+            return None;
+        }
         Sender::Agent(key)
             if state.agents.get(key).is_some_and(|a| a.retiring.as_ref().is_some_and(|r| r.asked && !r.resumed)) =>
         {

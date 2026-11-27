@@ -330,6 +330,18 @@ mod tests {
     }
 
     #[test]
+    fn project_passes_validate_modes_thresholds_and_dream_budget() -> Result<(), ConfigError> {
+        let config =
+            |read, fields| parse(&format!("{WAKE_PROJECT}\n[projects.\"example.com\".passes.{read}]\n{fields}\n"));
+        for fields in ["mode='scheduled'", "mode='auto'", "days=0", "budget=10", "spare=101"] {
+            assert!(config("pulse", fields).is_err(), "{fields}");
+        }
+        let valid = config("dream", "mode='auto'\nedits=8\nbudget=10")?;
+        assert_eq!(valid.projects["example.com"].passes[&mork_types::lookback::Read::Dream].budget, Some(10));
+        Ok(())
+    }
+
+    #[test]
     fn project_git_author_falls_back_to_global() -> Result<(), ConfigError> {
         let config = parse(&format!(
             "{WAKE_PROJECT}\n[projects.work]\nrepo = '/work'\nboard = {{ kind = 'markdown', path = '/board' }}\n\

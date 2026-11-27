@@ -116,7 +116,15 @@ pub(super) fn projects(state: &State, ctx: Ctx<'_>) -> Decision {
                 state.board.values().find(|b| &b.project == name && !b.prefix.is_empty()).map(|b| b.prefix.clone())
             });
             let auto = json!({"on": crate::messages::auto::on(state, name)});
-            json!({"name": name, "base": p.base, "prefix": prefix, "local": !p.forge.hosted(), "forge": p.forge.project_view(), "auto": auto})
+            let live = crate::lifecycle::lookback::live(state, name);
+            let passes = mork_types::lookback::Read::ALL.map(|read| {
+                let config = p.passes.get(&read).cloned().unwrap_or_default();
+                let last = state.lookbacks.get(name).and_then(|rows| rows.get(&read));
+                let running = live.filter(|(_, active)| *active == read).map(|(id, _)| id);
+                json!({"read": read, "mode": config.mode, "landings": config.landings, "edits": config.edits,
+                    "notes": config.notes, "days": config.days, "last": last, "running": running})
+            });
+            json!({"passes": passes, "name": name, "base": p.base, "prefix": prefix, "local": !p.forge.hosted(), "forge": p.forge.project_view(), "auto": auto})
         })
         .collect();
     Decision::ok(json!({"projects": {"projects": list}}))

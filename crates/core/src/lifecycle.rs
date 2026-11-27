@@ -19,6 +19,7 @@ pub mod replies;
 pub mod retired;
 pub mod start;
 pub mod stops;
+pub(crate) mod trigger;
 pub mod visual;
 
 use mork_types::card::Card;

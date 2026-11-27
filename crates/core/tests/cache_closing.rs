@@ -152,7 +152,7 @@ fn owed_closing_turn_and_correction_expire_when_cold() {
 
     s.now += cache::CLAUDE_MS + 1000;
     assert!(!s.owed(PLANNER), "cold closing turn is never returned as due");
-    s.apply(Event::Tick);
+    s.apply(Event::Tick { claude_account: None });
     let planner = agent(&s, PLANNER);
     assert!(planner.retiring.is_none(), "tick settles cold retiring seat");
     assert_eq!(planner.owed, Some(Owed::Wake), "held request becomes owed once cold closing turn expires");
@@ -168,7 +168,7 @@ fn owed_closing_turn_and_correction_expire_when_cold() {
 
     s.now += cache::CLAUDE_MS + 1000;
     assert!(!turns::due(&s.state, &s.config, s.now).iter().any(|k| k.as_str() == PLANNER));
-    s.apply(Event::Tick);
+    s.apply(Event::Tick { claude_account: None });
     let planner = agent(&s, PLANNER);
     assert!(planner.retiring.is_none(), "cold closing correction is expired by tick");
     assert!(planner.owed.is_none());
@@ -324,7 +324,7 @@ fn cold_limit_hit_in_closing_turn_keeps_not_before_for_held_wake() {
     assert!(!s.owed(PLANNER), "cold closing turn waiting on limit is not due");
     assert_eq!(agent(&s, PLANNER).not_before, Some(expected_until));
 
-    s.apply(Event::Tick);
+    s.apply(Event::Tick { claude_account: None });
     let planner = agent(&s, PLANNER);
     assert!(planner.retiring.is_none(), "tick expires the cold closing turn");
     assert_eq!(planner.owed, Some(Owed::Wake), "held request stays owed");
