@@ -96,7 +96,8 @@ Nothing reviews a review card in turn.
    For your own proofs that need a browser, follow the Chromium sentence in step 7 of the `reviewing-a-topic` skill.
    The engine runs none of them itself.
 5. **Give the verdict for the round alone.**
-   Before giving a verdict on earlier findings, run `mork ctl findings <card>` on the review card. Check each finding's number and recorded state against the reviewer's report.
+   Before giving a verdict on earlier findings, run `mork ctl findings <card>` on the review card.
+   Check each finding's number and recorded state against the reviewer's report.
    Findings and a clean verdict are normal results, not asks.
    Never decide an open question alone: raise it in `hand.message` with `hand.ask` true (on a delegated or self-sustained card, the engine gives it to the project's orchestrator automatically).
    Keep `hand.ask` false for the verdict itself, use no red hand just for findings, and ask for no approval, no `/done` and no finish of the review, nor to announce a clean verdict.
