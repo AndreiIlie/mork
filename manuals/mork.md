@@ -257,7 +257,8 @@ When `[mork] project` is unset, a seat cannot file cross-project notes with `--p
   The project's orchestrator turns a proposal into a card with `card.create` and deletes the note once triaged.
 
 A note moves nothing: it is no finding, and no fix must address it.
-The operator and the project's orchestrator can read its notes with `notes <project>`. The orchestrator triages them, lessons into memory or a skill and feedback into cards, and deletes those triaged (`notes.delete`).
+The operator and the project's orchestrator can read its notes with `notes <project>`.
+The orchestrator triages them, lessons into memory or a skill and feedback into cards, and deletes those triaged (`notes.delete`).
 
 ## Memory
 

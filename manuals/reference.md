@@ -209,7 +209,9 @@ Without `[claude_accounts]`, no saved accounts are read and `claude.account` ref
 
 ### tunnels
 
-In `mork.toml`, each `[tunnels.<name>]` entry configures an SSH web forward. The engine validates the entries and reserves their local ports. The dashboard has no control to open a forward.
+In `mork.toml`, each `[tunnels.<name>]` entry configures an SSH web forward.
+The engine validates the entries and reserves their local ports.
+The dashboard has no control to open a forward.
 Each entry requires `alias` (an SSH alias, non-empty, not starting with `-`, with no whitespace), `port` (non-zero unique local port), `remote_port` (non-zero remote port) and `url` (`http://` or `https://` browser address).
 
 ## Commands
@@ -444,8 +446,10 @@ Missing shares or reset times, or passed resets, have no pace.
 A passed reset shows as `stale`.
 A signed-out saved Claude account keeps its figures with `(read 2d ago)`, until a new turn reads that account again.
 The live account is the one in `login-home/.claude.json`, whether or not it is a saved account.
-In Settings under Usage, Account Quotas shows each pool’s used share, projected use at reset and time left. A signed-out account shows the age of its reading.
-Switch sends `claude.account` for a saved account. A refusal appears beside the account.
+In Settings under Usage, Account Quotas shows each pool’s used share, projected use at reset and time left.
+A signed-out account shows the age of its reading.
+Switch sends `claude.account` for a saved account.
+A refusal appears beside the account.
 Use `claude.account` directly for an account with no reading yet.
 Fable resets with the week and has no separate countdown.
 
@@ -1350,7 +1354,8 @@ Changes a board card: any of its fields, and a dated note on top of its descript
 `--note` adds a dated note signed with the sender; `--decision` does the same with its text prefixed `Decision: `.
 Give one or the other, never both.
 `--withdraw <n>` (`3` or `#3`) withdraws the marked decision that is note n: every note has a number, the oldest's #1, which a newer note never changes, shown in `card.show`'s notes (`{"number", "text"}`).
-It adds a dated note `Withdrawn decision #<n> - <its words>` and the decision itself stays, so the history is kept. The withdrawn decision leaves the specification the blind view and the review card get.
+It adds a dated note `Withdrawn decision #<n> - <its words>` and the decision itself stays, so the history is kept.
+The withdrawn decision leaves the specification the blind view and the review card get.
 Give it alone; it is refused when note n doesn't exist, isn't a marked decision or was already withdrawn.
 A note from before in either older form still withdraws the decision it took back when it was written, its card's notes told apart as they were then: `Withdrawn decision: <words>` the newest standing one under it with exactly those words, `Withdrawn decision #<n>: <words>` the one its number named.
 Where a closed card's older notes were then cut at their first line, either is shown as `Withdrawn decision #<n>: <words>`, numbering that decision as its notes are numbered now.
@@ -1828,7 +1833,9 @@ Example: `mork ctl --as orchestrator:example.com notes.delete example.com 12 15`
 
 ### orchestrator.review
 
-Asks a project’s orchestrator to review `memories` or `notes` for `target`, a configured project. The older section names `surveys` and `smells` also select notes. For shared memory, select `memories` and target `general` when `[mork] project` is configured.
+Asks a project’s orchestrator to review `memories` or `notes` for `target`, a configured project.
+The older section names `surveys` and `smells` also select notes.
+For shared memory, select `memories` and target `general` when `[mork] project` is configured.
 A `target` that names no configured project, `general` with another section, or `general` when `[mork] project` is unset is refused without recording `reviewed_ms`.
 
 The target project's stream gets a `review` line naming the section and the target, its `text` asking its orchestrator to review that part alone and report to the operator what matters: a memory by the orchestrators' skill section "A project's memory, notes and backlog", which holds the procedure, the project's notes read and cleaned up with `notes.delete`.
@@ -1857,9 +1864,16 @@ Each login remains writable so renewals reach the other seats.
 
 ### mork
 
-Plain `mork` starts the engine following the usual build pin and opens the dashboard in the system browser. If the engine is already running on this home, the command opens its dashboard and exits. The address uses the bridge’s bound port and carries no key. A browser new to that address prompts you to open the link from `mork web`. If the bridge or dashboard files are unavailable, Mork prints the reason.
+Plain `mork` starts the engine following the usual build pin and opens the dashboard in the system browser.
+If the engine is already running on this home, the command opens its dashboard and exits.
+The address uses the bridge’s bound port and carries no key.
+A browser new to that address prompts you to open the link from `mork web`.
+If the bridge or dashboard files are unavailable, Mork prints the reason.
 
-Use `mork --no-browser` to run the engine alone. A reload also runs without opening a browser tab. Closing a browser tab leaves Mork running. Send SIGTERM to stop the engine cleanly.
+Use `mork --no-browser` to run the engine alone.
+A reload also runs without opening a browser tab.
+Closing a browser tab leaves Mork running.
+Send SIGTERM to stop the engine cleanly.
 
 ### mork web
 

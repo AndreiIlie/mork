@@ -278,7 +278,7 @@ pub fn type_name(ty: FieldType) -> &'static str {
     }
 }
 
-/// Formats the arguments shown beside a slash command in the native and web help lists.
+/// Formats the arguments shown beside a slash command in web command help.
 pub fn slash_fields(spec: &CommandSpec) -> String {
     spec.fields
         .iter()

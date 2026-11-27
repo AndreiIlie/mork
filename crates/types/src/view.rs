@@ -26,7 +26,7 @@ pub struct Screen {
     pub rooms: Vec<RoomRow>,
     /// Every open ask: red first, then oldest first (5.9.1).
     pub hands: Vec<HandView>,
-    /// Main's Board tab: every configured board, in the config's order (5.8.1, fac-37).
+    /// Every configured board in config order.
     pub boards: Vec<BoardView>,
     /// Memory summaries in order: `general`, then each project's (fac-159).
     #[serde(default)]
@@ -210,7 +210,7 @@ pub struct Offer {
     pub command: Command,
 }
 
-/// One board in main's Board tab (5.8.1, fac-37).
+/// One project's board in the screen view.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BoardView {
     #[serde(default)]
