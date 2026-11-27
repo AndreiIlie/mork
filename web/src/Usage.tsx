@@ -7,14 +7,13 @@ import { Button } from "./ui/Button";
 import { ChartLayout } from "./ui/ChartLayout";
 import { type Kpi, KpiStrip } from "./ui/Kpi";
 import { List, Row } from "./ui/List";
-import { PageHeader, PageScroll } from "./ui/Page";
 import { ProgressBar } from "./ui/ProgressBar";
 import { SectionHead } from "./ui/Section";
 
 const MONO = "font-mono text-label-12 tabular-nums";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function money(cents: number, unknown: boolean): string {
+export function money(cents: number, unknown: boolean): string {
   return `${dollars(cents)}${unknown ? " + ?" : ""}`;
 }
 
@@ -29,10 +28,7 @@ function shortDayLabel(d: DayBurn, tzOffsetMin: number): string {
   return day === 1 ? `${at.getUTCMonth() + 1}/1` : String(day);
 }
 
-function kpis(burn: RecentBurn | null, shares: Share[], nowMs: number): Kpi[] {
-  const left = burn?.cards_left;
-  const pool = left === undefined ? undefined : shares.find((s) => s.cli === left.pool && s.window === "week");
-  const resets = pool?.reset_ms != null && pool.reset_ms > nowMs ? ` · resets in ${countdown(pool.reset_ms - nowMs)}` : "";
+export function spendKpis(burn: RecentBurn | null): Kpi[] {
   return [
     { label: "7-Day Spend", value: burn === null ? "?" : money(burn.total_cents, burn.unknown), sub: "last 7 days, every seat" },
     {
@@ -40,6 +36,15 @@ function kpis(burn: RecentBurn | null, shares: Share[], nowMs: number): Kpi[] {
       value: burn?.average_cents !== undefined ? dollars(burn.average_cents) : "?",
       sub: burn === null ? "" : `over ${burn.ended_cards} ended ${plural(burn.ended_cards, "card", "cards")}`,
     },
+  ];
+}
+
+function kpis(burn: RecentBurn | null, shares: Share[], nowMs: number): Kpi[] {
+  const left = burn?.cards_left;
+  const pool = left === undefined ? undefined : shares.find((s) => s.cli === left.pool && s.window === "week");
+  const resets = pool?.reset_ms != null && pool.reset_ms > nowMs ? ` · resets in ${countdown(pool.reset_ms - nowMs)}` : "";
+  return [
+    ...spendKpis(burn),
     {
       label: "Cards Left",
       value: left !== undefined ? `~${left.cards}` : "?",
@@ -48,7 +53,7 @@ function kpis(burn: RecentBurn | null, shares: Share[], nowMs: number): Kpi[] {
   ];
 }
 
-function SpendChart({ days, tzOffsetMin }: { days: DayBurn[]; tzOffsetMin: number }) {
+export function SpendChart({ days, tzOffsetMin }: { days: DayBurn[]; tzOffsetMin: number }) {
   const [hover, setHover] = useState<number | null>(null);
   const shown = days[hover ?? days.length - 1];
   const max = Math.max(1, ...days.map((d) => d.cents));
@@ -246,7 +251,6 @@ function BurnByRole({ burn }: { burn: RecentBurn | null }) {
   );
 }
 
-/** The Usage page at `/usage`: weekly figures, per-model cache rates, daily spend, quotas, and burn by role. */
 export function Usage({
   screen,
   burn,
@@ -262,18 +266,15 @@ export function Usage({
 }) {
   const days = burn?.daily ?? [];
   return (
-    <main className="flex min-w-0 flex-1 flex-col">
-      <PageHeader crumbs={<span>Workspace</span>} title="Usage" />
-      <PageScroll>
-        <RefusalLine refusal={burnError} className="mb-3" />
-        <KpiStrip items={kpis(burn, screen.top.usage, nowMs)} />
-        <PromptCacheHit burn={burn} />
-        {days.length > 0 && <SpendChart days={days} tzOffsetMin={screen.tz_offset_min} />}
-        <div className="mt-gutter grid grid-cols-1 gap-gutter xl:grid-cols-2">
-          <AccountQuotas shares={screen.top.usage} nowMs={nowMs} live={live} />
-          <BurnByRole burn={burn} />
-        </div>
-      </PageScroll>
-    </main>
+    <>
+      <RefusalLine refusal={burnError} className="mb-3" />
+      <KpiStrip items={kpis(burn, screen.top.usage, nowMs)} />
+      <PromptCacheHit burn={burn} />
+      {days.length > 0 && <SpendChart days={days} tzOffsetMin={screen.tz_offset_min} />}
+      <div className="mt-gutter grid grid-cols-1 gap-gutter xl:grid-cols-2">
+        <AccountQuotas shares={screen.top.usage} nowMs={nowMs} live={live} />
+        <BurnByRole burn={burn} />
+      </div>
+    </>
   );
 }

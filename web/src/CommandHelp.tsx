@@ -4,7 +4,7 @@ import { Button } from "./ui/Button";
 const usage = [
   ["/help", "Show this list"],
   ["/open <card>", "Open a Card Room"],
-  ["/usage", "Open Usage"],
+  ["/usage", "Open Settings Usage"],
   ["@name message", "Send a message to that seat"],
   ["Enter", "Send"],
   ["Shift+Enter", "Insert a new line"],
@@ -19,7 +19,7 @@ function Lines({ rows }: { rows: string[][] }) {
   ))}</dl>;
 }
 
-export function CommandHelp({ commands, close }: { commands: [string, string][]; close: () => void }) {
+export function CommandHelp({ commands, close, main = false }: { commands: [string, string][]; close: () => void; main?: boolean }) {
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") close();
@@ -33,9 +33,9 @@ export function CommandHelp({ commands, close }: { commands: [string, string][];
       <Button tier="secondary" size="sm" title="Close help (Esc)" onClick={close}>Close</Button>
     </div>
     <div className="min-h-0 overflow-y-auto px-gutter py-4">
-      <Lines rows={usage} />
-      <h4 className="mt-gutter text-heading-14">Operator commands</h4>
-      <p className="mb-3 mt-1 text-copy-13 text-gray-900">The current conversation supplies the place and card when applicable.</p>
+      <Lines rows={main ? usage.filter(([label]) => !label.startsWith("@")) : usage} />
+      <h4 className={main ? "mt-gutter mb-3 text-heading-14" : "mt-gutter text-heading-14"}>Operator commands</h4>
+      {!main && <p className="mb-3 mt-1 text-copy-13 text-gray-900">The current conversation supplies the place and card when applicable.</p>}
       <Lines rows={commands} />
     </div>
   </section>;

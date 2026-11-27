@@ -4,7 +4,7 @@ export interface Kpi {
   sub: string;
 }
 
-/** The strip of figures that heads Board and Usage. */
+/** The strip of figures that heads the Console and Usage. */
 export function KpiStrip({ items }: { items: Kpi[] }) {
   const columns = items.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4";
   return (

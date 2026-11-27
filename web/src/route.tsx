@@ -1,19 +1,39 @@
 import type { MouseEvent, ReactNode } from "react";
 
-export type Route = { page: "board" } | { page: "usage" } | { page: "card"; id: string; hand: string | null };
+export type SettingsTab = "general" | "usage" | "updates";
+export type Route =
+  | { page: "console" }
+  | { page: "project"; project: string }
+  | { page: "settings"; tab: SettingsTab }
+  | { page: "card"; id: string; hand: string | null };
 
 export function parseRoute(pathname: string, search = ""): Route {
-  if (/^\/usage\/?$/.test(pathname)) return { page: "usage" };
-  const match = /^\/cards\/([^/]+)\/?$/.exec(pathname);
-  if (match === null) return { page: "board" };
+  const path = pathname.replace(/\/$/, "");
+  if (path === "/usage" || path === SETTINGS_PATH.usage) return { page: "settings", tab: "usage" };
+  if (path === SETTINGS_PATH.general) return { page: "settings", tab: "general" };
+  if (path === SETTINGS_PATH.updates) return { page: "settings", tab: "updates" };
+  const match = /^\/(cards|projects)\/([^/]+)\/?$/.exec(pathname);
+  if (!match) return { page: "console" };
   try {
+    const id = decodeURIComponent(match[2]);
+    if (match[1] === "projects") return { page: "project", project: id };
     const rawHand = new URLSearchParams(search).get("hand");
     const hand = rawHand !== null && rawHand !== "" ? rawHand : null;
-    return { page: "card", id: decodeURIComponent(match[1]), hand };
+    return { page: "card", id, hand };
   } catch {
-    return { page: "board" };
+    return { page: "console" };
   }
 }
+
+export function projectPath(project: string): string {
+  return `/projects/${encodeURIComponent(project)}`;
+}
+
+export const SETTINGS_PATH: Record<SettingsTab, string> = {
+  general: "/settings",
+  usage: "/settings/usage",
+  updates: "/settings/updates",
+};
 
 export function cardPath(id: string, hand?: string | null): string {
   const base = `/cards/${encodeURIComponent(id)}`;

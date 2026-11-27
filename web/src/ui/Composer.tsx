@@ -26,13 +26,13 @@ function DraftThumbnail({ file }: { file: File }) {
 }
 
 export interface ComposerProps {
-  attachments: Attachment[];
-  onPasteImages: (files: File[]) => void;
-  onRemove: (id: number) => void;
+  attachments?: Attachment[];
+  onPasteImages?: (files: File[]) => void;
+  onRemove?: (id: number) => void;
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
-  onSendNow: () => void;
+  onSendNow?: () => void;
   placeholder: string;
   disabled?: boolean;
   sending?: boolean;
@@ -42,7 +42,7 @@ export interface ComposerProps {
 
 /** Full-bleed fused composer strip: the input grows from 2 to 8 lines then scrolls inside fixed padding, with a left slot and Send fused underneath. */
 export function Composer({
-  attachments,
+  attachments = [],
   onPasteImages,
   onRemove,
   value,
@@ -89,7 +89,7 @@ export function Composer({
             <div key={id} className="flex max-w-full items-start">
               <DraftThumbnail file={file} />
               <Button tier="ghost" square size="sm" disabled={locked} title="Remove image"
-                aria-label={`Remove ${file.name || "image"}`} onClick={() => onRemove(id)}>×</Button>
+                aria-label={`Remove ${file.name || "image"}`} onClick={() => onRemove?.(id)}>×</Button>
             </div>
           ))}
         </div>
@@ -102,7 +102,7 @@ export function Composer({
           disabled={locked}
           onChange={(e) => onChange(e.target.value)}
           onPaste={(event) => {
-            if (locked || event.clipboardData.getData("text/plain") !== "") return;
+            if (locked || !onPasteImages || event.clipboardData.getData("text/plain") !== "") return;
             const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
             if (!images.length) return;
             event.preventDefault();
@@ -117,8 +117,8 @@ export function Composer({
       <div className="flex items-center gap-2 px-gutter pb-3">
         {left}
         <span className="ml-auto flex items-center gap-2">
-          <Button tier="secondary" size="sm" disabled={!ready} onClick={onSendNow}
-            title="Send and interrupt the recipient’s running turn">Send now</Button>
+          {onSendNow && <Button tier="secondary" size="sm" disabled={!ready} onClick={onSendNow}
+            title="Send and interrupt the recipient’s running turn">Send now</Button>}
           <Button tier="primary" size="sm" disabled={!ready} onClick={onSubmit}>
             {sending ? "Sending…" : "Send"}
           </Button>

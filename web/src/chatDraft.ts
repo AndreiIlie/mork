@@ -75,7 +75,7 @@ export function usePlaceComposer(place: string, view: PlaceView | undefined, liv
       const images = slash ? [] : await Promise.all(draft.images.map((item) => item.store()));
       const card = view ? ("card" in view.kind ? view.kind.card : null) : place.split("/")[0];
       const context = { place, card, to: view?.input_to ?? "" };
-      const action = await submitComposer({ text, context, images, now: delivery === "now" });
+      const { action } = await submitComposer({ text, context, images, now: delivery === "now" });
       update(prev => slash ? { ...prev, text: "", sending: false } : EMPTY_DRAFT);
       if (action) show(action);
     } catch (error) {

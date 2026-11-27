@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { Board } from "./Board";
 import { CardRoom } from "./CardRoom";
+import { Console } from "./Console";
+import { Project } from "./Project";
+import { Settings } from "./Settings";
 import { Sidebar } from "./Sidebar";
 import { pruneTriageState } from "./Triage";
-import { Usage } from "./Usage";
 import { useHandAlerts, useNotificationPermission } from "./alerts";
 import { type BridgeState, INITIAL_STATE, connectBridge, watchCard } from "./bridge";
 import { useRecentBurn } from "./burn";
+import { useResourceTracker } from "./prefs";
+import { TextLink } from "./ui/TextLink";
 import { type Route, cardPath, navigate, parseRoute } from "./route";
 import type { HandView } from "./types";
 import { Dot } from "./ui/Dot";
@@ -81,8 +84,10 @@ export function App() {
   const nowMs = useNow(state);
   const phase = phaseWords(state);
   const activeCard = route.page === "card" ? route.id : null;
+  const [resourcesOn, setResourcesOn] = useResourceTracker();
+  const live = state.link === "live";
   const alerts = useNotificationPermission();
-  const { burn, error: burnError } = useRecentBurn(state.link === "live");
+  const { burn, error: burnError } = useRecentBurn(live);
 
   const onOpenHand = useCallback((hand: HandView) => {
     if (hand.card === null) {
@@ -102,8 +107,23 @@ export function App() {
 
   let page;
   if (state.screen === null) page = <Waiting state={state} />;
-  else if (route.page === "usage") {
-    page = <Usage screen={state.screen} burn={burn} burnError={burnError} nowMs={nowMs} live={state.link === "live"} />;
+  else if (route.page === "settings") {
+    page = <Settings
+      tab={route.tab} screen={state.screen} burn={burn} burnError={burnError}
+      build={state.build} mainView={state.views.main} nowMs={nowMs} live={live}
+      alerts={alerts} resourcesOn={resourcesOn} setResourcesOn={setResourcesOn}
+    />;
+  } else if (route.page === "project") {
+    const board = state.screen.boards.find((b) => b.project === route.project);
+    page = board ? (
+      <Project key={board.project} board={board} lookback={state.screen.projects?.find((p) => p.project === board.project)}
+        views={state.views} nowMs={nowMs} live={live} />
+    ) : (
+      <main className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3">
+        <h1 className="text-heading-16">No project {route.project}</h1>
+        <TextLink to="/">Back to Mork Console</TextLink>
+      </main>
+    );
   } else if (route.page === "card") {
     page = (
       <CardRoom
@@ -112,10 +132,10 @@ export function App() {
         cardId={route.id}
         handAsk={route.hand}
         nowMs={nowMs}
-        live={state.link === "live"}
+        live={live}
       />
     );
-  } else page = <Board screen={state.screen} views={state.views} burn={burn} nowMs={nowMs} live={state.link === "live"} />;
+  } else page = <Console screen={state.screen} burnError={burnError} burn={burn} nowMs={nowMs} live={live} />;
 
   return (
     <div className="flex h-screen bg-background-100 text-label-14 text-gray-1000">
@@ -123,11 +143,9 @@ export function App() {
         screen={state.screen}
         link={state.link}
         build={state.build}
-        mainView={state.views.main}
-        activeCard={activeCard}
-        onUsage={route.page === "usage"}
+        route={route}
         nowMs={nowMs}
-        notifications={alerts}
+        resourcesOn={resourcesOn}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         {state.link === "reconnecting" && (

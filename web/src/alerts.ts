@@ -5,7 +5,7 @@ import type { HandView, Screen } from "./types";
 export type FaviconTone = "red" | "amber" | null;
 
 export interface AlertPermission {
-  canAsk: boolean;
+  permission: NotificationPermission | "unsupported";
   request: () => void;
 }
 
@@ -90,7 +90,7 @@ export function useNotificationPermission(): AlertPermission {
       .catch(() => setPermission(readPermission()));
   }, []);
 
-  return { canAsk: permission === "default", request };
+  return { permission, request };
 }
 
 /** Drives document.title, the SVG favicon badge, and unfocused browser notifications for raised hands. */
