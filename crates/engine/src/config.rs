@@ -331,13 +331,20 @@ mod tests {
 
     #[test]
     fn project_passes_validate_modes_thresholds_and_dream_budget() -> Result<(), ConfigError> {
-        let config =
-            |read, fields| parse(&format!("{WAKE_PROJECT}\n[projects.\"example.com\".passes.{read}]\n{fields}\n"));
-        for fields in ["mode='scheduled'", "mode='auto'", "days=0", "budget=10", "spare=101"] {
-            assert!(config("pulse", fields).is_err(), "{fields}");
-        }
-        let valid = config("dream", "mode='auto'\nedits=8\nbudget=10")?;
+        let config = |fields, pairs| parse(&format!("{WAKE_PROJECT}\n[projects.\"example.com\".passes.dream]\n{fields}\n{pairs}"));
+        let entry = |cli, model, efforts| format!("[[picks.pass]]\ncli='{cli}'\nmodel='{model}'\nlabel='test'\nefforts={efforts}\n");
+        let opus = "claude-opus-5-5";
+        let pairs = entry("claude", opus, "['xhigh']") + &entry("agy", opus, "['high']");
+        let valid = config("mode='auto'\nbudget=10", &pairs)?;
         assert_eq!(valid.projects["example.com"].passes[&mork_types::lookback::Read::Dream].budget, Some(10));
+        for fields in ["mode='scheduled'", "days=0", "spare=30", "mode='auto'\nedits=8"] {
+            assert!(config(fields, &pairs).is_err(), "{fields}");
+        }
+        for invalid in [String::new(), entry("claude", opus, "[]"), entry("codex", "gemini-4-neon", "['high']"),
+            entry("agy", opus, "['xhigh']"), entry("claude", "claude-haiku-5-5", "['high']")] {
+            assert!(config("mode='auto'", &invalid).is_err(), "{invalid}");
+        }
+        assert!(parse(&format!("{WAKE_PROJECT}\n[projects.\"example.com\".passes.pulse]\nbudget=10")).is_err());
         Ok(())
     }
 

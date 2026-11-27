@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+pub mod bench;
 mod seats;
 
 pub use crate::job::SliceConfig;

@@ -83,7 +83,6 @@ pub struct PassConfig {
     pub edits: Option<u64>,
     pub notes: Option<u64>,
     pub days: Option<u64>,
-    pub spare: Option<u32>,
     pub budget: Option<u64>,
 }
 

@@ -20,6 +20,7 @@ pub(crate) fn check(text: &str, config: &mut Config) -> Result<(), ConfigError> 
             });
         }
     }
+    check_pass_pairs(text, config)?;
     check_projects(text, config)?;
     check_tunnels(text, config)?;
     Ok(())
@@ -81,18 +82,45 @@ fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError>
     Ok(())
 }
 
-fn check_passes(text: &str, name: &str, project: &mork_types::config::ProjectConfig) -> Result<(), ConfigError> {
+fn check_pass_pairs(text: &str, config: &Config) -> Result<(), ConfigError> {
+    use mork_types::config::{MODEL_CATALOG, OPERATOR_MODELS, bench::benchmark};
+    let Some(picks) = &config.picks else { return Ok(()) };
+    for entry in &picks.pass {
+        let model = &entry.model;
+        let cli = entry.cli.as_str();
+        let invalid = |why: String| ConfigError::Value {
+            line: table_line(text, "picks.pass"),
+            message: format!("picks.pass {cli} {model}: {why}"),
+        };
+        if !MODEL_CATALOG.iter().chain(OPERATOR_MODELS).any(|&(c, id, _)| c == entry.cli && id == model) {
+            return Err(invalid("unknown model on this CLI".into()));
+        }
+        for &effort in &entry.efforts {
+            if !entry.cli.takes(model, effort) {
+                return Err(invalid(format!("unsupported effort {}", effort.as_str())));
+            }
+            if benchmark(model, effort).is_none() {
+                return Err(invalid(format!("no benchmark at {}", effort.as_str())));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn check_passes(text: &str, name: &str, project: &mork_types::config::ProjectConfig, has_pairs: bool) -> Result<(), ConfigError> {
     use mork_types::lookback::{Read, Trigger};
     for (read, pass) in &project.passes {
         let thresholds = [pass.landings, pass.edits, pass.notes, pass.days];
-        let problem = if thresholds.contains(&Some(0)) {
+        let problem = if pass.mode == Trigger::Auto && thresholds.iter().any(Option::is_some) {
+            "auto takes no thresholds"
+        } else if pass.mode == Trigger::Auto && !has_pairs {
+            "auto requires a model and effort in picks.pass"
+        } else if thresholds.contains(&Some(0)) {
             "thresholds must be positive"
-        } else if pass.mode != Trigger::Manual && thresholds.iter().all(Option::is_none) {
-            "scheduled and auto require a threshold"
+        } else if pass.mode == Trigger::Scheduled && thresholds.iter().all(Option::is_none) {
+            "scheduled requires a threshold"
         } else if *read != Read::Dream && pass.budget.is_some() {
             "only dream takes a budget"
-        } else if pass.spare.is_some_and(|n| n > 100) {
-            "spare must be a percentage from 0 to 100"
         } else {
             continue;
         };
@@ -103,8 +131,9 @@ fn check_passes(text: &str, name: &str, project: &mork_types::config::ProjectCon
 }
 
 fn check_projects(text: &str, config: &mut Config) -> Result<(), ConfigError> {
+    let has_pairs = config.picks.as_ref().is_some_and(|p| p.pass.iter().any(|m| !m.efforts.is_empty()));
     for (name, p) in &mut config.projects {
-        check_passes(text, name.as_str(), p)?;
+        check_passes(text, name.as_str(), p, has_pairs)?;
         let approval = p.forge.merges_on_approval();
         if let mork_types::config::ForgeConfig::Github { token, approver, .. } = &mut p.forge {
             let table = format!("projects.{name}.forge");

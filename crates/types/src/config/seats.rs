@@ -9,6 +9,8 @@ use super::Config;
 #[serde(deny_unknown_fields)]
 pub struct Picks {
     #[serde(default)]
+    pub pass: Vec<PickModel>,
+    #[serde(default)]
     pub researcher: Vec<PickModel>,
     #[serde(default)]
     pub reviewer: ReviewPicks,
@@ -232,8 +234,8 @@ pub const ROSTER: &[Row] = &[
 pub const OPUS: &str = "claude-opus-5-5";
 /// GPT-6.2 Sol's model id.
 pub const SOL: &str = "gpt-6.2-sol";
-const SONNET: &str = "claude-sonnet-5-5";
-const ASTRA: &str = "gpt-6.2-astra";
+pub(super) const SONNET: &str = "claude-sonnet-5-5";
+pub(super) const ASTRA: &str = "gpt-6.2-astra";
 /// Gemini 4 Neon's model id; agy takes `<model>-<effort>`.
 pub const NEON: &str = "gemini-4-neon";
 /// agy's third-party quota bucket (fac-661); its Gemini Models bucket stays `account`.
