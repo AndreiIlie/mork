@@ -9,7 +9,6 @@ publish.workspace = true
 faults = []
 
 [dependencies]
-arboard.workspace = true
 mork-types.workspace = true
 mork-core.workspace = true
 mork-sys.workspace = true

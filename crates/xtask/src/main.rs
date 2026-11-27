@@ -42,7 +42,6 @@ fn audits() -> Vec<String> {
     }
     problems.extend(xtask::source::check(&root));
     problems.extend(xtask::caps::check(&root));
-    problems.extend(xtask::palette::check(&root));
     problems.extend(xtask::sentences::check(&root));
     problems
 }

@@ -43,17 +43,6 @@ pub fn line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// How long a call took, as the chat says it (fac-206): `<1s` under a second, `12s`, then
-/// `1m 05s` past a minute.
-pub fn took(ms: i64) -> String {
-    let secs = ms.max(0) / 1000;
-    match secs {
-        0 => "<1s".to_owned(),
-        1..60 => format!("{secs}s"),
-        _ => format!("{}m {:02}s", secs / 60, secs % 60),
-    }
-}
-
 /// One message, as the conversation draws it (5.7.5).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MessageView {

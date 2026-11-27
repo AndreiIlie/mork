@@ -57,10 +57,6 @@ pub struct Toolchain {
 pub struct MorkConfig {
     #[serde(default)]
     pub project: Option<crate::ProjectId>,
-    #[serde(default = "d_editor")]
-    pub editor: String,
-    #[serde(default = "d_true")]
-    pub animations: bool,
     #[serde(default = "d_true")]
     pub notifications: bool,
     #[serde(default = "d_max_test_runs")]
@@ -436,9 +432,6 @@ pub const REQUIRED: &[(&str, &[&str])] = &[("mork", &[]), ("git", &["author"])];
 /// A project's required keys.
 pub const PROJECT_REQUIRED: &[&str] = &["repo", "board", "test"];
 
-fn d_editor() -> String {
-    "code -g {file}:{line}".into()
-}
 fn d_true() -> bool {
     true
 }

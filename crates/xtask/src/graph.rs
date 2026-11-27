@@ -33,8 +33,7 @@ pub fn allowed_edges() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
         ("mork-sys", set(&[])),
         ("mork-core", set(&["mork-types"])),
         ("mork-engine", set(&["mork-core", "mork-types", "mork-sys"])),
-        ("mork-ui", set(&["mork-types"])),
-        ("mork-app", set(&["mork-types", "mork-core", "mork-engine", "mork-ui", "mork-sys"])),
+        ("mork-app", set(&["mork-types", "mork-core", "mork-engine", "mork-sys"])),
         ("mork-fakes", set(&[])),
         ("xtask", set(&[])),
     ])
@@ -138,11 +137,6 @@ pub fn check_graph(meta: &Value) -> Vec<String> {
     for d in transitive(&deps, "mork-core") {
         if !CORE_ALLOWED.contains(&d.as_str()) {
             out.push(format!("mork-core reaches {d}"));
-        }
-    }
-    for d in transitive(&deps, "mork-ui").into_iter().filter(|d| d.starts_with("mork-")) {
-        if d != "mork-types" {
-            out.push(format!("mork-ui reaches {d}"));
         }
     }
     out

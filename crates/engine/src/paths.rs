@@ -134,10 +134,7 @@ impl Home {
     pub fn backups(&self) -> PathBuf {
         self.root.join("backups")
     }
-    pub fn ui_session(&self) -> PathBuf {
-        self.root.join("ui-session.json")
-    }
-    /// The images pasted into the window's drafts (fac-31), kept for the messages that carry them.
+    /// The images pasted into message drafts, kept for the messages that carry them.
     pub fn pasted(&self) -> PathBuf {
         self.root.join("pasted")
     }
