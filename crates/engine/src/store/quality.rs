@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use mork_core::views::quality::{self, Event, History};
 use mork_types::quality::Quality;
-use rusqlite::params;
+use rusqlite::{Connection, params};
 
 use super::{Result, Store};
 
@@ -29,37 +29,44 @@ impl Store {
     /// Quality metrics from the journal and only those retained reviews needed to interpret older verdicts.
     pub fn quality(&self, now: i64) -> Result<Quality> {
         let since = now.saturating_sub(quality::WINDOW_MS);
-        let mut cards = BTreeMap::<String, History>::new();
-        let mut query = self.conn.prepare(HISTORY)?;
-        let mut rows = query.query([since])?;
-        while let Some(row) = rows.next()? {
-            let id: String = row.get(2)?;
-            let event = Event {
-                seq: row.get(0)?,
-                time: row.get(1)?,
-                kind: row.get(3)?,
-                data: serde_json::from_str(&row.get::<_, String>(4)?)?,
-            };
-            cards.entry(id).or_default().rows.push(event);
-        }
-        let mut meta = self.conn.prepare(
-            "SELECT json_extract(data,'$.project'),json_extract(data,'$.mode'),
-            CASE WHEN ?2 THEN json_extract(data,'$.review') END FROM entities WHERE kind='card' AND id=?1",
-        )?;
-        for (id, card) in &mut cards {
-            let legacy = card
-                .rows
-                .iter()
-                .any(|e| e.kind == "review.verdict" && e.time >= since && e.data.get("named").is_none());
-            let mut result = meta.query(params![id, legacy])?;
-            if let Some(row) = result.next()? {
-                card.project = row.get(0)?;
-                card.mode = row.get(1)?;
-                card.legacy = row.get::<_, Option<String>>(2)?.map(|raw| serde_json::from_str(&raw)).transpose()?;
-            } else {
-                card.project = "unknown".into();
-            }
-        }
+        let tx = self.conn.unchecked_transaction()?;
+        let cards = histories(&tx, since)?;
+        tx.commit()?;
         Ok(quality::aggregate(since, &cards))
     }
+}
+
+fn histories(conn: &Connection, since: i64) -> Result<BTreeMap<String, History>> {
+    let mut cards = BTreeMap::<String, History>::new();
+    let mut query = conn.prepare(HISTORY)?;
+    let mut rows = query.query([since])?;
+    while let Some(row) = rows.next()? {
+        let id: String = row.get(2)?;
+        let event = Event {
+            seq: row.get(0)?,
+            time: row.get(1)?,
+            kind: row.get(3)?,
+            data: serde_json::from_str(&row.get::<_, String>(4)?)?,
+        };
+        cards.entry(id).or_default().rows.push(event);
+    }
+    let mut meta = conn.prepare(
+        "SELECT json_extract(data,'$.project'),json_extract(data,'$.mode'),
+        CASE WHEN ?2 THEN json_extract(data,'$.review') END FROM entities WHERE kind='card' AND id=?1",
+    )?;
+    for (id, card) in &mut cards {
+        let legacy = card
+            .rows
+            .iter()
+            .any(|e| e.kind == "review.verdict" && e.time >= since && e.data.get("named").is_none());
+        let mut result = meta.query(params![id, legacy])?;
+        if let Some(row) = result.next()? {
+            card.project = row.get(0)?;
+            card.mode = row.get(1)?;
+            card.legacy = row.get::<_, Option<String>>(2)?.map(|raw| serde_json::from_str(&raw)).transpose()?;
+        } else {
+            card.project = "unknown".into();
+        }
+    }
+    Ok(cards)
 }

@@ -116,7 +116,7 @@ impl Engine {
             Command::HistorySearch { words } => return self.history_search(conn, req.id, &from, words),
             cmd @ Command::HistoryJournal { .. } => return self.history_journal(conn, req.id, &from, cmd),
             Command::Status { jobs, all, card } => Ok(self.status(jobs, all, card.as_deref(), conn.origin)),
-            Command::Quality {} => self.quality(),
+            Command::Quality {} => return self.quality(conn, req.id),
             Command::Usage {} => Ok(self.usage()),
             Command::ClaudeAccount { name } => self.claude_account(&name),
             Command::DebugSleep { ms } => return self.debug_sleep(conn, req.id, ms),
@@ -139,10 +139,17 @@ impl Engine {
         })
     }
 
-    fn quality(&self) -> Result<Value, ErrorBody> {
-        let quality =
-            self.store.quality(clock::now_ms()).map_err(|e| ErrorBody::new(ErrorCode::Refused, e.to_string()))?;
-        Ok(json!(mork_types::quality::QualityAnswer { quality }))
+    fn quality(&self, conn: &Arc<Conn>, id: u64) -> Option<Result<Value, ErrorBody>> {
+        let path = self.store.path.clone();
+        let conn = Arc::clone(conn);
+        std::thread::spawn(move || {
+            let answer = crate::store::Store::open_read_only(&path)
+                .and_then(|store| store.quality(clock::now_ms()))
+                .map(|quality| json!(mork_types::quality::QualityAnswer { quality }))
+                .map_err(|e| ErrorBody::new(ErrorCode::Refused, e.to_string()));
+            conn.answer(id, answer);
+        });
+        None
     }
 
     fn claude_account(&mut self, name: &str) -> Result<Value, ErrorBody> {
