@@ -111,22 +111,6 @@ fn objected(state: &State, who: &Who, r: &Reply, job: &Job) -> bool {
     said || r.messages.iter().any(|m| planner(&m.to) && m.kind.is_none_or(|k| k == Intent::Request))
 }
 
-const BUILD_RULE: &str = "You build every deliverable. The `launch` command has been removed.";
-
-pub(crate) fn build_rule(state: &State, a: &Agent, sections: &mut Sections<'_>, out: &mut String) {
-    if a.role != Role::Foreman {
-        return;
-    }
-    let Some(card) = places::card_of(state, &a.place).and_then(|id| state.cards.get(&id)) else { return };
-    if full(card)
-        && a.place.as_str() == card.id.as_str()
-        && !crate::lifecycle::facts::agreeing(card)
-        && sections.sends("build-rule", BUILD_RULE)
-    {
-        let _ = write!(out, "\n\n## Your build\n\n{BUILD_RULE}\n");
-    }
-}
-
 /// The brief foreman's challenge and, if requested, the waiting plan.
 pub(crate) fn section(state: &State, a: &Agent, (s, plan): (&mut Sections<'_>, bool), out: &mut String) {
     let Some(card) = places::card_of(state, &a.place).and_then(|c| state.cards.get(&c)) else { return };

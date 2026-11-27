@@ -137,7 +137,6 @@ fn fixed(state: &State, a: &Agent, config: &Config, (s, plan): (&mut Sections<'_
     specification(state, a, s, out);
     picks(state, a, config, s, out);
     super::required::section(state, a, (s, plan), out);
-    super::required::build_rule(state, a, s, out);
 }
 
 fn delegation(state: &State, a: &Agent, s: &mut Sections<'_>, out: &mut String) {
@@ -146,16 +145,7 @@ fn delegation(state: &State, a: &Agent, s: &mut Sections<'_>, out: &mut String) 
     }
     let Some(c) = card_of(state, a) else { return };
     let rule = delegation_rule(c);
-    // A no-planner card's foreman challenges nobody's plan, and nobody challenges its own (fac-616).
-    let objection = if c.no_planner {
-        ""
-    } else {
-        " An objection of the foreman's you refuse and it still holds opens in your flagged hand message with both positions, one at a time, at every level; never decide it alone."
-    };
-    let text = format!(
-        "\n## Delegation\n\nCurrent level: {}. {rule}{objection} Never send a specification question as a message to the orchestrator: raise it in your flagged hand message, which the engine gives automatically when delegated. Direct request messages to the orchestrator are for mechanical needs only.\n",
-        c.delegation()
-    );
+    let text = format!("\n## Delegation\n\nCurrent level: {}. {rule}\n", c.delegation());
     if s.sends("delegation", &text) {
         out.push_str(&text);
     }

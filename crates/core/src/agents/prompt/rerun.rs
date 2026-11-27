@@ -49,8 +49,6 @@ pub(in crate::agents) fn rerun(
         text.push_str(AGAIN);
         fixed(state, a, config, (&mut s, plan), &mut text);
         reply_reminder(state, a, &mut s, &mut text);
-    } else {
-        crate::agents::required::build_rule(state, a, &mut s, &mut text);
     }
     if planner_foreman(state, a) && !text.contains(FOREMAN_SPECIFICATION) {
         let _ = write!(text, "\n\n{FOREMAN_SPECIFICATION}");
