@@ -261,6 +261,37 @@ export async function readHistory(place: string, before = Number.MAX_SAFE_INTEGE
   return page;
 }
 
+async function clipboardBlob(file: File): Promise<Blob> {
+  if (file.type === "image/png" || file.type === "image/jpeg") return file;
+  // A browser can expose other clipboard formats. Rasterize them for the native PNG store.
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not read the pasted image.");
+    context.drawImage(bitmap, 0, 0);
+    return await new Promise<Blob>((resolve, reject) => canvas.toBlob((png) => {
+      if (png) resolve(png);
+      else reject(new Error("Could not convert the pasted image to PNG."));
+    }, "image/png"));
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** Stores a pasted image with the bridge key and returns its path for say.images. */
+export async function uploadImage(file: File): Promise<string> {
+  const key = resolveKey();
+  if (key === null) throw new Error("no bridge key");
+  const res = await fetch("/images/pasted", {
+    method: "POST", headers: { Authorization: `Bearer ${key}` }, body: await clipboardBlob(file),
+  });
+  if (!res.ok) throw new Error(`Could not upload the image (${res.status} ${res.statusText}).`);
+  return res.text();
+}
+
 /** A message's image from the bridge, fetched with the key, as an object URL its caller revokes. */
 export async function fetchImage(url: string): Promise<string> {
   const key = resolveKey();

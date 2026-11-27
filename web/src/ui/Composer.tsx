@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "./Button";
 
 function fitHeight(el: HTMLTextAreaElement) {
@@ -9,7 +9,25 @@ function fitHeight(el: HTMLTextAreaElement) {
   el.style.overflowY = "";
 }
 
+export interface Attachment {
+  id: number;
+  file: File;
+}
+
+function DraftThumbnail({ file }: { file: File }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const local = URL.createObjectURL(file);
+    setUrl(local);
+    return () => URL.revokeObjectURL(local);
+  }, [file]);
+  return url && <img src={url} alt={file.name} className="block h-16 w-auto max-w-full border border-gray-400 object-contain" />;
+}
+
 export interface ComposerProps {
+  attachments: Attachment[];
+  onPasteImages: (files: File[]) => void;
+  onRemove: (id: number) => void;
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
@@ -23,6 +41,9 @@ export interface ComposerProps {
 
 /** Full-bleed fused composer strip: the input grows from 2 to 8 lines then scrolls inside fixed padding, with a left slot and Send fused underneath. */
 export function Composer({
+  attachments,
+  onPasteImages,
+  onRemove,
   value,
   onChange,
   onSubmit,
@@ -34,6 +55,7 @@ export function Composer({
   left,
 }: ComposerProps) {
   const locked = disabled || sending;
+  const ready = !locked && (value.trim() !== "" || attachments.length > 0);
   const box = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     if (box.current !== null) fitHeight(box.current);
@@ -55,11 +77,22 @@ export function Composer({
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      if (!locked && value.trim() !== "") onSubmit();
+      if (ready) onSubmit();
     }
   };
   return (
     <div className="flex shrink-0 flex-col border-t border-gray-400 bg-background-200 transition-colors focus-within:bg-gray-100">
+      {attachments.length > 0 && (
+        <div className="flex max-h-[30vh] flex-wrap gap-2 overflow-y-auto px-gutter pt-3">
+          {attachments.map(({ id, file }) => (
+            <div key={id} className="flex max-w-full items-start">
+              <DraftThumbnail file={file} />
+              <Button tier="ghost" square size="sm" disabled={locked} title="Remove image"
+                aria-label={`Remove ${file.name || "image"}`} onClick={() => onRemove(id)}>×</Button>
+            </div>
+          ))}
+        </div>
+      )}
       <label className="block cursor-text px-gutter pb-3 pt-3">
         <textarea
           ref={box}
@@ -67,6 +100,12 @@ export function Composer({
           value={value}
           disabled={locked}
           onChange={(e) => onChange(e.target.value)}
+          onPaste={(event) => {
+            const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+            if (locked || !images.length) return;
+            event.preventDefault();
+            onPasteImages(images);
+          }}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
           aria-label={placeholder}
@@ -76,9 +115,9 @@ export function Composer({
       <div className="flex items-center gap-2 px-gutter pb-3">
         {left}
         <span className="ml-auto flex items-center gap-2">
-          <Button tier="secondary" size="sm" disabled={locked || value.trim() === ""} onClick={onSendNow}
+          <Button tier="secondary" size="sm" disabled={!ready} onClick={onSendNow}
             title="Send and interrupt the recipient’s running turn">Send now</Button>
-          <Button tier="primary" size="sm" disabled={locked || value.trim() === ""} onClick={onSubmit}>
+          <Button tier="primary" size="sm" disabled={!ready} onClick={onSubmit}>
             {sending ? "Sending…" : "Send"}
           </Button>
         </span>
