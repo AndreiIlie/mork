@@ -206,8 +206,7 @@ pub(super) fn stats(state: &State, only: Option<&str>, config: &Config) -> Value
     json!({"memory.stats": {"memories": listed}})
 }
 
-/// Main's Memory tab: `general`, then each project in the config's order, then any memory of a
-/// project the config no longer has; seeing them reads nothing.
+/// Lists `general`, then projects in config order, then memories of removed projects. Listing them records no reads.
 pub fn view(state: &State, offset_min: i32, ctx: Ctx<'_>) -> Vec<MemoryView> {
     let mut memories: Vec<&str> = vec![GENERAL];
     memories.extend(ctx.config.ordered_projects().map(|p| p.as_str()).filter(|p| *p != GENERAL));

@@ -209,9 +209,8 @@ Without `[claude_accounts]`, no saved accounts are read and `claude.account` ref
 
 ### tunnels
 
-In `mork.toml`, each `[tunnels.<name>]` entry configures a window-owned SSH web forward shown in the window's `web tunnels` overlay in name order.
+In `mork.toml`, each `[tunnels.<name>]` entry configures an SSH web forward. The engine validates the entries and reserves their local ports. The dashboard has no control to open a forward.
 Each entry requires `alias` (an SSH alias, non-empty, not starting with `-`, with no whitespace), `port` (non-zero unique local port), `remote_port` (non-zero remote port) and `url` (`http://` or `https://` browser address).
-With no `[tunnels.*]` configured, the overlay lists no rows.
 
 ## Commands
 
@@ -408,6 +407,7 @@ Example: the newest rows, `mork ctl history.journal ex-550 40`; around an event,
 The live cards, one line each; job records only when requested, the live ones by default.
 
 Answers `{"status": {"lines": ["ex-550  brief  yellow  asks 1  Its title"], "revision": n}}`; a run that carries cards names them at its line's end (`  carries ex-551 ex-552`).
+On the operator socket, `status.web` also gives `{"port": <bound port>}` when the bridge can serve the dashboard, or `{"unavailable": "<reason>"}`.
 With `--jobs` (JSON: `{"status":{"jobs":true}}`), also includes `jobs`: a list of `{"id", "kind", "settled", "settled_ms"}` records for the jobs not yet settled.
 `--all` adds the settled jobs whose folders are still kept, which build wait and `doctor` read.
 `--card <card>` keeps the jobs of that card alone: a turn of its agents, or a work job (clone, install, bundle, check, candidate, train, suite) made for it; other cards' and Mork's own builds are left out.
@@ -444,9 +444,9 @@ Missing shares or reset times, or passed resets, have no pace.
 A passed reset shows as `stale`.
 A signed-out saved Claude account keeps its figures with `(read 2d ago)`, until a new turn reads that account again.
 The live account is the one in `login-home/.claude.json`, whether or not it is a saved account.
-In the right column's Usage section, each pool's windows show their used share, projected end after an arrow, red at 100% or over, and time left; the signed-out account is dimmed with its reading's age on its pool line.
-Its header is clickable when it belongs to a saved account: it sends `claude.account` and a successful switch swaps the headers' tones immediately; a refusal shows in the note line.
-An account with no reading yet has no header and is reached through the command alone.
+In Settings under Usage, Account Quotas shows each pool’s used share, projected use at reset and time left. A signed-out account shows the age of its reading.
+Switch sends `claude.account` for a saved account. A refusal appears beside the account.
+Use `claude.account` directly for an account with no reading yet.
 Fable resets with the week and has no separate countdown.
 
 Example: `mork ctl usage`
@@ -667,7 +667,7 @@ Example: `mork ctl message.send-now ex-550 412`
 Opens a DM between the operator and one of a card's agents: its foreman.
 
 The DM is a place of its own, `<card>/<role>/dm`, with an agent and a session of its own; nothing is posted and no one woken.
-In the window it has no row: its card's tabs, after its spec and build rooms' on a full card with a planner, have one for each of its DMs, and one for its foreman's before it is opened, which opens it as `dm` does.
+An open foreman DM appears under its foreman in the card room.
 The foreman's DM agent names `planner` to reach it in the challenge place.
 Answers `{"dm": {"place"}}`, the same for a DM already open.
 Refused for other roles (a foreman's children have theirs from `spawn`), an unknown card, or a role the card has no agent in.
@@ -682,7 +682,7 @@ Researchers require `model` and `effort` except on an auto-started pass.
 There, omit `model`, `effort` and `cli`.
 The engine chooses a pair from `picks.pass` at spawn and refuses the spawn if no quota pool is open.
 An open pool with measured zero spare can serve a researcher.
-A reviewer requires `topic`, what it reviews in the foreman's own words, quoted so a topic of several words passes whole (`--topic 'money, permissions or data integrity'`): the window's room list shows it beside the reviewer's name, and it is saved on the seat only, never on the card.
+A reviewer requires `topic`, what it reviews in the foreman's own words, quoted so a topic of several words passes whole (`--topic 'money, permissions or data integrity'`): the card room labels the reviewer with that topic, and it is saved on the seat only, never on the card.
 A researcher that names one is refused.
 A reviewer may omit `model`, `effort` and `cli` together to launch on its configured inside or outside default, without allowlist permission.
 A baseline seat names none of them: it launches on `[seats.baseline]`.
@@ -734,7 +734,7 @@ A plain `[[picks.reviewer]]` is rejected as a config error naming its line, with
 Configure every role and review kind the foreman needs to select explicitly; an omitted or empty list grants no choices.
 
 The child is `<card>/<role>-<n>` (`ex-550/researcher-2`), numbered after the last of its role, its parent the seat that spawned it.
-Its place is its DM, `<card>/<role>-<n>/dm`, nested under its card's row in the window, which folds it, where `task` is posted from its parent as a request that wakes it.
+Its parent posts `task` to the child’s DM, `<card>/<role>-<n>/dm`, as a request that wakes it.
 It has a session of its own, which its later tasks resume: the foreman's message to it by name (`researcher-1`), or the operator's in its DM.
 The engine reports its `built`, `reported` or `blocked` to its parent in its parent's room (the spec room for a planner's researcher), reaching its running turn between tool calls or waking it for its next turn: it submits nothing, the foreman alone submits the card with its own `built`, after merging `origin/<base>` in that turn.
 Between a foreman's turns, a question, `blocked`, or a red hand outside a reviewer's verdict wakes it at once.
@@ -817,7 +817,7 @@ Visual mode works on a no-planner card at start (`--visual`), by carrying an ear
 The flag is this run's alone: every full start without it gets a planner.
 Refused with `--mode report`.
 The operator's or an orchestrator's alone: any other seat's start naming it is buzzed.
-The window has no control for it.
+Select No planner when starting a full run from the board.
 
 Cards named after the first are carried by its run (JSON `carries`): `start ex-550 ex-551 ex-552` runs all three in ex-550's one plan, room, clone, branch, review and merge, and decisions stay on ex-550.
 When the word after the card is a mode word, the words fill mode, model and effort in order as before (`start ex-550 report opus high`); otherwise each word after the card is one carried card as typed, never split at commas nor read as a JSON list, and mode, model and effort take their flags.
@@ -1299,7 +1299,7 @@ Publishes the tasks of one of a card's deliverables, in order, shown with the ca
 `deliverable` is its name, exactly as the card's deliverables give it, or its number, from 1, as `card.show` lists them (digits alone are a number); on a card cut into none, `1` is the whole card, which the plan makes its one deliverable.
 `tasks` takes a string with one task per line, in order, or a JSON array of strings (directly through `--json`, or encoded in a string); a leading list marker (`-`, `*`, `1.`) is dropped and a blank line or empty array item skipped.
 The tasks replace that deliverable's earlier ones whole, its first task current, and it becomes the current deliverable; the other deliverables keep theirs.
-The window shows the open card's deliverables in the Plan section of its side column, under its Notes, as sections that fold, the current one unfolded.
+The card’s Build stage shows its Plan, with the current deliverable expanded.
 The plan is posted in the card's room to its foreman, numbered and naming its deliverable.
 An agent's plan is an update that wakes nobody.
 The foreman reads other agents' task lists in its next turn's news.
@@ -1349,13 +1349,13 @@ Changes a board card: any of its fields, and a dated note on top of its descript
 
 `--note` adds a dated note signed with the sender; `--decision` does the same with its text prefixed `Decision: `.
 Give one or the other, never both.
-`--withdraw <n>` (`3` or `#3`) withdraws the marked decision that is note n: every note has a number, the oldest's #1, which a newer note never changes, shown in `card.show`'s notes (`{"number", "text"}`) and before each note in the window.
-It adds a dated note `Withdrawn decision #<n> - <its words>` and the decision itself stays, so the history is kept; the window shows the decision struck through, and it leaves the specification the blind view and the review card get.
+`--withdraw <n>` (`3` or `#3`) withdraws the marked decision that is note n: every note has a number, the oldest's #1, which a newer note never changes, shown in `card.show`'s notes (`{"number", "text"}`).
+It adds a dated note `Withdrawn decision #<n> - <its words>` and the decision itself stays, so the history is kept. The withdrawn decision leaves the specification the blind view and the review card get.
 Give it alone; it is refused when note n doesn't exist, isn't a marked decision or was already withdrawn.
 A note from before in either older form still withdraws the decision it took back when it was written, its card's notes told apart as they were then: `Withdrawn decision: <words>` the newest standing one under it with exactly those words, `Withdrawn decision #<n>: <words>` the one its number named.
 Where a closed card's older notes were then cut at their first line, either is shown as `Withdrawn decision #<n>: <words>`, numbering that decision as its notes are numbered now.
 The engine can't tell who asked for a withdrawal, so say in your reply which instruction of the operator's it follows.
-The window shows every note.
+Use `card.show` to read all notes and their numbers.
 Marked decisions not withdrawn alone reach the blind view, newest first, under "The operator's later decisions", part of the specification.
 Old notes stay unmarked.
 Otherwise one write: `description` replaces the text under the notes, `labels` the whole list, `acceptance` adds criteria (one per line); `title`, `status`, `priority` and `parent` are set.
@@ -1805,7 +1805,6 @@ A clone with no handoff folder, or one holding no regular file, files none.
 A review card's handoff holds what its foreman left through every round.
 A note whose project nothing accounted for is listed under Mork project when `[mork] project` is configured, and under no project when it is unset.
 An unknown project is refused.
-The window shows every project's in main's Notes tab.
 
 Example: `mork ctl --as orchestrator:example.com notes example.com`
 
@@ -1829,13 +1828,13 @@ Example: `mork ctl --as orchestrator:example.com notes.delete example.com 12 15`
 
 ### orchestrator.review
 
-Sends a project's orchestrator one section of main's tabs to review: `section` is `memories` (the Memory tab's memories) or `notes` (the Notes tab, the project's notes; `surveys` and `smells` name it too), and `target` a configured project, whose part of the section it is, or `general`, the Memory tab's shared memory alone, which goes to Mork project's orchestrator when `[mork] project` is configured.
+Asks a project’s orchestrator to review `memories` or `notes` for `target`, a configured project. The older section names `surveys` and `smells` also select notes. For shared memory, select `memories` and target `general` when `[mork] project` is configured.
 A `target` that names no configured project, `general` with another section, or `general` when `[mork] project` is unset is refused without recording `reviewed_ms`.
 
 The target project's stream gets a `review` line naming the section and the target, its `text` asking its orchestrator to review that part alone and report to the operator what matters: a memory by the orchestrators' skill section "A project's memory, notes and backlog", which holds the procedure, the project's notes read and cleaned up with `notes.delete`.
 The line is read live while that orchestrator is hooked, else at its next hook's catch-up.
 For `memories`, it records the target memory's `reviewed_ms`.
-`memory.stats` reports the timestamp and the Memory tab shows its date.
+`memory.stats` reports the timestamp.
 It posts nothing in any place.
 Answers `{"orchestrator.review": {"section", "target"}}`, journals `orchestrator.review`.
 Refused for any other section.
@@ -1855,6 +1854,12 @@ The wall has its own `/run`.
 The agy token is stored in `logins/agy/antigravity-oauth-token` under Mork home.
 Claude and Codex use `logins/claude/.credentials.json` and `logins/codex/auth.json`.
 Each login remains writable so renewals reach the other seats.
+
+### mork
+
+Plain `mork` starts the engine following the usual build pin and opens the dashboard in the system browser. If the engine is already running on this home, the command opens its dashboard and exits. The address uses the bridge’s bound port and carries no key. A browser new to that address prompts you to open the link from `mork web`. If the bridge or dashboard files are unavailable, Mork prints the reason.
+
+Use `mork --no-browser` to run the engine alone. A reload also runs without opening a browser tab. Closing a browser tab leaves Mork running. Send SIGTERM to stop the engine cleanly.
 
 ### mork web
 

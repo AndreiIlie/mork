@@ -11,7 +11,7 @@
 
 Website: [https://mork.sh](https://mork.sh) · [Architecture](ARCHITECTURE.md) · [Security Model](SECURITY.md)
 
-Mork drives the coding CLIs you already pay for (Claude Code, OpenAI Codex, Gemini) through a deterministic Rust state machine (~95k LOC Rust across 8 crates, ~5.5k LOC React/TypeScript). Each work card runs in its own git clone inside a Linux Bubblewrap + Landlock + seccomp-bpf sandbox with an isolated per-seat home directory, gets audited by fresh read-only reviewers from a different model family with zero builder chat history, and lands through a serialized merge queue after checks and tests pass.
+Mork drives the coding CLIs you already pay for (Claude Code, OpenAI Codex, Gemini) through a deterministic Rust state machine (~90k lines of Rust across 7 crates, ~7k lines of React/TypeScript). Each work card runs in its own git clone inside a Linux Bubblewrap + Landlock + seccomp-bpf sandbox with an isolated per-seat home directory, gets audited by fresh read-only reviewers from a different model family with zero builder chat history, and lands through a serialized merge queue after checks and tests pass.
 
 ![Mork Board](docs/screenshots/board.png)
 
@@ -33,7 +33,7 @@ A single CLI session reviewing its own diff stays anchored on its own assumption
 
 ## Architecture
 
-Mork is an 8-crate Rust workspace with a dependency graph and boundary rules enforced by `cargo xtask check` (`crates/xtask/src/graph.rs`):
+Mork is a 7-crate Rust workspace with a dependency graph and boundary rules enforced by `cargo xtask check` (`crates/xtask/src/graph.rs`):
 
 | Path | Role |
 | --- | --- |
@@ -41,7 +41,6 @@ Mork is an 8-crate Rust workspace with a dependency graph and boundary rules enf
 | `crates/core/` | Pure deterministic state machine: card lifecycle, review rounds, triage, merge queue, SQL/file door rules, and view builders (zero I/O). |
 | `crates/engine/` | Runtime loop, SQLite event journal (`store/`), Bubblewrap + Landlock + seccomp-bpf sandboxing (`jobs/`), per-seat homes (`seat_homes.rs`), modular `board`/`forge`/`tickets` traits, CLI drivers (`cli/`), live test-suite watcher, Vite visual mock host, and keyed localhost web bridge (`web/`). |
 | `crates/sys/` | Isolated OS primitives (Landlock and seccomp-bpf syscall bindings and `openat`-rooted symlink-safe file helpers; the only crate permitted to use `unsafe`). |
-| `crates/ui/` | Native Linux desktop window crate. |
 | `crates/app/` | Main binary (`mork`), CLI control client (`mork ctl`, `mork ctl search`), and embedded roles/manuals/skills. |
 | `crates/fakes/` | Fake CLI/forge harnesses used by integration tests. |
 | `crates/xtask/` | Workspace verification: rustfmt, comments, clippy, crate-graph and capability audits, file/function size caps, test-assertion diff checks, web Tailwind/TS checks, and parallel test runner. |
@@ -81,7 +80,7 @@ realpath web/dist
 
 Edit `~/.config/mork/mork.toml`. Under `[mork]`, set `web_assets` to the absolute path printed by `realpath` and `web_port` to a free, fixed port (the example uses `41900`). Set your Git author and replace the example repository, board, and toolchain paths with your own.
 
-Run `./mork --no-window` in the extracted directory. In a second terminal in that directory, run `./mork web` and open the printed URL.
+Run `./mork` in the extracted directory to start the engine and open the dashboard in your browser. On your first visit, run `./mork web` in a second terminal and open the printed link to connect. Use `./mork --no-browser` to start the engine alone.
 
 ### Build and run from source
 
@@ -105,7 +104,7 @@ cargo build --release -p mork-app
 ./target/release/mork
 ```
 
-Open the keyed localhost URL printed by `./target/release/mork web` to access the web UI, or control cards directly from the CLI:
+The engine opens the dashboard in your browser. On your first visit, open the link printed by `./target/release/mork web` in a second terminal. You can also control cards from the CLI.
 
 ```bash
 mork ctl card.create my-app "Short title" "Problem statement and evidence"

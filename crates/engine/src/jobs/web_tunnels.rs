@@ -1,4 +1,4 @@
-//! The window's SSH forwards (fac-35) own their connections: no daemon or shared SSH master
+//! Tracked SSH forwards (fac-35) own their connections: no daemon or shared SSH master
 //! may keep a forward alive after its tracker or the app exits.
 
 use std::collections::BTreeMap;
@@ -19,12 +19,12 @@ use super::{
 };
 use crate::{clock, paths::Home};
 
-/// The window's explicit open or close request, never an engine command available to a seat.
+/// An explicit open or close request local to the tracker.
 pub type Request = (String, bool);
 
 pub type Configured = BTreeMap<String, TunnelConfig>;
 
-/// Starts the tracker off the window thread. Dropping its sender closes its owned forwards;
+/// Starts the tracker on its own thread. Dropping its sender closes its owned forwards;
 /// `changed` returning false closes them too. The process guard also ends them when the app dies.
 pub fn start(
     home: Home,

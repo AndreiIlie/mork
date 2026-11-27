@@ -31,7 +31,7 @@ const RETRY_MS = 2000;
 const PROBE_MS = 500;
 const WATCH_TAIL = 100;
 const ALLOWED_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
-// The window's wiring: 0 probes status, 1 watches the screen and open card, commands count from 2.
+// IDs 0 and 1 are reserved for the status probe and watch setup, so command replies can be matched independently.
 const PROBE_ID = 0;
 const WATCH_ID = 1;
 const FIRST_COMMAND_ID = 2;
@@ -288,7 +288,7 @@ export async function readHistory(place: string, before = Number.MAX_SAFE_INTEGE
 
 async function clipboardBlob(file: File): Promise<Blob> {
   if (file.type === "image/png" || file.type === "image/jpeg") return file;
-  // A browser can expose other clipboard formats. Rasterize them for the native PNG store.
+  // A browser can expose other clipboard formats. Rasterize them for the engine’s PNG store.
   const bitmap = await createImageBitmap(file);
   try {
     const canvas = document.createElement("canvas");

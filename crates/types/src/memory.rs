@@ -72,7 +72,7 @@ pub struct Tally {
     pub reviewed_ms: Option<i64>,
 }
 
-/// A memory as main's Memory tab shows it, the data of `memory.stats`: its counts, then its files.
+/// A memory’s counts and files, as returned by `memory.stats`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MemoryView {
     pub tally: Tally,
@@ -83,7 +83,7 @@ pub struct MemoryView {
     pub files: Vec<FileRow>,
 }
 
-/// A file's row in the Memory tab.
+/// A file in a memory summary.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileRow {
     pub name: String,

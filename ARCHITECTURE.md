@@ -1,33 +1,16 @@
 # Mork Architecture
 
-Mork is a local Linux orchestrator (~95k LOC Rust across 8 crates, ~5.5k LOC React/TypeScript) built around one design rule: **separate pure orchestration logic from impure OS/CLI boundaries, and enforce that separation in CI (`cargo xtask check`).**
+Mork is a local Linux orchestrator (~90k lines of Rust across 7 crates, ~7k lines of React/TypeScript) built around one design rule: **separate pure orchestration logic from impure OS/CLI boundaries, and enforce that separation in CI (`cargo xtask check`).**
 
 ## 1. Crate Dependency Graph
 
 `crates/xtask/src/graph.rs` enforces the workspace dependency DAG and capability boundaries at check time:
 
 ```text
-                ┌───────────────┐
-                │   mork-app    │  binary, CLI client (ctl/search/test), embedded manuals/roles/skills
-                └───────┬───────┘
-                        │
-          ┌─────────────┴─────────────┐
-          ▼                           ▼
-   ┌────────────┐              ┌─────────────┐
-   │  mork-ui   │              │ mork-engine │  runtime loop, SQLite journal, bwrap/Landlock/seccomp wall,
-   │ (desktop)  │              │             │  per-seat homes, provider traits, CLI drivers, door, web bridge
-   └─────┬──────┘              └──────┬──────┘
-         │                      ┌─────┘
-         ▼                      ▼
-  ┌──────────────┐       ┌────────────┐  ┌─────────────┐
-  │  mork-core   │       │  mork-sys  │  │ mork-fakes  │ (mork-app tests only)
-  │ (pure logic) │       │  (unsafe)  │  └─────────────┘
-  └──────┬───────┘       └────────────┘
-         │
-         ▼
-  ┌───────────────┐
-  │  mork-types   │  wire protocol, provider config schema, view models, IDs
-  └───────────────┘
+mork-app      → mork-engine, mork-core, mork-types, mork-sys
+mork-engine   → mork-core, mork-types, mork-sys
+mork-core     → mork-types
+mork-fakes    ← mork-app (tests only)
 ```
 
 Enforced workspace invariants (`Cargo.toml` + `crates/xtask/`):

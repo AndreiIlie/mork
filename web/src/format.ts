@@ -1,6 +1,6 @@
 import type { Author, BoardRow, Color, HandView, RoomRow } from "./types";
 
-// Match the native countdown in crates/ui/src/spans.rs: show the last ten minutes and hide it once cold.
+// Show the last ten minutes and hide it once cold.
 export function coldMinutes(coldAtMs: number | undefined, nowMs: number): number | null {
   if (coldAtMs === undefined || coldAtMs <= nowMs) return null;
   const m = Math.ceil((coldAtMs - nowMs) / 60_000);
@@ -45,7 +45,7 @@ export function dollars(cents: number): string {
   return `$${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
 }
 
-// Matches crates/types/src/chat.rs `took`: `<1s`, `12s`, then `1m 05s`.
+// Elapsed times read `<1s`, `12s`, then `1m 05s`.
 export function took(ms: number): string {
   const secs = Math.floor(Math.max(0, ms) / 1000);
   if (secs === 0) return "<1s";
@@ -88,7 +88,7 @@ export function authorName(from: Author): string {
   return from.label;
 }
 
-// Matches crates/ui/src/sections.rs: a DM session shows as `dm foreman`, others as their key's last part.
+// A DM session shows as `dm foreman`, others as their key's last part.
 export function agentSeatName(agent: string): string {
   const dm = agent.endsWith("/dm");
   const base = dm ? agent.slice(0, -"/dm".length) : agent;

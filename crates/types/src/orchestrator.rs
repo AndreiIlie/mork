@@ -40,8 +40,7 @@ pub enum OrchestratorWhat {
         ask: OrchestratorAsk,
         text: String,
     },
-    /// The operator sent one project's part of the Memory or Notes tab to review (fac-230, fac-249's
-    /// buttons). A line kept from before them has no target: the whole section.
+    /// The operator requested review of a project's memory or notes. Older records without a target cover the whole section.
     Review {
         section: ReviewSection,
         /// The project, or `general`, whose part it is.
@@ -51,13 +50,13 @@ pub enum OrchestratorWhat {
     },
 }
 
-/// A section of main's tabs the operator sends to review (fac-230).
+/// The material the operator selected for review.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ReviewSection {
-    /// The Memory tab's memories.
+    /// Shared or project memory.
     Memories,
-    /// The Notes tab: a project's notes. A line kept from before it says `surveys` or `smells`.
+    /// A project's notes. An older record may say `surveys` or `smells`.
     #[serde(alias = "surveys", alias = "smells")]
     Notes,
 }
