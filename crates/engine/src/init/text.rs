@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use mork_types::config::Cli;
+use mork_types::config::{Cli, SEAT_DEFAULTS};
 use serde::Serialize;
 
 use super::detect::Tools;
@@ -58,7 +58,7 @@ pub(super) fn global(tools: &Tools, bin_tools: &Path, assets: Option<&Path>, aut
     out.push_str(&format!("\n[git]\nauthor = {}\n", quote(author)));
     if !(tools.clis.contains(&Cli::Claude) && tools.clis.contains(&Cli::Codex)) {
         let cli = tools.clis.first().ok_or("no coding CLI on PATH")?.as_str();
-        for seat in ["planner", "foreman", "review-foreman", "reviewer", "researcher", "baseline"] {
+        for seat in SEAT_DEFAULTS.iter().map(|s| s.0).filter(|name| *name != "echo") {
             out.push_str(&format!("\n[seats.{seat}]\ncli = {}\n", quote(cli)));
         }
     }
@@ -152,7 +152,7 @@ mod tests {
                 .collect();
             let tools = Tools { clis, ..Tools::default() };
             let cfg = config::parse(&global(&tools, Path::new("/tools"), None, "A <a@b>")?)?;
-            for seat in ["planner", "foreman", "review-foreman", "reviewer", "researcher", "baseline"] {
+            for seat in SEAT_DEFAULTS.iter().map(|s| s.0).filter(|name| *name != "echo") {
                 for at in Standing::ALL {
                     assert!(tools.clis.contains(&cfg.seat_in(seat, at).unwrap().cli));
                 }
