@@ -149,7 +149,12 @@ fn effort_only_pick_releases_held_report_agy_opus_without_falling_back_to_work()
     s.config.seats.insert(
         "foreman".into(),
         SeatOverride {
-            report: Some(ModelOverride { cli: Some(Cli::Agy), model: Some(OPUS.into()), effort: Some(Effort::Xhigh) }),
+            report: Some(ModelOverride {
+                routing: None,
+                cli: Some(Cli::Agy),
+                model: Some(OPUS.into()),
+                effort: Some(Effort::Xhigh),
+            }),
             ..SeatOverride::default()
         },
     );

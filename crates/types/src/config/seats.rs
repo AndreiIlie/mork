@@ -9,6 +9,14 @@ use super::Config;
 #[serde(deny_unknown_fields)]
 pub struct Picks {
     #[serde(default)]
+    pub planner: Vec<PickModel>,
+    #[serde(default)]
+    pub foreman: ForemanPicks,
+    #[serde(default, rename = "review-foreman")]
+    pub review_foreman: Vec<PickModel>,
+    #[serde(default)]
+    pub baseline: Vec<PickModel>,
+    #[serde(default)]
     pub pass: Vec<PickModel>,
     #[serde(default)]
     pub researcher: Vec<PickModel>,
@@ -38,6 +46,24 @@ pub struct ReviewPicks {
     pub outside: Vec<PickModel>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ForemanPicks {
+    #[serde(default)]
+    pub work: Vec<PickModel>,
+    #[serde(default)]
+    pub report: Vec<PickModel>,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RoutingMode {
+    #[default]
+    Fixed,
+    Shadow,
+    Auto,
+}
+
 /// A configured child model, independent of any seat's defaults.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -52,6 +78,7 @@ pub struct PickModel {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModelOverride {
+    pub routing: Option<RoutingMode>,
     pub cli: Option<Cli>,
     pub model: Option<String>,
     pub effort: Option<Effort>,
@@ -61,6 +88,7 @@ pub struct ModelOverride {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SeatOverride {
+    pub routing: Option<RoutingMode>,
     pub cli: Option<Cli>,
     pub model: Option<String>,
     pub effort: Option<Effort>,
@@ -102,7 +130,7 @@ pub enum Wall {
 }
 
 /// The CLIs a seat runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
 pub enum Cli {
     Claude,
@@ -177,6 +205,8 @@ impl Cli {
 /// A seat, its defaults merged with the config's overrides.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Seat {
+    #[serde(default)]
+    pub routing: RoutingMode,
     pub name: String,
     pub cli: Cli,
     pub model: String,
@@ -390,6 +420,7 @@ impl Config {
             |m| catalog().find(|c| c.0 == cli && c.1 == m).map_or_else(|| m.clone(), |c| c.2.to_owned()),
         );
         Some(Seat {
+            routing: phase.and_then(|p| p.routing).or(o.routing).unwrap_or_default(),
             name: name.to_owned(),
             cli,
             model,

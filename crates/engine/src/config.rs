@@ -310,6 +310,20 @@ mod tests {
                                [projects.\"example.com\"]\nrepo = \"/repo\"\nboard = { kind = \"markdown\", path = \"/board\" }\ntest = \"true\"\n";
 
     #[test]
+    fn routing_validates_the_effective_role_list() -> Result<(), ConfigError> {
+        use mork_types::config::RoutingMode;
+        let common = format!("{WAKE_PROJECT}\n[seats.foreman.report]\nrouting='auto'\n");
+        let entry = "[[picks.foreman.report]]\ncli='codex'\nmodel='gpt-6.2-sol'\nlabel='sol'\nefforts=['high']";
+        assert!(parse(&common).is_err());
+        assert!(parse(&format!("{common}{}", entry.replace("gpt-6.2-sol", "gpt-6.1-terra"))).is_err());
+        let config = parse(&format!("{common}{entry}"))?;
+        assert_eq!(config.routing_mode("foreman", mork_types::config::Standing::ALL[1]), RoutingMode::Auto);
+        assert_eq!(config.routing_mode("foreman", mork_types::config::Standing::WORK), RoutingMode::Fixed);
+        assert!(parse(&format!("{WAKE_PROJECT}\n[seats.echo]\nrouting='fixed'")).is_err());
+        Ok(())
+    }
+
+    #[test]
     fn example_seat_models_belong_to_their_cli_catalog() -> Result<(), ConfigError> {
         use mork_types::config::{MODEL_CATALOG, OPERATOR_MODELS, SeatPhase, Standing};
 

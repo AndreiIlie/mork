@@ -20,7 +20,7 @@ pub(crate) fn check(text: &str, config: &mut Config) -> Result<(), ConfigError> 
             });
         }
     }
-    check_pass_pairs(text, config)?;
+    check_router_pairs(text, config)?;
     check_projects(text, config)?;
     check_tunnels(text, config)?;
     Ok(())
@@ -82,15 +82,43 @@ fn check_claude_accounts(text: &str, config: &Config) -> Result<(), ConfigError>
     Ok(())
 }
 
-fn check_pass_pairs(text: &str, config: &Config) -> Result<(), ConfigError> {
+fn check_router_pairs(text: &str, config: &Config) -> Result<(), ConfigError> {
+    use mork_types::config::{RoutingMode, Standing, routing::ROLES};
+    if let Some(echo) = config.seats.get("echo")
+        && (echo.routing.is_some() || Standing::ALL.iter().any(|&at| echo.at(at).is_some_and(|s| s.routing.is_some())))
+    {
+        return Err(ConfigError::Value {
+            line: table_line(text, "seats.echo"),
+            message: "echo has no routing role".into(),
+        });
+    }
+    for &(role, at) in ROLES {
+        if config.routing_mode(role, at) == RoutingMode::Fixed {
+            continue;
+        }
+        let (table, list) = config.router_list(role, at);
+        if !list.iter().any(|e| !e.efforts.is_empty()) {
+            return Err(ConfigError::Value {
+                line: table_line(text, table),
+                message: format!("{role} routing requires a model and effort in {table}"),
+            });
+        }
+        check_pairs(text, table, list)?;
+    }
+    if let Some(picks) = &config.picks {
+        check_pairs(text, "picks.pass", &picks.pass)?;
+    }
+    Ok(())
+}
+
+fn check_pairs(text: &str, table: &str, list: &[mork_types::config::PickModel]) -> Result<(), ConfigError> {
     use mork_types::config::{MODEL_CATALOG, OPERATOR_MODELS, bench::benchmark};
-    let Some(picks) = &config.picks else { return Ok(()) };
-    for entry in &picks.pass {
+    for entry in list {
         let model = &entry.model;
         let cli = entry.cli.as_str();
         let invalid = |why: String| ConfigError::Value {
-            line: table_line(text, "picks.pass"),
-            message: format!("picks.pass {cli} {model}: {why}"),
+            line: table_line(text, table),
+            message: format!("{table} {cli} {model}: {why}"),
         };
         if !MODEL_CATALOG.iter().chain(OPERATOR_MODELS).any(|&(c, id, _)| c == entry.cli && id == model) {
             return Err(invalid("unknown model on this CLI".into()));
