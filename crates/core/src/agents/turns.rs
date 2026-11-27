@@ -364,7 +364,7 @@ pub fn session_seen(state: &State, id: &JobId, session: &SessionSeen, now: i64) 
         None
     } else {
         super::ends::note_session(&mut a, session, job);
-        super::costs::note(&mut a, session, job, now)
+        super::costs::note(&mut a, session, job, now, false)
     };
     if a == before {
         return Decision::default();

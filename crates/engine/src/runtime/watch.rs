@@ -296,7 +296,7 @@ impl Engine {
             tools: !stream.steps.is_empty(),
             tool_counts: self.live.get(&job.id).filter(|live| live.offset > 0).map(|_| stream.tool_counts()),
             taken: stream.taken.iter().filter_map(|u| cli::live::seq_of(job.id.as_str(), u)).collect(),
-            answered: stream.answered,
+            answered: stream.answered || stream.result.as_ref().is_some_and(Result::is_ok),
             compacted: stream.compacted,
         };
         (stream, session)

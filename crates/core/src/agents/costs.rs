@@ -32,7 +32,7 @@ pub fn stored_context<'a>(config: &Config, a: &'a Agent) -> Option<StoredContext
 }
 
 /// Records a job's cost once, with its share of the running token and dollar totals (fac-526).
-pub(super) fn note(a: &mut Agent, s: &SessionSeen, job: &Job, now: i64) -> Option<Value> {
+pub(super) fn note(a: &mut Agent, s: &SessionSeen, job: &Job, now: i64, replied: bool) -> Option<Value> {
     if let Some(w) = &s.window {
         a.window = Some(w.clone());
     }
@@ -56,7 +56,7 @@ pub(super) fn note(a: &mut Agent, s: &SessionSeen, job: &Job, now: i64) -> Optio
     }
     a.cost_job = Some(job.id.clone());
     let mut line = json!({
-        "ran": s.answered || s.tools || delta.is_some_and(|n| n > 0) || tokens.is_some_and(|t| t != Tokens::default()),
+        "ran": replied || s.answered || s.tools || delta.is_some_and(|n| n > 0) || tokens.is_some_and(|t| t != Tokens::default()),
         "by": job.chosen_by, "agent": a.key.as_str(), "job": job.id, "session": session, "at": now,
         "cli": selection.as_ref().map(|s| s.cli), "model": selection.as_ref().map(|s| s.model.as_str()),
         "effort": selection.as_ref().map(|s| s.effort), "delta": delta.unwrap_or(0), "unknown": delta.is_none(),
@@ -80,7 +80,7 @@ pub(super) fn of_end(a: &mut Agent, end: &JobEnd, job: &Job, now: i64) -> Option
         JobEnd::Finished { session, .. } | JobEnd::Cut { session } => session,
         JobEnd::Stopped | JobEnd::Failed { .. } => &empty,
     };
-    note(a, session, job, now)
+    note(a, session, job, now, matches!(end, JobEnd::Finished { reply: Ok(_), .. }))
 }
 
 fn token_share(a: &mut Agent, totals: &BTreeMap<String, Tokens>) -> Option<Tokens> {
