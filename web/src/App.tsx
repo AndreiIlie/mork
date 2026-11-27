@@ -10,20 +10,31 @@ import { type BridgeState, INITIAL_STATE, connectBridge, watchCard } from "./bri
 import { useRecentBurn } from "./burn";
 import { useResourceTracker } from "./prefs";
 import { TextLink } from "./ui/TextLink";
-import { type Route, cardPath, navigate, parseRoute } from "./route";
+import { cardPath, navigate, parseRoute } from "./route";
 import type { HandView } from "./types";
 import { Dot } from "./ui/Dot";
 
 const TICK_MS = 5000;
 
-function useRoute(): Route {
-  const [route, setRoute] = useState(() => parseRoute(window.location.pathname, window.location.search));
+function readRoute() {
+  const { pathname, search } = window.location;
+  return { route: parseRoute(pathname, search), address: pathname + search };
+}
+
+function useRoute() {
+  const [location, setLocation] = useState(() => {
+    const { route, address } = readRoute();
+    return { route, returnPath: route.page === "settings" ? "/" : address };
+  });
   useEffect(() => {
-    const onPop = () => setRoute(parseRoute(window.location.pathname, window.location.search));
+    const onPop = () => {
+      const { route, address } = readRoute();
+      setLocation((previous) => ({ route, returnPath: route.page === "settings" ? previous.returnPath : address }));
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
-  return route;
+  return location;
 }
 
 // The engine's clock at its last screen, run on by the browser's, so countdowns move between screens.
@@ -80,7 +91,7 @@ function Waiting({ state }: { state: BridgeState }) {
 
 export function App() {
   const [state, setState] = useState<BridgeState>(INITIAL_STATE);
-  const route = useRoute();
+  const { route, returnPath } = useRoute();
   const nowMs = useNow(state);
   const phase = phaseWords(state);
   const activeCard = route.page === "card" ? route.id : null;
@@ -109,7 +120,7 @@ export function App() {
   if (state.screen === null) page = <Waiting state={state} />;
   else if (route.page === "settings") {
     page = <Settings
-      tab={route.tab} screen={state.screen} burn={burn} burnError={burnError}
+      tab={route.tab} returnPath={returnPath} screen={state.screen} burn={burn} burnError={burnError}
       build={state.build} mainView={state.views.main} nowMs={nowMs} live={live}
       alerts={alerts} resourcesOn={resourcesOn} setResourcesOn={setResourcesOn}
     />;

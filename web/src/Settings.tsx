@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { ReloadChangelog } from "./ReloadChangelog";
 import { Usage } from "./Usage";
 import type { AlertPermission } from "./alerts";
@@ -73,8 +73,9 @@ function Updates({ screen, build, view, live }: { screen: Screen; build: string 
   );
 }
 
-export function Settings({ tab, screen, burn, burnError, build, mainView, nowMs, live, alerts, resourcesOn, setResourcesOn }: {
+export function Settings({ tab, returnPath, screen, burn, burnError, build, mainView, nowMs, live, alerts, resourcesOn, setResourcesOn }: {
   tab: SettingsTab;
+  returnPath: string;
   screen: Screen;
   burn: RecentBurn | null;
   burnError: string | null;
@@ -86,6 +87,19 @@ export function Settings({ tab, screen, burn, burnError, build, mainView, nowMs,
   resourcesOn: boolean;
   setResourcesOn: (on: boolean) => void;
 }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea, select"))) return;
+      if (document.querySelector(':modal, [aria-modal="true"]')) return;
+      event.preventDefault();
+      navigate(returnPath);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [returnPath]);
+
   return (
     <main className="flex min-w-0 flex-1 flex-col">
       <PageHeader
