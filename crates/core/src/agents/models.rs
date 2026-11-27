@@ -1,10 +1,11 @@
 //! Changing a model keeps its seat's wall, tools, credentials and authority (fac-96, fac-115); what a seat runs is
 //! its roster's row for where it stands (fac-399).
 
+use super::pools::walls_kept;
 use mork_types::card::{Card, Mode};
 use mork_types::config::{
     Cli, Config, Effort, MODEL_CATALOG, OPERATOR_MODELS, PickModel, ROSTER, ReviewKind, SEAT_DEFAULTS, Seat, SeatPhase,
-    Standing, Wall, barred, cli_of_model,
+    Standing, barred, cli_of_model,
 };
 use mork_types::reply::Role;
 use mork_types::state::{Agent, Choice, Fresh, MessageKind, Sender};
@@ -148,11 +149,6 @@ pub fn choices_for(state: &State, config: &Config, a: &Agent, by: By) -> Vec<Mod
     offers(config, a, standing(state, a), by)
 }
 
-// An unwalled Claude seat's deny list exists only in Claude Code (fac-25, fac-402); agy's wall alone holds it (fac-657).
-pub(super) fn walls_kept(seat: &Seat, cli: Cli) -> bool {
-    seat.wall != Wall::None || (cli != Cli::Agy && (seat.cli == Cli::Codex || cli == Cli::Claude))
-}
-
 // Fable and Astra are offered to the operator's own pick alone (fac-558, fac-615); a session already on one keeps it.
 fn offers(config: &Config, a: &Agent, at: Standing, by: By) -> Vec<ModelChoice> {
     let Some(seat) = config.seat_in(&a.seat, at) else { return Vec::new() };
@@ -216,6 +212,9 @@ pub(super) fn pick_options(state: &State, config: &Config, a: &Agent) -> String 
 
 // A pick launches while what it named is still offered where its agent stands.
 fn offered(config: &Config, a: &Agent, at: Standing, c: &Choice) -> bool {
+    if c.by == "router" {
+        return config.seat_in(&a.seat, at).is_some_and(|s| walls_kept(&s, c.cli));
+    }
     let by = By::made(c);
     allowed(config, a, at, c.cli, &c.model, c.effort, by)
         && offers(config, a, at, by).iter().any(|m| m.cli == c.cli && m.model == c.model)

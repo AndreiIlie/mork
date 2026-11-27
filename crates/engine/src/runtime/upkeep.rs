@@ -36,6 +36,7 @@ impl Engine {
         }
         self.last_upkeep = Some(clock::instant());
         let now = clock::now_ms();
+        self.refresh_routing(now);
         self.daily_backup(now);
         self.prune(now);
     }

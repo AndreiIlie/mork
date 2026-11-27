@@ -4,7 +4,7 @@
 mod common;
 
 use common::{Sim, reply};
-use mork_core::agents::pools::{Offer, ranked};
+use mork_core::agents::pools::{self, Offer};
 use mork_core::agents::turns::due;
 use mork_core::decide::Event;
 use mork_core::lifecycle::lookback::live;
@@ -284,7 +284,7 @@ fn quota_uses_the_signed_in_account_and_the_launching_models_pool() {
 }
 
 fn offers(s: &Sim) -> Vec<Offer> {
-    ranked(
+    pools::offers(
         &s.state.limits,
         s.now,
         s.claude_account,
@@ -320,33 +320,21 @@ fn untouched_stale_and_measured_zero_have_distinct_offers() {
 }
 
 #[test]
-fn pair_scores_follow_effort_cost_pool_spare_and_configured_order() {
+fn auto_pass_bar_and_launch_share_one_draw_across_pools() {
     let mut s = Sim::new();
-    s.claude_account = Some("live");
-    let efforts = &["low", "medium", "high", "xhigh", "max"];
-    for (cli, model, cutoffs) in [(Cli::Claude, OPUS, [10, 40, 70]), (Cli::Codex, SOL, [8, 38, 74])] {
-        picks(&mut s, &[(cli, model, efforts)]);
-        for (spare, effort) in
-            [(1, Effort::Low), (cutoffs[0], Effort::Medium), (cutoffs[1], Effort::High), (cutoffs[2], Effort::Xhigh)]
-        {
-            limit(&mut s, cli, "account", "week", Some(0), false, (cli == Cli::Claude).then_some("live"));
-            let row = s.state.limits.values_mut().find(|l| l.cli == cli).unwrap();
-            row.resets_at = Some(s.now + 7 * DAY * (100 - spare) / 100);
-            let pair = &offers(&s)[0];
-            assert_eq!((i64::from(pair.spare), pair.effort), (spare, effort));
-        }
-    }
-    picks(&mut s, &[(Cli::Codex, SOL, efforts), (Cli::Claude, OPUS, efforts)]);
-    for row in s.state.limits.values_mut() {
-        let spare = if row.cli == Cli::Claude { 51 } else { 10 };
-        row.resets_at = Some(s.now + 7 * DAY * (100 - spare) / 100);
-    }
-    assert_eq!(offers(&s)[0].pool, "claude live");
-    for row in s.state.limits.values_mut() {
-        row.percent = Some(95);
-    }
-    assert_eq!(offers(&s)[0].model, SOL);
-    assert_eq!(offers(&s)[0].effort, Effort::Low);
+    auto(&mut s, Cli::Codex, SOL);
+    picks(&mut s, &[(Cli::Codex, SOL, &["low", "high"]), (Cli::Agy, OPUS, &["medium"])]);
+    land(&mut s, PROJECT, 100);
+    limit(&mut s, Cli::Codex, "account", "week", Some(10), false, None);
+    limit(&mut s, Cli::Agy, "3p", "week", Some(60), false, None);
+    let projects = s.operator(json!({"projects":{}})).unwrap();
+    let project = projects["projects"]["projects"].as_array().unwrap().iter().find(|p| p["name"] == PROJECT).unwrap();
+    tick(&mut s);
+    let row = |kind| &s.journal.iter().find(|(_, k, c, _)| k == kind && c.as_deref() == Some(CARD)).unwrap().3;
+    assert_eq!(row("card.start")["bar"], project["passes"][0]["bar"]);
+    assert_eq!(row("route")["pick"]["model"], SOL);
+    assert_eq!(row("route")["pick"]["effort"], row("card.start")["effort"]);
+    assert_eq!(row("card.start")["spare"], 40);
 }
 
 #[test]
@@ -373,7 +361,7 @@ fn auto_researcher_uses_the_current_offer_outside_child_picks() {
     let chosen = s.state.agents[child.as_str()].choice.as_ref().unwrap();
     assert_eq!(
         (chosen.cli, chosen.model.as_str(), chosen.effort, chosen.by.as_str()),
-        (Cli::Agy, OPUS, Effort::Medium, "engine")
+        (Cli::Agy, OPUS, Effort::Medium, "router")
     );
 }
 

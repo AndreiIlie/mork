@@ -90,7 +90,7 @@ impl Sim {
     }
 
     pub fn ctx(&self) -> Ctx<'_> {
-        Ctx { now: self.now, config: &self.config, faults: false, claude_account: self.claude_account }
+        Ctx { routing: None, now: self.now, config: &self.config, faults: false, claude_account: self.claude_account }
     }
 
     /// Decides one event and commits its changes, a second later than the last.

@@ -318,6 +318,10 @@ pub enum ApprovedVia {
 /// The gates of a card's current head (4.4.3, 4.7.7, 4.8): each holds the head it is for.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Gates {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submitting_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub builder: Option<(crate::Sha, String)>,
     /// The checks running, on this head.
     pub checking: Option<crate::ids::Sha>,
     /// This head's untrusted checks wait for `resume` (fac-484); absent until they fail or carry over.

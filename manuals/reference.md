@@ -420,6 +420,29 @@ A read: allowed during a reload.
 
 Example: `mork ctl status`; with job records, `mork ctl status --jobs`; one card's, `mork ctl status --jobs --card ex-550`
 
+### routing
+
+Any seat can run `mork ctl routing` to see the router’s quality and cost estimates by role and project or review topic, quota prices, learned partner effects and the last 20 recommendations.
+Shadow agreement compares the recommendation with the first pair that reached the model.
+
+Set `routing = "fixed"`, `"shadow"` or `"auto"` on a seat or its applicable work, report, inside or outside row.
+Fixed is the default.
+Shadow records a recommendation and launches the usual selection.
+Auto selects a model and effort when the seat is made.
+Explicit selections take precedence.
+If every candidate pool is closed, the configured seat runs.
+
+Candidates use the same `cli`, `model`, `label` and `efforts` fields as `picks.pass`.
+Configure them under `picks.planner`, `picks.foreman.work`, `picks.foreman.report`, `picks.review-foreman`, `picks.baseline`, `picks.researcher` or `picks.reviewer.inside` and `picks.reviewer.outside`.
+Each shadow or auto role needs at least one benchmarked model and effort.
+Explicit child selections still follow the researcher and reviewer permission lists.
+
+The router starts from the benchmark index and dollars per task.
+It learns from up to 90 days of journal evidence with a 30-day half-life.
+Seven prior observations anchor each global estimate and each project or topic estimate.
+It draws quality, adds the measured partner effect and subtracts the pool price times relative estimated cost.
+Auto passes use this router over `picks.pass`.
+
 ### quality
 
 Reads the last 30 days of Quality figures, also shown in Settings under Quality.
@@ -545,7 +568,9 @@ A missing five-hour share permits a run unless the limit is reached.
 A required weekly reading must be usable and, on Codex and agy, at most ten minutes old.
 A fresh reading on those CLIs showing zero use with no future reset counts as 50 spare.
 An expired Claude week needs a new reading.
-The pair's score is `reasoning index * spare / (spare + scaled cost)`, using benchmark dollars per task scaled by 3.5 for Claude and agy third-party models, 13 for Codex and 2 for agy Gemini.
+One draw for the project's next pass picks among open pairs with positive spare.
+Its pool price is 0.10 times the fraction of quota without expiring spare.
+Relative cost uses the measured cost estimate scaled by 3.5 for Claude and agy third-party models, 13 for Codex and 2 for agy Gemini.
 Ties follow list order.
 The winning pair's spare must be positive to start a pass.
 The bar is 100 minus that spare.
@@ -697,13 +722,14 @@ Example: `mork ctl dm ex-550 foreman`
 
 Spawns a researcher, reviewer or baseline seat for a card's foreman: a child, named, walled, in a DM of its own.
 
-Researchers require `model` and `effort` except on an auto-started pass.
-There, omit `model`, `effort` and `cli`.
+Researchers require `model` and `effort` in fixed and shadow mode.
+In auto mode they may omit both to use the router.
+On an auto-started pass, omit `model`, `effort` and `cli`.
 The engine chooses a pair from `picks.pass` at spawn and refuses the spawn if no quota pool is open.
 An open pool with measured zero spare can serve a researcher.
 A reviewer requires `topic`, what it reviews in the foreman's own words, quoted so a topic of several words passes whole (`--topic 'money, permissions or data integrity'`): the card room labels the reviewer with that topic, and it is saved on the seat only, never on the card.
 A researcher that names one is refused.
-A reviewer may omit `model`, `effort` and `cli` together to launch on its configured inside or outside default, without allowlist permission.
+A reviewer may omit `model`, `effort` and `cli` together to use its inside or outside seat configuration, including routing mode.
 A baseline seat names none of them: it launches on `[seats.baseline]`.
 If any selection option is supplied, both `model` and `effort` are required.
 An explicit selection chooses the child before its first turn.
@@ -1071,7 +1097,8 @@ A same-CLI pick of model or effort resumes the session.
 
 A seat records the CLI, model and effort its phase first launched with and keeps them through config changes until a pick or phase change.
 A new review round also refreshes kept foremen and reviewers whose launched selection came from `mork.toml`, taking their current inside or outside setting; a model or effort picked at spawn or later stays, and a pending pick still applies.
-Leaving a phase expires its selection, so returning to it takes its latest configured default.
+Leaving a phase expires its selection.
+The next phase uses its configured routing mode.
 A session recorded before phase tracking takes its default at its next turn.
 A pending selection removed from config, incompatible with the seat's wall, or naming Fable, Astra or `max` when it is not the operator's own is ignored, while the session keeps its launched selection.
 Automatic defaults need no allowlist permission.
@@ -1641,7 +1668,7 @@ Turned on after the plan's approve, no mock opens and the card stays where it is
 `/preview` and `/demo` remain the operator's commands; nothing waits on them.
 
 Once the clone is made, a visual card's mock opens at its baseline step, its host's port taken: the engine posts the foreman's "Build the baseline" and, on a card with a planner, the planner's "Agree the specification", whose turns wait until that step ends; on a no-planner card, "Agree the specification" comes once the baseline ends or visual mode turns off.
-The foreman reads the card and the code, names the pages the card changes, and spawns its baseline seat (`spawn <card> baseline '<task>'`, on its configured default) to reproduce each as it stands today in the clone's `.git/mork-mock/` (untracked), keeping any mock already there, an earlier run's included, and filling only what it lacks.
+The foreman reads the card and the code, names the pages the card changes, and spawns its baseline seat (`spawn <card> baseline '<task>'`, using its configured routing mode) to reproduce each as it stands today in the clone's `.git/mork-mock/` (untracked), keeping any mock already there, an earlier run's included, and filling only what it lacks.
 Its `built` from a turn that read that request ends the step and submits nothing: the mock is then the specification holder's, the baseline seat released; with no page to reproduce it spawns nothing and ends `built` at once.
 The planner's turns wait while the step runs, and the folder has one writer at a time: a mock holder's turn (the planner's, or the no-planner foreman's once the mock is open) waits while a baseline seat's turn of the card runs, and a baseline seat's while the mock holder's runs.
 A stall in the step nudges the foreman.

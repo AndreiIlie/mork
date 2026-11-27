@@ -222,6 +222,7 @@ export type Command =
     } }
   | { usage: Record<string, never> }
   | { quality: Record<string, never> }
+  | { routing: Record<string, never> }
   | { "claude.account": {
       name: string;
     } }

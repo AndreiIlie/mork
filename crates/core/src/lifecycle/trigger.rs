@@ -7,27 +7,47 @@ use mork_types::note::NoteWhat;
 use serde::Serialize;
 
 use super::lookback::{self, Start};
-use crate::agents::{
-    pools::{self, Offer},
-    turns,
-};
+use crate::agents::turns;
 use crate::decide::Ctx;
 use crate::post::Poster;
+use crate::routing::choose::{Candidate as Pair, Inputs, Request};
 use crate::state::{Change, State};
 
-pub(crate) fn best(state: &State, name: &str, at: Standing, ctx: Ctx<'_>) -> Option<Offer> {
-    let pairs = &ctx.config.picks.as_ref()?.pass;
-    let seat = ctx.config.seat_in(name, at)?;
-    pools::ranked(&state.limits, ctx.now, ctx.claude_account, &seat, pairs).into_iter().find(|o| o.open)
+#[derive(Clone)]
+pub(crate) struct Offer {
+    pub pair: Pair,
+    pub row: serde_json::Value,
 }
 
-pub(crate) fn starting_offer(state: &State, ctx: Ctx<'_>) -> Option<Offer> {
+pub(crate) fn offer(
+    state: &State,
+    project: &ProjectId,
+    key: &str,
+    name: &str,
+    at: Standing,
+    ctx: Ctx<'_>,
+) -> Option<Offer> {
+    let seat = ctx.config.seat_in(name, at)?;
+    let req = Request {
+        agent: key,
+        run: 1,
+        phase: at.phase,
+        role: crate::routing::seats::role(name, at.phase),
+        leaf: Some(project.as_str()),
+        partner: None,
+    };
+    let rec = Inputs::new(&state.limits, ctx).choose(&req, &seat, &ctx.config.picks.as_ref()?.pass, name == "foreman");
+    Some(Offer { pair: rec.best()?.clone(), row: rec.row(&req, mork_types::config::RoutingMode::Auto) })
+}
+
+pub(crate) fn starting_offer(state: &State, project: &ProjectId, ctx: Ctx<'_>) -> Option<Offer> {
     let at = Standing { phase: SeatPhase::Report, review: None };
-    best(state, "foreman", at, ctx).filter(|o| o.spare > 0)
+    let key = format!("{}/foreman", lookback::next_id(state, project.as_str()));
+    offer(state, project, &key, "foreman", at, ctx)
 }
 
 pub(crate) fn bar(pair: &Offer) -> u32 {
-    100 - pair.spare
+    100 - pair.pair.offer.spare
 }
 
 fn idle(p: &Poster<'_>) -> bool {
@@ -41,16 +61,17 @@ struct Candidate<'a> {
     read: Read,
     score: Score,
     margin: f64,
+    pair: Offer,
 }
 
 pub(crate) fn due(p: &mut Poster<'_>, ctx: Ctx<'_>) {
-    let offer = OnceCell::new();
     let mut winner = None;
     for project in ctx.config.ordered_projects() {
         let passes = &ctx.config.projects[project].passes;
         if passes.is_empty() || lookback::live(p.state, project).is_some() {
             continue;
         }
+        let offer = OnceCell::new();
         let mut scheduled = None;
         let mut candidate = None;
         for (&read, pass) in passes.iter().filter(|(_, pass)| pass.mode != Trigger::Manual) {
@@ -62,11 +83,13 @@ pub(crate) fn due(p: &mut Poster<'_>, ctx: Ctx<'_>) {
                 if let Some(met) = threshold(p, &base, pass, ctx) {
                     scheduled.get_or_insert((read, met));
                 }
-            } else if let Some(pair) = offer.get_or_init(|| idle(p).then(|| starting_offer(p.state, ctx)).flatten()) {
+            } else if let Some(pair) =
+                offer.get_or_init(|| idle(p).then(|| starting_offer(p.state, project, ctx)).flatten())
+            {
                 let score = score(p.state, &base, ctx);
                 let margin = score.total - f64::from(bar(pair));
                 if score.active() && margin > 0.0 {
-                    prefer(&mut candidate, Candidate { project, read, score, margin });
+                    prefer(&mut candidate, Candidate { project, read, score, margin, pair: pair.clone() });
                 }
             }
         }
@@ -76,8 +99,8 @@ pub(crate) fn due(p: &mut Poster<'_>, ctx: Ctx<'_>) {
             prefer(&mut winner, c);
         }
     }
-    if let (Some(c), Some(Some(pair))) = (winner, offer.get()) {
-        lookback::begin(p, c.project, c.read, Start::Auto(pair, &c.score), ctx);
+    if let Some(c) = winner {
+        lookback::begin(p, c.project, c.read, Start::Auto(&c.pair, &c.score), ctx);
     }
 }
 

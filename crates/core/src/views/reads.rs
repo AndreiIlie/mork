@@ -108,7 +108,6 @@ fn deliverables(run: Option<&Card>) -> Value {
 /// `projects`: each project's name, base, board prefix, where it lives, and its auto switch (fac-233).
 pub(super) fn projects(state: &State, ctx: Ctx<'_>) -> Decision {
     let config = ctx.config;
-    let bar = std::cell::OnceCell::new();
     let list: Vec<Value> = config
         .ordered_projects()
         .filter_map(|n| config.projects.get(n).map(|p| (n, p)))
@@ -118,6 +117,7 @@ pub(super) fn projects(state: &State, ctx: Ctx<'_>) -> Decision {
             });
             let auto = json!({"on": crate::messages::auto::on(state, name)});
             let live = crate::lifecycle::lookback::live(state, name);
+            let bar = std::cell::OnceCell::new();
             let passes = mork_types::lookback::Read::ALL.map(|read| {
                 let config = p.passes.get(&read).cloned().unwrap_or_default();
                 let last = state.lookbacks.get(name).and_then(|rows| rows.get(&read));
@@ -125,7 +125,7 @@ pub(super) fn projects(state: &State, ctx: Ctx<'_>) -> Decision {
                 if config.mode == mork_types::lookback::Trigger::Auto {
                     use crate::lifecycle::trigger;
                     let base = trigger::baseline(state, name, read, ctx.now);
-                    let bar = bar.get_or_init(|| trigger::starting_offer(state, ctx).as_ref().map(trigger::bar));
+                    let bar = bar.get_or_init(|| trigger::starting_offer(state,name,ctx).as_ref().map(trigger::bar));
                     return json!({"read": read, "mode": config.mode, "last": last, "running": running,
                         "score": trigger::score(state, &base, ctx), "bar": bar});
                 }

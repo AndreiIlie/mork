@@ -15,6 +15,7 @@ pub mod messages;
 pub mod post;
 pub mod queue;
 pub mod reviews;
+pub mod routing;
 mod search_text;
 pub mod state;
 pub mod views;

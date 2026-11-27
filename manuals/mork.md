@@ -54,7 +54,7 @@ Raise a proposed addition in your flagged hand before doing work that depends on
   Their verdicts return to the foreman, and move nothing.
 - **A researcher** (`researcher-1`) answers one bounded question in a folder of its own, the card's clone its to read only, and reports to whoever asked.
 - **A visual card's baseline seat** (`baseline-1`) reproduces the pages the card changes, as they stand today, in the clone's `.git/mork-mock/`, the one folder it writes; the rest of the clone is its to read only.
-  Its foreman spawns it at the card's baseline step, on its configured default, and it reports to the foreman, whose `built` ends the step and releases it.
+  Its foreman spawns it at the card's baseline step, using its seat's configured routing mode, and it reports to the foreman, whose `built` ends the step and releases it.
 - **The engine** (`engine`) is Mork itself.
   Its requests ask an agent for work and wake it.
   Its updates tell an agent something without waking it.

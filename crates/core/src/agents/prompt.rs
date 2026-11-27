@@ -165,6 +165,9 @@ pub(crate) fn delegation_rule(c: &Card) -> &'static str {
 fn picks(state: &State, a: &Agent, config: &Config, s: &mut Sections<'_>, out: &mut String) {
     let Some(card) = card_of(state, a).filter(|_| matches!(a.role, Role::Planner | Role::Foreman)) else { return };
     let roles: &[Role] = match card.mode {
+        Mode::Full if a.role == Role::Foreman && crate::lifecycle::mock::baseline(card) => {
+            &[Role::Researcher, Role::Baseline]
+        }
         Mode::Full | Mode::Report => &[Role::Researcher],
         Mode::Review => &[Role::Reviewer, Role::Researcher],
         Mode::Light => return,
@@ -183,7 +186,16 @@ fn choices(state: &State, card: &Card, config: &Config, role: Role) -> String {
         return "For a researcher: spawn with the task alone. The engine chooses the model and effort from picks.pass at each spawn.".into();
     }
     let (_, child) = super::children::child(state, card, role);
-    format!("For a {}: {}.", role.as_str(), super::models::pick_options(state, config, &child))
+    let at = super::models::standing(state, &child);
+    let mode = match config.routing_mode(child.seat.as_str(), at) {
+        mork_types::config::RoutingMode::Auto => "auto routing, omit the selection to use the router",
+        mork_types::config::RoutingMode::Shadow => "shadow routing",
+        mork_types::config::RoutingMode::Fixed => "fixed routing",
+    };
+    if role == Role::Baseline {
+        return format!("For a baseline seat: spawn without a selection ({mode}).");
+    }
+    format!("For a {}: {} ({mode}).", role.as_str(), super::models::pick_options(state, config, &child))
 }
 
 // How full an agent's context is, as its CLI last reported it (fac-25): its own call to make

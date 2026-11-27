@@ -12,15 +12,16 @@ Use the least work that answers the task.
 - **Spawn a researcher, reviewer or baseline seat.**
   Use `mork ctl spawn <card> researcher '<task>' --model <model> --effort <effort>` for a researcher, or `spawn` with `reviewer` on a review card.
   For a task with quotes or parentheses, its `--task-file <path>` option reads the task from a file in place of `'<task>'`, `-` reading stdin.
-  A visual card's `baseline` seat is the foreman's at its baseline step alone, one at a time: `mork ctl spawn <card> baseline '<task>'`, naming no model, effort or CLI, on its configured default; only the operator picks it later.
+  A visual card's `baseline` seat is the foreman's at its baseline step alone, one at a time: `mork ctl spawn <card> baseline '<task>'`, naming no model, effort or CLI, using its configured routing mode; only the operator picks it later.
   Task it with the pages to reproduce as they stand today, the mock's link, and "keep what the folder holds, fill what it lacks"; end `built` once its report says the baseline is done.
   A planner can spawn researchers at brief or during a specification dispute.
   The planner is no child: a foreman neither spawns nor picks it.
   On an auto-started pass, omit model, effort and CLI for a researcher.
   The engine chooses from `picks.pass` at each spawn and refuses when no quota pool is open.
-  Every other researcher spawn requires both model and effort.
+  On other cards, omit selection flags to use the router when Allowed models shows auto routing.
+  Researcher spawns in fixed or shadow mode require both model and effort.
   A reviewer requires `--topic '<topic>'`, quoted, what it reviews in your own words, and a researcher takes none.
-  A reviewer may omit model, effort and CLI together to use its configured inside or outside default, without allowlist permission.
+  A reviewer may omit model, effort and CLI together to use its configured inside or outside routing mode.
   For an explicit selection, name both model and effort from your Allowed models section.
   Selections also preserve the seat's wall: an unwalled Claude seat runs Claude models only.
   `--model` takes the full id or its label's first word; name `--cli` to pick another CLI than the model's own, or when the model has no default CLI.
@@ -40,7 +41,7 @@ Use the least work that answers the task.
   Each setting may choose any CLI, model and effort, without constraining or granting a foreman's selections.
   - For a bounded research question, choose a model at the highest effort on the researcher's allowed list.
     For a short "where is X" lookup, choose a model at the lowest effort on that list.
-  - **A reviewer** spawned without a selection takes its configured inside or outside default.
+  - **A reviewer** spawned without a selection uses the inside or outside seat's routing mode.
     Choose the starting effort for the round as the `review-cards` skill says.
     For any topic that touches money, permissions or migrations, use a stronger allowed model at that effort from the start when available.
     For a topic where a reviewer left a doubt unresolved, use a stronger allowed model at that effort or higher.

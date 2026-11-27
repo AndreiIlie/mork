@@ -116,6 +116,7 @@ impl Engine {
             Command::HistorySearch { words } => return self.history_search(conn, req.id, &from, words),
             cmd @ Command::HistoryJournal { .. } => return self.history_journal(conn, req.id, &from, cmd),
             Command::Status { jobs, all, card } => Ok(self.status(jobs, all, card.as_deref(), conn.origin)),
+            Command::Routing {} => return self.routing_answer(conn, req.id),
             Command::Quality {} => return self.quality(conn, req.id),
             Command::Usage {} => Ok(self.usage()),
             Command::ClaudeAccount { name } => self.claude_account(&name),

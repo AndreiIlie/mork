@@ -13,6 +13,7 @@ mod notes;
 mod orchestrators;
 mod quality;
 mod retired;
+mod routing;
 pub mod schema;
 
 use std::path::{Path, PathBuf};

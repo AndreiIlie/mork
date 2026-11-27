@@ -98,6 +98,7 @@ pub const CATALOG: &[CommandSpec] = &[
     ),
     read("status", Engine, &[opt("jobs", Bool), opt("all", Bool), opt("card", Str)]),
     read("usage", Engine, &[]),
+    read("routing", Engine, &[]),
     read("quality", Engine, &[]),
     cmd("claude.account", Engine, &[req("name", Str)]),
     read("projects", Views, &[]),

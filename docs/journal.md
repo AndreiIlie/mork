@@ -10,6 +10,12 @@ The job's `settled_ms` written by the decision uses it too
 ([agents/ends.rs: `settle`](../crates/core/src/agents/ends.rs)), as does a new
 approval's `at_ms` ([lifecycle/brief.rs: `approve`, `offer`](../crates/core/src/lifecycle/brief.rs)).
 
+## Routing
+
+A `route` records the seat, run, role, mode, project or reviewer lens, partner model, candidate scores and recommended pair at selection time. A null pick means no eligible candidate. Each candidate records its quality mean and draw, synergy, estimated and relative cost, quota pool, spare, price, eligibility and final score.
+
+A turn's `cost` records `ran` when its stream shows model activity and `by` for the choice applied to that job. A reviewer's verdict `reply` records its `job` and bound `round`. A stale verdict has no bound round.
+
 ## Project passes
 
 A pass’s `card.start` row carries its `trigger`.

@@ -54,7 +54,7 @@ pub(super) fn start(state: &State, project: &ProjectId, read: Option<&str>, ctx:
 pub(super) enum Start<'a> {
     Manual,
     Scheduled(&'a str),
-    Auto(&'a crate::agents::pools::Offer, &'a super::trigger::Score),
+    Auto(&'a super::trigger::Offer, &'a super::trigger::Score),
 }
 
 pub(super) fn begin(p: &mut Poster<'_>, project: &ProjectId, read: Read, start: Start<'_>, ctx: Ctx<'_>) -> CardId {
@@ -79,19 +79,23 @@ pub(super) fn begin(p: &mut Poster<'_>, project: &ProjectId, read: Read, start: 
     match start {
         Start::Manual => {}
         Start::Scheduled(met) => data["threshold"] = json!(met),
-        Start::Auto(pair, score) => {
+        Start::Auto(routed, score) => {
+            let pair = &routed.pair.offer;
             let who = crate::messages::requests::agent_of(&id, mork_types::reply::Role::Foreman);
             let mut agent = crate::post::new_agent(&who);
             agent.seen = p.next_seq;
             agent.seen_before = agent.seen;
             agent.choice = Some(pair.choice(mork_types::config::SeatPhase::Report));
             p.put_agent(agent);
-            data = json!({"run": 1, "mode": "report", "trigger": trigger, "score": score, "bar": super::trigger::bar(pair),
+            data = json!({"run": 1, "mode": "report", "trigger": trigger, "score": score, "bar": super::trigger::bar(routed),
                 "spare": pair.spare, "pool": pair.pool, "cli": pair.cli, "model": pair.model, "effort": pair.effort,
-                "pair_score": pair.score});
+                "pair_score": routed.pair.score});
         }
     }
     p.journal("card.start", Some(id.as_str()), data);
+    if let Start::Auto(routed, _) = start {
+        p.journal("route", Some(id.as_str()), routed.row.clone());
+    }
     p.fetch(project.as_str());
     id
 }

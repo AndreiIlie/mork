@@ -28,7 +28,7 @@ fn request(config: &Config, project: &str, mode: Mode, role: Role, words: &[&str
         &from,
         "walls",
         &command,
-        Ctx { now: 1, config, faults: true, claude_account: None },
+        Ctx { routing: None, now: 1, config, faults: true, claude_account: None },
     )
 }
 

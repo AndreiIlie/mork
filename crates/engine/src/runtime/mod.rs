@@ -32,6 +32,7 @@ mod reloads;
 mod retries;
 mod review_proofs;
 mod review_threads;
+mod routing;
 mod say_images;
 mod search;
 mod slots;
@@ -183,6 +184,7 @@ impl Watched {
 }
 
 pub struct Engine {
+    routing: routing::Cache,
     bound_web_port: Option<u16>,
     reserved_ports: std::collections::BTreeSet<u16>,
     pub opts: Options,
@@ -223,6 +225,7 @@ pub struct Engine {
 }
 
 pub enum Input {
+    Routing(Result<Box<mork_types::routing::Statistics>, String>),
     Socket(Incoming),
     /// A delayed answer (`debug.sleep`).
     Answer {
@@ -307,6 +310,7 @@ impl Engine {
         Ctx {
             now,
             config: &self.ctx.config,
+            routing: self.routing.stats.as_deref(),
             faults: self.faults(),
             claude_account: self.views_cache.claude_accounts.live.as_ref().map(|a| a.id.as_str()),
         }
@@ -401,6 +405,7 @@ impl Engine {
                 Ok(Input::WorkPrepared(p)) => self.work_prepared(*p),
                 Ok(Input::CandidateRead { job, end }) => self.candidate_read(&job, *end),
                 Ok(Input::TokenAsked(project)) => self.token_asked(project),
+                Ok(Input::Routing(result)) => self.routing_read(result),
                 Ok(Input::Outside(r)) => self.outside_read(*r),
                 Ok(Input::Resources(r)) => self.resources_read(r),
                 Ok(Input::DoorKilled(k)) => self.door_killed(*k),

@@ -240,7 +240,9 @@ fn open(opts: Options, t: &mut Timer, lock_file: File, sock_fds: Option<(RawFd, 
     t.step("store.load");
     let (ctx, fallback) = context(&opts, config, choosing, skills);
     let wakes = super::wakes::Wakes::open(&opts.home);
+    let routing = super::routing::Cache::open(&ctx.config, &store)?;
     let engine = Engine {
+        routing,
         reserved_ports,
         bound_web_port,
         opts,

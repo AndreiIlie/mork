@@ -113,6 +113,7 @@ impl Fixture {
             last_upkeep: None,
             keep: Kept { lock: File::create(self.home.app_lock()).unwrap(), mork: -1, agent: -1 },
             seen: Default::default(),
+            routing: Default::default(),
             limits_read: Default::default(),
             pipe: Default::default(),
             views_cache: Default::default(),

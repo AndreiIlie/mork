@@ -5,18 +5,25 @@ use std::collections::BTreeMap;
 use mork_types::config::{Cli, Effort, PickModel, Seat, agy_bucket, bench};
 use mork_types::usage::{Limit, length_ms, pool_name, short_name};
 
-use super::{models::walls_kept, usage::pace};
+use super::usage::pace;
+use mork_types::config::Wall;
+
+// An unwalled Claude seat's deny list exists only in Claude Code (fac-25, fac-402); agy's wall alone holds it (fac-657).
+pub(super) fn walls_kept(seat: &Seat, cli: Cli) -> bool {
+    seat.wall != Wall::None || (cli != Cli::Agy && (seat.cli == Cli::Codex || cli == Cli::Claude))
+}
 
 const POLLED_MAX_AGE: i64 = 10 * 60_000;
 const UNTOUCHED_SPARE: u32 = 50;
 const SHORT_CEILING: u32 = 60;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Offer {
     pub cli: Cli,
     pub model: String,
     pub effort: Effort,
-    pub score: f64,
+    pub index: f64,
+    pub scale: f64,
     pub spare: u32,
     pub open: bool,
     pub pool: String,
@@ -28,14 +35,14 @@ impl Offer {
             cli: self.cli,
             model: self.model.clone(),
             effort: self.effort,
-            by: "engine".into(),
+            by: "router".into(),
             phase: Some(phase),
         }
     }
 }
 
-/// Ranks the allowed pairs for this wall by score, keeping their input order on ties.
-pub fn ranked(
+/// Quota and benchmark inputs in the configured order, restricted to this seat’s wall.
+pub fn offers(
     limits: &BTreeMap<String, Limit>,
     now: i64,
     account: Option<&str>,
@@ -50,19 +57,17 @@ pub fn ranked(
         }
         let bucket = if cli == Cli::Agy { agy_bucket(&entry.model) } else { "account" };
         let pool = pool_name(cli, bucket);
-        let pool = if cli == Cli::Claude {
-            let Some(id) = account else { continue };
+        let pool = if let Some(id) = account.filter(|_| cli == Cli::Claude) {
             format!("{pool} {id}")
         } else {
             pool
         };
         let spare = headroom(limits, entry, bucket, account, now);
         for &effort in &entry.efforts {
-            let Some((index, dollars)) = bench::benchmark(&entry.model, effort) else { continue };
+            let Some((index, _)) = bench::benchmark(&entry.model, effort) else { continue };
             if !cli.takes(&entry.model, effort) {
                 continue;
             }
-            let share = f64::from(spare.unwrap_or_default());
             offers.push(Offer {
                 cli,
                 model: entry.model.clone(),
@@ -70,11 +75,11 @@ pub fn ranked(
                 pool: pool.clone(),
                 open: spare.is_some(),
                 spare: spare.unwrap_or_default(),
-                score: index * share / (share + dollars * bench::cost_scale(cli, bucket)),
+                index,
+                scale: bench::cost_scale(cli, bucket),
             });
         }
     }
-    offers.sort_by(|a, b| b.score.total_cmp(&a.score));
     offers
 }
 
@@ -85,6 +90,9 @@ fn headroom(
     account: Option<&str>,
     now: i64,
 ) -> Option<u32> {
+    if entry.cli == Cli::Claude && account.is_none() {
+        return None;
+    }
     let rows = limits.values().filter(|l| {
         l.cli == entry.cli && (l.cli != Cli::Claude || l.account.as_ref().map(|a| a.id.as_str()) == account)
     });

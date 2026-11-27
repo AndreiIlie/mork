@@ -188,12 +188,12 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
     let Sender::Agent(parent) = from else { return Decision::refused("a child needs a seat to report to") };
     agent.parent = Some(parent.clone());
     agent.topic.clone_from(&topic);
+    let mut p = Poster::for_ctx(state, ctx);
     agent.choice =
-        match spawn_choice(state, from, &agent, c, (model.as_deref(), effort.as_deref(), cli.as_deref()), ctx) {
+        match spawn_choice(&mut p, from, &agent, c, (model.as_deref(), effort.as_deref(), cli.as_deref()), ctx) {
             Ok(choice) => choice,
             Err(e) => return Decision::refused(e),
         };
-    let mut p = Poster::for_ctx(state, ctx);
     p.put_agent(agent);
     task(&mut p, &who, from, task_text.trim());
     let mut event = json!({"agent": who.key.as_str(), "role": role.as_str()});
@@ -207,13 +207,14 @@ pub(super) fn spawn(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -
 }
 
 fn spawn_choice(
-    state: &State,
+    p: &mut Poster<'_>,
     from: &Sender,
     agent: &Agent,
     card: &Card,
     (model, effort, cli): (Option<&str>, Option<&str>, Option<&str>),
     ctx: Ctx<'_>,
 ) -> Result<Option<Choice>, String> {
+    let state = p.state;
     let at = super::models::standing(state, agent);
     let selected = model.is_some() || effort.is_some() || cli.is_some();
     if agent.role == Role::Researcher && crate::lifecycle::lookback::automatic(card) {
@@ -222,14 +223,18 @@ fn spawn_choice(
                 "the engine chooses this auto pass's researchers: drop `--model`, `--effort` and `--cli`".into()
             );
         }
-        return crate::lifecycle::trigger::best(state, "researcher", at, ctx)
-            .map(|pair| Some(pair.choice(at.phase)))
-            .ok_or_else(|| "no quota pool is open for a researcher now".into());
+        let offer = crate::lifecycle::trigger::offer(state, &card.project, agent.key.as_str(), "researcher", at, ctx)
+            .ok_or_else(|| "no quota pool is open for a researcher now".to_owned())?;
+        p.journal("route", Some(card.id.as_str()), offer.row);
+        return Ok(Some(offer.pair.offer.choice(at.phase)));
     }
     if agent.role == Role::Baseline && selected {
         return Err("a baseline seat runs on its configured default, `[seats.baseline]`: drop `--model`, `--effort` and `--cli`".into());
     }
-    if !selected && matches!(agent.role, Role::Reviewer | Role::Baseline) {
+    if !selected
+        && (matches!(agent.role, Role::Reviewer | Role::Baseline)
+            || ctx.config.routing_mode(agent.seat.as_str(), at) == mork_types::config::RoutingMode::Auto)
+    {
         return Ok(None);
     }
     if model.is_none() || effort.is_none() {

@@ -249,6 +249,7 @@ fn foreman_replied(p: &mut Poster<'_>, card: &Card, who: &Who, r: &Reply, job: &
     let mut c = p.card(&card.id).unwrap_or(card.clone());
     if submits {
         p.journal("build.requested", Some(card.id.as_str()), serde_json::json!({"job": job.id}));
+        c.gates.submitting_model = mork_types::cost::Selection::from_argv(&job.spec.argv).map(|s| s.model);
         c.gates.built_pending = true;
         crate::reviews::triage::withdraw(p, &mut c);
     }

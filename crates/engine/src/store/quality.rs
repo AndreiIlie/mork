@@ -30,15 +30,15 @@ impl Store {
     pub fn quality(&self, now: i64) -> Result<Quality> {
         let since = now.saturating_sub(quality::WINDOW_MS);
         let tx = self.conn.unchecked_transaction()?;
-        let cards = histories(&tx, since)?;
+        let cards = histories(&tx, since, HISTORY)?;
         tx.commit()?;
         Ok(quality::aggregate(since, &cards))
     }
 }
 
-fn histories(conn: &Connection, since: i64) -> Result<BTreeMap<String, History>> {
+pub(super) fn histories(conn: &Connection, since: i64, sql: &str) -> Result<BTreeMap<String, History>> {
     let mut cards = BTreeMap::<String, History>::new();
-    let mut query = conn.prepare(HISTORY)?;
+    let mut query = conn.prepare(sql)?;
     let mut rows = query.query([since])?;
     while let Some(row) = rows.next()? {
         let id: String = row.get(2)?;

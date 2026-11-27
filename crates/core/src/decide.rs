@@ -26,6 +26,7 @@ pub struct Ctx<'a> {
     pub now: i64,
     pub config: &'a Config,
     pub claude_account: Option<&'a str>,
+    pub routing: Option<&'a mork_types::routing::Statistics>,
     /// A build with `faults`: the echo role and `debug.sleep` exist (1.10.4).
     pub faults: bool,
 }
@@ -283,6 +284,7 @@ impl Decision {
 /// Records each project's stream, auto-gives delegated cards' seat and plan asks, and requests help for engine asks.
 pub fn decide(state: &State, event: &Event, ctx: Ctx<'_>) -> Decision {
     let mut d = route(state, event, ctx);
+    crate::routing::seats::created(state, &mut d, ctx);
     crate::messages::streams::record(state, &mut d, ctx.config.mork.project.as_ref(), ctx.now);
     crate::messages::delegate::give_opened(state, &mut d, ctx.now);
     crate::messages::delegate::request_opened(state, &mut d, ctx.now);

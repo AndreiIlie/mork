@@ -46,10 +46,12 @@ Nothing reviews a review card in turn.
    Performance applies when the change can affect it.
 3. **Task one blind reviewer per topic** with `mork ctl spawn <card> reviewer '<task>' --topic '<topic>'`.
    Use `--task-file <path>` in place of `'<task>'` for a task with quotes or parentheses.
-   Select the tier's starting effort from the review kind's configured default and its permitted picks.
+   When Allowed models shows auto routing for reviewers, omit the selection flags.
+   The router chooses both model and effort, including for Deep reviews.
+   In fixed and shadow mode, select the tier's starting effort from the review kind's configured default and its permitted picks.
    Omit selection flags for the default.
    For an explicit selection use `--model <model> --effort <effort>`, following the `delegating` skill for unresolved doubts.
-   For a returning reviewer, apply any permitted effort change with `pick` before sending its task.
+   For a returning reviewer in fixed or shadow mode, apply any permitted tier effort change with `pick` before sending its task.
    Quote a topic of several words so it passes whole (`--topic 'correctness and tests'`, `--topic 'money, permissions or data integrity'`).
    The room list shows it beside the reviewer.
    Name the topic first, then what the specification asks, including applicable defaults from the approved plan and later decisions from "Under review".

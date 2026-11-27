@@ -91,6 +91,7 @@ fn built(p: &mut Poster<'_>, mut card: Card, moved: bool, tip: Option<Sha>, ctx:
         let why = crate::queue::joins::BEFORE_CHECKS;
         return crate::queue::joins::through_foreman(p, card, why, tip, ctx);
     }
+    card.gates.builder = card.head.clone().zip(card.gates.submitting_model.take());
     p.journal("build.submitted", Some(id.as_str()), serde_json::json!({"head": card.head}));
     start_checks(p, card, ctx);
 }
