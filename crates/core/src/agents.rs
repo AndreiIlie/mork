@@ -10,6 +10,7 @@ pub mod fresh;
 pub mod held;
 pub mod lesson;
 pub mod models;
+pub mod pools;
 pub mod prompt;
 pub mod recovery;
 pub mod reply;

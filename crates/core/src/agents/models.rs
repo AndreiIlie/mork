@@ -149,7 +149,7 @@ pub fn choices_for(state: &State, config: &Config, a: &Agent, by: By) -> Vec<Mod
 }
 
 // An unwalled Claude seat's deny list exists only in Claude Code (fac-25, fac-402); agy's wall alone holds it (fac-657).
-fn walls_kept(seat: &Seat, cli: Cli) -> bool {
+pub(super) fn walls_kept(seat: &Seat, cli: Cli) -> bool {
     seat.wall != Wall::None || (cli != Cli::Agy && (seat.cli == Cli::Codex || cli == Cli::Claude))
 }
 
