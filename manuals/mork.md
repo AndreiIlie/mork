@@ -389,6 +389,8 @@ Raise one question at a time in your flagged hand message.
 A foreman raising an `answer` ask ends `working`.
 When blocked, state what you need in `message`, set `ask` to true and end `blocked`.
 One correction is allowed; a second refusal is the turn's error.
+A topic reviewer's first valid `review-fail` with empty `findings` gets one confirmation prompt, including when it follows a malformed reply.
+The reviewer adds the findings or repeats the empty failure to confirm it.
 A cut turn runs once more, checking first what it already did.
 A failed turn raises an error ask; a message or `resume` runs it again.
 A usage limit waits for its reset.

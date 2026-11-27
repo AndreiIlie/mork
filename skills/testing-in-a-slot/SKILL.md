@@ -8,7 +8,7 @@ description: "Use before running a project's checks, its linter or its tests fro
 Tests and checks run in a slot the engine hands out, so that cards don't starve each other's machine.
 A researcher's or baseline seat's run takes a project slot and a machine test run, but not its card's slot.
 
-- **The project's tests of what you touched:** `mork test --run <program> [arguments…]`, the exact command you want as separate words, never one quoted string, for a narrow crate, test or filter (`mork test --run cargo test -p mork-core --test fac95_gate`).
+- **The project's tests of what you touched:** `mork test --run <program> [arguments…]`, the exact command you want as separate words, never one quoted string, for a narrow crate, test or filter (`mork test --run cargo test -p mork-core --test reviewer_history`).
   Run it from the clone's root: it waits for a slot, then runs in your wall where you started it.
   Queued, it prints `mork test: waiting for a slot (…)` and says nothing more until it runs: that is a queue, not a hang, and it keeps waiting across a reload of Mork, `--run`, `--file` and `--checks` alike.
 - **One file's tests:** `mork test --file <path>…`, where the project has a one-file command.

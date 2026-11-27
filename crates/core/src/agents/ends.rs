@@ -308,8 +308,7 @@ fn cut(p: &mut Poster<'_>, a: &mut Agent, job: &Job) -> Settlement {
     Settlement::Cut
 }
 
-// Only malformed replies, wrong-role outcomes, incomplete findings, untyped messages, invalid images or ineffective
-// foreman outcomes leaving a card waiting are refused: once a correction, twice an error (1.4.9, fac-423).
+// Validation precedes publication so only the accepted reply can wake another seat.
 fn apply_reply(p: &mut Poster<'_>, a: &mut Agent, job: &Job, reply: &Value, ctx: Ctx<'_>) -> Result<bool, String> {
     let state = p.state;
     let who =
@@ -325,17 +324,14 @@ fn apply_reply(p: &mut Poster<'_>, a: &mut Agent, job: &Job, reply: &Value, ctx:
         })
     };
     match checked {
-        Err(reason) if job.corrects.is_none() => {
-            a.status = AgentStatus::Idle;
-            a.owed = Some(Owed::Correction { of: job.id.clone(), reason: reason.clone() });
-            p.journal("reply.refused", None, json!({"job": job.id.as_str(), "reason": reason}));
-            Ok(false)
-        }
-        Err(reason) => {
-            p.journal("reply.refused", None, json!({"job": job.id.as_str(), "reason": reason}));
-            Err(format!("reply refused twice: {reason}"))
+        Err(reason) => refuse(p, a, job, job.corrects.is_none().then_some(&job.id), reason),
+        Ok(Accepted::Reply(r, _)) if super::children::needs_confirmation(a, job, &r) => {
+            let of = job.corrects.as_ref().unwrap_or(&job.id);
+            a.confirm_empty_review = Some(of.clone());
+            refuse(p, a, job, Some(of), super::children::EMPTY_REVIEW.into())
         }
         Ok(accepted) => {
+            a.confirm_empty_review = None;
             a.status = AgentStatus::Idle;
             a.cuts = 0;
             let mut dropped = false;
@@ -373,4 +369,18 @@ fn apply_reply(p: &mut Poster<'_>, a: &mut Agent, job: &Job, reply: &Value, ctx:
 enum Accepted {
     Echo(String),
     Reply(Box<mork_types::reply::Reply>, Vec<crate::messages::places::Route>),
+}
+
+fn refuse(
+    p: &mut Poster<'_>,
+    a: &mut Agent,
+    job: &Job,
+    corrects: Option<&JobId>,
+    reason: String,
+) -> Result<bool, String> {
+    p.journal("reply.refused", None, json!({"job": job.id.as_str(), "reason": reason}));
+    let Some(of) = corrects else { return Err(format!("reply refused twice: {reason}")) };
+    a.status = AgentStatus::Idle;
+    a.owed = Some(Owed::Correction { of: of.clone(), reason });
+    Ok(false)
 }

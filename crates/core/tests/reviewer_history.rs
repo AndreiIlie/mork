@@ -53,6 +53,49 @@ fn run_turn(sim: &mut Sim, key: &str, commands: &[Value], reply: Value) -> Strin
     prompt
 }
 
+#[test]
+fn reviewer_can_supply_findings_or_confirm_an_empty_failure_before_reporting() {
+    for findings in [vec![finding("src/a.rs", 10, "Lost update")], vec![]] {
+        let mut sim = Sim::new();
+        let rc = start_round_one(&mut sim, "web-1", "h1");
+        let foreman = format!("{rc}/foreman");
+        let reviewer = format!("{rc}/reviewer-1");
+        sim.turn_sending(&foreman, &[spawn_cmd(&rc, "tests", "Review tests")], reply("working", "Review"));
+        if findings.is_empty() {
+            // Correcting a malformed reply cannot itself confirm a failure the reviewer has yet to report.
+            sim.turn(&reviewer, Value::Null);
+        }
+        let mut empty = reply("review-fail", "Check failed");
+        empty["hand"]["message"] = json!("src/a.rs:10 loses the update");
+        sim.turn(&reviewer, empty);
+
+        let reports = |sim: &Sim| {
+            sim.messages(&rc)
+                .into_iter()
+                .filter(|m| m.from == Sender::Agent(reviewer.as_str().into()))
+                .collect::<Vec<_>>()
+        };
+        assert!(reports(&sim).is_empty());
+        assert!(!sim.owed(&foreman));
+        assert!(sim.card(&rc).review.unwrap().open().unwrap().reviewers.is_empty());
+
+        let n = findings.len();
+        let corrected = verdict_reply("review-fail", "Final verdict", findings);
+        let prompt = run_turn(&mut sim, &reviewer, &[], corrected);
+        assert_contains_all(&prompt, &["blocking finding in `findings`", "repeat `review-fail` with empty `findings`"]);
+        let reports = reports(&sim);
+        assert_eq!(reports.len(), 1);
+        assert!(reports[0].text.contains("Final verdict"));
+        let review = sim.card(&rc).review.unwrap();
+        let verdict = &review.open().unwrap().reviewers["reviewer-1"];
+        assert!(!verdict.passed);
+        assert_eq!(verdict.findings.len(), n);
+        assert_eq!(reports[0].text.contains("Lost update"), n == 1);
+        assert!(sim.owed(&foreman));
+        assert!(!sim.owed(&reviewer));
+    }
+}
+
 fn resubmit_after_triage(sim: &mut Sim, card: &str, head: &str, fix: &[&str], decline: &[&str]) {
     sim.proofs_copied();
     sim.suite(card, 0);

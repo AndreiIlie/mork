@@ -1,5 +1,4 @@
-//! A refused reply posts no effects: malformed JSON, wrong-role outcomes, incomplete findings, untyped messages,
-//! invalid images, or ineffective foreman outcomes leaving a card waiting (fac-423). Echo replies hold one message.
+//! A reply must pass validation before its hand or messages can be posted. Echo replies hold one message.
 
 use mork_types::card::{Mode, Stage};
 use mork_types::config::Cli;

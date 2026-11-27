@@ -1786,7 +1786,7 @@ Give the program and each argument as separate words, never the whole command as
 When `[mork] project` is configured, on that project it runs under its test settings: `env` with `MORK_UNWALLED=1`, and the app's `faults` added to a `cargo test` that builds the app and names no features of its own.
 Its stdin and output pass through (a heredoc reaches the command), and it exits with the command's code; nothing is remembered: only verification's and the merge queue's passes are.
 
-Example: `mork test --run cargo test -p mork-core --test fac14_review`
+Example: `mork test --run cargo test -p mork-core --test reviewer_history`
 
 ### mork test --walls
 
