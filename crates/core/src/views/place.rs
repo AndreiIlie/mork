@@ -126,6 +126,7 @@ fn row(state: &State, a: &Agent, outside: &Outside, ctx: Ctx<'_>) -> AgentRow {
         parent: a.parent.clone(),
         agent: a.key.clone(),
         role: a.role,
+        topic: a.topic.clone(),
         label: setting.as_ref().map(|s| s.model.label.clone()).unwrap_or_else(|| a.seat.to_string()),
         effort: setting.as_ref().map(|s| s.effort.as_str().to_owned()).unwrap_or_default(),
         light: agent_light(state, &a.key, outside),

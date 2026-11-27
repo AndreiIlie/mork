@@ -25,6 +25,7 @@ export type AgentRow = {
   parent?: AgentKey;
   agent: AgentKey;
   role: Role;
+  topic?: string;
   label: string;
   effort: string;
   light: AgentLight;

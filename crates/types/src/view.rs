@@ -369,6 +369,8 @@ pub struct AgentRow {
     pub parent: Option<crate::AgentKey>,
     pub agent: AgentKey,
     pub role: Role,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topic: Option<String>,
     /// Its seat's label and effort (`sol`, `xhigh`).
     pub label: String,
     pub effort: String,
