@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, SyncSender, TrySendError};
 
-use mork_types::protocol::{Answer, ErrorBody, ErrorCode, Hello, HelloLine, MAX_LINE, Request};
+use mork_types::protocol::{Answer, ErrorBody, ErrorCode, Frame, Hello, HelloLine, MAX_LINE, Request};
 use mork_types::state::Sender;
 
 use crate::lock::Lock;
@@ -144,10 +144,10 @@ impl Conn {
 }
 
 fn answer_line(id: u64, result: Result<serde_json::Value, ErrorBody>) -> serde_json::Result<String> {
-    serde_json::to_string(&match result {
+    serde_json::to_string(&Frame::Answer(match result {
         Ok(ok) => Answer::Ok { id, ok },
         Err(err) => Answer::Err { id, err },
-    })
+    }))
 }
 
 /// What the readers send the engine.
@@ -206,7 +206,7 @@ impl Shared {
                 home: self.home.clone(),
             },
         };
-        serde_json::to_string(&h).unwrap_or_default()
+        serde_json::to_string(&Frame::Hello(h)).unwrap_or_default()
     }
 }
 

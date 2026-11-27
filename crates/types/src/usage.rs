@@ -107,3 +107,41 @@ pub struct DayBurn {
     /// Cards that landed that day.
     pub landed: u64,
 }
+
+#[derive(Debug, Serialize)]
+pub struct UsageAnswer {
+    pub usage: UsageView,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UsageView {
+    pub by_pool: Vec<String>,
+    pub limits: Vec<LimitView>,
+    pub contexts: Vec<ContextView>,
+    pub recent_burn: RecentBurn,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ContextView {
+    pub agent: crate::AgentKey,
+    pub used: u64,
+    pub window: Option<u64>,
+    pub model: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LimitView {
+    pub cli: crate::config::Cli,
+    pub account: Option<Account>,
+    pub bucket: String,
+    pub window: String,
+    pub name: String,
+    pub percent: Option<u32>,
+    pub resets_at: Option<i64>,
+    pub reached: bool,
+    pub seen_ms: i64,
+    pub length_ms: Option<i64>,
+    pub source: String,
+    pub age_ms: i64,
+    pub unknown: Option<String>,
+}

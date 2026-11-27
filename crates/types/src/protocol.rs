@@ -69,3 +69,26 @@ pub struct Request {
     #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
     pub sent_as: Option<String>,
 }
+
+/// An incoming web socket line, distinguished by its existing outer keys.
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum Frame {
+    Hello(HelloLine),
+    Watch { event: WatchEvent },
+    Answer(Answer),
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WatchEvent {
+    Screen(Box<crate::view::Screen>),
+    View(WatchedPlace),
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum WatchedPlace {
+    Full(Box<crate::view::PlaceView>),
+    Messages(crate::chat::MessagesView),
+}

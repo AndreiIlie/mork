@@ -123,3 +123,8 @@ pub enum Line {
     /// An agent's message: its words to the operator whole, to another agent one line that unfolds.
     Agent,
 }
+
+#[derive(Debug, Serialize)]
+pub struct HistoryAnswer {
+    pub history: HistoryPage,
+}

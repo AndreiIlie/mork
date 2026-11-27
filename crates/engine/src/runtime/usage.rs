@@ -1,8 +1,7 @@
 use mork_core::state::State;
 use mork_types::config::Cli;
-use mork_types::usage::Limit;
+use mork_types::usage::{Limit, LimitView};
 use mork_types::view::Share;
-use serde_json::{Value, json};
 
 use crate::claude_accounts::Accounts;
 use crate::cli::limits::{ACCOUNT, length_ms, short_name};
@@ -134,7 +133,7 @@ pub(super) fn week_pools(state: &State, now: i64, accounts: &Accounts) -> Vec<mo
         .collect()
 }
 
-pub(super) fn answer(state: &State, now: i64, accounts: &Accounts) -> (Vec<String>, Vec<Value>) {
+pub(super) fn answer(state: &State, now: i64, accounts: &Accounts) -> (Vec<String>, Vec<LimitView>) {
     let readings = readings(state, now, accounts);
     let lines = readings.iter().filter(|r| pool(r)).map(|r| line(r, now)).collect();
     let limits = readings
@@ -146,11 +145,21 @@ pub(super) fn answer(state: &State, now: i64, accounts: &Accounts) -> (Vec<Strin
                 Cli::Codex => "codex's limits read (app-server)",
                 Cli::Agy => "agy's limits read (/usage)",
             };
-            json!({"cli": l.cli.as_str(), "account": l.account, "bucket": l.bucket, "window": r.window,
-                   "name": l.window, "percent": l.percent, "resets_at": l.resets_at, "reached": l.reached,
-                   "seen_ms": l.seen_ms, "length_ms": length_ms(&l.window), "source": source,
-                   "age_ms": now.saturating_sub(l.seen_ms),
-                   "unknown": l.percent.is_none().then_some("the CLI gave no share for this window")})
+            LimitView {
+                cli: l.cli,
+                account: l.account.clone(),
+                bucket: l.bucket.clone(),
+                window: r.window.clone(),
+                name: l.window.clone(),
+                percent: l.percent,
+                resets_at: l.resets_at,
+                reached: l.reached,
+                seen_ms: l.seen_ms,
+                length_ms: length_ms(&l.window),
+                source: source.to_owned(),
+                age_ms: now.saturating_sub(l.seen_ms),
+                unknown: l.percent.is_none().then(|| "the CLI gave no share for this window".to_owned()),
+            }
         })
         .collect();
     (lines, limits)

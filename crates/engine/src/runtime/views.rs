@@ -3,8 +3,10 @@
 
 use std::sync::Arc;
 
-use mork_types::chat::MessagesView;
+use mork_types::chat::{HistoryAnswer, MessagesView};
+use mork_types::protocol::{Frame, WatchEvent, WatchedPlace};
 use mork_types::seen::{CommandView, TurnView};
+use mork_types::usage::{ContextView, UsageAnswer, UsageView};
 use mork_types::view::{BoardView, Doing, HistoryPage, MessageView, PlaceView, Screen};
 use serde_json::{Value, json};
 
@@ -316,6 +318,17 @@ fn bounded_screen(mut s: Screen) -> Screen {
     s
 }
 
+fn send_event(conn: &Conn, watched: &super::Watched, place: &str, event: WatchEvent) {
+    let mut frame = json!(Frame::Watch { event });
+    // Each watch event wraps exactly one payload. Only the payload's revision is excluded from its hash.
+    if let Some(view) = frame["event"].as_object_mut().and_then(|event| event.values_mut().next())
+        && watched.unchanged(place, view)
+    {
+        return;
+    }
+    conn.send_line(&frame.to_string());
+}
+
 impl Engine {
     pub(super) fn ctx_now(&self) -> mork_core::decide::Ctx<'_> {
         mork_core::decide::Ctx { now: crate::clock::now_ms(), config: &self.ctx.config, faults: self.faults() }
@@ -323,10 +336,10 @@ impl Engine {
 
     /// A place's view, its latest `tail` messages when one is given, as `core` works it out,
     /// within its line; without `full`, only the conversation (fac-280).
-    pub(super) fn view(&self, place: &str, tail: Option<u64>, full: bool) -> Value {
+    fn view(&self, place: &str, tail: Option<u64>, full: bool) -> WatchedPlace {
         if !full {
             let v = mork_core::views::conversation::messages(&self.state, place, tail);
-            return serde_json::to_value(bounded_messages(v)).unwrap_or_default();
+            return WatchedPlace::Messages(bounded_messages(v));
         }
         let card = mork_core::messages::places::card_of(&self.state, place);
         let outside = self.outside(card.as_ref());
@@ -334,7 +347,7 @@ impl Engine {
         let mut v = bounded(v);
         v.turns = self.chat_turns(place, &v.messages, None);
         super::chat::bound(&mut v.turns);
-        serde_json::to_value(v).unwrap_or_default()
+        WatchedPlace::Full(Box::new(v))
     }
 
     /// `history`: a page of a place's messages before one, within its line (fac-42); the turns
@@ -346,14 +359,14 @@ impl Engine {
             page.turns = self.chat_turns(place.as_str(), &page.messages, Some(before));
             super::chat::bound(&mut page.turns);
         }
-        json!({"history": page})
+        json!(HistoryAnswer { history: page })
     }
 
     /// The screen but the place shown (5).
-    pub(super) fn screen_view(&self) -> Value {
+    fn screen_view(&self) -> Screen {
         let outside = self.outside(None);
         let s = mork_core::views::screen::screen(&self.state, &outside, self.ctx_now());
-        serde_json::to_value(bounded_screen(s)).unwrap_or_default()
+        bounded_screen(s)
     }
 
     /// `usage`: every limit, context and 7-day burn summary, in full (5.10.3).
@@ -365,23 +378,23 @@ impl Engine {
         let at = (now, self.views_cache.tz_offset_min);
         let recent_burn = super::burn::recent(&self.state, &self.store, at, accounts);
         // The answer's keys print sorted: `by_pool` sorts first, so the pace lines come above the full fields.
-        json!({"usage": {"by_pool": lines, "limits": limits, "contexts": contexts, "recent_burn": recent_burn}})
+        json!(UsageAnswer { usage: UsageView { by_pool: lines, limits, contexts, recent_burn } })
     }
 
-    fn agent_contexts(&self) -> Vec<Value> {
+    fn agent_contexts(&self) -> Vec<ContextView> {
         self.state
             .agents
             .values()
             .filter_map(|a| {
                 if let Some(c) = self.seen.get(&a.key).and_then(|s| s.context.as_ref()) {
                     let window = self.ctx.config.mork.effective_window(c.window);
-                    return Some(json!({"agent": a.key.as_str(), "used": c.used, "window": window, "model": c.model}));
+                    return Some(ContextView { agent: a.key.clone(), used: c.used, window, model: c.model.clone() });
                 }
                 let stored = mork_core::agents::costs::stored_context(&self.ctx.config, a)?;
                 let model = stored.model.map(str::to_owned).or_else(|| {
                     mork_core::agents::models::setting(&self.state, &self.ctx.config, a).map(|s| s.model.model)
                 });
-                Some(json!({"agent": a.key.as_str(), "used": stored.used, "window": stored.window, "model": model}))
+                Some(ContextView { agent: a.key.clone(), used: stored.used, window: stored.window, model })
             })
             .collect()
     }
@@ -389,15 +402,12 @@ impl Engine {
     /// Each watched place's view, and the screen when it is watched.
     pub(super) fn send_views(&self, conn: &Arc<Conn>, watched: &super::Watched) {
         for p in &watched.places {
-            let (key, mut view) = if p == SCREEN {
-                ("screen", self.screen_view())
+            let event = if p == SCREEN {
+                WatchEvent::Screen(Box::new(self.screen_view()))
             } else {
-                ("view", self.view(p, watched.tail, watched.full))
+                WatchEvent::View(self.view(p, watched.tail, watched.full))
             };
-            if watched.unchanged(p, &mut view) {
-                continue;
-            }
-            conn.send_line(&json!({"event": {key: view}}).to_string());
+            send_event(conn, watched, p, event);
         }
     }
 
@@ -406,10 +416,7 @@ impl Engine {
         self.watchers.retain(|(c, _)| c.is_open());
         for (conn, watched) in &self.watchers {
             if watched.places.iter().any(|p| p == SCREEN) {
-                let mut view = self.screen_view();
-                if !watched.unchanged(SCREEN, &mut view) {
-                    conn.send_line(&json!({"event": {"screen": view}}).to_string());
-                }
+                send_event(conn, watched, SCREEN, WatchEvent::Screen(Box::new(self.screen_view())));
             }
         }
     }
