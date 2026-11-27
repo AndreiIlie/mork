@@ -313,7 +313,7 @@ mod tests {
         }))
         .unwrap();
         let outside = crate::views::outside::Outside::default();
-        let ctx = crate::decide::Ctx { now: 0, config: &cfg, faults: false, claude_account: None };
+        let ctx = crate::decide::Ctx { routing: None, now: 0, config: &cfg, faults: false, claude_account: None };
 
         let build = crate::views::place::place(&s, "fac-1", None, &outside, ctx);
         let spec = crate::views::place::place(&s, "fac-1/spec", None, &outside, ctx);

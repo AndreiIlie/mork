@@ -3,18 +3,21 @@ use mork_types::quality::{FindingRow, Precision, QualityGroup};
 use mork_types::review::{FindingState, Raised, Review};
 use std::collections::{BTreeMap, BTreeSet};
 
-struct Finding {
-    group: QualityGroup,
-    lens: String,
-    fixed: bool,
-    declined: bool,
+pub(crate) struct Finding {
+    pub(crate) by: String,
+    pub(crate) round: u64,
+    pub(crate) time: i64,
+    pub(crate) group: QualityGroup,
+    pub(crate) lens: String,
+    pub(crate) fixed: bool,
+    pub(crate) declined: bool,
     covered: bool,
     stalled: bool,
 }
 
 type Groups = BTreeMap<(QualityGroup, String), Precision>;
 
-fn generations(rows: &[Event]) -> Vec<&[Event]> {
+pub(crate) fn generations(rows: &[Event]) -> Vec<&[Event]> {
     let mut linked = false;
     let mut start = 0;
     let mut generations = Vec::new();
@@ -73,7 +76,7 @@ impl<'a> Origin<'a> {
         }
     }
 
-    fn finding(&self, project: &str, by: &str, covered: bool) -> Finding {
+    fn finding(&self, project: &str, by: &str, covered: bool, event: &Event) -> Finding {
         let role = if by == "foreman" { "review foreman" } else { "reviewer" };
         let lens = match (covered, by) {
             (false, _) => "unknown",
@@ -81,6 +84,9 @@ impl<'a> Origin<'a> {
             _ => self.topics.get(by).map_or("unknown", String::as_str),
         };
         Finding {
+            by: by.to_owned(),
+            round: event.round().unwrap_or_default(),
+            time: event.time,
             group: group(project, role, self.reports.get(by).copied()),
             lens: lens.into(),
             fixed: false,
@@ -94,12 +100,12 @@ impl<'a> Origin<'a> {
         if let Some(named) = e.data["named"].as_array() {
             for row in named.iter().filter(|f| f["round"].as_u64() == e.round()) {
                 if let (Some(n), Some(by)) = (row["n"].as_u64(), row["by"].as_str()) {
-                    findings.entry(n).or_insert_with(|| self.finding(project, by, true));
+                    findings.entry(n).or_insert_with(|| self.finding(project, by, true, e));
                 }
             }
         } else {
             for f in stored(snapshot, e) {
-                let mut row = self.finding(project, &f.by, false);
+                let mut row = self.finding(project, &f.by, false, e);
                 let state = crate::views::findings::state_of(f);
                 row.declined = state == FindingState::Declined && !f.withdrawn;
                 row.fixed = state == FindingState::Resolved && !f.withdrawn;
@@ -137,6 +143,16 @@ fn collect(
     snapshot: Option<&Review>,
     stalled: &[&Event],
 ) {
+    let found = decisions(card, since, rows, snapshot);
+    tally(groups, found, stalled);
+}
+
+pub(crate) fn decisions(
+    card: &History,
+    since: i64,
+    rows: &[Event],
+    snapshot: Option<&Review>,
+) -> BTreeMap<u64, Finding> {
     let mut found = BTreeMap::new();
     let mut origin = Origin::default();
     for e in rows {
@@ -146,6 +162,10 @@ fn collect(
         }
         apply_outcome(&mut found, e);
     }
+    found
+}
+
+fn tally(groups: &mut Groups, found: BTreeMap<u64, Finding>, stalled: &[&Event]) {
     let stalled: BTreeSet<_> = stalled.iter().flat_map(|e| numbers(e)).collect();
     for (n, mut f) in found {
         f.stalled = f.covered && stalled.contains(&n);

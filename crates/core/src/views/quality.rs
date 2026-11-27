@@ -1,7 +1,7 @@
 //! Journal-backed quality figures. Sequence identifies and orders work across cards sharing a timestamp.
 
-mod findings;
-mod runs;
+pub(crate) mod findings;
+pub(crate) mod runs;
 
 use std::collections::BTreeMap;
 
@@ -20,11 +20,11 @@ pub struct Event {
 }
 
 impl Event {
-    fn text(&self, field: &str) -> Option<&str> {
+    pub(crate) fn text(&self, field: &str) -> Option<&str> {
         self.data[field].as_str()
     }
 
-    fn round(&self) -> Option<u64> {
+    pub(crate) fn round(&self) -> Option<u64> {
         self.data["n"].as_u64()
     }
 }

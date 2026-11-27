@@ -3,14 +3,14 @@ use crate::views::burn::{parent_of, run_start};
 use mork_types::quality::{BuilderRow, FirstPass, QualityGroup, QualitySpend, SpendRow};
 use std::collections::{BTreeMap, BTreeSet};
 
-struct Run<'a> {
-    rows: &'a [Event],
-    mode: &'a str,
-    parent: Option<(&'a str, i64)>,
-    start: i64,
+pub(crate) struct Run<'a> {
+    pub(crate) rows: &'a [Event],
+    pub(crate) mode: &'a str,
+    pub(crate) parent: Option<(&'a str, i64)>,
+    pub(crate) start: i64,
 }
 
-fn runs(history: &History) -> Vec<Run<'_>> {
+pub(crate) fn runs(history: &History) -> Vec<Run<'_>> {
     let mut starts = Vec::new();
     let mut current = 1;
     for (i, e) in history.rows.iter().enumerate() {
@@ -40,7 +40,7 @@ fn runs(history: &History) -> Vec<Run<'_>> {
         .collect()
 }
 
-fn builder<'a>(rows: &'a [Event], asked: Option<&Event>) -> Option<&'a Event> {
+pub(crate) fn builder<'a>(rows: &'a [Event], asked: Option<&Event>) -> Option<&'a Event> {
     let asked = asked?;
     let mut pending = None;
     let mut submissions = BTreeMap::new();
@@ -136,7 +136,7 @@ impl Totals {
     }
 }
 
-pub(super) fn aggregate(since: i64, cards: &Histories) -> (Vec<BuilderRow>, Vec<SpendRow>) {
+pub(crate) fn with_runs(cards: &Histories, mut visit: impl FnMut(&str, &Run<'_>, &[&Event])) {
     let runs: BTreeMap<_, _> = cards.iter().map(|(id, history)| (id.as_str(), runs(history))).collect();
     let mut linked = BTreeMap::<_, Vec<&Event>>::new();
     for review in runs.values().flatten() {
@@ -145,13 +145,17 @@ pub(super) fn aggregate(since: i64, cards: &Histories) -> (Vec<BuilderRow>, Vec<
         // A review's closing turns can settle after its parent starts another run.
         linked.entry((parent, owner.start)).or_default().extend(review.rows.iter().filter(|e| e.seq >= owner.start));
     }
-    let mut totals = Totals::default();
     for (id, runs) in runs {
         for run in runs.iter().filter(|r| r.mode == "full") {
             let mut children = linked.remove(&(id, run.start)).unwrap_or_default();
             children.sort_by_key(|e| e.seq);
-            totals.count(since, &cards[id], run, &children);
+            visit(id, run, &children);
         }
     }
+}
+
+pub(super) fn aggregate(since: i64, cards: &Histories) -> (Vec<BuilderRow>, Vec<SpendRow>) {
+    let mut totals = Totals::default();
+    with_runs(cards, |id, run, children| totals.count(since, &cards[id], run, children));
     totals.finish()
 }

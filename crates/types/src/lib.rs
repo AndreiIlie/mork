@@ -35,6 +35,7 @@ pub mod quality;
 pub mod reply;
 pub mod review;
 pub mod rooms;
+pub mod routing;
 pub mod seen;
 pub mod state;
 pub mod suites;
