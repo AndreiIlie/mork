@@ -4,7 +4,7 @@ import { agentSeatName, modelTakesEffort } from "./format";
 import { RefusalLine } from "./offers";
 import type { AgentRow, ModelChoice } from "./types";
 
-const VENDOR: Record<string, string> = { claude: "Claude", codex: "Codex", agy: "agy" };
+export const VENDOR: Record<string, string> = { claude: "Claude", codex: "Codex", agy: "agy" };
 const SEGMENTS = "inline-flex flex-wrap divide-x divide-gray-400 border border-gray-400";
 const LEFT = "w-[64px] shrink-0 text-label-12 text-gray-700";
 

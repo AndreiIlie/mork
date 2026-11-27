@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from "react";
 import type { Editor } from "../config";
 import { ChevronIcon } from "../icons";
-import { EffortRow, VendorRow } from "../SeatModel";
+import { EffortRow, VENDOR, VendorRow } from "../SeatModel";
 import type { ConfigField, ModelChoice, PickModel, SeatDefault } from "../types";
 import { Button } from "../ui/Button";
 import { Row } from "../ui/List";
 import { TextLink } from "../ui/TextLink";
-import { Section, Withheld } from "./Fields";
+import { Section, Setting, Withheld } from "./Fields";
 
 const seatNames: Record<string, string> = { planner: "Planner", foreman: "Foreman", "review-foreman": "Review foreman", reviewer: "Reviewer", researcher: "Researcher", baseline: "Baseline" };
 const standings: Record<string, string> = { work: "build", report: "report", inside: "our work", outside: "outside work" };
@@ -41,7 +41,18 @@ function SeatRow({ editor, field, open, toggle }: { editor: Editor; field: Confi
   const seat = v && "seat" in v ? v.seat : null;
   const offered = seat && field.offers.find(m => sameModel(m, seat));
   const fallback = field.default && "seat" in field.default ? field.default.seat : null;
-  const edit = (next: SeatDefault) => editor.edit(field.key, { seat: next });
+  const label = standing ? seatNames[name] + " · " + standing : seatNames[name];
+  const edit = (next: SeatDefault) => editor.edit(field.key, { seat: next }, label);
+  function pick(cli: SeatDefault["cli"], model: string, effort: SeatDefault["effort"]) {
+    const saved = field.value && "seat" in field.value ? field.value.seat : null;
+    for (const existing of [seat, saved, fallback]) {
+      if (existing && existing.cli === cli && existing.model === model && existing.effort === effort) {
+        edit(existing);
+        return;
+      }
+    }
+    edit({ cli, model, effort, configured: true });
+  }
   return <div>
     <Row onClick={toggle} expanded={open}>
       <ChevronIcon open={open} className="text-gray-900" />
@@ -53,9 +64,8 @@ function SeatRow({ editor, field, open, toggle }: { editor: Editor; field: Confi
       </> : <Withheld />}
     </Row>
     {open && seat && <Panel>
-      <Models choices={field.offers} lit={seat} select={m => edit({ cli: m.cli, model: m.model,
-        effort: m.efforts.includes(seat.effort) ? seat.effort : "high", configured: true })} />
-      <EffortRow efforts={offered?.efforts ?? []} selected={[seat.effort]} onPick={effort => edit({ ...seat, effort, configured: true })} />
+      <Models choices={field.offers} lit={seat} select={m => pick(m.cli, m.model, m.efforts.includes(seat.effort) ? seat.effort : "high")} />
+      <EffortRow efforts={offered?.efforts ?? []} selected={[seat.effort]} onPick={effort => pick(seat.cli, seat.model, effort)} />
       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
         <p className="text-label-12 text-gray-900">Used when a seat first starts, and when its configured choice expires. A picked model stays.</p>
         {seat.configured && fallback && <TextLink onClick={() => edit(fallback)}>Use default</TextLink>}
@@ -68,13 +78,11 @@ function PickRows({ editor, field, open, toggle }: { editor: Editor; field: Conf
   const v = editor.value(field.key);
   const picks = v && "picks" in v ? v.picks : null;
   const [title, words] = listNames[field.key];
-  const edit = (picks: PickModel[]) => editor.edit(field.key, { picks });
+  const edit = (picks: PickModel[]) => editor.edit(field.key, { picks }, title);
   const remaining = field.offers.filter(m => !picks?.some(p => sameModel(m, p)));
   return <div>
-    <Row actions={picks ? <Button tier="secondary" size="sm" pressed={open} disabled={!remaining.length} onClick={toggle}>Add model</Button> : <Withheld />}>
-      <div className="min-w-0 flex-1"><div className="text-label-14 text-gray-1000">{title}</div>
-        <div className="mt-0.5 text-label-12 text-gray-700">{words}</div></div>
-    </Row>
+    <Setting title={title} words={words}>{picks ? <Button tier="secondary" size="sm" pressed={open}
+      disabled={!remaining.length} onClick={toggle}>Add model</Button> : <Withheld />}</Setting>
     {picks && open && <Panel><Models choices={remaining} lit={null} select={m => {
       edit([...picks, { ...m, efforts: m.efforts.includes("high") ? ["high"] : m.efforts.slice(0, 1) }]); toggle();
     }} /></Panel>}
@@ -89,7 +97,7 @@ function PickRows({ editor, field, open, toggle }: { editor: Editor; field: Conf
           <Button tier="ghost" size="sm" onClick={() => edit(picks.filter((_, i) => i !== index))}>Remove</Button>
         </>}>
           <span className="w-[128px] shrink-0 text-label-14 text-gray-1000">{pick.label}</span>
-          <span className="font-mono text-label-12 text-gray-700">{{ claude: "Claude", codex: "Codex", agy: "agy" }[pick.cli]}</span>
+          <span className="font-mono text-label-12 text-gray-700">{VENDOR[pick.cli] ?? pick.cli}</span>
         </Row>;
       })}
     </div>}

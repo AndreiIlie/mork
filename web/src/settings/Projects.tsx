@@ -1,4 +1,5 @@
 import type { Editor } from "../config";
+import { AutoDelegation } from "../Project";
 import { RefusalLine, useHandOffers } from "../offers";
 import { Row } from "../ui/List";
 import { Segmented } from "../ui/Segmented";
@@ -11,24 +12,18 @@ const passes = [
 ] as const;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function Switch({ editor, name, options }: { editor: Editor; name: string; options: readonly string[] }) {
+function Switch({ editor, name, label, options }: { editor: Editor; name: string; label: string; options: readonly string[] }) {
   const v = editor.value(name);
   if (!v || !("text" in v)) return <Withheld />;
-  function select(text: string) {
-    editor.edit(name, { text });
-    if (text === "auto") {
-      const prefix = name.slice(0, -4);
-      for (const key of ["landings", "edits", "notes", "days"]) editor.edit(prefix + key, { text: "" });
-    }
-  }
-  return <Segmented compact options={options} value={v.text} label={cap} onChange={select} />;
+  return <Segmented compact options={options} value={v.text} label={cap} onChange={text => editor.edit(name, { text }, label)} />;
 }
 
 function Pass({ editor, read, title, words }: { editor: Editor; read: string; title: string; words: string }) {
   const prefix = "passes." + read + ".";
   const v = editor.value(prefix + "mode");
+  const budget = editor.fields.get(prefix + "budget")?.default;
   return <div>
-    <Setting title={title} words={words}><Switch editor={editor} name={prefix + "mode"} options={["manual", "scheduled", "auto"]} /></Setting>
+    <Setting title={title} words={words}><Switch editor={editor} name={prefix + "mode"} label={title} options={["manual", "scheduled", "auto"]} /></Setting>
     {v && "text" in v && v.text === "scheduled" && <div className="border-t border-gray-400"><Row indent={1}>
       <span className="w-[176px] shrink-0 text-label-12 text-gray-700">Starts when one is reached</span>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -37,22 +32,21 @@ function Pass({ editor, read, title, words }: { editor: Editor; read: string; ti
       </div></Row></div>}
     {read === "dream" && <div className="border-t border-gray-400"><Row indent={1}>
       <span className="w-[176px] shrink-0 text-label-12 text-gray-700">Memory files kept</span>
-      <Field editor={editor} name={prefix + "budget"} label="Dream budget" placeholder="60" />
+      <Field editor={editor} name={prefix + "budget"} label="Dream memory files kept" placeholder={budget && "text" in budget ? budget.text : undefined} />
     </Row></div>}
   </div>;
 }
 
-export function ProjectSettings({ editor, auto }: { editor: Editor; auto: boolean | undefined }) {
+export function ProjectSettings({ editor, auto, live }: { editor: Editor; auto: boolean | undefined; live: boolean }) {
   const project = editor.section.project!;
-  const { pending, refusals, press } = useHandOffers();
+  const autoOffers = useHandOffers();
   return <Section title={project} editor={editor}>
     <Setting title="Auto delegation" words="Each card that starts in this project starts delegated. Changes at once.">
-      <Segmented compact options={["Off", "On"] as const} value={auto ? "On" : "Off"} disabled={() => auto === undefined || !!pending[project]}
-        onChange={v => { if ((v === "On") !== auto) press(project, { label: "Auto delegation", command: { auto: { project, off: v === "Off" } } }); }} />
+      <AutoDelegation project={project} auto={auto} live={live} offers={autoOffers} compact />
     </Setting>
-    <RefusalLine refusal={refusals[project] ?? null} />
+    <RefusalLine refusal={autoOffers.refusals[project] ?? null} />
     <Setting title="Colleague review" words="Standard keeps the lighter rules for colleagues' work. Full reviews it as our own.">
-      <Switch editor={editor} name="colleague_review" options={["standard", "full"]} /></Setting>
+      <Switch editor={editor} name="colleague_review" label="Colleague review" options={["standard", "full"]} /></Setting>
     <Setting title="Test slots" words="Test and check runs this project may hold at one time.">
       <Field editor={editor} name="slots" label="Test slots" /></Setting>
     <div><Setting title="Checks" words="Run on each submitted head, before review. Leave both empty for none." />
