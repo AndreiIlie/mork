@@ -12,15 +12,27 @@ use std::sync::Arc;
 #[derive(Default)]
 pub(super) struct Cache {
     pub stats: Option<Box<Statistics>>,
-    last: i64,
+    next_read: Option<i64>,
     reading: bool,
 }
+
+const REFRESH_MS: i64 = 600_000;
 
 impl Cache {
     pub fn open(config: &Config, store: &Store) -> Result<Self, String> {
         let last = clock::now_ms();
         let stats = config.routing_enabled().then(|| read(&store.path, last)).transpose()?;
-        Ok(Self { stats, last, reading: false })
+        let next_read = stats.as_ref().map(|_| last + REFRESH_MS);
+        Ok(Self { stats, next_read, reading: false })
+    }
+
+    pub fn configure(&mut self, enabled: bool) {
+        if enabled {
+            self.next_read.get_or_insert(0);
+        } else {
+            self.next_read = None;
+            self.stats = None;
+        }
     }
 }
 
@@ -30,11 +42,11 @@ fn read(path: &std::path::Path, now: i64) -> Result<Box<Statistics>, String> {
 
 impl Engine {
     pub(super) fn refresh_routing(&mut self, now: i64) {
-        if self.routing.stats.is_none() || self.routing.reading || now.saturating_sub(self.routing.last) < 600_000 {
+        if self.routing.reading || self.routing.next_read.is_none_or(|next| now < next) {
             return;
         }
         self.routing.reading = true;
-        self.routing.last = now;
+        self.routing.next_read = Some(now + REFRESH_MS);
         let path = self.store.path.clone();
         let tx = self.tx.clone();
         std::thread::spawn(move || {
@@ -44,6 +56,9 @@ impl Engine {
 
     pub(super) fn routing_read(&mut self, result: Result<Box<Statistics>, String>) {
         self.routing.reading = false;
+        if self.routing.next_read.is_none() {
+            return;
+        }
         match result {
             Ok(stats) => self.routing.stats = Some(stats),
             Err(e) => self.log(&format!("routing statistics: {e}")),

@@ -35,8 +35,10 @@ impl Engine {
             config_edit::save(&self.opts.config_path, &self.loaded_config, &self.ctx.config, change, &secrets)
                 .map_err(|msg| ErrorBody::new(ErrorCode::Refused, secrets.mask(&msg)))?;
         cfg.mork.web_port = self.bound_web_port.or(cfg.mork.web_port);
+        self.routing.configure(cfg.routing_enabled());
         self.ctx.config = cfg;
         self.loaded_config = text;
+        self.refresh_routing(crate::clock::now_ms());
         self.pipe.slots.freed = true;
         self.publish_screen();
         Ok(json!({"config.change":{}}))
