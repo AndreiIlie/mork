@@ -76,13 +76,15 @@ fn seat(card: &str, name: &str) -> bool {
 }
 
 /// A cardless row belongs only through a named seat, place or exact job id, never through its text.
-pub fn cardless(card: &str, jobs: &BTreeSet<String>, data: &Value) -> bool {
+pub fn cardless(card: &str, jobs: &BTreeSet<String>, kind: &str, data: &Value) -> bool {
+    let owns_job = |job: Option<&Value>| job.and_then(Value::as_str).is_some_and(|id| jobs.contains(id));
     let named = ["agent", "from", "to", "place"].into_iter().any(|field| {
         data.get(field).and_then(Value::as_str).is_some_and(|s| seat(card, s) || field == "place" && s == card)
     });
     named
         || data.pointer("/from/agent").and_then(Value::as_str).is_some_and(|s| seat(card, s))
-        || data.get("job").and_then(Value::as_str).is_some_and(|j| jobs.contains(j))
+        || owns_job(data.get("job"))
+        || kind == "limits" && owns_job(data["read"].get("job"))
 }
 
 /// A stored event, with the message or hand its data points at when one is retained.
@@ -216,7 +218,20 @@ impl Page {
 
 #[cfg(test)]
 mod tests {
-    use super::{Anchor, Read};
+    use std::collections::BTreeSet;
+
+    use serde_json::json;
+
+    use super::{Anchor, Read, cardless};
+
+    #[test]
+    fn limits_rows_belong_to_the_card_that_owns_the_read_job() {
+        let jobs = BTreeSet::from(["job-1".to_owned()]);
+        let belongs = |read| cardless("fac-1", &jobs, "limits", &json!({"changed": [], "read": read}));
+        assert!(belongs(json!({"job": "job-1", "at": 24})));
+        assert!(!belongs(json!({"job": "job-10", "at": 24})));
+        assert!(!belongs(json!(null)));
+    }
 
     #[test]
     fn no_selector_reads_the_newest_rows() {

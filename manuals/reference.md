@@ -374,6 +374,7 @@ An indivisible row too large for a page is refused.
 This is a count-limited page, never an unbounded journal dump.
 
 Rows recorded without a card are included when they name the card's seats, places or exact stored job ids.
+A `limits` row belongs to the card that owns the job named in `data.read.job`.
 Closing memory edits appear under the issuing seat's card as `memory.write`, `memory.delete` or `memory.skipped`.
 A `memory.staged` row carries only the seat and operation.
 These kinds locate the recorded facts; their data records changes, not a reconstructed snapshot:
