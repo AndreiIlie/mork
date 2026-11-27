@@ -1,17 +1,55 @@
-// Wire shapes the engine sends over `/ws`, hand-written after crates/types/src/view.rs and protocol.rs.
-// Fields serde skips when empty are optional here.
+// Generated from crates/types by cargo xtask web-types.
 
-export interface Hello {
-  build: string;
-  dirty: boolean;
-  protocol: number;
-  state_version: number | null;
-  home: string;
-}
+export type Account = {
+  id: string;
+  plan: string;
+};
 
-export type Color = "grey" | "green" | "yellow" | "red";
+export type ActionId = string;
 
-export type Role = "planner" | "foreman" | "reviewer" | "researcher" | "baseline" | "echo";
+export type AgentKey = string;
+
+export type AgentLight =
+  | "working"
+  | "asking"
+  | "error"
+  | "waiting"
+  | "idle";
+
+export type AgentList = {
+  agent: AgentKey;
+  steps: Array<ListStep>;
+};
+
+export type AgentRow = {
+  parent?: AgentKey;
+  agent: AgentKey;
+  role: Role;
+  label: string;
+  effort: string;
+  light: AgentLight;
+  doing: Doing;
+  context: [number, number] | null;
+  steps: Array<string>;
+  setting?: Setting;
+  pending?: Setting;
+  choices?: Array<ModelChoice>;
+  efforts: Array<Effort>;
+  turn?: TurnView;
+  cache?: CacheState;
+};
+
+export type Answer =
+  | {
+      id: number;
+      ok: unknown;
+    }
+  | {
+      id: number;
+      err: ErrorBody;
+    };
+
+export type AskId = string;
 
 export type AskKind =
   | "approve-brief"
@@ -32,236 +70,1070 @@ export type AskKind =
   | "mock"
   | "triage";
 
-export type Phase = { is: "ready" } | { is: "recovering"; doing: string } | { is: "reloading"; short: string };
+export type Author =
+  | { is: "operator" }
+  | { is: "engine" }
+  | { is: "orchestrator" } & {
+      project: string;
+    }
+  | { is: "pa" }
+  | { is: "agent" } & {
+      label: string;
+      role: Role;
+    };
 
-export type Master = { is: "unknown" } | { is: "equal" } | { is: "ahead"; commits: number };
+export type BoardGroup = {
+  name: string;
+  count: number;
+  cards: Array<BoardRow>;
+};
 
-export type Update =
-  | { is: "preparing"; short: string }
-  | { is: "build-failed"; short: string; retry: unknown }
-  | { is: "not-pinned"; short: string; retry: unknown };
+export type BoardRow = {
+  id: CardId;
+  title: string;
+  ran: boolean;
+  live: LiveMarks | null;
+  status?: string;
+  room?: CardId;
+};
 
-export interface PinLine {
-  pin: string | null;
-  master: Master;
-  ready?: boolean;
-  update?: Update;
-}
+export type BoardView = {
+  auto: boolean;
+  project: ProjectId;
+  live: BoardGroup;
+  merge: MergeQueue;
+  areas: Array<BoardGroup>;
+  done: BoardGroup;
+};
 
-export interface Share {
-  cli: string;
-  window: string;
-  percent: number | null;
-  reached: boolean;
-  stale: boolean;
-  reset_ms?: number | null;
-  ends_percent?: number | null;
-  signed_out?: boolean;
-  switch_account?: string;
-  read_ago?: string | null;
-}
+export type BriefView = {
+  changes?: Array<string>;
+  code_shape?: Array<string>;
+  mock?: string;
+};
 
-export type LookbackRead = "pulse" | "deep-sweep";
+export type CacheState =
+  | { is: "running" }
+  | { is: "idle" } & {
+      cold_at_ms: number;
+    };
 
-export interface LastView {
-  date: string;
-  ended_ms: number;
-  commits: number | null;
-}
+export type CardAbout = {
+  preview?: PreviewControl;
+  actions?: Array<string>;
+  project: ProjectId;
+  branch?: string;
+  base: string;
+  fork?: string;
+  pr?: number;
+  pr_url?: string;
+  run_cost_cents?: number;
+  run_cost_unknown?: boolean;
+  seat_costs?: Array<SeatCost>;
+  delegated?: boolean;
+  self_sustained?: boolean;
+  switches?: Array<Switch>;
+};
 
-export interface ReadView {
-  read: LookbackRead;
-  last: LastView | null;
-  running: string | null;
-}
+export type CardHeader = {
+  id: CardId;
+  title: string;
+  mode: Mode;
+  stage: Stage;
+  paused: boolean;
+  pipeline: Array<StageMark>;
+  times: Times;
+  facts: Array<Fact>;
+  cost_cents: number | null;
+  clone: string | null;
+  about: CardAbout;
+  spec?: PlaceId;
+  parent?: CardId;
+};
 
-export interface ProjectView {
-  project: string;
-  rows: ReadView[];
-}
+export type CardId = string;
 
-export interface RoleBurn {
-  role: string;
-  cents: number;
-  unknown: boolean;
-}
-
-export interface CardsLeft {
+export type CardsLeft = {
   pool: string;
   cards: number;
-}
+};
 
-export interface RecentBurn {
-  since_ms: number;
-  total_cents: number;
-  unknown: boolean;
-  roles: RoleBurn[];
-  ended_cards: number;
-  average_cents?: number;
-  cache_by_model: { cli: string; model: string; cache_hit_percent?: number }[];
-  cards_left?: CardsLeft;
-  /** The last 14 local days, oldest first, for the Usage charts. */
-  daily?: DayBurn[];
-}
+export type ChatTurn = {
+  agent: AgentKey;
+  after_seq: number;
+  running: boolean;
+  step_count: number;
+  turn: TurnView;
+};
 
-/** One local day's spend and landed cards. */
-export interface DayBurn {
-  /** The day's local midnight, in epoch ms. */
+export type Choices = {
+  ask: string;
+  options: Array<string>;
+  pick?: number;
+  reason?: string;
+};
+
+export type Cli =
+  | "claude"
+  | "codex"
+  | "agy";
+
+export type Color =
+  | "grey"
+  | "green"
+  | "yellow"
+  | "red";
+
+export type Command =
+  | { watch: {
+      places: Array<string>;
+      tail?: number;
+      full?: boolean;
+    } }
+  | { hook: Record<string, never> }
+  | { wakes: Record<string, never> }
+  | { history: {
+      place: PlaceId;
+      before: number;
+      count: number;
+      turns?: boolean;
+    } }
+  | { "history.search": {
+      words: string;
+    } }
+  | { "history.journal": {
+      card: CardId;
+      count: number;
+      seq?: number;
+      at?: number;
+      before?: number;
+      kinds?: Array<string>;
+    } }
+  | { status: {
+      jobs?: boolean;
+      all?: boolean;
+      card?: string;
+    } }
+  | { usage: Record<string, never> }
+  | { "claude.account": {
+      name: string;
+    } }
+  | { projects: Record<string, never> }
+  | { lookback: {
+      project: ProjectId;
+      read?: string;
+    } }
+  | { build: {
+      commit: string;
+    } }
+  | { pin: {
+      commit: string;
+    } }
+  | { reload: {
+      target?: string;
+    } }
+  | { say: {
+      place: PlaceId;
+      to?: string;
+      text: string;
+      images?: Array<string>;
+      kind?: Intent;
+      delivery?: Delivery;
+      choice?: number;
+    } }
+  | { dm: {
+      card: CardId;
+      role: Role;
+    } }
+  | { spawn: {
+      card: CardId;
+      role: Role;
+      task: string;
+      model?: string;
+      effort?: string;
+      cli?: string;
+      topic?: string;
+    } }
+  | { ack: {
+      ask: AskId;
+    } }
+  | { start: {
+      card: CardId;
+      mode?: Mode;
+      visual?: boolean;
+      model?: string;
+      effort?: string;
+      delegated?: boolean;
+      "self-sustained"?: boolean;
+      "no-planner"?: boolean;
+      carries?: Array<CardId>;
+    } }
+  | { approve: {
+      card: CardId;
+    } }
+  | { mock: {
+      card: CardId;
+    } }
+  | { brief: {
+      card: CardId;
+      words?: string;
+    } }
+  | { merge: {
+      card: CardId;
+    } }
+  | { stop: {
+      card?: CardId;
+      agent?: AgentKey;
+    } }
+  | { resume: {
+      card?: CardId;
+      agent?: AgentKey;
+    } }
+  | { fresh: {
+      agent: string;
+    } }
+  | { pick: {
+      agent: string;
+      model?: string;
+      effort?: string;
+      cli?: string;
+    } }
+  | { close: {
+      card: CardId;
+      why: string;
+    } }
+  | { done: {
+      card: CardId;
+    } }
+  | { preview: {
+      card: CardId;
+      action?: string;
+    } }
+  | { demo: {
+      card: CardId;
+    } }
+  | { prs: {
+      project: ProjectId;
+    } }
+  | { review: {
+      project: ProjectId;
+      pr: number;
+    } }
+  | { "review.merge": {
+      project: ProjectId;
+      pr: number;
+    } }
+  | { "review.branch": {
+      project: ProjectId;
+      branch: string;
+    } }
+  | { post: {
+      card: CardId;
+    } }
+  | { resolve: {
+      card: CardId;
+      n: number;
+      declined?: boolean;
+      dropped?: string;
+    } }
+  | { answer: {
+      card: CardId;
+      n: number;
+      text: string;
+    } }
+  | { rereview: {
+      card: CardId;
+    } }
+  | { triage: {
+      card: CardId;
+      fix?: Array<string>;
+      decline?: Array<string>;
+      foreman?: Array<string>;
+    } }
+  | { deliverables: {
+      card: CardId;
+      names: TextList;
+    } }
+  | { plan: {
+      card: CardId;
+      deliverable: Pick;
+      tasks: TextList;
+    } }
+  | { "plan.task": {
+      card: CardId;
+      deliverable: Pick;
+      task: Pick;
+    } }
+  | { "card.show": {
+      card: CardId;
+    } }
+  | { findings: {
+      card: CardId;
+    } }
+  | { "card.create": {
+      project: ProjectId;
+      title: string;
+      description: string;
+      id?: CardId;
+    } }
+  | { "card.change": {
+      card: CardId;
+      note?: string;
+      decision?: string;
+      withdraw?: string;
+      title?: string;
+      status?: string;
+      priority?: string;
+      labels?: Array<string>;
+      parent?: string;
+      acceptance?: string;
+      description?: string;
+    } }
+  | { "card.close": {
+      card: CardId;
+      as: string;
+      note: string;
+    } }
+  | { actions: Record<string, never> }
+  | { "action.retry": {
+      action: ActionId;
+    } }
+  | { "action.drop": {
+      action: ActionId;
+    } }
+  | { "action.done": {
+      action: ActionId;
+      note: string;
+    } }
+  | { "test.lease": {
+      kind: string;
+      command: Array<string>;
+    } }
+  | { "test.resume": {
+      lease: LeaseId;
+    } }
+  | { "test.done": {
+      lease: LeaseId;
+      exit: number;
+    } }
+  | { door: {
+      target: string;
+      op: string;
+      params: unknown;
+    } }
+  | { "door.once": {
+      ask: AskId;
+    } }
+  | { "door.no": {
+      ask: AskId;
+    } }
+  | { "door.help": {
+      target?: string;
+    } }
+  | { give: {
+      ask: AskId;
+    } }
+  | { opinion: {
+      ask: AskId;
+    } }
+  | { delegate: {
+      card: CardId;
+      off?: boolean;
+      "self-sustained"?: boolean;
+    } }
+  | { visual: {
+      card: CardId;
+      off?: boolean;
+    } }
+  | { auto: {
+      project: ProjectId;
+      off?: boolean;
+    } }
+  | { "memory.read": {
+      memory: string;
+      name: string;
+    } }
+  | { "memory.search": {
+      words: string;
+    } }
+  | { "memory.write": {
+      memory: string;
+      name: string;
+      description: string;
+      text: string;
+      new?: boolean;
+    } }
+  | { "memory.delete": {
+      memory: string;
+      name: string;
+    } }
+  | { "memory.stats": {
+      memory?: string;
+    } }
+  | { "notes.add": {
+      kind: NewNote;
+      text: string;
+      file?: TextList;
+      title?: string;
+      line?: number;
+      why?: string;
+      project?: ProjectId;
+    } }
+  | { notes: {
+      project: ProjectId;
+    } }
+  | { "notes.delete": {
+      project: ProjectId;
+      ids: Array<string>;
+    } }
+  | { "orchestrator.review": {
+      section: ReviewSection;
+      target: string;
+    } }
+  | { "debug.sleep": {
+      ms: number;
+    } };
+
+export type CommandView = {
+  text: string;
+  cut?: boolean;
+};
+
+export type ContextView = {
+  agent: AgentKey;
+  used: number;
+  window: number | null;
+  model: string | null;
+};
+
+export type DayBurn = {
   day_ms: number;
   cents: number;
   unknown: boolean;
   landed: number;
-}
+};
 
-export interface UsageAnswer {
-  usage?: {
-    recent_burn?: RecentBurn;
-  };
-}
+export type Deliverable = {
+  name: string;
+  tasks: Array<string>;
+  current: number;
+};
 
-/** The top line: pin state, live usage pools, phase, and optional machine resources. */
-export interface TopLine {
-  pin: PinLine;
-  usage: Share[];
-  phase: Phase;
-  resources?: {
-    cpu_percent: number | null;
-    ram: { used_mib: number; total_mib: number } | null;
-  };
-}
+export type Delivery =
+  | "queued"
+  | "now";
 
-/** A command the engine would accept now, and the word its button shows. */
-export interface Offer {
-  label: string;
-  command: unknown;
-}
+export type Detail = {
+  id: string;
+  kind: DetailKind;
+  text: string;
+  cut?: boolean;
+  sub?: boolean;
+};
 
-export interface HandView {
+export type DetailKind =
+  | "text"
+  | "thinking";
+
+export type Doing =
+  | { is: "working" } & {
+      step: string;
+    }
+  | { is: "waiting-for-slot" }
+  | { is: "waiting-on-you" }
+  | { is: "error" } & {
+      words: string;
+    }
+  | { is: "idle" };
+
+export type Effort =
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
+
+export type ErrorBody = {
+  code: ErrorCode;
+  message: string;
+};
+
+export type ErrorCode =
+  | "invalid"
+  | "refused"
+  | "buzz"
+  | "leak"
+  | "internals"
+  | "recovering"
+  | "reloading"
+  | "replaced"
+  | "too_large";
+
+export type Fact =
+  | { fact: "head" } & {
+      head: string;
+    }
+  | { fact: "join-owed" } & {
+      base: string;
+      tip: string;
+      asked: boolean;
+    }
+  | { fact: "base-ahead" } & {
+      base: string;
+      commits: number;
+    }
+  | { fact: "overlap" } & {
+      card: CardId;
+      files: number;
+    }
+  | { fact: "mode" } & {
+      mode: Mode;
+    }
+  | { fact: "run" } & {
+      run: number;
+    }
+  | { fact: "carries" } & {
+      cards: Array<CardId>;
+    };
+
+export type FileRow = {
+  name: string;
+  description: string;
+  reads: number;
+  last_read_ms: number | null;
+};
+
+export type Finding = {
+  file: string;
+  line: number;
+  summary: string;
+  proof: string;
+};
+
+export type FindingState =
+  | "open"
+  | "resolved"
+  | "declined"
+  | "dropped";
+
+export type FindingView = {
+  n: number;
+  round: number;
+  by: string;
+  file: string;
+  line: number;
+  summary: string;
+  state: FindingState;
+  proof?: string;
+};
+
+export type FoldedReview = {
+  card: CardId;
+  round: number;
+  foreman?: AgentRow;
+  reviewers: Array<AgentRow>;
+  others?: Array<AgentRow>;
+};
+
+export type Frame =
+  | HelloLine
+  | {
+      event: WatchEvent;
+    }
+  | Answer;
+
+export type HandView = {
   seq: number;
-  message_place: string;
+  message_place: PlaceId;
   headline: string;
-  ask: string;
-  place: string;
-  card: string | null;
+  ask: AskId;
+  place: PlaceId;
+  card: CardId | null;
   role: Role | null;
   kind: AskKind;
   color: Color;
   words: string;
   raised_ms: number;
-  offers: Offer[];
+  offers: Array<Offer>;
   given?: boolean;
   design?: boolean;
   cold_at_ms?: number;
-  /** An approve-brief hand's standing decisions on its card, oldest first. */
-  decisions?: string[];
-  /** Its seat's options and pick, when its hand gave them; `words` holds them composed. */
+  decisions?: Array<string>;
   choices?: Choices;
-  /** An approve-brief hand's typed sketch and a visual card's mock link. */
   brief?: BriefView;
-}
+};
 
-export interface Choices {
-  ask: string;
-  options: string[];
-  /** The option the seat picks, by its number from 1. */
-  pick?: number;
-  reason?: string;
-}
+export type HandoffFile = {
+  path: string;
+  bytes: number;
+};
 
-export interface BriefView {
-  changes?: string[];
-  code_shape?: string[];
-  mock?: string;
-}
+export type Hello = {
+  build: string;
+  dirty: boolean;
+  protocol: number;
+  state_version: number | null;
+  home: string;
+};
 
-export interface LiveMarks {
+export type HelloLine = {
+  hello: Hello;
+};
+
+export type HistoryAnswer = {
+  history: HistoryPage;
+};
+
+export type HistoryPage = {
+  place: PlaceId;
+  messages: Array<MessageView>;
+  earlier: number;
+  turns?: Array<ChatTurn>;
+};
+
+export type ImageView = {
+  path: string;
+  url?: string;
+};
+
+export type Intent =
+  | "request"
+  | "response"
+  | "update";
+
+export type JobId = string;
+
+export type LastView = {
+  date: string;
+  ended_ms: number;
+  commits: number | null;
+};
+
+export type LeaseId = string;
+
+export type LimitView = {
+  cli: Cli;
+  account: Account | null;
+  bucket: string;
+  window: string;
+  name: string;
+  percent: number | null;
+  resets_at: number | null;
+  reached: boolean;
+  seen_ms: number;
+  length_ms: number | null;
+  source: string;
+  age_ms: number;
+  unknown: string | null;
+};
+
+export type LineKind =
+  | "marker"
+  | "engine"
+  | "operator"
+  | "agent";
+
+export type ListStep = {
+  id: string;
+  words: string;
+  status: StepStatus;
+};
+
+export type LiveMarks = {
   light: Color | null;
   stage: string;
-  working: Role[];
+  working: Array<Role>;
   progress: number;
-}
+};
 
-export interface BoardRow {
-  id: string;
-  title: string;
-  ran: boolean;
-  live: LiveMarks | null;
-  status?: string;
-  room?: string;
-}
-
-export interface BoardGroup {
+export type LiveRow = {
   name: string;
-  count: number;
-  cards: BoardRow[];
-}
+  topic?: string;
+  words: string;
+  working?: boolean;
+  under?: boolean;
+  seat?: boolean;
+  start_ms?: number;
+  end_ms?: number;
+  progress?: SuiteProgress;
+};
 
-export interface MergeQueue {
+export type LookbackRead =
+  | "pulse"
+  | "deep-sweep";
+
+export type Master =
+  | { is: "unknown" }
+  | { is: "equal" }
+  | { is: "ahead" } & {
+      commits: number;
+    };
+
+export type MemoryView = {
+  tally: Tally;
+  reviewed: string | null;
+  files: Array<FileRow>;
+};
+
+export type MergeQueue = {
   base: string;
   slot: [BoardRow, string] | null;
-  waiting: [BoardRow, number][];
+  waiting: Array<[BoardRow, number]>;
   in_line: number;
-}
+};
 
-export interface StartDefaults {
-  level: number;
-  from: "run" | "project";
-  visual: boolean;
-  carries: string[];
-  modes: { full: boolean; report: boolean };
-}
+export type MessageView = {
+  seq: number;
+  time_ms: number;
+  from: Author;
+  to: string | null;
+  kind: LineKind;
+  headline: string;
+  text: string;
+  cut: boolean;
+  number: number | null;
+  hand: ReplyHand | null;
+  findings: Array<Finding>;
+  images?: Array<ImageView>;
+  open_ask?: AskId;
+  choice?: number;
+};
 
-export interface BoardView {
-  auto: boolean;
-  project: string;
-  live: BoardGroup;
-  merge: MergeQueue;
-  areas: BoardGroup[];
-  done: BoardGroup;
-}
+export type MessagesView = {
+  place: PlaceId;
+  revision: number;
+  messages: Array<MessageView>;
+  earlier: number;
+  pinned?: Array<MessageView>;
+};
 
-export type AgentLight = "working" | "asking" | "error" | "waiting" | "idle";
+export type Mode =
+  | "full"
+  | "light"
+  | "report"
+  | "review";
+
+export type ModelCache = {
+  cli: string;
+  model: string;
+  cache_hit_percent?: number;
+};
+
+export type ModelChoice = {
+  cli: Cli;
+  model: string;
+  label: string;
+};
+
+export type NewNote =
+  | "feedback"
+  | "lesson"
+  | "smell"
+  | "proposal";
+
+export type Note = {
+  id: number;
+  project: ProjectId | null;
+  card: CardId | null;
+  seat: AgentKey | null;
+  time: number;
+} & NoteWhat;
+
+export type NoteWhat =
+  | { kind: "survey" } & {
+      from: string;
+      text: string;
+    }
+  | { kind: "smell" } & {
+      file: string;
+      line: number;
+      what: string;
+      why: string;
+    }
+  | { kind: "feedback" } & {
+      text: string;
+    }
+  | { kind: "lesson" } & {
+      text: string;
+    }
+  | { kind: "proposal" } & {
+      title: string;
+      text: string;
+      files: Array<string>;
+    }
+  | { kind: "handoff" } & {
+      run: number;
+      dir: string;
+      files: Array<HandoffFile>;
+      skipped: Array<string>;
+    };
+
+export type Offer = {
+  label: string;
+  command: Command;
+};
+
+export type OutputFile = {
+  job: JobId;
+  agent: AgentKey;
+  name: string;
+  size: number;
+  modified_ms: number;
+};
+
+export type OverviewStage = {
+  kind: OverviewStageKind;
+  label: string;
+  at: OverviewStageAt;
+  start_ms: number;
+  end_ms?: number;
+  summary?: string;
+  round?: RoundView;
+};
+
+export type OverviewStageAt =
+  | "passed"
+  | "failed"
+  | "current";
+
+export type OverviewStageKind =
+  | "spec"
+  | "build"
+  | "verify"
+  | "land"
+  | "report"
+  | "review";
+
+export type OverviewView = {
+  stages: Array<OverviewStage>;
+  live?: Array<LiveRow>;
+};
+
+export type Phase =
+  | { is: "ready" }
+  | { is: "recovering" } & {
+      doing: string;
+    }
+  | { is: "reloading" } & {
+      short: string;
+    };
+
+export type Pick =
+  | number
+  | string;
+
+export type PinLine = {
+  pin: string | null;
+  master: Master;
+  ready: boolean;
+  update?: Update;
+};
+
+export type PlaceId = string;
 
 export type PlaceKind =
   | { is: "main" }
-  | { is: "card"; card: string }
-  | { is: "spec"; card: string }
-  | { is: "challenge"; card: string }
-  | { is: "dm"; card: string; role: Role }
-  | { is: "child"; card: string; role?: Role; agent: string }
+  | { is: "card" } & {
+      card: CardId;
+    }
+  | { is: "spec" } & {
+      card: CardId;
+    }
+  | { is: "challenge" } & {
+      card: CardId;
+    }
+  | { is: "dm" } & {
+      card: CardId;
+      role: Role;
+    }
+  | { is: "child" } & {
+      card: CardId;
+      role?: Role;
+      agent: AgentKey;
+    }
   | { is: "other" };
 
-/** A place's row; only a foreman's children's are read here, for their working squares. */
-export interface RoomRow {
-  place: string;
+export type PlaceView = {
+  decisions?: Array<string>;
+  start?: StartDefaults;
+  place: PlaceId;
+  kind: PlaceKind;
+  revision: number;
+  card: CardHeader | null;
+  agents: Array<AgentRow>;
+  messages: Array<MessageView>;
+  earlier: number;
+  turns?: Array<ChatTurn>;
+  pinned?: Array<MessageView>;
+  offers: Array<Offer>;
+  input_to: string;
+  plan?: Plan;
+  notes?: Array<string>;
+  sessions?: Array<AgentRow>;
+  outputs?: Array<OutputFile>;
+  lists?: Array<AgentList>;
+  summaries?: Array<Summary>;
+  review?: FoldedReview;
+  triage?: TriageView;
+  overview?: OverviewView;
+};
+
+export type Plan = {
+  deliverables: Array<Deliverable>;
+  current: number;
+};
+
+export type PreviewControl = {
+  on: boolean;
+  url: string;
+  enabled: boolean;
+};
+
+export type ProjectId = string;
+
+export type ProjectNotes = {
+  project: ProjectId;
+  notes: Array<Note>;
+};
+
+export type ProjectView = {
+  project: ProjectId;
+  rows: Array<ReadView>;
+};
+
+export type Ram = {
+  used_mib: number;
+  total_mib: number;
+};
+
+export type ReadPoint = {
+  seq: number;
+  step: number;
+};
+
+export type ReadView = {
+  read: LookbackRead;
+  last: LastView | null;
+  running: CardId | null;
+};
+
+export type RecentBurn = {
+  since_ms: number;
+  total_cents: number;
+  unknown: boolean;
+  roles: Array<RoleBurn>;
+  ended_cards: number;
+  average_cents?: number;
+  cache_by_model: Array<ModelCache>;
+  cards_left?: CardsLeft;
+  daily?: Array<DayBurn>;
+};
+
+export type ReplyHand = {
+  color: Color;
+  headline: string;
+  message: string;
+  ask: boolean;
+  design?: boolean;
+  withdraw_ask?: boolean;
+  images?: Array<string>;
+  options?: Array<string>;
+  pick?: number;
+  reason?: string;
+  changes?: Array<string>;
+  code_shape?: Array<string>;
+};
+
+export type Request = {
+  id: number;
+  cmd: unknown;
+  as?: string;
+};
+
+export type Resources = {
+  cpu_percent: number | null;
+  ram: Ram | null;
+};
+
+export type ReviewSection =
+  | "memories"
+  | "notes";
+
+export type ReviewerCounts = {
+  reported: number;
+  kept?: number;
+};
+
+export type Role =
+  | "planner"
+  | "foreman"
+  | "reviewer"
+  | "researcher"
+  | "baseline"
+  | "echo";
+
+export type RoleBurn = {
+  role: string;
+  cents: number;
+  unknown: boolean;
+};
+
+export type RoomRow = {
+  place: PlaceId;
   kind: PlaceKind;
   light: Color | null;
   stage: string;
   paused: boolean;
-  squares: AgentLight[];
+  squares: Array<AgentLight>;
   topic?: string;
-  under?: unknown;
-}
+  under?: Under;
+};
 
-export interface Screen {
+export type RoundView = {
+  n: number;
+  commit: string;
+  verdict: string;
+  findings: Array<FindingView>;
+  reviewers?: Record<string, ReviewerCounts>;
+};
+
+export type Screen = {
   revision: number;
   now_ms: number;
   tz_offset_min: number;
   top: TopLine;
-  rooms: RoomRow[];
-  hands: HandView[];
-  boards: BoardView[];
-  memories?: unknown[];
-  notes?: unknown[];
-  projects?: ProjectView[];
-}
+  rooms: Array<RoomRow>;
+  hands: Array<HandView>;
+  boards: Array<BoardView>;
+  memories: Array<MemoryView>;
+  notes?: Array<ProjectNotes>;
+  projects?: Array<ProjectView>;
+};
 
-export interface ErrorBody {
-  code: string;
-  message: string;
-}
+export type SeatCost = {
+  agent: AgentKey;
+  cost_cents: number;
+  unknown: boolean;
+  tokens: Tokens;
+};
 
-export type Mode = "full" | "light" | "report" | "review";
+export type Setting = {
+  model: ModelChoice;
+  effort: Effort;
+};
+
+export type Share = {
+  cli: string;
+  window: string;
+  percent: number | null;
+  reached: boolean;
+  stale: boolean;
+  reset_ms: number | null;
+  ends_percent: number | null;
+  signed_out: boolean;
+  switch_account?: string;
+  read_ago: string | null;
+};
 
 export type Stage =
   | "starting"
@@ -276,308 +1148,177 @@ export type Stage =
   | "done"
   | "closed";
 
-export interface CardAbout {
-  preview?: { on: boolean; url: string; enabled: boolean };
-  actions?: string[];
-  switches?: { name: string; position: number; positions: { label: string; command?: Offer["command"] }[] }[];
-  project: string;
-  branch?: string;
-  base: string;
-  fork?: string;
-  pr?: number;
-  pr_url?: string;
-  delegated?: boolean;
-  self_sustained?: boolean;
-}
+export type StageAt =
+  | "passed"
+  | "current"
+  | "to-come";
 
-export type StageAt = "passed" | "current" | "to-come";
+export type StageKind =
+  | "spec"
+  | "build"
+  | "verify"
+  | "land"
+  | "report"
+  | "review"
+  | "done";
 
-export type StageKind = "spec" | "build" | "verify" | "land" | "report" | "review" | "done";
-
-export interface StageMark {
+export type StageMark = {
   kind: StageKind;
   label: string;
   at: StageAt;
   runs: number;
   count?: string;
   sub?: string;
-}
+};
 
-export interface CardHeader {
+export type StartDefaults = {
+  level: number;
+  from: string;
+  visual: boolean;
+  carries: Array<CardId>;
+  modes: StartModes;
+};
+
+export type StartModes = {
+  full: boolean;
+  report: boolean;
+};
+
+export type StepStatus =
+  | "pending"
+  | "in-progress"
+  | "completed";
+
+export type StepView = {
   id: string;
-  title: string;
-  mode: Mode;
-  stage: Stage;
-  paused: boolean;
-  pipeline: StageMark[];
-  about: CardAbout;
-  spec?: string;
-  parent?: string;
-}
-
-export type CacheState = { is: "running" } | { is: "idle"; cold_at_ms: number };
-
-export type Doing =
-  | { is: "working"; step: string }
-  | { is: "waiting-for-slot" }
-  | { is: "waiting-on-you" }
-  | { is: "error"; words: string }
-  | { is: "idle" };
-
-export interface ModelChoice {
-  cli: string;
-  model: string;
-  label: string;
-}
-
-export interface Setting {
-  model: ModelChoice;
-  effort: string;
-}
-
-export interface AgentRow {
-  parent?: string;
-  agent: string;
-  role: Role;
-  label: string;
-  effort: string;
-  light: AgentLight;
-  doing: Doing;
-  context: [number, number] | null;
-  setting?: Setting;
-  pending?: Setting;
-  choices?: ModelChoice[];
-  efforts?: string[];
-  cache?: CacheState;
-}
-
-export type Author =
-  | { is: "operator" }
-  | { is: "engine" }
-  | { is: "orchestrator"; project: string }
-  | { is: "pa" }
-  | { is: "agent"; label: string; role: Role };
-
-export type LineKind = "marker" | "engine" | "operator" | "agent";
-
-export interface ReplyHand {
-  color: Color;
-  headline: string;
-  message: string;
-  ask: boolean;
-  design?: boolean;
-  withdraw_ask?: boolean;
-  images?: string[];
-  options?: string[];
-  /** The option the seat would pick, by its number from 1; absent for none. */
-  pick?: number;
-  reason?: string;
-  changes?: string[];
-  code_shape?: string[];
-}
-
-export interface Finding {
-  file: string;
-  line: number;
-  summary: string;
-  proof: string;
-}
-
-/** A message's image: its path, and where the bridge serves a job's published copy. */
-export interface ImageView {
-  path: string;
-  url?: string;
-}
-
-export interface MessageView {
-  seq: number;
-  time_ms: number;
-  from: Author;
-  to: string | null;
-  kind: LineKind;
-  headline: string;
-  text: string;
-  cut: boolean;
-  number: number | null;
-  hand: ReplyHand | null;
-  findings: Finding[];
-  images?: ImageView[];
-  open_ask?: string;
-  /** The option number an answer chose, when it chose one. */
-  choice?: number;
-}
-
-export interface Deliverable {
-  name: string;
-  tasks: string[];
-  current: number;
-}
-
-export interface Plan {
-  deliverables: Deliverable[];
-  current: number;
-}
-
-export type FindingState = "open" | "resolved" | "declined" | "dropped";
-
-export interface FindingView {
-  n: number;
-  round: number;
-  by: string;
-  file: string;
-  line: number;
-  summary: string;
-  state: FindingState;
-  proof?: string;
-}
-
-export interface FoldedReview {
-  card: string;
-  round: number;
-  /** Its foreman, the parent of its reviewers, with its own state. */
-  foreman?: AgentRow | null;
-  reviewers: AgentRow[];
-  /** Its other seats, its foreman's DM among them. */
-  others?: AgentRow[];
-}
-
-export interface RoundView {
-  n: number;
-  verdict: string;
-  commit: string;
-  findings: FindingView[];
-  reviewers?: Record<string, ReviewerCounts>;
-}
-
-export interface ReviewerCounts {
-  reported: number;
-  kept?: number;
-}
-
-export interface TriageFindingView {
-  pos: number;
-  n: number;
-  by: string;
-  file: string;
-  line: number;
-  summary: string;
-  proof: string;
-}
-
-export interface TriageView {
-  ask: string;
-  round: number;
-  stalemate?: boolean;
-  findings: TriageFindingView[];
-}
-
-export type OverviewStageKind = "spec" | "build" | "verify" | "land" | "report" | "review";
-
-export type OverviewStageAt = "passed" | "failed" | "current";
-
-export interface OverviewStage {
-  kind: OverviewStageKind;
-  label: string;
-  at: OverviewStageAt;
-  start_ms: number;
-  end_ms?: number;
-  summary?: string;
-  round?: RoundView;
-}
-
-export interface OverviewView {
-  stages: OverviewStage[];
-  live?: LiveRow[];
-}
-
-/** One live row under the current stage: a verification step or a working seat. */
-export interface LiveRow {
-  name: string;
-  topic?: string;
   words: string;
-  working?: boolean;
-  under?: boolean;
-  seat?: boolean;
+  command?: CommandView;
+  details?: Array<Detail>;
   start_ms?: number;
   end_ms?: number;
-  progress?: SuiteProgress;
-}
+  thought_ms?: number;
+};
 
-/** A running suite's counts so far: tests, or a Jest suite's test files, with no total. */
-export interface SuiteProgress {
+export type SuiteProgress = {
   passed: number;
   failed: number;
   total?: number;
   files?: boolean;
   latest?: string;
-}
+};
 
-export interface Detail {
-  id: string;
-  kind: "text" | "thinking";
+export type Summary = {
+  card: CardId;
+  title: string;
   text: string;
-  cut?: boolean;
-  sub?: boolean;
-}
+};
 
-export interface StepView {
-  id: string;
-  words: string;
-  command?: { text: string; cut?: boolean };
-  start_ms?: number;
-  end_ms?: number;
-  thought_ms?: number;
-  details?: Detail[];
-}
+export type Switch = {
+  name: string;
+  position: number;
+  positions: Array<SwitchPosition>;
+};
 
-export interface TurnView {
-  job: string;
-  steps: StepView[];
+export type SwitchPosition = {
+  label: string;
+  command?: Command;
+};
+
+export type Tally = {
+  memory: string;
+  written: number;
+  read: number;
+  deleted: number;
+  reviewed_ms: number | null;
+};
+
+export type TextList =
+  | string
+  | Array<string>;
+
+export type Times = {
+  stages: Array<[string, number]>;
+  waiting_on_you: number;
+  paused: number;
+};
+
+export type Tokens = {
+  input: number;
+  cache_read: number;
+  cache_write: number;
+  output: number;
+};
+
+export type TopLine = {
+  pin: PinLine;
+  usage: Array<Share>;
+  phase: Phase;
+  resources?: Resources;
+};
+
+export type TriageFindingView = {
+  n: number;
+  by: string;
+  file: string;
+  line: number;
+  summary: string;
+  proof: string;
+};
+
+export type TriageView = {
+  ask: AskId;
+  review: CardId;
+  round: number;
+  stalemate?: boolean;
+  findings: Array<TriageFindingView>;
+};
+
+export type TurnView = {
+  job: JobId;
+  steps: Array<StepView>;
+  read?: Array<ReadPoint>;
+  after?: Array<Detail>;
   cut?: boolean;
   thought_ms?: number;
   thinking_since?: number;
-  after?: Detail[];
-}
+};
 
-export interface ChatTurn {
-  agent: string;
-  after_seq: number;
-  running: boolean;
-  step_count: number;
-  turn: TurnView;
-}
+export type Under = {
+  project: string;
+  card: CardId;
+  review?: boolean;
+  detail?: string;
+  mode?: Mode;
+};
 
-export interface PlaceView {
-  decisions?: string[];
-  start?: StartDefaults;
-  place: string;
-  kind: PlaceKind;
-  revision: number;
-  card: CardHeader | null;
-  agents: AgentRow[];
-  messages: MessageView[];
-  earlier: number;
-  turns?: ChatTurn[];
-  pinned?: MessageView[];
-  offers: Offer[];
-  input_to: string;
-  plan?: Plan;
-  sessions?: AgentRow[];
-  review?: FoldedReview;
-  triage?: TriageView;
-  overview?: OverviewView;
-}
+export type Update =
+  | { is: "preparing" } & {
+      short: string;
+    }
+  | { is: "build-failed" } & {
+      short: string;
+      retry: Command;
+    }
+  | { is: "not-pinned" } & {
+      short: string;
+      retry: Command;
+    };
 
-export interface HistoryPage {
-  place: string;
-  messages: MessageView[];
-  earlier: number;
-  turns?: ChatTurn[];
-}
+export type UsageAnswer = {
+  usage: UsageView;
+};
 
-/** One line from the engine: its hello, a watched view, or an answer by id. */
-export type Frame =
-  | { hello: Hello }
-  | { event: { screen?: Screen; view?: PlaceView } }
-  | { id: number; ok: unknown }
-  | { id: number; err: ErrorBody };
+export type UsageView = {
+  by_pool: Array<string>;
+  limits: Array<LimitView>;
+  contexts: Array<ContextView>;
+  recent_burn: RecentBurn;
+};
+
+export type WatchEvent =
+  | { screen: Screen }
+  | { view: WatchedPlace };
+
+export type WatchedPlace =
+  | PlaceView
+  | MessagesView;

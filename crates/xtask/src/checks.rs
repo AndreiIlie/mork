@@ -121,6 +121,7 @@ pub(super) fn run() -> u8 {
             Vec::new()
         }),
     );
+    report.step("web types", problems(&root, xtask::web_types::check(&root).err().into_iter().collect(), "web types"));
     report.step("rustfmt", child("rustfmt", super::rustfmt()));
     report.step("comments", problems(&root, xtask::comments::check(&root), "comments"));
     for (name, targets) in super::CLIPPY_PASSES {

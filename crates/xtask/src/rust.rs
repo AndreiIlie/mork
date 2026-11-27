@@ -26,7 +26,7 @@ pub fn scan(text: &str) -> Result<Vec<(usize, Seen)>, String> {
 }
 
 // M1.32: a block's or an inline module's aliases too.
-fn aliases_of<'a>(items: impl Iterator<Item = &'a syn::Item>) -> HashMap<String, String> {
+pub(crate) fn aliases_of<'a>(items: impl Iterator<Item = &'a syn::Item>) -> HashMap<String, String> {
     let mut aliases = HashMap::new();
     for item in items {
         if let syn::Item::Use(u) = item

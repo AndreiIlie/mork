@@ -99,9 +99,10 @@ fn clippy(targets: &[&str], json: bool) -> Command {
 }
 
 fn check() -> bool {
+    let wire_ok = report(&xtask::web_types::check(&xtask::root()).err().into_iter().collect::<Vec<_>>());
     let fmt_ok = run(rustfmt(), "rustfmt");
     let comments_ok = comments();
-    let mut steps = vec![("rustfmt", fmt_ok), ("comments", comments_ok)];
+    let mut steps = vec![("web types", wire_ok), ("rustfmt", fmt_ok), ("comments", comments_ok)];
     // Clippy has no lint for a comment's length: the comment rules fail the check before it runs (fac-2).
     if !comments_ok {
         return verdict("check", &steps);
@@ -247,6 +248,7 @@ fn main() -> ExitCode {
     let ok = match std::env::args().nth(1).as_deref() {
         Some("check") => check(),
         Some("web") => web(),
+        Some("web-types") => report(&xtask::web_types::write(&xtask::root()).err().into_iter().collect::<Vec<_>>()),
         Some("audit") => {
             let a = comments();
             eprintln!("xtask: audits");
@@ -256,7 +258,7 @@ fn main() -> ExitCode {
         Some("test") => test(),
         Some("hygiene") => hygiene(),
         _ => {
-            eprintln!("usage: cargo xtask <check|checks --base <b> --json <report>|web|audit|test|hygiene>");
+            eprintln!("usage: cargo xtask <check|checks --base <b> --json <report>|web|web-types|audit|test|hygiene>");
             false
         }
     };

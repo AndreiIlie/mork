@@ -16,6 +16,7 @@ pub mod visibility;
 pub mod walk;
 pub mod walls;
 pub mod web;
+pub mod web_types;
 
 use std::path::PathBuf;
 

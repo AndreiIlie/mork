@@ -3,13 +3,8 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-macro_rules! newtype {
-    ($(#[$m:meta])* $name:ident) => {
-        $(#[$m])*
-        #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-        #[serde(transparent)]
-        pub struct $name(pub String);
-
+macro_rules! impl_id {
+    ($name:ident) => {
         impl $name {
             pub fn new(s: impl Into<String>) -> Self {
                 Self(s.into())
@@ -72,51 +67,62 @@ macro_rules! newtype {
     };
 }
 
-newtype!(
-    /// A job's id: `<yyyymmdd-hhmmss>-<owner>-<4 hex>` (1.4.2).
-    JobId
-);
-newtype!(
-    /// A card's id, as its board names it in lowercase (`ex-550`).
-    CardId
-);
-newtype!(
-    /// An agent: a seat in a role at a place (`ex-550/foreman`, `main/echo`).
-    AgentKey
-);
-newtype!(
-    /// A git commit's full hash.
-    Sha
-);
-newtype!(
-    /// A place: `main`, a card's room (`ex-550`), a DM (`ex-550/foreman/dm`), a test place.
-    PlaceId
-);
-newtype!(
-    /// A seat of the config (`foreman`, `reviewer`, `echo`).
-    SeatName
-);
-newtype!(
-    /// A CLI's session: Claude's session id, or Codex's thread id.
-    SessionId
-);
+/// A job's id: `<yyyymmdd-hhmmss>-<owner>-<4 hex>` (1.4.2).
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct JobId(pub String);
+impl_id!(JobId);
+/// A card's id, as its board names it in lowercase (`ex-550`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct CardId(pub String);
+impl_id!(CardId);
+/// An agent: a seat in a role at a place (`ex-550/foreman`, `main/echo`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct AgentKey(pub String);
+impl_id!(AgentKey);
+/// A git commit's full hash.
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Sha(pub String);
+impl_id!(Sha);
+/// A place: `main`, a card's room (`ex-550`), a DM (`ex-550/foreman/dm`), a test place.
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PlaceId(pub String);
+impl_id!(PlaceId);
+/// A seat of the config (`foreman`, `reviewer`, `echo`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SeatName(pub String);
+impl_id!(SeatName);
+/// A CLI's session: Claude's session id, or Codex's thread id.
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SessionId(pub String);
+impl_id!(SessionId);
 
-newtype!(
-    /// An ask: `<place>/<kind>/<n>` (`ex-550/approve-brief/1`).
-    AskId
-);
-newtype!(
-    /// A project of the config (`example`).
-    ProjectId
-);
-newtype!(
-    /// An outward action's id (2.5).
-    ActionId
-);
-newtype!(
-    /// A test or engine lease (4.9): `test-<n>`, `engine-<card>`.
-    LeaseId
-);
+/// An ask: `<place>/<kind>/<n>` (`ex-550/approve-brief/1`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct AskId(pub String);
+impl_id!(AskId);
+/// A project of the config (`example`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ProjectId(pub String);
+impl_id!(ProjectId);
+/// An outward action's id (2.5).
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ActionId(pub String);
+impl_id!(ActionId);
+/// A test or engine lease (4.9): `test-<n>`, `engine-<card>`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct LeaseId(pub String);
+impl_id!(LeaseId);
 
 impl Sha {
     /// The first seven characters, as the screen shows a commit.
