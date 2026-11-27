@@ -113,6 +113,11 @@ export type BriefView = {
   mock?: string;
 };
 
+export type BuilderRow = {
+  group: QualityGroup;
+  counts: FirstPass;
+};
+
 export type CacheState =
   | { is: "running" }
   | { is: "idle" } & {
@@ -216,6 +221,7 @@ export type Command =
       card?: string;
     } }
   | { usage: Record<string, never> }
+  | { quality: Record<string, never> }
   | { "claude.account": {
       name: string;
     } }
@@ -628,6 +634,13 @@ export type Fact =
       cards: Array<CardId>;
     };
 
+export type FailureRate = {
+  turns: number;
+  calls: number;
+  failed: number;
+  percent: number | null;
+};
+
 export type FileRow = {
   name: string;
   description: string;
@@ -640,6 +653,12 @@ export type Finding = {
   line: number;
   summary: string;
   proof: string;
+};
+
+export type FindingRow = {
+  group: QualityGroup;
+  lens: string;
+  counts: Precision;
 };
 
 export type FindingState =
@@ -657,6 +676,14 @@ export type FindingView = {
   summary: string;
   state: FindingState;
   proof?: string;
+};
+
+export type FirstPass = {
+  verified: number;
+  first_pass: number;
+  first_pass_percent: number | null;
+  landed: number;
+  median_rounds: number | null;
 };
 
 export type FoldedReview = {
@@ -1018,6 +1045,17 @@ export type Plan = {
   current: number;
 };
 
+export type Precision = {
+  findings: number;
+  fixed: number;
+  declined: number;
+  covered: number;
+  stalled: number;
+  fixed_percent: number | null;
+  declined_percent: number | null;
+  stalemate_percent: number | null;
+};
+
 export type PreviewControl = {
   on: boolean;
   url: string;
@@ -1034,6 +1072,31 @@ export type ProjectNotes = {
 export type ProjectView = {
   project: ProjectId;
   rows: Array<ReadView>;
+};
+
+export type Quality = {
+  since_ms: number;
+  builders: Array<BuilderRow>;
+  findings: Array<FindingRow>;
+  spend: Array<SpendRow>;
+  tools: Array<ToolRow>;
+};
+
+export type QualityAnswer = {
+  quality: Quality;
+};
+
+export type QualityGroup = {
+  project: string;
+  role: string;
+  model: string;
+  effort: string;
+};
+
+export type QualitySpend = {
+  cards: number;
+  average_dollars: number;
+  unknown: boolean;
 };
 
 export type Ram = {
@@ -1171,6 +1234,11 @@ export type Share = {
   read_ago: string | null;
 };
 
+export type SpendRow = {
+  group: QualityGroup;
+  spend: QualitySpend;
+};
+
 export type Stage =
   | "starting"
   | "brief"
@@ -1283,6 +1351,11 @@ export type Tokens = {
   cache_read: number;
   cache_write: number;
   output: number;
+};
+
+export type ToolRow = {
+  group: QualityGroup;
+  counts: FailureRate;
 };
 
 export type TopLine = {

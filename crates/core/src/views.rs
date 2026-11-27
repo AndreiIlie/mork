@@ -15,6 +15,7 @@ mod overview;
 mod pipeline;
 pub mod place;
 mod projects;
+pub mod quality;
 mod reads;
 pub mod screen;
 pub mod search;

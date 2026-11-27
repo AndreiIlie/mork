@@ -105,7 +105,7 @@ fn delegated_and_self_sustained_escalate_on_repeated_unresolved_findings() {
         assert_eq!(row("review.stalemate")["findings"], json!([1]));
         assert_eq!(row("review.verdict")["named"], json!([{"n":1,"round":1,"by":"foreman"}]));
         assert_eq!(row("review.asked")["submitted"], row("build.submitted")["head"]);
-        assert_eq!(row("build.submitted")["head"], "h2");
+        assert_eq!(row("build.submitted")["head"], json!(common::sha("h2")));
         assert!(s.journal.iter().any(|(_, k, _, v)| k == "cost" && v["job"] == row("build.requested")["job"]));
         let ask = open_triage(&s).clone();
         assert_eq!(ask.color, Color::Red);

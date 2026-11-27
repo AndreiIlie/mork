@@ -11,6 +11,7 @@ mod lookback;
 mod memory;
 mod notes;
 mod orchestrators;
+mod quality;
 mod retired;
 pub mod schema;
 

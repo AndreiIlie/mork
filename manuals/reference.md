@@ -416,6 +416,19 @@ A read: allowed during a reload.
 
 Example: `mork ctl status`; with job records, `mork ctl status --jobs`; one card's, `mork ctl status --jobs --card ex-550`
 
+### quality
+
+Reads the last 30 days of Quality figures, also shown in Settings under Quality.
+Any seat can run `mork ctl quality`.
+The answer contains `quality.builders`, `findings`, `spend` and `tools`, grouped by project, role, launch model and effort.
+First-pass rate counts runs first verified in the window.
+Median rounds and average dollars use landed runs.
+Finding Precision counts each kept finding raised in the window once per reviewer lens.
+Fixed and declined percentages use decided findings.
+Stalemate uses findings with recorded coverage.
+Tool failure rate counts stream-marked failures among measured calls on cards.
+Missing measurements are excluded.
+
 ### usage
 
 Every CLI's usage-limit windows, each agent's context use, and the rolling 7-day burn summary.

@@ -45,6 +45,7 @@ pub fn verdict(p: &mut Poster<'_>, mut rc: Card, r: &Reply, job: &Job, ctx: Ctx<
     let fixer = if passed { None } else { fixer_of(p, &rc) };
     let said = if findings.is_empty() { format!("{}\n\n{}", r.hand.headline, r.hand.message) } else { String::new() };
     let Some(review) = rc.review.as_deref_mut() else { return };
+    let kept = finding_ids(review, &named);
     if let Some(round) = review.open_mut() {
         round.verdict = Some(if passed { Verdict::Passed } else { Verdict::Failed });
         round.named = named;
@@ -58,21 +59,6 @@ pub fn verdict(p: &mut Poster<'_>, mut rc: Card, r: &Reply, job: &Job, ctx: Ctx<
     rc.gates.review_asked = None;
     let id = rc.id.clone();
     p.put_card(rc.clone());
-    let kept: Vec<_> = rc
-        .review
-        .iter()
-        .flat_map(|r| {
-            let numbers = r
-                .rounds
-                .iter()
-                .find(|v| v.n == open.n)
-                .into_iter()
-                .flat_map(|v| &v.named)
-                .collect::<std::collections::BTreeSet<_>>();
-            r.raised.iter().filter(move |f| numbers.contains(&f.n))
-        })
-        .map(|f| json!({"n": f.n, "round": f.round, "by": f.by}))
-        .collect();
     let data = json!({"named": kept, "n": open.n, "commit": open.commit, "passed": passed, "findings": findings.len()});
     p.journal("review.verdict", Some(id.as_str()), data);
     if passed {
@@ -99,6 +85,16 @@ pub fn verdict(p: &mut Poster<'_>, mut rc: Card, r: &Reply, job: &Job, ctx: Ctx<
     // Its verification completes if its suite ended too (fac-375).
     crate::queue::runs::reviewed(p, &card.id, ctx);
     crate::queue::train::maintain(p, card.project.as_str(), ctx);
+}
+
+fn finding_ids(review: &mork_types::review::Review, named: &[u32]) -> Vec<serde_json::Value> {
+    let numbers: std::collections::BTreeSet<_> = named.iter().collect();
+    review
+        .raised
+        .iter()
+        .filter(|f| numbers.contains(&f.n))
+        .map(|f| json!({"n":f.n,"round":f.round,"by":f.by}))
+        .collect()
 }
 
 // A verdict's report, a failed round's once its proofs' copy ended or none was owed: an entry's run reports once its

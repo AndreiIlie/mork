@@ -31,6 +31,7 @@ pub mod pipeline;
 pub mod plan;
 pub mod ports;
 pub mod protocol;
+pub mod quality;
 pub mod reply;
 pub mod review;
 pub mod rooms;

@@ -116,6 +116,11 @@ impl Engine {
             Command::HistorySearch { words } => return self.history_search(conn, req.id, &from, words),
             cmd @ Command::HistoryJournal { .. } => return self.history_journal(conn, req.id, &from, cmd),
             Command::Status { jobs, all, card } => Ok(self.status(jobs, all, card.as_deref())),
+            Command::Quality {} => self
+                .store
+                .quality(crate::clock::now_ms())
+                .map(|quality| json!(mork_types::quality::QualityAnswer { quality }))
+                .map_err(|e| ErrorBody::new(ErrorCode::Refused, e.to_string())),
             Command::Usage {} => Ok(self.usage()),
             Command::ClaudeAccount { name } => self.claude_account(&name),
             Command::DebugSleep { ms } => return self.debug_sleep(conn, req.id, ms),

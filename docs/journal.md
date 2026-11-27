@@ -168,3 +168,13 @@ Each value contains the description and text. A creation has `before: null`, and
 A closing seat's rows belong to its own card even when the reviewed card holds its edit.
 At staging, `memory.staged` records only the seat and operation. When the holding card ends, an applied edit produces the ordinary write or delete row.
 A `memory.skipped` row keeps the proposed `after`, file name, memory, seat and reason when an intervening edit takes precedence or the target of a deletion is already gone.
+
+## Quality figures
+
+A turn's `cost` row carries its job and, when the CLI stream was read, `tools` with total calls, failed calls and failed counts by tool name in `by`.
+A measured turn with no calls records zero. Older or unread streams have no tool counts.
+
+An accepted submission records `build.requested` with the foreman's job. Taking its clean head through the build gates records `build.submitted` with that head.
+The linked review's `review.asked` records the submitted head alongside its integration commit.
+A reviewer's `child.spawned` records the topic. The `named` list on an accepted `review.verdict` identifies each kept finding by number, origin round and raiser.
+A delegated stalemate records `review.stalemate` on the subject with the review card, round and repeated finding numbers.

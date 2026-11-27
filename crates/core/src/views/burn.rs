@@ -161,13 +161,7 @@ fn count_prompt_tokens<'a>(by_model: &mut BTreeMap<(&'a str, &'a str), (u128, u1
 fn slice_run<'a>(rows: &'a [Row<'a>], run: u64) -> &'a [Row<'a>] {
     let mut starts: Vec<(usize, u64)> = Vec::new();
     for (i, (_, _, kind, data)) in rows.iter().enumerate() {
-        if *kind == "card.start" {
-            let r = data.get("run").and_then(Value::as_u64).unwrap_or(1);
-            starts.push((i, r));
-        } else if *kind == "card.stage"
-            && let Some(r) = data.get("run").and_then(Value::as_u64)
-            && r > starts.last().map_or(1, |(_, cur)| *cur)
-        {
+        if let Some(r) = run_start(kind, data, starts.last().map_or(1, |(_, cur)| *cur)) {
             // A PR approval can reopen a done review as run + 1 without writing a card.start row (fac-557).
             starts.push((i, r));
         }
@@ -184,12 +178,17 @@ fn slice_run<'a>(rows: &'a [Row<'a>], run: u64) -> &'a [Row<'a>] {
     &[]
 }
 
+pub(super) fn run_start(kind: &str, data: &Value, current: u64) -> Option<u64> {
+    let run = data["run"].as_u64().unwrap_or(1);
+    (kind == "card.start" || (kind == "card.stage" && run > current)).then_some(run)
+}
+
+pub(super) fn parent_of<'a>(kind: &str, data: &'a Value) -> Option<&'a str> {
+    matches!(kind, "card.start" | "review.adopted" | "review.ended").then(|| data["of"].as_str()).flatten()
+}
+
 fn run_parent<'a>(slice: &'a [Row<'a>], fallback: Option<&'a str>) -> Option<&'a str> {
-    let from_slice = slice.iter().rev().find_map(|(_, _, k, d)| {
-        matches!(*k, "card.start" | "review.adopted" | "review.ended")
-            .then(|| d.get("of").and_then(Value::as_str))
-            .flatten()
-    });
+    let from_slice = slice.iter().rev().find_map(|(_, _, k, d)| parent_of(k, d));
     from_slice.or(fallback)
 }
 

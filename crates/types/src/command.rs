@@ -109,6 +109,8 @@ pub enum Command {
     },
     #[serde(rename = "usage")]
     Usage {},
+    #[serde(rename = "quality")]
+    Quality {},
     #[serde(rename = "claude.account")]
     ClaudeAccount { name: String },
     #[serde(rename = "projects")]
