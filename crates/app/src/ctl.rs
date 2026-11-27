@@ -29,11 +29,12 @@ struct Link {
 }
 
 fn connect(home: &Home) -> Result<Link, String> {
-    connect_at(home, &socket(home))
+    let stream =
+        UnixStream::connect(socket(home)).map_err(|_| format!("no Mork running on {}", home.root().display()))?;
+    hello(stream)
 }
 
-fn connect_at(home: &Home, path: &std::path::Path) -> Result<Link, String> {
-    let stream = UnixStream::connect(path).map_err(|_| format!("no Mork running on {}", home.root().display()))?;
+fn hello(stream: UnixStream) -> Result<Link, String> {
     let mut reader = BufReader::new(stream.try_clone().map_err(|e| e.to_string())?);
     let mut line = String::new();
     reader.read_line(&mut line).map_err(|e| e.to_string())?;
@@ -323,9 +324,15 @@ pub fn request(home: &Home, cmd: &Value) -> Result<Option<Value>, String> {
     request_link(link, cmd).map(Some)
 }
 
-pub(super) fn open_dashboard(home: &Home) -> Result<(), String> {
-    let link = connect_at(home, &home.mork_sock())?;
-    let answer = request_link(link, &json!({"status": {}}))?;
+/// The bound dashboard port, or `None` when the operator socket has no listener.
+pub(super) fn dashboard_port(home: &Home) -> Result<Option<u16>, String> {
+    use std::io::ErrorKind::{ConnectionRefused, NotFound};
+    let stream = match UnixStream::connect(home.mork_sock()) {
+        Ok(stream) => stream,
+        Err(e) if matches!(e.kind(), NotFound | ConnectionRefused) => return Ok(None),
+        Err(e) => return Err(e.to_string()),
+    };
+    let answer = request_link(hello(stream)?, &json!({"status": {}}))?;
     let web = &answer["status"]["web"];
     if let Some(why) = web["unavailable"].as_str() {
         return Err(why.to_owned());
@@ -335,7 +342,7 @@ pub(super) fn open_dashboard(home: &Home) -> Result<(), String> {
         .and_then(|n| u16::try_from(n).ok())
         .filter(|&p| p != 0)
         .ok_or_else(|| "the running engine did not report a web port".to_owned())?;
-    launch::browser(home.root(), &mork_engine::web::key::address(port)).map_err(|e| e.to_string())
+    Ok(Some(port))
 }
 
 fn request_link(mut link: Link, cmd: &Value) -> Result<Value, String> {

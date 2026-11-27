@@ -299,18 +299,9 @@ pub fn web(home: &Home) -> i32 {
     if walled {
         return fail("mork web is refused inside a wall");
     }
-    let path = match config::path() {
-        Some(p) => p,
-        None => return fail("mork web: no config path: set MORK_CONFIG or HOME"),
-    };
-    let cfg = match config::read(&path) {
-        Ok(c) => c,
+    let port = match web_port(home) {
+        Ok(port) => port,
         Err(e) => return fail(&format!("mork web: {e}")),
-    };
-    let port = match cfg.mork.web_port {
-        None => return fail("mork web: [mork] web_port is not set in mork.toml"),
-        Some(0) => return fail("mork web: web_port = 0 uses an ephemeral port; set a fixed port"),
-        Some(p) => p,
     };
     let key_path = home.web_key();
     let key = match mork_engine::web::key::read(&key_path) {
@@ -322,4 +313,25 @@ pub fn web(home: &Home) -> i32 {
     };
     println!("{}", mork_engine::web::key::link(port, &key));
     0
+}
+
+fn web_port(home: &Home) -> Result<u16, String> {
+    if let Some(port) = ctl::dashboard_port(home)? {
+        return Ok(port);
+    }
+    match std::fs::File::open(home.app_lock()) {
+        Ok(lock) => {
+            if !mork_sys::lock_is_free(&lock).map_err(|e| e.to_string())? {
+                return Err("Mork is still starting".into());
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.to_string()),
+    }
+    let path = config::path().ok_or("no config path: set MORK_CONFIG or HOME")?;
+    match config::read(&path)?.mork.web_port {
+        None => Err("[mork] web_port is not set in mork.toml".into()),
+        Some(0) => Err("web_port = 0 uses an ephemeral port; start Mork to get its bound port".into()),
+        Some(port) => Ok(port),
+    }
 }

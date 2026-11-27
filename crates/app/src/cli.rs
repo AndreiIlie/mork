@@ -150,15 +150,29 @@ fn app(home: &Home, args: &[String], reloaded: Option<String>) -> i32 {
     };
     match runtime::run(opts) {
         Ok(code) => code,
-        Err(runtime::StartError::AlreadyRunning(why)) if open_web => match ctl::open_dashboard(home) {
-            Ok(()) => 0,
-            Err(e) => {
-                eprintln!("mork: {why}. Couldn't open the dashboard: {e}");
-                1
-            }
-        },
+        Err(runtime::StartError::AlreadyRunning(why)) if open_web => open_running_dashboard(home, &why),
         Err(runtime::StartError::AlreadyRunning(why) | runtime::StartError::Failed(why)) => {
             eprintln!("mork: {why}");
+            1
+        }
+    }
+}
+
+fn open_running_dashboard(home: &Home, why: &str) -> i32 {
+    let result = match ctl::dashboard_port(home) {
+        Ok(Some(port)) => {
+            jobs::launch::browser(home.root(), &mork_engine::web::key::address(port)).map_err(|e| e.to_string())
+        }
+        Ok(None) => {
+            eprintln!("mork: Mork is still starting");
+            return 1;
+        }
+        Err(e) => Err(e),
+    };
+    match result {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("mork: {why}. Couldn't open the dashboard: {e}");
             1
         }
     }

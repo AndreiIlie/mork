@@ -1881,6 +1881,7 @@ Each login remains writable so renewals reach the other seats.
 
 Plain `mork` starts the engine following the usual build pin and opens the dashboard in the system browser.
 If the engine is already running on this home, the command opens its dashboard and exits.
+If the engine holds the lock and its socket is not listening yet, the command prints `Mork is still starting` and exits with code 1.
 The address uses the bridge’s bound port and carries no key.
 A browser new to that address prompts you to open the link from `mork web`.
 If the bridge or dashboard files are unavailable, Mork prints the reason.
@@ -1892,9 +1893,13 @@ Send SIGTERM to stop the engine cleanly.
 
 ### mork web
 
-`mork web` reads `mork.toml` and `<home>/web.key` and prints `http://127.0.0.1:<web_port>/#key=<hex>` on stdout.
-It never contacts the engine and never creates `web.key`.
-It exits non-zero with one line on stderr when run inside a wall, when `web_port` is unset or `0`, or when `web.key` is missing or not 64 ASCII hex digits.
+`mork web` prints `http://127.0.0.1:<port>/#key=<hex>` on stdout using the existing key from `<home>/web.key`.
+While Mork is running, the command reads the dashboard’s bound port from `status`, including the port assigned for `web_port = 0`.
+If the dashboard is unavailable, the command reports the reason from `status`.
+When Mork is stopped, the command reads the fixed `web_port` from `mork.toml`.
+An unset or zero port in that file is an error while stopped.
+The command also exits non-zero with one line on stderr inside a wall, during early startup, or if the key is missing or invalid.
+The key must contain exactly 64 ASCII hex digits.
 
 ### mork test
 
