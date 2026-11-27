@@ -194,16 +194,14 @@ pub fn ran(p: &mut Poster<'_>, c: Card, purpose: &Purpose, run: FinalRun, ctx: C
     if let Err(why) = unchanged(&run, &commit, &tree) {
         return hold(p, c, purpose.clone(), AskKind::Error, &format!("its run's result is discarded: {why}"));
     }
-    let flags = test_changes(run.checks.as_ref().and_then(|r| r.report.as_ref()));
+    let report = run.checks.as_ref().and_then(|r| r.report.as_ref());
+    let flags = test_changes(report);
     let mut failures = Vec::new();
-    if let (Some(Ok(n)), Some(k)) = (&checks, run.checks.as_ref())
+    if let (Some(Ok(n)), Some(report)) = (&checks, report)
         && *n > 0
     {
-        let ours = c.pr.and_then(|n| super::approval::owner(p.state, c.project.as_str(), n));
-        let colleague = crate::reviews::gate::entry(&c) && ours.is_none();
-        if let Some(report) = &k.report {
-            failures.push(crate::reviews::checks::output(report, *n, colleague));
-        }
+        // The round selects its bar when asked, so keep the entry's complete report until then.
+        failures.push(if gate::entry(&c) { report.to_string() } else { format!("The checks found {n}:\n{report}") });
     }
     if let Some(words) = infra(c.project.as_str(), &run, ctx) {
         return hold(p, c, purpose.clone(), AskKind::Error, &words);

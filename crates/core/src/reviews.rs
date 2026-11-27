@@ -9,7 +9,7 @@ pub(crate) mod history;
 pub(crate) mod responses;
 pub mod results;
 pub mod rounds;
-// ESLint core rules whose findings are house style in a colleague's review (fac-220).
+// The standard colleague bar filters these ESLint core rules as house style.
 mod style_rules;
 mod threads;
 pub mod tickets;

@@ -5,6 +5,7 @@ use std::fmt::Write as _;
 
 use mork_types::CardId;
 use mork_types::card::Card;
+use mork_types::config::ColleagueReview;
 use mork_types::review::{Review, Round, Verdict};
 use mork_types::work::{Cloned, RebasedPrevious};
 
@@ -90,11 +91,15 @@ pub(super) fn request(
     out.push_str(&new_plan(rc, n, ours.unwrap_or(subject)));
     out.push_str(&ruled(rc, &cloned.resolved));
     if super::gate::entry(rc) {
-        out.push_str(&checks(rc, ours.is_none()));
+        let bar = match ours {
+            Some(_) => ColleagueReview::Full,
+            None => ctx.config.projects.get(&rc.project).map(|p| p.colleague_review).unwrap_or_default(),
+        };
+        out.push_str(&checks(rc, bar));
         let landing = merge_words(rc, forge, ctx);
         match ours {
             Some(ours) => out.push_str(&own_pr(rc, ours, forge, &landing)),
-            None => out.push_str(&colleague(rc, forge, &landing)),
+            None => out.push_str(&colleague(rc, forge, &landing, bar)),
         }
         out.push_str(&ours_notes(state, subject, ours, ctx));
         if let Some(r) = rc.review.as_deref() {
@@ -412,17 +417,16 @@ fn ruled(rc: &Card, resolved: &[u64]) -> String {
     out
 }
 
-// Colleagues' checks can support a topic finding without making our house rules binding.
-fn checks(rc: &Card, colleague: bool) -> String {
-    let scope = if colleague {
-        "count what remains only where it proves a finding for this round's topics"
-    } else {
-        "review its findings against the specification and the repository's AGENTS.md"
+fn checks(rc: &Card, bar: ColleagueReview) -> String {
+    let Some(saved) = rc.checks_output.as_deref().map(str::trim).filter(|o| !o.is_empty()) else {
+        return String::new();
     };
-    match rc.checks_output.as_deref().map(str::trim).filter(|o| !o.is_empty()) {
-        Some(o) => format!("\n\nThe repository's checks on the candidate failed; {scope}:\n\n```\n{o}\n```"),
-        None => String::new(),
-    }
+    let scope = match bar {
+        ColleagueReview::Standard => "count what remains only where it proves a finding for this round's topics",
+        ColleagueReview::Full => "review its findings against the specification and the repository's AGENTS.md",
+    };
+    let output = super::checks::output(saved, bar);
+    format!("\n\nThe repository's checks on the candidate failed; {scope}:\n\n```\n{output}\n```")
 }
 
 // The plan the review reads, by deliverable and in words (fac-128); the brief is in the context.
@@ -457,7 +461,7 @@ pub fn under_way(rc: &Card) -> String {
 
 // What a colleague's review card's foreman is asked besides its candidate: where its verdict and
 // findings go, what it judges, and its orchestration.
-fn colleague(card: &Card, forge: &str, landing: &str) -> String {
+fn colleague(card: &Card, forge: &str, landing: &str, bar: ColleagueReview) -> String {
     let dest = card.review.as_ref().and_then(|r| r.dest.as_deref()).unwrap_or("its base");
     let what = match card.pr {
         Some(pr) => format!(
@@ -468,8 +472,12 @@ fn colleague(card: &Card, forge: &str, landing: &str) -> String {
             card.branch.as_deref().unwrap_or_default()
         ),
     };
+    let rules = match bar {
+        ColleagueReview::Standard => "Standard colleague review. On correctness, judge whether the change does what it means to and breaks nothing. Conformance to the repository's AGENTS.md or to our own test style is no finding.",
+        ColleagueReview::Full => "Full colleague review. Use our own PR topics for the tier, including Design and simplicity when applicable. Enforce the repository's AGENTS.md, architecture and test style. Product and business decisions belong to the author and stakeholders. Report broken behavior and regressions.",
+    };
     format!(
-        "\n\n{what}\n\n{REVIEW_TIER} On correctness, judge whether the change does what it means to and breaks nothing. Conformance to the repository's AGENTS.md or to our own test style is no finding.\n\nGive each topic to a blind reviewer of its own, `mork ctl spawn {} reviewer '<task>' --topic '<topic>'` on its configured default, adding `--model <model> --effort <effort>` only to choose another from its pick list, the topic in your own words (the room list shows it beside the reviewer), its task naming that topic first. A reviewer's first pass reads the whole change against its destination. End `review-pass`, or `review-fail` with the proven findings.{}",
+        "\n\n{what}\n\n{REVIEW_TIER} {rules} Give each reviewer the colleague review bar with its task.\n\nGive each topic to a blind reviewer of its own, `mork ctl spawn {} reviewer '<task>' --topic '<topic>'` on its configured default, adding `--model <model> --effort <effort>` only to choose another from its pick list, the topic in your own words (the room list shows it beside the reviewer), its task naming that topic first. A reviewer's first pass reads the whole change against its destination. End `review-pass`, or `review-fail` with the proven findings.{}",
         card.id,
         format_args!("{}{}", tagged(forge), HANDS)
     )

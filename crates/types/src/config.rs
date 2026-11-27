@@ -175,6 +175,14 @@ pub enum MergeMode {
     Approval,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ColleagueReview {
+    #[default]
+    Standard,
+    Full,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ForgeConfig {
@@ -365,6 +373,8 @@ pub struct ProjectConfig {
     pub base: String,
     #[serde(default)]
     pub forge: ForgeConfig,
+    #[serde(default)]
+    pub colleague_review: ColleagueReview,
     pub board: BoardConfig,
     #[serde(default)]
     pub statuses: Statuses,

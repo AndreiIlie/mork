@@ -1,4 +1,4 @@
-// ESLint core rules whose findings are house style in a colleague's review (fac-220).
+// The standard colleague bar filters these ESLint core rules as house style.
 
 // ESLint 9.39.1 lib/rules/*.js meta.type: layout or suggestion, including deprecated rules.
 // https://github.com/eslint/eslint/tree/v9.39.1/lib/rules

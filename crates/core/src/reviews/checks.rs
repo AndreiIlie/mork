@@ -1,21 +1,20 @@
-// House lint and test style are outside the scope of a colleague's review (fac-220).
-
 use std::fmt::Write as _;
 
+use mork_types::config::ColleagueReview;
 use serde_json::Value;
 
 use super::style_rules;
 
-/// The report given to a round: our card's PR keeps it all; a colleague's loses house findings.
-pub fn output(report: &Value, n: usize, colleague: bool) -> String {
-    if !colleague {
-        return format!("The checks found {n}:\n{report}");
-    }
-    let mut report = report.clone();
-    let mut dropped = [0; 3];
-    let Some(findings) = report["findings"].as_array_mut() else {
-        return format!("The checks found {n}:\n{report}");
+/// Formats the saved checks report for the round's bar and passes through plain failure messages.
+pub fn output(saved: &str, bar: ColleagueReview) -> String {
+    let Ok(mut report) = serde_json::from_str::<Value>(saved) else { return saved.to_owned() };
+    let Some(findings) = report.get_mut("findings").and_then(Value::as_array_mut) else {
+        return saved.to_owned();
     };
+    if bar == ColleagueReview::Full {
+        return format!("The checks found {}:\n{saved}", findings.len());
+    }
+    let mut dropped = [0; 3];
     findings.retain(|finding| match kind(finding) {
         Some(i) => {
             dropped[i] += 1;
