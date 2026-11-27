@@ -71,7 +71,7 @@ function StartForm({ card, defaults, live, onDone }: { card: BoardRow; defaults:
       carries: full ? defaults.carries : undefined,
       delegated: level !== defaults.level && level === 1 || undefined,
       "self-sustained": level !== defaults.level && level === 2 || undefined,
-    };
+    } as const;
     press("start", { label: "Start", command: { start: command } }, onDone);
   };
   const kept = [

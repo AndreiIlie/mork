@@ -318,10 +318,14 @@ fn bounded_screen(mut s: Screen) -> Screen {
     s
 }
 
+fn wrapped_payload(value: &mut Value) -> Option<&mut Value> {
+    value.as_object_mut()?.values_mut().next()
+}
+
 fn send_event(conn: &Conn, watched: &super::Watched, place: &str, event: WatchEvent) {
     let mut frame = json!(Frame::Watch { event });
-    // Each watch event wraps exactly one payload. Only the payload's revision is excluded from its hash.
-    if let Some(view) = frame["event"].as_object_mut().and_then(|event| event.values_mut().next())
+    // The frame and its watch event each have one key. Hash the payload so revisions alone send nothing.
+    if let Some(view) = wrapped_payload(&mut frame).and_then(wrapped_payload)
         && watched.unchanged(place, view)
     {
         return;
@@ -334,8 +338,7 @@ impl Engine {
         mork_core::decide::Ctx { now: crate::clock::now_ms(), config: &self.ctx.config, faults: self.faults() }
     }
 
-    /// A place's view, its latest `tail` messages when one is given, as `core` works it out,
-    /// within its line; without `full`, only the conversation (fac-280).
+    // Conversation watches omit full place state so a message-only client stays within the line budget.
     fn view(&self, place: &str, tail: Option<u64>, full: bool) -> WatchedPlace {
         if !full {
             let v = mork_core::views::conversation::messages(&self.state, place, tail);
@@ -362,7 +365,6 @@ impl Engine {
         json!(HistoryAnswer { history: page })
     }
 
-    /// The screen but the place shown (5).
     fn screen_view(&self) -> Screen {
         let outside = self.outside(None);
         let s = mork_core::views::screen::screen(&self.state, &outside, self.ctx_now());

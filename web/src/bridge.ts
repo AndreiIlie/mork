@@ -1,4 +1,4 @@
-import type { ErrorBody, Frame, HistoryPage, PlaceView, Screen } from "./types";
+import type { ErrorBody, Frame, HistoryAnswer, HistoryPage, PlaceView, Request, Screen } from "./types";
 
 /** Where the link to the engine stands: `reconnecting` keeps the last screen it had. */
 export type Link = "connecting" | "live" | "reconnecting" | "disconnected";
@@ -133,7 +133,7 @@ function isScreen(value: unknown): value is Screen {
 function isPlaceView(value: unknown): value is PlaceView {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Partial<PlaceView>;
-  return typeof v.place === "string" && Array.isArray(v.messages) && typeof v.earlier === "number";
+  return Array.isArray(v.agents) && typeof v.place === "string" && Array.isArray(v.messages) && typeof v.earlier === "number";
 }
 
 interface Pending {
@@ -167,11 +167,13 @@ class Dial {
       this.update((s) => ({ build, link: s.screen === null ? "connecting" : "reconnecting" }));
       this.write(PROBE_ID, { status: {} });
     } else if ("event" in frame) {
-      if (isScreen(frame.event?.screen)) {
+      const event = frame.event;
+      if (typeof event !== "object" || event === null) return;
+      if ("screen" in event && isScreen(event.screen)) {
         liveDial = this;
-        this.update({ link: "live", recovering: null, screen: frame.event.screen, screenAt: Date.now() });
-      } else if (isPlaceView(frame.event?.view)) {
-        const view = frame.event.view;
+        this.update({ link: "live", recovering: null, screen: event.screen, screenAt: Date.now() });
+      } else if ("view" in event && isPlaceView(event.view)) {
+        const view = event.view;
         if (!watchedPlaces().includes(view.place)) return;
         liveDial = this;
         this.update((s) => ({ views: { ...s.views, [view.place]: view } }));
@@ -191,7 +193,7 @@ class Dial {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      if (!this.write(id, command)) this.settle(id, { code: "closed", message: "not connected" }, undefined);
+      if (!this.write(id, command)) this.settle(id, { message: "not connected" }, undefined);
     });
   }
 
@@ -228,7 +230,7 @@ class Dial {
     }, PROBE_MS);
   }
 
-  private settle(id: number, err: ErrorBody | null, ok: unknown): void {
+  private settle(id: number, err: Pick<ErrorBody, "message"> | null, ok: unknown): void {
     const p = this.pending.get(id);
     if (p === undefined) return;
     this.pending.delete(id);
@@ -238,7 +240,7 @@ class Dial {
 
   private write(id: number, cmd: unknown): boolean {
     if (this.ws.readyState !== WebSocket.OPEN) return false;
-    this.ws.send(JSON.stringify({ id, cmd }));
+    this.ws.send(JSON.stringify({ id, cmd } satisfies Request));
     return true;
   }
 }
@@ -252,7 +254,7 @@ export function requestCommand(command: unknown): Promise<unknown> {
 // A size-limited view can omit its entire tail. Read the newest page when it supplies no cursor.
 export async function readHistory(place: string, before = Number.MAX_SAFE_INTEGER, turns = false): Promise<HistoryPage> {
   const answer = await requestCommand({ history: { place, before, count: 100, turns } });
-  const page = (answer as { history?: HistoryPage } | null)?.history;
+  const page = (answer as HistoryAnswer | null)?.history;
   if (page?.place !== place || !Array.isArray(page.messages) || typeof page.earlier !== "number") {
     throw new Error("unexpected history response");
   }

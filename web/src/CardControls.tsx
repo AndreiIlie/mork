@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useHandOffers, RefusalLine } from "./offers";
-import type { CardHeader, Color } from "./types";
+import type { CardHeader, Color, Command } from "./types";
 import { Button } from "./ui/Button";
 import { Dot } from "./ui/Dot";
 import { Menu } from "./ui/Menu";
@@ -15,7 +15,9 @@ export function CardControls({ card, status, live }: { card: CardHeader; status:
   const [strip, setStrip] = useState<"brief" | "close" | null>(null);
   const [words, setWords] = useState("");
   const disabled = !live || pending[card.id] !== undefined;
-  const send = (label: string, command: unknown, done?: () => void) => press(card.id, { label, command }, done);
+  const send = (label: string, command?: Command, done?: () => void) => {
+    if (command) press(card.id, { label, command }, done);
+  };
   const has = (name: string) => !disabled && card.about.actions?.includes(name);
   const control = (name: string) => card.about.switches?.find((s) => s.name === name);
   const active = control("active");
