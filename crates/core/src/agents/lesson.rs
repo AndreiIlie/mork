@@ -5,6 +5,8 @@ use mork_types::reply::{FEEDBACK_ANSWER, MORK_FEEDBACK_ANSWER};
 use mork_types::state::Agent;
 use serde_json::Value;
 
+const MEMORY: &str = "Before answering, you may use `mork ctl memory.write <project> <name> --description <description> --text <text>` or `mork ctl memory.delete <project> <name>` on your card's project memory. Save a lesson another card can use and say how you checked it. Card decisions belong on the card. Edits are held until your card ends, or the reviewed card ends for a linked review. After that, edits apply immediately.";
+
 const QUESTION: &str = "Before you go: did you meet a bug, an issue, or have a suggestion that you haven't filed with `mork ctl notes.add`? If it is about this project, say it in `feedback`: the engine files it as a note to the project's orchestrator. If it is about Mork itself, say it in `mork_feedback`: the engine files it as a note to Mork's orchestrator, whichever project your card is on. On Mork's own card both go to Mork's notes. Say what happened and what would help. \"nothing\" in either where there is none.";
 
 const QUESTION_PROJECT_ONLY: &str = "Before you go: did you meet a bug, an issue, or have a suggestion that you haven't filed with `mork ctl notes.add`? Say it in `feedback`: the engine files it as a note to the project's orchestrator. Say what happened and what would help. \"nothing\" where there is none.";
@@ -20,11 +22,11 @@ pub(super) fn owed(a: &Agent, running: bool) -> bool {
 pub(super) fn prompt(with_mork: bool) -> String {
     if with_mork {
         format!(
-            "Your seat is ending. Nothing you answer moves the card or reaches another agent.\n\n{QUESTION}\n\nReply with one JSON object, as this turn's schema says: `{FEEDBACK_ANSWER}` and `{MORK_FEEDBACK_ANSWER}`; no hand, no messages, no outcome."
+            "Your seat is ending. Nothing you answer moves the card or reaches another agent.\n\n{MEMORY}\n\n{QUESTION}\n\nReply with one JSON object, as this turn's schema says: `{FEEDBACK_ANSWER}` and `{MORK_FEEDBACK_ANSWER}`; no hand, no messages, no outcome."
         )
     } else {
         format!(
-            "Your seat is ending. Nothing you answer moves the card or reaches another agent.\n\n{QUESTION_PROJECT_ONLY}\n\nReply with one JSON object, as this turn's schema says: `{FEEDBACK_ANSWER}`; no hand, no messages, no outcome."
+            "Your seat is ending. Nothing you answer moves the card or reaches another agent.\n\n{MEMORY}\n\n{QUESTION_PROJECT_ONLY}\n\nReply with one JSON object, as this turn's schema says: `{FEEDBACK_ANSWER}`; no hand, no messages, no outcome."
         )
     }
 }
@@ -33,11 +35,11 @@ pub(super) fn prompt(with_mork: bool) -> String {
 pub(super) fn refused(reason: &str, with_mork: bool) -> String {
     if with_mork {
         format!(
-            "Your closing reply was refused: {reason}. Reply again with your two answers, `{FEEDBACK_ANSWER}` (about this project, filed as a note to its orchestrator) and `{MORK_FEEDBACK_ANSWER}` (about Mork, filed as a note to Mork's orchestrator), each \"nothing\" where there is none, fixed."
+            "Your closing reply was refused: {reason}. {MEMORY} Reply again with your two answers, `{FEEDBACK_ANSWER}` (about this project, filed as a note to its orchestrator) and `{MORK_FEEDBACK_ANSWER}` (about Mork, filed as a note to Mork's orchestrator), each \"nothing\" where there is none, fixed."
         )
     } else {
         format!(
-            "Your closing reply was refused: {reason}. Reply again with your answer, `{FEEDBACK_ANSWER}` (about this project, filed as a note to its orchestrator), \"nothing\" where there is none, fixed."
+            "Your closing reply was refused: {reason}. {MEMORY} Reply again with your answer, `{FEEDBACK_ANSWER}` (about this project, filed as a note to its orchestrator), \"nothing\" where there is none, fixed."
         )
     }
 }

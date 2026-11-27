@@ -46,6 +46,8 @@ pub struct Card {
     pub title: String,
     pub description: String,
     pub acceptance: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub staged_memory: Vec<crate::memory::Staged>,
     pub mode: Mode,
     pub stage: Stage,
     #[serde(default, skip_serializing_if = "Option::is_none")]

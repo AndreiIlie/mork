@@ -127,7 +127,7 @@ impl Store {
             if version == 0 {
                 schema::create(&tx)?;
                 set_meta_in(&tx, "created_by", build)?;
-            } else {
+            } else if version < 56 {
                 inline_asks::migrate(&tx)?;
             }
             set_meta_in(&tx, "migrated_by", build)?;
@@ -424,6 +424,26 @@ mod tests {
         let db = dir.join("state.db");
         let store = Store::open(&db, "test").unwrap();
         assert_eq!(store.version, schema::NEWEST);
+        // A version 56 ask already points at its message. Replaying the old migration would replace that link.
+        use mork_types::ask::{Ask, AskKind, Color};
+        let mut ask = Ask::new("done".into(), "web-1", Some("web-1".into()), AskKind::Done, Color::Yellow, "Done?");
+        ask.seq = Some(7);
+        store.conn.execute("INSERT INTO messages VALUES(7, 'web-1', '{}')", []).unwrap();
+        store
+            .conn
+            .execute("INSERT INTO entities VALUES('ask', 'done', ?1)", [serde_json::to_string(&ask).unwrap()])
+            .unwrap();
+        store.conn.pragma_update(None, "user_version", 56).unwrap();
+        drop(store);
+        let store = Store::open(&db, "test").unwrap();
+        assert_eq!(store.version, schema::NEWEST);
+        let seq: u64 = store
+            .conn
+            .query_row("SELECT json_extract(data,'$.seq') FROM entities WHERE kind='ask' AND id='done'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(seq, 7);
         let future = schema::NEWEST + 1;
         store.conn.pragma_update(None, "user_version", future).unwrap();
         assert!(matches!(Store::open_read_only(&db), Err(StoreError::Version { found, .. }) if found == future));

@@ -5,8 +5,8 @@ use rusqlite::Transaction;
 /// The oldest version this build opens for writing, after the rename migrations (fac-747).
 pub const OLDEST: u32 = 55;
 
-/// The newest state version this build writes.
-pub const NEWEST: u32 = 56;
+/// Version 57 keeps pending project memory edits on their holding cards (fac-741).
+pub const NEWEST: u32 = 57;
 
 const V31: &str = "
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);

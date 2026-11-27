@@ -1,9 +1,11 @@
+use mork_types::CardId;
 use mork_types::config::Config;
-use mork_types::memory::{FileRow, GENERAL, MemoryFile, MemoryView, Tally, key};
+use mork_types::memory::{Content, Edit, FileRow, GENERAL, MemoryFile, MemoryView, Tally, key};
 use mork_types::state::Sender;
 use serde_json::{Value, json};
 
 use crate::decide::{Ctx, Decision};
+use crate::post::Poster;
 use crate::state::{Change, State};
 
 const NAME_MAX: usize = 64;
@@ -73,34 +75,9 @@ pub(super) fn read(state: &State, from: &Sender, f: &MemoryFile, now: i64) -> De
 }
 
 pub(super) fn write(state: &State, from: &Sender, w: Written<'_>, ctx: Ctx<'_>) -> Result<Decision, String> {
-    known(w.memory, ctx)?;
     checked(&w)?;
-    let old = state.memory_files.get(&key(w.memory, w.name));
-    if old.is_none() && !w.new {
-        let files = state.memory_files.values().filter(|f| f.memory == w.memory);
-        if let Some(f) = super::similar::close_file(files, w.name, w.description) {
-            return Err(format!(
-                "close to existing file `{}` in memory `{}`: read it and rewrite it under its name, or write again with `--new`",
-                f.name, f.memory
-            ));
-        }
-    }
-    let f = MemoryFile {
-        memory: w.memory.into(),
-        name: w.name.into(),
-        description: w.description.trim().into(),
-        text: w.text.into(),
-        writer: from.label(),
-        origin: old.map_or_else(|| from.label(), |o| o.origin.clone()),
-        written_ms: ctx.now,
-        reads: old.map_or(0, |o| o.reads),
-        last_read_ms: old.and_then(|o| o.last_read_ms),
-    };
-    let mut d = Decision::ok(json!({"memory.write": {"memory": f.memory, "name": f.name, "rewrote": old.is_some()}}));
-    d.journal("memory.write", None, json!({"memory": f.memory, "name": f.name, "by": f.writer}));
-    d.changes.push(Change::PutMemoryFile(Box::new(f)));
-    d.changes.push(tallied(state, w.memory, |t| t.written += 1));
-    Ok(d)
+    let after = Some(Content { description: w.description.trim().into(), text: w.text.into() });
+    super::staged::change(state, from, w.memory, Edit { name: w.name.into(), after }, w.new, ctx)
 }
 
 fn checked(w: &Written<'_>) -> Result<(), String> {
@@ -118,12 +95,61 @@ fn checked(w: &Written<'_>) -> Result<(), String> {
     Ok(())
 }
 
-pub(super) fn delete(state: &State, f: &MemoryFile) -> Decision {
-    let mut d = Decision::ok(json!({"memory.delete": {"memory": f.memory, "name": f.name}}));
-    d.journal("memory.delete", None, json!({"memory": f.memory, "name": f.name, "why": "deleted"}));
-    d.changes.push(Change::RemoveMemoryFile { key: f.key() });
-    d.changes.push(tallied(state, &f.memory, |t| t.deleted += 1));
-    d
+// A card can commit several edits in one decision. Its later diffs and counters include the earlier ones.
+fn current_file<'a>(p: &'a Poster<'_>, memory: &str, name: &str) -> Option<&'a MemoryFile> {
+    let key = key(memory, name);
+    for change in p.other.iter().rev() {
+        match change {
+            Change::PutMemoryFile(f) if f.memory == memory && f.name == name => return Some(f),
+            Change::RemoveMemoryFile { key: k } if *k == key => return None,
+            _ => {}
+        }
+    }
+    p.state.memory_files.get(&key)
+}
+
+fn current_tally(p: &Poster<'_>, memory: &str) -> Tally {
+    p.other
+        .iter()
+        .rev()
+        .find_map(|change| match change {
+            Change::PutMemoryTally(t) if t.memory == memory => Some(t.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| tally_of(p.state, memory))
+}
+
+pub(super) fn apply(p: &mut Poster<'_>, memory: &str, edit: &Edit, by: &str, card: Option<&CardId>) -> bool {
+    let old = current_file(p, memory, &edit.name);
+    let before = old.map(|f| Content { description: f.description.clone(), text: f.text.clone() });
+    let mut data = json!({"memory": memory, "name": edit.name, "by": by, "before": before, "after": edit.after});
+    let mut tally = current_tally(p, memory);
+    let (kind, change) = if let Some(content) = &edit.after {
+        let f = MemoryFile {
+            memory: memory.into(),
+            name: edit.name.clone(),
+            description: content.description.clone(),
+            text: content.text.clone(),
+            writer: by.into(),
+            origin: old.map_or(by, |f| &f.origin).into(),
+            written_ms: p.now,
+            reads: old.map_or(0, |f| f.reads),
+            last_read_ms: old.and_then(|f| f.last_read_ms),
+        };
+        tally.written += 1;
+        ("memory.write", Change::PutMemoryFile(Box::new(f)))
+    } else if let Some(f) = old {
+        data["why"] = json!("deleted");
+        tally.deleted += 1;
+        ("memory.delete", Change::RemoveMemoryFile { key: f.key() })
+    } else {
+        return false;
+    };
+    p.other.push(change);
+    p.other.push(Change::PutMemoryTally(tally));
+    p.journal(kind, card.map(CardId::as_str), data);
+    super::staged::mark(p, memory, &edit.name);
+    true
 }
 
 // `memory.stats`: each memory's counts and files, or `only`'s.

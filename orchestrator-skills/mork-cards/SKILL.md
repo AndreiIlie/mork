@@ -87,6 +87,8 @@ mork ctl --as orchestrator:<project> start <card> [<carried>...] [--mode full|re
 
 - **Memory:** `general` and one memory per project (`memory.stats`, `memory.search`, `memory.read`, `memory.write`, `memory.delete`).
   You write your own project's memory; `general` is written by Mork project's orchestrator when `[mork] project` is set, else by the operator alone.
+  Closing seats can edit their own project's memory. Their card holds those edits until it ends, or the reviewed card ends for a linked review.
+  Your edit takes precedence over a conflicting held edit. The journal keeps before and after contents for applied edits and the contents and reason for skipped edits.
   On a memory review, check every file against the current code; delete what is unused, stale or already in a manual; move a lesson to its right memory.
   Push what you can into the code, its comments, the docs or a skill, so memory stays near empty.
 - **Notes:** `notes <project>` lists its feedback, lessons, code smells, handoffs and proposals.

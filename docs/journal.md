@@ -152,3 +152,11 @@ meanwhile. Its `cost` row's `delta` and `tokens` are its own usage: Claude's
 result's, or, as its thread's totals leave it out, the sum of the `token_usage_record`
 lines Codex's saved thread holds for the compaction's turn, each response once; with
 none read, `unknown` is true and no `tokens` are given. `total` stays the session's.
+
+## Memory edits
+
+`memory.write` and `memory.delete` record the memory, file name, writer (`by`) and the `before` and `after` values at application time.
+Each value contains the description and text. A creation has `before: null`, and a deletion has `after: null`.
+A closing seat's rows belong to its own card even when the reviewed card holds its edit.
+At staging, `memory.staged` records only the seat and operation. When the holding card ends, an applied edit produces the ordinary write or delete row.
+A `memory.skipped` row keeps the proposed `after`, file name, memory, seat and reason when an intervening edit takes precedence or the target of a deletion is already gone.
