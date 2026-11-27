@@ -17,6 +17,9 @@ impl Engine {
     /// A command `core` decides, an agent's `say` images replaced first with copies in its calling job's `published/`,
     /// removed again when it is refused.
     pub(super) fn decided(&mut self, mut cmd: Command, from: Sender, job: Option<&JobId>) -> Result<Value, ErrorBody> {
+        if let Command::MessageSendNow { place, seq } = &cmd {
+            self.refresh_recipient(place, *seq);
+        }
         let copies = self.say_copies(&mut cmd, &from, job)?;
         let answer = self.apply(&Event::Command { from, cmd }).answer.unwrap_or_else(|| Ok(json!({})));
         if answer.is_err() {

@@ -63,6 +63,8 @@ pub struct State {
 /// The parts of the world `core` decides on that the engine reads again after a restart.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct World {
+    /// Read acknowledgements from running job streams, reconstructed when their output is replayed.
+    pub live_reads: BTreeMap<JobId, Vec<u64>>,
     /// The token is the operator's own account, or Bitbucket refuses it (3.7.2, 4.11.5): why. Stored
     /// (M3.2), unlike the rest of the world.
     pub token_refused: BTreeMap<mork_types::ProjectId, String>,
@@ -159,6 +161,9 @@ impl State {
                 self.places.insert(p.id.clone(), p.clone());
             }
             Change::PutJob(j) => {
+                if j.settled.is_some() {
+                    self.world.live_reads.remove(&j.id);
+                }
                 self.jobs.insert(j.id.clone(), (**j).clone());
             }
             Change::AddMessage(m) => {

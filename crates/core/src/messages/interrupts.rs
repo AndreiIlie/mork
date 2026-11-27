@@ -1,13 +1,34 @@
 //! Send now (fac-78): a message cuts its recipient's running turn, and once that turn has settled
 //! its session continues with the message. The card and its other agents run on.
 
-use mork_types::AgentKey;
-use mork_types::state::{Agent, AgentStatus, Job, Owed, Settlement};
+use mork_types::state::{Agent, AgentStatus, Job, Owed, Sender, Settlement};
+use mork_types::{AgentKey, Command};
 use serde_json::json;
 
-use crate::decide::Intent;
+use super::receipts;
+use crate::decide::{Ctx, Decision, Intent, buzz};
 use crate::post::Poster;
 use crate::state::{Change, State};
+
+pub(super) fn posted(state: &State, from: &Sender, cmd: &Command, place: &str, seq: u64, ctx: Ctx<'_>) -> Decision {
+    let seats = receipts::recipients(state, place);
+    let target = receipts::message(state, place, seq).and_then(|m| receipts::addressed(&seats, m));
+    let Some(target) = target else { return Decision::refused("the message has no recipient seat here") };
+    let key = &target.agent.key;
+    if let Some(e) = buzz::stopping(state, from, Some(key), true) {
+        return buzz::buzzed(from, cmd, e);
+    }
+    match target.receipt.pending(seq) {
+        None => return Decision::refused("the recipient has already read this message"),
+        Some(false) => return Decision::refused("the recipient has no running turn to interrupt"),
+        Some(true) => {}
+    }
+    let mut p = Poster::for_ctx(state, ctx);
+    cut(&mut p, key);
+    let mut d = Decision::ok(json!({"message.send-now": {"seq": seq, "to": key}}));
+    p.finish(&mut d);
+    d
+}
 
 // What the turn after an interrupted one starts with.
 const INTERRUPT_NOTE: &str = "Your previous turn was interrupted by a new message before it finished: what it ran and edited stands, its reply was dropped, and its news are given again below. Before redoing anything outward, check whether it already happened.";

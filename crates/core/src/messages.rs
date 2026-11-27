@@ -8,6 +8,7 @@ pub mod delegate;
 pub mod images;
 pub mod interrupts;
 pub mod places;
+pub mod receipts;
 pub mod replies;
 pub mod requests;
 pub mod routes;
@@ -28,6 +29,8 @@ use crate::state::{Change, State};
 pub fn command(state: &State, from: &Sender, cmd: &Command, ctx: Ctx<'_>) -> Decision {
     if matches!(cmd, Command::Say { .. }) {
         say::say(state, from, cmd, ctx)
+    } else if let Command::MessageSendNow { place, seq } = cmd {
+        interrupts::posted(state, from, cmd, place, *seq, ctx)
     } else if let Command::Ack { ask } = cmd {
         asks::ack(state, ask, ctx)
     } else if let Command::Auto { project, off } = cmd {

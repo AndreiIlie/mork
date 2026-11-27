@@ -282,3 +282,57 @@ fn report_restart_is_available_when_a_formerly_carried_card_is_running() {
     s.operator(json!({"start": {"card": CARD, "mode": "report"}})).unwrap();
     assert!(s.card(CARD).carries.is_empty());
 }
+
+fn post_for_foreman(s: &mut Sim, text: &str) -> u64 {
+    s.operator(json!({"say": {"place": CARD, "text": text}})).expect("post")["say"]["seq"].as_u64().expect("seq")
+}
+
+fn pending(s: &Sim, seq: u64) -> Option<bool> {
+    let page = mork_core::views::conversation::history(&s.state, CARD, u64::MAX, 100);
+    page.messages.iter().find(|m| m.seq == seq).expect("posted message").pending
+}
+
+#[test]
+fn unread_post_interrupts_once_and_continues_with_the_original_messages() {
+    use mork_core::decide::{Event, JobEnd};
+    use mork_types::protocol::ErrorCode;
+
+    let mut s = start_no_planner();
+    let before = post_for_foreman(&mut s, "Before turn start.");
+    assert_eq!(pending(&s, before), Some(false));
+    let job = s.turn_started(FOREMAN);
+    assert_eq!(pending(&s, before), None);
+    let first = post_for_foreman(&mut s, "First pending message.");
+    let second = post_for_foreman(&mut s, "Second pending message.");
+    assert_eq!(pending(&s, first), Some(true));
+    let cmd = json!({"message.send-now": {"place": CARD, "seq": first}});
+    let sibling = Sender::Agent("web-1/researcher-1".into());
+    assert_eq!(s.cmd(sibling, cmd.clone()).expect_err("unauthorized").code, ErrorCode::Buzz);
+    let count = s.state.messages.len();
+    s.operator(cmd.clone()).expect("interrupt");
+    assert!(s.state.jobs[&job].interrupted);
+    assert!(s.operator(cmd).is_err(), "a stopping turn cannot be cut twice");
+    assert_eq!(s.state.messages.len(), count);
+    s.apply(Event::JobEnded { id: job, end: JobEnd::Stopped });
+    let (_, prompt) = s.turn_started_with_argv(FOREMAN, &["x"]);
+    assert!(prompt.contains("First pending message.") && prompt.contains("Second pending message."));
+    assert_eq!((pending(&s, first), pending(&s, second)), (None, None));
+}
+
+#[test]
+fn a_delivered_message_stays_unread_until_the_recipient_acknowledges_it() {
+    use mork_core::decide::{Event, JobEnd, SessionSeen};
+
+    let mut s = start_no_planner();
+    let job = s.turn_started(FOREMAN);
+    let seq = post_for_foreman(&mut s, "Delivered during the turn.");
+    s.state.jobs.get_mut(&job).expect("running turn").delivered.push(seq);
+    assert_eq!(pending(&s, seq), Some(true));
+    s.state.world.live_reads.insert(job.clone(), vec![seq]);
+    assert_eq!(pending(&s, seq), None);
+    assert!(s.operator(json!({"message.send-now": {"place": CARD, "seq": seq}})).is_err());
+    assert!(!s.state.jobs[&job].stop_requested);
+    let session = SessionSeen { started: true, taken: vec![seq], ..Default::default() };
+    s.apply(Event::JobEnded { id: job, end: JobEnd::Finished { reply: Ok(reply("working", "Read")), session } });
+    assert_eq!(pending(&s, seq), None);
+}

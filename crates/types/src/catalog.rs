@@ -117,6 +117,7 @@ pub const CATALOG: &[CommandSpec] = &[
             opt("choice", U64),
         ],
     ),
+    cmd("message.send-now", Messages, &[req("place", Str), req("seq", U64)]),
     cmd("dm", Agents, &[req("card", Str), req("role", Str)]),
     cmd(
         "spawn",

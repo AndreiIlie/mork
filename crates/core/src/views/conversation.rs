@@ -12,6 +12,7 @@ use mork_types::state::{Message, Sender};
 use mork_types::view::{Author, HistoryPage, ImageView, Line, MessageView};
 use mork_types::{AgentKey, PlaceId};
 
+use crate::messages::receipts::{self, Recipient};
 use crate::state::State;
 
 /// The largest message page a conversation view publishes.
@@ -19,7 +20,8 @@ pub const MESSAGES_MAX: usize = 5000;
 
 /// A place's conversation alone, as `place` shows it (fac-280): nothing of its card, agents or work.
 pub fn messages(state: &State, place: &str, tail: Option<u64>) -> MessagesView {
-    let (messages, earlier, pinned) = conversation(state, place, tail);
+    let seats = receipts::recipients(state, place);
+    let (messages, earlier, pinned) = conversation(state, place, tail, &seats);
     MessagesView { place: PlaceId::new(place), revision: state.revision, messages, earlier, pinned }
 }
 
@@ -29,9 +31,10 @@ pub fn history(state: &State, place: &str, before: u64, count: u64) -> HistoryPa
     let all: Vec<&Message> = state.messages_in(place).collect();
     let open = ask_links(state);
     let rf = review_foreman(state, place);
+    let seats = receipts::recipients(state, place);
     let end = all.iter().position(|m| m.seq >= before).unwrap_or(all.len());
     let start = end.saturating_sub(usize::try_from(count).unwrap_or(usize::MAX));
-    let messages = all[start..end].iter().map(|m| shown(m, &open, rf.as_ref())).collect();
+    let messages = all[start..end].iter().map(|m| shown(m, &open, rf.as_ref(), &seats)).collect();
     HistoryPage { place: PlaceId::new(place), messages, earlier: start, turns: Vec::new() }
 }
 
@@ -41,15 +44,19 @@ pub(super) fn conversation(
     state: &State,
     place: &str,
     tail: Option<u64>,
+    seats: &[Recipient],
 ) -> (Vec<MessageView>, usize, Vec<MessageView>) {
     let all: Vec<&Message> = state.messages_in(place).collect();
     let open = ask_links(state);
     let tail = tail.map_or(MESSAGES_MAX, |t| usize::try_from(t).unwrap_or(usize::MAX).min(MESSAGES_MAX));
     let earlier = all.len().saturating_sub(tail);
     let rf = review_foreman(state, place);
-    let pinned =
-        all[..earlier].iter().filter(|m| open.contains_key(&m.seq)).map(|m| shown(m, &open, rf.as_ref())).collect();
-    (all[earlier..].iter().map(|m| shown(m, &open, rf.as_ref())).collect(), earlier, pinned)
+    let pinned = all[..earlier]
+        .iter()
+        .filter(|m| open.contains_key(&m.seq))
+        .map(|m| shown(m, &open, rf.as_ref(), seats))
+        .collect();
+    (all[earlier..].iter().map(|m| shown(m, &open, rf.as_ref(), seats)).collect(), earlier, pinned)
 }
 
 // A review card's foreman reads `review foreman` in its lines, as on the rail (fac-691).
@@ -58,8 +65,17 @@ fn review_foreman(state: &State, place: &str) -> Option<AgentKey> {
     (state.cards.get(&card)?.mode == Mode::Review).then(|| AgentKey::new(format!("{card}/foreman")))
 }
 
-fn shown(m: &Message, open: &BTreeMap<u64, &mork_types::AskId>, review_foreman: Option<&AgentKey>) -> MessageView {
+fn shown(
+    m: &Message,
+    open: &BTreeMap<u64, &mork_types::AskId>,
+    review_foreman: Option<&AgentKey>,
+    seats: &[Recipient],
+) -> MessageView {
     let mut v = MessageView { open_ask: open.get(&m.seq).copied().cloned(), ..message(m) };
+    if let Some(target) = receipts::addressed(seats, m) {
+        v.recipient = Some(target.agent.key.clone());
+        v.pending = target.receipt.pending(m.seq);
+    }
     if let (Sender::Agent(k), Author::Agent { label, .. }) = (&m.from, &mut v.from)
         && Some(k) == review_foreman
     {
@@ -90,6 +106,8 @@ pub(super) fn message(m: &Message) -> MessageView {
         }
     };
     MessageView {
+        recipient: None,
+        pending: None,
         seq: m.seq,
         time_ms: m.time,
         from,

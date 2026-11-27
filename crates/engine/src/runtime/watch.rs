@@ -59,6 +59,12 @@ impl Engine {
         })
     }
 
+    pub(super) fn refresh_recipient(&mut self, place: &str, seq: u64) {
+        if let Some(id) = mork_core::messages::receipts::running_recipient(&self.state, place, seq) {
+            self.watch_one(&id);
+        }
+    }
+
     fn watch_one(&mut self, id: &JobId) {
         let dir = self.job_dir(id);
         let launching = self.state.jobs.get(id).is_some_and(|j| j.status == JobStatus::Launching);
@@ -165,6 +171,12 @@ impl Engine {
             (&old.steps, &old.doing, &old.context, &old.turn, &old.list)
                 != (&seen.steps, &seen.doing, &seen.context, &seen.turn, &seen.list)
         });
+        let read: Vec<_> = seen.turn.iter().flat_map(|t| t.read.iter().map(|r| r.seq)).collect();
+        if read.is_empty() {
+            self.state.world.live_reads.remove(id);
+        } else {
+            self.state.world.live_reads.insert(id.clone(), read);
+        }
         self.seen.insert(owner, seen);
         // A step shows on the next of the tick's publishes, a few a second at most (1.5).
         if moved {

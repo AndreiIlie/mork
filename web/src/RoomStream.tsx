@@ -1,11 +1,12 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AskLabel, InlineAsk, keepLines } from "./InlineAsk";
 import { Markdown } from "./Markdown";
 import { ActivityTracker, EndedTurnRow } from "./Turns";
-import { fetchImage, readHistory } from "./bridge";
+import { fetchImage, readHistory, sendCommand } from "./bridge";
 import { authorName, clockTime, plural } from "./format";
 import type { ChatTurn, HandView, ImageView, MessageView, PlaceView, ReplyHand, TriageView } from "./types";
 import { useRetainedStream } from "./streamHistory";
+import { Button } from "./ui/Button";
 import { Dot } from "./ui/Dot";
 import { PinnedScroll } from "./ui/PinnedScroll";
 
@@ -39,6 +40,7 @@ function collapseRepeats(entries: StreamEntry[]): StreamEntry[] {
       last !== undefined &&
       last.kind === "message" &&
       last.m.kind === "marker" &&
+      e.m.pending === undefined && last.m.pending === undefined &&
       e.m.headline.trim() !== "" &&
       last.m.to === e.m.to &&
       last.m.headline === e.m.headline
@@ -127,6 +129,7 @@ function FoldedRow({
   preview,
   body,
   expandable,
+  delivery,
   m,
   tzOffsetMin,
 }: {
@@ -134,6 +137,7 @@ function FoldedRow({
   preview: string;
   body: string;
   expandable: boolean;
+  delivery: ReactNode;
   m: MessageView;
   tzOffsetMin: number;
 }) {
@@ -148,18 +152,21 @@ function FoldedRow({
   );
   return (
     <div className="py-2">
-      {expandable ? (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex w-full cursor-pointer items-center gap-3 text-left text-label-12 text-gray-700 hover:text-gray-900"
-        >
-          {line}
-        </button>
-      ) : (
-        <div className="flex items-center gap-3 text-label-12 text-gray-700">{line}</div>
-      )}
+      <div className="flex items-center gap-3">
+        {expandable ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left text-label-12 text-gray-700 hover:text-gray-900"
+          >
+            {line}
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-3 text-label-12 text-gray-700">{line}</div>
+        )}
+        {delivery}
+      </div>
       {open && (
         <div className="mt-2 border-l border-gray-400 pl-3">
           {body !== "" && <Markdown text={body} className="text-gray-900" />}
@@ -170,7 +177,28 @@ function FoldedRow({
   );
 }
 
+function MessageDelivery({ m, place, live }: { m: MessageView; place: string; live: boolean }) {
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const interrupt = () => {
+    setSending(true);
+    setError(null);
+    sendCommand({ "message.send-now": { place, seq: m.seq } })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setSending(false));
+  };
+  return (
+    <>
+      {m.pending !== undefined && <span className="text-label-12 text-gray-900">Unread</span>}
+      {m.pending && <Button tier="secondary" size="sm" disabled={!live || sending} onClick={interrupt}
+        title="Interrupt the running turn to read pending messages">Send now</Button>}
+      {error && <span role="alert" className="text-copy-13 text-red-900">{error}</span>}
+    </>
+  );
+}
+
 interface MessageRowProps {
+  place: string;
   m: MessageView;
   reviewForeman?: string;
   tzOffsetMin: number;
@@ -181,12 +209,14 @@ interface MessageRowProps {
   run?: MessageView[];
 }
 
-function MessageRow({ m, reviewForeman, tzOffsetMin, nowMs, live, hand, triage, run }: MessageRowProps) {
+function MessageRow({ m, place, reviewForeman, tzOffsetMin, nowMs, live, hand, triage, run }: MessageRowProps) {
   const recipient = reviewForeman && (m.to === "foreman" || m.to === reviewForeman) ? "review foreman" : m.to;
+  const delivery = <MessageDelivery m={m} place={place} live={live} />;
   const times = run?.length ?? 1;
   if (m.kind === "marker") {
     return (
       <FoldedRow
+        delivery={delivery}
         label={m.to !== null ? `engine → ${recipient}` : "engine"}
         preview={times > 1 ? `${firstLine(m.headline)} ×${times}` : firstLine(m.headline)}
         body={
@@ -205,6 +235,7 @@ function MessageRow({ m, reviewForeman, tzOffsetMin, nowMs, live, hand, triage, 
   if (m.kind === "agent" && m.hand === null && m.to !== null && m.to !== "operator") {
     return (
       <FoldedRow
+        delivery={delivery}
         label={`${authorName(m.from)} → ${recipient}`}
         preview={firstLine(m.headline !== "" ? m.headline : m.text)}
         body={m.text !== "" ? m.text : m.headline}
@@ -237,6 +268,7 @@ function MessageRow({ m, reviewForeman, tzOffsetMin, nowMs, live, hand, triage, 
       )}
       {hand !== undefined && <AskLabel hand={hand} nowMs={nowMs} />}
       <span className="font-mono text-label-12 tabular-nums text-gray-700">{clockTime(m.time_ms, tzOffsetMin)}</span>
+      {delivery}
     </div>
   );
   if (operator) {
@@ -339,7 +371,7 @@ export const RoomStream = memo(function RoomStream({ view, tzOffsetMin, nowMs, l
   const loaded = new Set(messages.map((m) => m.seq));
   const pinned = (view.pinned ?? []).filter((m) => bySeq.has(m.seq) && !loaded.has(m.seq));
   const row = (m: MessageView, run?: MessageView[]) => (
-    <MessageRow reviewForeman={reviewForeman} key={m.seq} m={m} run={run} tzOffsetMin={tzOffsetMin} nowMs={nowMs}
+    <MessageRow place={view.place} reviewForeman={reviewForeman} key={m.seq} m={m} run={run} tzOffsetMin={tzOffsetMin} nowMs={nowMs}
       hand={bySeq.get(m.seq)} triage={triage} live={live} />
   );
 

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { ChatTurn, HistoryPage, MessageView, PlaceView } from "./types";
 
 interface RetainedStream {
@@ -55,5 +55,17 @@ export function useRetainedStream(view: PlaceView) {
     setStream((prev) => prev.messages[0]?.seq === firstSeq ? prependHistory(prev, page) : prev);
   }, [firstSeq]);
 
-  return { ...stream, firstSeq, prepend };
+  // A loaded row outside the live tail can be read or returned to news while it stays onscreen.
+  const messages = useMemo(() => {
+    const tail = view.messages[0]?.seq ?? Infinity;
+    if (stream.messages.length === 0 || stream.messages[0].seq >= tail) return stream.messages;
+    const receipts = new Map(view.receipts?.map(r => [r.recipient, { ...r, taken: new Set(r.taken) }]));
+    return stream.messages.map(m => {
+      if (m.seq >= tail || m.recipient === undefined) return m;
+      const r = receipts.get(m.recipient);
+      const pending = r && m.seq >= r.seen && !r.taken.has(m.seq) ? r.interruptible : undefined;
+      return pending === m.pending ? m : { ...m, pending };
+    });
+  }, [stream.messages, view]);
+  return { ...stream, messages, firstSeq, prepend };
 }

@@ -147,6 +147,8 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         choice: Option<u32>,
     },
+    #[serde(rename = "message.send-now")]
+    MessageSendNow { place: crate::PlaceId, seq: u64 },
     #[serde(rename = "dm")]
     Dm { card: CardId, role: Role },
     /// A foreman's child, given its first task and chosen model and effort.

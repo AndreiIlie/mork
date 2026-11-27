@@ -278,6 +278,8 @@ pub struct LiveMarks {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlaceView {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub receipts: Vec<crate::chat::SeatReceipt>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub decisions: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<crate::about::StartDefaults>,
