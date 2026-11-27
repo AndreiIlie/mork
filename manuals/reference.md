@@ -575,7 +575,8 @@ Example: `mork ctl say ex-550/researcher-1/dm --kind request Where is the empty 
 
 Interrupts the recipient of an unread message so its session continues with the pending messages already posted.
 
-Give the original message’s `place` and `seq`. The operator, an orchestrator, or the recipient’s parent seat may interrupt it.
+Give the original message’s `place` and `seq`.
+The operator, an orchestrator, or the recipient’s parent seat may interrupt it.
 The command checks the recipient’s latest read receipt and refuses if the message has been read or the turn can no longer be interrupted.
 It returns `{"message.send-now": {"seq", "to"}}` and keeps the original message in the conversation.
 

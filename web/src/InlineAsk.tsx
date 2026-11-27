@@ -1,3 +1,4 @@
+import { Button } from "./ui/Button";
 import { useState } from "react";
 import { Markdown } from "./Markdown";
 import { TriagePanel } from "./Triage";
@@ -52,17 +53,18 @@ export function InlineAsk({ hand, triage, live }: { hand: HandView; triage?: Tri
       {options.length > 0 && (
         <div className="my-3 flex flex-col gap-2">
           {options.map((o) => (
-            <button
-              key={o.n}
-              type="button"
-              disabled={!live || answering !== null || busy !== null}
-              onClick={() => choose(o.n)}
-              className={`flex min-h-control cursor-pointer items-baseline gap-3 border px-3 py-[3px] text-left text-label-14 text-gray-1000 transition-colors hover:border-gray-900 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ${
-                o.n === pick ? "border-gray-700 bg-gray-200" : "border-gray-400 bg-background-100"
-              }`}
-            >
-              <span className="font-mono text-label-13 tabular-nums">{o.n}</span>
-              <span className="min-w-0 flex-1">
+            <label key={o.n} className="flex w-fit max-w-full cursor-pointer items-start gap-3 text-label-14 text-gray-1000">
+              <Button
+                tier="secondary"
+                square
+                size="sm"
+                aria-label={`Choose ${o.n}. ${o.text}`}
+                disabled={!live || answering !== null || busy !== null}
+                onClick={() => choose(o.n)}
+              >
+                {o.n}
+              </Button>
+              <span className="min-w-0 flex-1 py-1">
                 {o.text}
                 {o.n === pick && (
                   <span className="mt-0.5 block text-label-13 text-gray-900">
@@ -70,7 +72,7 @@ export function InlineAsk({ hand, triage, live }: { hand: HandView; triage?: Tri
                   </span>
                 )}
               </span>
-            </button>
+            </label>
           ))}
         </div>
       )}

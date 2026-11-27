@@ -283,10 +283,14 @@ fn report_restart_is_available_when_a_formerly_carried_card_is_running() {
     assert!(s.card(CARD).carries.is_empty());
 }
 
+// why: the fixture requires a successful post with a sequence number.
+#[allow(clippy::expect_used)]
 fn post_for_foreman(s: &mut Sim, text: &str) -> u64 {
     s.operator(json!({"say": {"place": CARD, "text": text}})).expect("post")["say"]["seq"].as_u64().expect("seq")
 }
 
+// why: a missing posted message would make the receipt assertion meaningless.
+#[allow(clippy::expect_used)]
 fn pending(s: &Sim, seq: u64) -> Option<bool> {
     let page = mork_core::views::conversation::history(&s.state, CARD, u64::MAX, 100);
     page.messages.iter().find(|m| m.seq == seq).expect("posted message").pending
