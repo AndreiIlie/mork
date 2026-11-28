@@ -221,11 +221,15 @@ fn price_exploration_and_partner_history_change_the_winning_model() {
     assert_eq!(with_solo.outcomes[&quality][&arm(SOL)].global.sum, 9.0);
     assert_eq!(with_solo.partners.len(), 4);
     assert_eq!(partnered.partners, with_solo.partners);
-    stats.partners = with_solo.partners;
-    let paired = choose(&stats, &Request { partner: Some(OPUS), ..req });
-    assert_eq!(paired.candidates[0].synergy, -0.0625);
-    assert_eq!(paired.candidates[1].synergy, 0.0625);
-    assert_eq!(paired.best().unwrap().offer.model, expensive);
+    let with_opus = Request { partner: Some(OPUS), ..req };
+    for history in [&partnered, &with_solo] {
+        let routed = choose(history, &with_opus);
+        assert_eq!(routed.candidates[0].synergy, -0.0625);
+        assert_eq!(routed.candidates[1].synergy, 0.0625);
+    }
+
+    stats.partners = partnered.partners;
+    assert_eq!(choose(&stats, &with_opus).best().unwrap().offer.model, expensive);
 }
 
 #[test]
