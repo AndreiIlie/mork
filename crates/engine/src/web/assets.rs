@@ -49,7 +49,8 @@ pub fn open_asset(root: &Path, url_path: &str) -> Option<(File, &'static str)> {
         return Some((file, content_type(&rel)));
     }
     // Dots in a card id or project name are part of the route even when they look like file extensions.
-    let route = rel.extension().is_none() || matches!(rel.parent().and_then(Path::to_str), Some("cards" | "projects"));
+    let route = rel.extension().is_none()
+        || matches!(rel.parent().and_then(Path::to_str), Some("cards" | "projects" | "settings/projects"));
     if rel != Path::new("index.html") && route {
         let index = Path::new("index.html");
         return open_regular(root, index).map(|file| (file, content_type(index)));
@@ -111,6 +112,7 @@ mod tests {
         assert_eq!(read_body("/cards/ex-583.1"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
         assert_eq!(read_body("/cards/pr-example.com-123"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
         assert_eq!(read_body("/projects/homefile.ro"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
+        assert_eq!(read_body("/settings/projects/homefile.ro"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
         assert_eq!(read_body("/projects/a/b.js"), None);
         assert_eq!(read_body("/cards/a/b.js"), None);
         assert_eq!(read_body("/assets/missing.js"), None);

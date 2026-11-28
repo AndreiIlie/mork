@@ -5,7 +5,8 @@ import { ReloadChangelog } from "./ReloadChangelog";
 import { Usage } from "./Usage";
 import { Quality } from "./Quality";
 import type { AlertPermission } from "./alerts";
-import { RefusalLine, useHandOffers } from "./offers";
+import type { Reload } from "./reload";
+import { RefusalLine } from "./offers";
 import { SETTINGS_PATH, type SettingsTab, navigate } from "./route";
 import type { PlaceView, RecentBurn, Screen } from "./types";
 import { Button } from "./ui/Button";
@@ -35,16 +36,14 @@ function General({ alerts, resourcesOn, setResourcesOn }: { alerts: AlertPermiss
   );
 }
 
-function Updates({ screen, build, view, live }: { screen: Screen; build: string | null; view?: PlaceView; live: boolean }) {
+function Updates({ screen, build, view, live, reload }: { screen: Screen; build: string | null; view?: PlaceView; live: boolean; reload: Reload }) {
   const pin = screen.top.pin;
-  const { pending, refusals, press } = useHandOffers();
-  const busy = pending.reload !== undefined || screen.top.phase.is === "reloading";
   return (
     <>
       <List>
         <Row actions={
           <Button tier={pin.ready ? "primary" : "secondary"} size="sm" title="Reload Mork to its pinned build"
-            disabled={!live || busy} onClick={() => press("reload", { label: "Reload", command: { reload: {} } })}>
+            disabled={!live || reload.busy} onClick={() => reload.press("updates")}>
             Reload
           </Button>
         }>
@@ -59,13 +58,14 @@ function Updates({ screen, build, view, live }: { screen: Screen; build: string 
           </div>
         </Row>
       </List>
-      <RefusalLine refusal={refusals.reload ?? null} className="mt-2" />
+      <RefusalLine refusal={reload.refusal("updates")} className="mt-2" />
       <ReloadChangelog view={view} live={live} tzOffsetMin={screen.tz_offset_min} />
     </>
   );
 }
 
-export function Settings({ tab, returnPath, screen, burn, burnError, build, mainView, nowMs, live, alerts, resourcesOn, setResourcesOn }: {
+export function Settings({ reload, tab, returnPath, screen, burn, burnError, build, mainView, nowMs, live, alerts, resourcesOn, setResourcesOn }: {
+  reload: Reload;
   tab: SettingsTab;
   returnPath: string;
   screen: Screen;
@@ -104,7 +104,7 @@ export function Settings({ tab, returnPath, screen, burn, burnError, build, main
         {(tab === "projects" || tab === "seats" || tab === "system") && <ConfigTabs tab={tab} screen={screen} live={live} />}
         {tab === "usage" && <Usage screen={screen} burnError={burnError} burn={burn} nowMs={nowMs} live={live} />}
         {tab === "quality" && <Quality live={live} />}
-        {tab === "updates" && <Updates screen={screen} build={build} view={mainView} live={live} />}
+        {tab === "updates" && <Updates reload={reload} screen={screen} build={build} view={mainView} live={live} />}
       </PageScroll>
     </main>
   );

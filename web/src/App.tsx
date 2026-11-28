@@ -11,6 +11,7 @@ import { useRecentBurn } from "./burn";
 import { useResourceTracker } from "./prefs";
 import { TextLink } from "./ui/TextLink";
 import { cardPath, navigate, parseRoute } from "./route";
+import { useReload } from "./reload";
 import type { HandView } from "./types";
 import { Dot } from "./ui/Dot";
 
@@ -99,6 +100,7 @@ export function App() {
   const live = state.link === "live";
   const alerts = useNotificationPermission();
   const { burn, error: burnError } = useRecentBurn(live);
+  const reload = useReload(state.screen?.top.phase.is === "reloading");
 
   const onOpenHand = useCallback((hand: HandView) => {
     if (hand.card === null) {
@@ -122,7 +124,7 @@ export function App() {
     page = <Settings
       tab={route.tab} returnPath={returnPath} screen={state.screen} burn={burn} burnError={burnError}
       build={state.build} mainView={state.views.main} nowMs={nowMs} live={live}
-      alerts={alerts} resourcesOn={resourcesOn} setResourcesOn={setResourcesOn}
+      alerts={alerts} resourcesOn={resourcesOn} setResourcesOn={setResourcesOn} reload={reload}
     />;
   } else if (route.page === "project") {
     const board = state.screen.boards.find((b) => b.project === route.project);
@@ -155,6 +157,8 @@ export function App() {
         link={state.link}
         build={state.build}
         route={route}
+        returnPath={returnPath}
+        reload={reload}
         nowMs={nowMs}
         resourcesOn={resourcesOn}
       />

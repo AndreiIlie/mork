@@ -74,3 +74,11 @@ export function ArrowDownIcon() {
 export function Cold({ minutes }: { minutes: number }) {
   return <span className="shrink-0 font-mono text-label-12 tabular-nums text-amber-900">cold in {minutes}m</span>;
 }
+
+export function BackIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M13 8H3M7.5 3.5L3 8l4.5 4.5" />
+    </svg>
+  );
+}

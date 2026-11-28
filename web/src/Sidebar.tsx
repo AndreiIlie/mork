@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { ownHands } from "./alerts";
 import type { Link } from "./bridge";
 import { cardTarget, workingSeats } from "./format";
-import { ChevronIcon, HandIcon, MorkMark, SettingsIcon } from "./icons";
+import { BackIcon, ChevronIcon, HandIcon, MorkMark, SettingsIcon } from "./icons";
 import { closestQuotas } from "./quota";
-import { type Route, PageLink, SETTINGS_PATH, cardPath, projectPath } from "./route";
+import { type Route, PageLink, SETTINGS_PATH, cardPath, projectPath, settingsProjectPath } from "./route";
 import type { BoardView, Screen, Share } from "./types";
 import { Dot, StatusDot } from "./ui/Dot";
 import { ProgressBar } from "./ui/ProgressBar";
+import { Button } from "./ui/Button";
+import { RefusalLine } from "./offers";
+import type { Reload } from "./reload";
 
 const LINK_WORDS: Record<Link, string> = { live: "Connected", connecting: "Connecting…", reconnecting: "Reconnecting…", disconnected: "Disconnected" };
 const LINK_DOT = { live: "green", connecting: "yellow", reconnecting: "yellow", disconnected: "grey" } as const;
@@ -83,7 +86,47 @@ function ProjectTree({ board, screen, route }: { board: BoardView; screen: Scree
   );
 }
 
-export function Sidebar({ screen, link, build, route, nowMs, resourcesOn }: {
+const NAV_ITEM = "flex h-8 items-center gap-2 px-edge text-label-13 transition-colors";
+const NAV_ON = "bg-gray-200 font-medium text-gray-1000";
+const NAV_OFF = "text-gray-900 hover:bg-gray-100 hover:text-gray-1000";
+
+function NavItem({ to, on, children }: { to: string; on: boolean; children: ReactNode }) {
+  return <PageLink to={to} current={on} className={`${NAV_ITEM} ${on ? NAV_ON : NAV_OFF}`}><span className="flex min-w-0 flex-1 items-center gap-2">{children}</span></PageLink>;
+}
+
+function NavGroup({ label, children }: { label: string; children: ReactNode }) {
+  return <div className="pb-3"><div className="px-edge pb-1 pt-3 text-label-12 text-gray-700">{label}</div>{children}</div>;
+}
+
+function SettingsNav({ route, projects }: { route: Extract<Route, { page: "settings" }>; projects: string[] }) {
+  const { tab, project } = route;
+  return (
+    <nav aria-label="Settings" className="min-h-0 flex-1 overflow-y-auto">
+      <NavGroup label="Settings">
+        <NavItem to={SETTINGS_PATH.general} on={tab === "general"}>General</NavItem>
+        <PageLink to={SETTINGS_PATH.projects} className={`${NAV_ITEM} ${tab === "projects" ? "text-gray-1000" : NAV_OFF}`}>Projects</PageLink>
+        {projects.map((p) => (
+          <PageLink key={p} to={settingsProjectPath(p)} current={tab === "projects" && project === p} className={`flex h-8 items-center pl-[calc(var(--spacing-edge)+16px)] pr-edge text-label-12 transition-colors ${tab === "projects" && project === p ? NAV_ON : NAV_OFF}`}>
+            <span className="truncate">{p}</span>
+          </PageLink>
+        ))}
+        <NavItem to={SETTINGS_PATH.seats} on={tab === "seats"}>Seats</NavItem>
+        <NavItem to={SETTINGS_PATH.system} on={tab === "system"}>System</NavItem>
+      </NavGroup>
+      <NavGroup label="Reports">
+        <NavItem to={SETTINGS_PATH.usage} on={tab === "usage"}>Usage</NavItem>
+        <NavItem to={SETTINGS_PATH.quality} on={tab === "quality"}>Quality</NavItem>
+      </NavGroup>
+      <NavGroup label="Mork">
+        <NavItem to={SETTINGS_PATH.updates} on={tab === "updates"}>Updates</NavItem>
+      </NavGroup>
+    </nav>
+  );
+}
+
+export function Sidebar({ screen, link, build, route, returnPath, reload, nowMs, resourcesOn }: {
+  returnPath: string;
+  reload: Reload;
   screen: Screen | null;
   link: Link;
   build: string | null;
@@ -96,24 +139,37 @@ export function Sidebar({ screen, link, build, route, nowMs, resourcesOn }: {
   const updateReady = screen?.top.pin?.ready;
   const onConsole = route.page === "console";
   const onSettings = route.page === "settings";
+  const handsMark = hands.length > 0 && (
+    <span title={`${hands.length} raised hands`} className="ml-auto flex items-center gap-1.5 text-gray-1000">
+      <HandIcon className="h-3 w-3" />
+      <span className="font-mono text-label-12 font-medium tabular-nums">{hands.length}</span>
+    </span>
+  );
   return (
     <aside className="flex w-[260px] shrink-0 flex-col border-r border-gray-400 bg-background-100">
-      <PageLink to="/" className={`flex h-12 shrink-0 items-center gap-[10px] border-b border-gray-400 px-edge transition-colors ${onConsole ? "bg-gray-200" : "hover:bg-gray-100"}`}>
-        <MorkMark />
-        <span className="text-heading-14 text-gray-1000">Mork</span>
-        {hands.length > 0 && (
-          <span title={`${hands.length} raised hands`} className="ml-auto flex items-center gap-1.5 text-gray-1000">
-            <HandIcon className="h-3 w-3" />
-            <span className="font-mono text-label-12 font-medium tabular-nums">{hands.length}</span>
-          </span>
-        )}
-      </PageLink>
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {screen?.boards.map((b) => (
-          <ProjectTree key={b.project} board={b} screen={screen} route={route} />
-        ))}
-      </div>
+      {onSettings ? (
+        <>
+          <PageLink to={returnPath} className="flex h-12 shrink-0 items-center gap-[10px] border-b border-gray-400 px-edge text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-1000">
+            <BackIcon />
+            <span className="text-label-14">Back</span>
+            {handsMark}
+          </PageLink>
+          <SettingsNav route={route} projects={screen?.boards.map((b) => b.project) ?? []} />
+        </>
+      ) : (
+        <>
+          <PageLink to="/" className={`flex h-12 shrink-0 items-center gap-[10px] border-b border-gray-400 px-edge transition-colors ${onConsole ? "bg-gray-200" : "hover:bg-gray-100"}`}>
+            <MorkMark />
+            <span className="text-heading-14 text-gray-1000">Mork</span>
+            {handsMark}
+          </PageLink>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {screen?.boards.map((b) => (
+              <ProjectTree key={b.project} board={b} screen={screen} route={route} />
+            ))}
+          </div>
+        </>
+      )}
 
       {resourcesOn && resources && (
         <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-t border-gray-400 px-edge text-label-12 text-gray-700">
@@ -133,15 +189,22 @@ export function Sidebar({ screen, link, build, route, nowMs, resourcesOn }: {
         </div>
       )}
 
-      <PageLink to={SETTINGS_PATH.general} className={`flex h-11 shrink-0 items-center gap-2 border-t border-gray-400 px-edge text-label-14 transition-colors ${onSettings ? "bg-gray-200 font-medium text-gray-1000" : "text-gray-900 hover:bg-gray-100 hover:text-gray-1000"}`}>
-        <SettingsIcon />
-        <span>Settings</span>
-        {updateReady ? (
-          <span className="ml-auto text-label-12 font-normal text-gray-1000">Update ready</span>
-        ) : (
-          <span className="ml-auto font-mono text-label-12 font-normal text-gray-700">{build === null ? "offline" : build.slice(0, 8)}</span>
+      <RefusalLine refusal={reload.refusal("rail")} className="shrink-0 border-t border-gray-400 px-edge py-2" />
+      <div className={`flex h-11 shrink-0 items-center border-t border-gray-400 transition-colors ${onSettings ? "bg-gray-200" : "hover:bg-gray-100"}`}>
+        <PageLink to={SETTINGS_PATH.general} className={`flex h-full min-w-0 flex-1 items-center gap-2 px-edge text-label-14 ${onSettings ? "font-medium text-gray-1000" : "text-gray-900 hover:text-gray-1000"}`}>
+          <SettingsIcon />
+          <span>Settings</span>
+          {!updateReady && <span className="ml-auto font-mono text-label-12 font-normal text-gray-700">{build === null ? "offline" : build.slice(0, 8)}</span>}
+        </PageLink>
+        {updateReady && (
+          <span className="shrink-0 pr-edge">
+            <Button tier="secondary" size="sm" title={`Reload Mork to ${screen?.top.pin?.pin ?? "its pinned build"}`}
+              disabled={link !== "live" || reload.busy} onClick={() => reload.press("rail")}>
+              Reload
+            </Button>
+          </span>
         )}
-      </PageLink>
+      </div>
     </aside>
   );
 }
