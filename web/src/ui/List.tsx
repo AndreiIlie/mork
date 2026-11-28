@@ -18,9 +18,14 @@ export type RowIndent = keyof typeof INDENT;
 const DIVIDERS = "divide-y divide-gray-400";
 const TABLE_CELL = "whitespace-nowrap px-3 first:pl-edge last:pr-edge";
 
+export interface TableColumn {
+  label: string;
+  kind?: "identity" | "number";
+}
+
 interface TableHead {
   label: string;
-  columns: readonly string[];
+  columns: readonly TableColumn[];
 }
 
 /** A bordered list whose tabular rows share column widths with their header. */
@@ -31,11 +36,11 @@ export function List({ children, table }: { children: ReactNode; table?: TableHe
         <div className="overflow-x-auto">
           <table aria-label={table.label} className="w-full text-left text-label-13">
             <thead>
-              <tr>{table.columns.map(label => (
-                <th key={label} scope="col" className={`${TABLE_CELL} py-2 text-gray-700`}>{label}</th>
+              <tr>{table.columns.map(({ label, kind }) => (
+                <th key={label} scope="col" className={`${TABLE_CELL} py-2 font-normal text-gray-700 ${kind === "number" ? "text-right" : ""} ${kind === "identity" ? "w-[300px]" : ""}`}>{label}</th>
               ))}</tr>
             </thead>
-            <tbody className={DIVIDERS}>{children}</tbody>
+            <tbody className={`${DIVIDERS} border-t border-gray-400`}>{children}</tbody>
           </table>
         </div>
       ) : children}
@@ -60,11 +65,11 @@ export interface RowProps {
 }
 
 /** A row is plain, a button (`onClick`) or a link (`to`); `actions` sit beside the trigger, never inside it. */
-export function Row(props: RowProps | { cells: readonly (string | number)[] }) {
+export function Row(props: RowProps | { cells: readonly ReactNode[]; columns: readonly TableColumn[] }) {
   if ("cells" in props) {
     return (
       <tr>{props.cells.map((cell, i) => (
-        <td key={i} className={`${TABLE_CELL} py-3 tabular-nums`}>{cell}</td>
+        <td key={i} className={`${TABLE_CELL} py-3 ${props.columns[i].kind === "number" ? "text-right font-mono tabular-nums" : ""}`}>{cell}</td>
       ))}</tr>
     );
   }

@@ -108,7 +108,7 @@ export function Console({ screen, burn, burnError, nowMs, live }: {
           <RefusalLine refusal={burnError} className="mb-3" />
           <KpiStrip items={figures(screen, burn)} />
           {hands.length > 0 && <RaisedHands hands={hands} nowMs={nowMs} live={live} />}
-          {days.length > 0 && <SpendChart days={days} tzOffsetMin={screen.tz_offset_min} />}
+          {days.length > 0 && <div className="mt-gutter"><SpendChart days={days} tzOffsetMin={screen.tz_offset_min} /></div>}
         </PageScroll>
       )}
       {result && <CommandResult result={result} close={() => setResult(null)} />}

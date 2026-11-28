@@ -61,7 +61,7 @@ export function SpendChart({ days, tzOffsetMin }: { days: DayBurn[]; tzOffsetMin
   const labels = days.map((d) => ({ full: dayLabel(d, tzOffsetMin), short: shortDayLabel(d, tzOffsetMin) }));
 
   return (
-    <section className="mt-gutter border border-gray-400 px-edge py-3">
+    <section className="border border-gray-400 px-edge py-3">
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
         <h2 className="text-heading-14 text-gray-1000">Daily Spend & Landed Cards</h2>
         <span className="text-label-12 text-gray-700">Last 14 days · bars are dollars, numbers are cards landed</span>
@@ -99,7 +99,7 @@ export function SpendChart({ days, tzOffsetMin }: { days: DayBurn[]; tzOffsetMin
 
 function PromptCacheHit({ burn }: { burn: RecentBurn | null }) {
   return (
-    <section className="mt-gutter">
+    <section>
       <SectionHead title="Prompt Cache Hit" right={<span className="text-label-12 text-gray-700">Last 7 days</span>} />
       {burn === null || burn.cache_by_model.length === 0 ? (
         <p className="text-label-13 text-gray-700">{burn === null ? "Loading…" : "?"}</p>
@@ -268,12 +268,14 @@ export function Usage({
   return (
     <>
       <RefusalLine refusal={burnError} className="mb-3" />
-      <KpiStrip items={kpis(burn, screen.top.usage, nowMs)} />
-      <PromptCacheHit burn={burn} />
-      {days.length > 0 && <SpendChart days={days} tzOffsetMin={screen.tz_offset_min} />}
-      <div className="mt-gutter grid grid-cols-1 gap-gutter xl:grid-cols-2">
-        <AccountQuotas shares={screen.top.usage} nowMs={nowMs} live={live} />
-        <BurnByRole burn={burn} />
+      <div className="flex flex-col gap-8">
+        <KpiStrip items={kpis(burn, screen.top.usage, nowMs)} />
+        <div className="grid grid-cols-1 gap-gutter xl:grid-cols-2">
+          <AccountQuotas shares={screen.top.usage} nowMs={nowMs} live={live} />
+          <BurnByRole burn={burn} />
+        </div>
+        {days.length > 0 && <SpendChart days={days} tzOffsetMin={screen.tz_offset_min} />}
+        <PromptCacheHit burn={burn} />
       </div>
     </>
   );
