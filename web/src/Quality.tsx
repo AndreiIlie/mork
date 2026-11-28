@@ -11,13 +11,17 @@ import { SettingsPage } from "./settings/Page";
 
 const whole = new Intl.NumberFormat("en-US");
 
+function formatPercent(value: number | null): string {
+  return value === null ? "?" : value.toFixed(1) + "%";
+}
+
 function percent(part: number, total: number): string {
-  return total === 0 ? "?" : ((part * 100) / total).toFixed(1) + "%";
+  return formatPercent(total === 0 ? null : (part * 100) / total);
 }
 
 function Rate({ value, part, total }: { value: number | null; part: number; total: number }) {
   return <span className="font-mono tabular-nums">
-    <span className="text-gray-1000">{value === null ? "?" : value.toFixed(1) + "%"}</span>
+    <span className="text-gray-1000">{formatPercent(value)}</span>
     <span className="ml-2 inline-block min-w-[64px] text-left text-gray-700">{whole.format(part)}/{whole.format(total)}</span>
   </span>;
 }
@@ -122,7 +126,7 @@ export function Quality({ live }: { live: boolean }) {
         columns={[{ label: "Seat", kind: "identity" }, ...numericColumns("Turns", "Calls", "Failed", "Failure rate")]}
         rows={tools.map(({ group: g, counts: c }) => [
           <SeatIdentity role={g.role} model={g.model} effort={g.effort} />, whole.format(c.turns), whole.format(c.calls), whole.format(c.failed),
-          <span className="text-gray-1000">{c.percent === null ? "?" : c.percent.toFixed(1) + "%"}</span>])} />
+          <span className="text-gray-1000">{formatPercent(c.percent)}</span>])} />
     </SettingsPage>
   );
 }

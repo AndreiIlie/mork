@@ -4,7 +4,7 @@ export interface Kpi {
   sub: string;
 }
 
-/** The strip of figures that heads the Console and Usage. */
+/** Shows summary figures in equal columns, with an odd final figure spanning both columns on narrow screens. */
 export function KpiStrip({ items }: { items: Kpi[] }) {
   const columns = items.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4";
   return (
