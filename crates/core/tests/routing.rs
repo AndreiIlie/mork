@@ -40,6 +40,52 @@ fn routes<'a>(sim: &'a Sim, key: &str) -> Vec<&'a Value> {
     sim.journal.iter().filter(|(_, k, _, d)| k == "route" && d["agent"] == key).map(|r| &r.3).collect()
 }
 
+fn partner_history(builders: [&str; 2], solo_wins: usize) -> mork_types::routing::Statistics {
+    use mork_core::views::quality::{Event, History};
+    use std::collections::BTreeMap;
+
+    let mut cards = BTreeMap::new();
+    let mut seq = 0;
+    let mut event = |kind: &str, data: Value| {
+        seq += 1;
+        Event { seq, time: 0, kind: kind.into(), data }
+    };
+    let planners = [OPUS, "claude-fable-5-2"];
+    let partnered = builders.into_iter().enumerate().flat_map(|(b, builder)| {
+        planners.into_iter().enumerate().map(move |(p, planner)| (builder, Some(planner), b != p))
+    });
+    let solo = std::iter::repeat_n((builders[0], None, true), solo_wins);
+    for (i, (builder, planner, first_pass)) in partnered.chain(solo).enumerate() {
+        let id = format!("card-{i}");
+        let mut rows = vec![event("card.start", json!({"mode":"full"}))];
+        if let Some(planner) = planner {
+            let key = format!("{id}/planner");
+            rows.push(event("cost", json!({"agent":key,"cli":"claude","model":planner,"effort":"high","ran":true})));
+            rows.push(event("reply", json!({"agent":key,"outcome":"brief-ready"})));
+        }
+        rows.push(event("brief.approved", json!({})));
+        let key = format!("{id}/foreman");
+        rows.push(event(
+            "cost",
+            json!({"agent":key,"job":"build","cli":"codex","model":builder,"effort":"high","ran":true}),
+        ));
+        rows.push(event("build.requested", json!({"job":"build"})));
+        rows.push(event("build.submitted", json!({"head":"abc"})));
+        let mut review = vec![
+            event("card.start", json!({"mode":"review","of":id})),
+            event("review.asked", json!({"n":1,"submitted":"abc"})),
+            event("review.verdict", json!({"n":1})),
+        ];
+        if !first_pass {
+            review.push(event("review.verdict", json!({"n":2})));
+        }
+        rows.push(event("merge.tested", json!({})));
+        cards.insert(format!("{id}-review"), History { rows: review, ..History::default() });
+        cards.insert(id, History { rows, project: "web".into(), ..History::default() });
+    }
+    mork_core::routing::observe::aggregate(0, &cards)
+}
+
 #[test]
 fn start_routes_once_and_explicit_selections_win() {
     let key = "web-1/planner";
@@ -170,10 +216,15 @@ fn price_exploration_and_partner_history_change_the_winning_model() {
     let ordinary = choose(&stats, &req);
     assert!(ordinary.candidates.iter().all(|c| c.offer.open && c.offer.spare == 0));
     assert_eq!(ordinary.best().unwrap().offer.model, SOL);
-    stats
-        .partners
-        .insert(("foreman.work".into(), expensive.into(), OPUS.into()), Estimate { sum: 1000.0, weight: 1000.0 });
+    let partnered = partner_history([SOL, expensive], 0);
+    let with_solo = partner_history([SOL, expensive], 8);
+    assert_eq!(with_solo.outcomes[&quality][&arm(SOL)].global.sum, 9.0);
+    assert_eq!(with_solo.partners.len(), 4);
+    assert_eq!(partnered.partners, with_solo.partners);
+    stats.partners = with_solo.partners;
     let paired = choose(&stats, &Request { partner: Some(OPUS), ..req });
+    assert_eq!(paired.candidates[0].synergy, -0.0625);
+    assert_eq!(paired.candidates[1].synergy, 0.0625);
     assert_eq!(paired.best().unwrap().offer.model, expensive);
 }
 

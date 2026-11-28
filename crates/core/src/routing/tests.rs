@@ -56,6 +56,45 @@ fn history(mode: &str, rows: Vec<(i64, &str, Value)>) -> History {
     }
 }
 
+#[test]
+fn sparse_partners_and_shared_difficulty_have_zero_synergy() {
+    let mut counts = BTreeMap::new();
+    for (model, partner, wins, weight) in [
+        ("astra", "fable", 1.0, 19.0),
+        ("neon", "fable", 8.0, 20.0),
+        ("sol", "fable", 3.0, 15.0),
+        ("sol", "opus", 12.0, 24.0),
+    ] {
+        counts.insert((model.to_owned(), partner.to_owned()), Estimate { sum: wins, weight });
+    }
+    assert!(super::posterior::fit_partners(counts.clone()).all(|(_, e)| e.synergy == 0.0));
+
+    // Opus lifts both Sol and Neon by 0.3, with different amounts of evidence.
+    counts.insert(("neon".into(), "opus".into()), Estimate { sum: 7.0, weight: 10.0 });
+    assert!(super::posterior::fit_partners(counts).all(|(_, e)| e.synergy == 0.0));
+}
+
+#[test]
+fn uneven_pair_weights_center_both_margins_before_shrinkage() {
+    let mut counts = BTreeMap::new();
+    let mut expected = BTreeMap::new();
+    for (model, partner, weight, baseline, shift, excess) in [
+        ("a", "x", 10.0, 0.6, -0.2, 1.0),
+        ("a", "y", 20.0, 0.6, 0.1, -3.0),
+        ("a", "z", 25.0, 0.6, 0.0, 2.0),
+        ("b", "x", 70.0, 0.4, -0.2, -1.0),
+        ("b", "y", 15.0, 0.4, 0.1, 3.0),
+        ("b", "z", 8.0, 0.4, 0.0, -2.0),
+    ] {
+        let key = (model.to_owned(), partner.to_owned());
+        expected.insert(key.clone(), excess / (weight + 7.0));
+        counts.insert(key, Estimate { sum: (baseline + shift) * weight + excess, weight });
+    }
+    for (key, effect) in super::posterior::fit_partners(counts) {
+        assert!((effect.synergy - expected[&key]).abs() < 1e-12, "{key:?}");
+    }
+}
+
 fn cost(id: &str, job: &str, model: &str, delta: u64) -> Value {
     let arm = arm(model);
     json!({"agent":id,"job":job,"cli":arm.cli,"model":model,"effort":"high","ran":true,"by":"mork.toml","delta":delta})

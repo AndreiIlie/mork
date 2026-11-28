@@ -36,10 +36,8 @@ pub fn answer(config: &Config, inputs: &Inputs<'_>, stats: &Statistics) -> Value
     let synergy: Vec<_> = stats
         .partners
         .iter()
-        .map(|((role, model, partner), rate)| {
-            let population = Population { stats, role, mean_index: 1.0 };
-            let effect = population.synergy(model, Some(partner));
-            json!({"role":role, "model":model, "partner":partner, "weight":rate.weight, "synergy":effect})
+        .map(|((role, model, partner), effect)| {
+            json!({"role":role, "model":model, "partner":partner, "weight":effect.weight, "synergy":effect.synergy})
         })
         .collect();
     let picks: Vec<_> = stats.recent.iter().map(|(_, row)| row).collect();

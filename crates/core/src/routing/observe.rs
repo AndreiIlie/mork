@@ -4,7 +4,7 @@ mod seats;
 use std::collections::BTreeMap;
 
 use mork_types::config::{Cli, Effort};
-use mork_types::routing::{Arm, Metric, Statistics};
+use mork_types::routing::{Arm, Estimate, Metric, Statistics};
 
 use super::{HALF_LIFE, PLANNER, WINDOW};
 use crate::views::quality::{Event, History, runs};
@@ -32,6 +32,7 @@ fn ran(row: &Event) -> bool {
 struct Observer {
     now: i64,
     stats: Statistics,
+    pair_counts: BTreeMap<String, BTreeMap<(String, String), Estimate>>,
 }
 
 impl Observer {
@@ -48,9 +49,10 @@ impl Observer {
 
     fn pair(&mut self, role: &str, arm: &Arm, partner: Option<&str>, sum: f64, weight: f64) {
         if let Some(partner) = partner.filter(|_| weight > 0.0) {
-            self.stats
-                .partners
-                .entry((role.to_owned(), arm.model.clone(), partner.to_owned()))
+            self.pair_counts
+                .entry(role.to_owned())
+                .or_default()
+                .entry((arm.model.clone(), partner.to_owned()))
                 .or_default()
                 .add(sum, weight);
         }
@@ -59,7 +61,7 @@ impl Observer {
 
 /// Builds a snapshot from complete, sequenced histories for outcomes in the observation window.
 pub fn aggregate(now: i64, cards: &BTreeMap<String, History>) -> Statistics {
-    let mut obs = Observer { now, stats: Statistics::default() };
+    let mut obs = Observer { now, stats: Statistics::default(), pair_counts: BTreeMap::new() };
     let mut partners = BTreeMap::new();
     runs::with_runs(cards, |id, run, reviews| {
         let asked = reviews.iter().copied().filter(|r| r.kind == "review.asked");
@@ -84,6 +86,11 @@ pub fn aggregate(now: i64, cards: &BTreeMap<String, History>) -> Statistics {
         reviewers::collect(&mut obs, card, &partners, &mut rounds);
     }
     reviewers::catch(&mut obs, &rounds);
+    for (role, counts) in obs.pair_counts {
+        for ((model, partner), effect) in super::posterior::fit_partners(counts) {
+            obs.stats.partners.insert((role.clone(), model, partner), effect);
+        }
+    }
     obs.stats
 }
 

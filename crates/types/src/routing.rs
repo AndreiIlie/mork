@@ -35,10 +35,16 @@ pub struct Levels {
     pub leaves: BTreeMap<String, Estimate>,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct PartnerEffect {
+    pub synergy: f64,
+    pub weight: f64,
+}
+
 #[derive(Debug, Default)]
 pub struct Statistics {
     pub outcomes: BTreeMap<(String, Metric), BTreeMap<Arm, Levels>>,
-    pub partners: BTreeMap<(String, String, String), Estimate>,
+    pub partners: BTreeMap<(String, String, String), PartnerEffect>,
     pub recent: Vec<(i64, Value)>,
     pub shadow: BTreeMap<String, [usize; 2]>,
 }
