@@ -112,7 +112,10 @@ mod tests {
         assert_eq!(read_body("/cards/ex-583.1"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
         assert_eq!(read_body("/cards/pr-example.com-123"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
         assert_eq!(read_body("/projects/homefile.ro"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
-        assert_eq!(read_body("/settings/projects/homefile.ro"), Some(("<h1>app</h1>".into(), "text/html; charset=utf-8")));
+        assert_eq!(
+            read_body("/settings/projects/homefile.ro"),
+            Some(("<h1>app</h1>".into(), "text/html; charset=utf-8"))
+        );
         assert_eq!(read_body("/projects/a/b.js"), None);
         assert_eq!(read_body("/cards/a/b.js"), None);
         assert_eq!(read_body("/assets/missing.js"), None);
