@@ -122,7 +122,7 @@ export function App() {
   if (state.screen === null) page = <Waiting state={state} />;
   else if (route.page === "settings") {
     page = <Settings
-      tab={route.tab} returnPath={returnPath} screen={state.screen} burn={burn} burnError={burnError}
+      key={route.tab} tab={route.tab} project={route.project} returnPath={returnPath} screen={state.screen} burn={burn} burnError={burnError}
       build={state.build} mainView={state.views.main} nowMs={nowMs} live={live}
       alerts={alerts} resourcesOn={resourcesOn} setResourcesOn={setResourcesOn} reload={reload}
     />;

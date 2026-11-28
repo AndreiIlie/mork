@@ -7,15 +7,26 @@ import { List, Row } from "../ui/List";
 import { SectionHead } from "../ui/Section";
 import { TextInput } from "../ui/TextInput";
 
-export function Section({ title, note, editor, children }: { title: string; note?: string; editor: Editor; children: ReactNode }) {
-  return <fieldset disabled={editor.busy} className="mb-gutter min-w-0">
-    <SectionHead title={title} note={note} right={editor.dirty && <>
-      <span className="text-label-12 text-gray-700">Unsaved changes</span>
-      <Button tier="ghost" size="sm" onClick={editor.discard}>Discard</Button>
-      <Button tier="primary" size="sm" onClick={editor.save}>Save</Button>
-    </>} />
-    <RefusalLine refusal={editor.refusal || null} className="mb-2" />
+export function Group({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+  return <section className="mb-8 min-w-0">
+    <SectionHead title={title} note={note} />
     <List>{children}</List>
+  </section>;
+}
+
+export function SaveBar({ editor, locked = false }: { editor: Editor; locked?: boolean }) {
+  return <>
+    <span className="text-label-12 text-gray-700">Unsaved changes</span>
+    <Button tier="ghost" size="sm" disabled={editor.busy || locked} onClick={editor.discard}>Discard</Button>
+    <Button tier="primary" size="sm" disabled={editor.busy || locked} onClick={editor.save}>Save</Button>
+  </>;
+}
+
+export function Section({ title, note, editor, children }: { title: string; note?: string; editor: Editor; children: ReactNode }) {
+  return <fieldset disabled={editor.busy} className="mb-8 min-w-0">
+    <SectionHead title={title} note={note} right={editor.dirty ? <SaveBar editor={editor} /> : undefined} />
+    <RefusalLine refusal={editor.refusal || null} className="mb-2" />
+    {children}
   </fieldset>;
 }
 
@@ -24,6 +35,10 @@ function SettingText({ title, words }: { title: string; words: string }) {
     <div className="text-label-14 text-gray-1000">{title}</div>
     <div className="mt-0.5 text-label-12 text-gray-700">{words}</div>
   </div>;
+}
+
+export function Labelled({ label, children }: { label: string; children: ReactNode }) {
+  return <Row><span className="w-[144px] shrink-0 text-label-14 text-gray-1000">{label}</span>{children}</Row>;
 }
 
 export function Setting({ title, words, children }: { title: string; words: string; children?: ReactNode }) {

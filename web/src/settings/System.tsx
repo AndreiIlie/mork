@@ -1,4 +1,5 @@
 import type { Editor } from "../config";
+import { List } from "../ui/List";
 import { Entries, Field, Section, Setting } from "./Fields";
 
 const limits = [
@@ -14,13 +15,15 @@ const resources = [
 
 export function SystemSettings({ editor }: { editor: Editor }) {
   if (editor.section.section === "reach") return <Section title="Wall reach" note="every project's walls" editor={editor}>
-    <Entries editor={editor} name="domains" title="Domains" words="Hosts every walled turn reaches through the proxy." placeholder="api.example.com or api.example.com:8443" />
-    <Entries editor={editor} name="ports" title="Ports" words="Outbound ports for install, build and probe jobs." placeholder="8443" />
+    <List>
+      <Entries editor={editor} name="domains" title="Domains" words="Hosts every walled turn reaches through the proxy." placeholder="api.example.com or api.example.com:8443" />
+      <Entries editor={editor} name="ports" title="Ports" words="Outbound ports for install, build and probe jobs." placeholder="8443" />
+    </List>
   </Section>;
   const slice = editor.section.section === "slice";
   return <Section title={slice ? "Job resources" : "Limits"} note={slice ? "applies at the next reload" : undefined} editor={editor}>
-    {(slice ? resources : limits).map(([key, title, words]) => <Setting key={key} title={title} words={words}>
+    <List>{(slice ? resources : limits).map(([key, title, words]) => <Setting key={key} title={title} words={words}>
       <Field editor={editor} name={key} label={title} width={key === "context_cap" ? "md" : "sm"} />
-    </Setting>)}
+    </Setting>)}</List>
   </Section>;
 }
